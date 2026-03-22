@@ -8,6 +8,7 @@
 .toolbar-content {
   display: flex;
   padding: 0 10px;
+  gap: 0.5rem;
 }
 
 .toolbar-wrapper {
@@ -22,6 +23,7 @@
 
 .toolbar-wrapper.mod-right {
   justify-content: flex-end;
+  gap: 0.5rem;
 }
 
 .parsha-title {
@@ -33,20 +35,14 @@
   direction: rtl;
 }
 
+.toolbar-button {
+  font-size: 0.9rem;
+}
+
 .parsha-title:hover {
   background-color: var(--medium-accent-color);
 }
 
 .parsha-title:active {
   background-color: var(--heavy-accent-color);
-}
-
-.toolbar-github {
-  vertical-align: middle; /* HACK: https://stackoverflow.com/a/27999850/2374361 */
-}
-
-@media (prefers-color-scheme: dark) {
-  .toolbar-github {
-    filter: invert();
-  }
 }

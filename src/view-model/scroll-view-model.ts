@@ -11,7 +11,7 @@ import {
 } from '../calendar-model/model-types.ts'
 import IntegerIterator from '../integer-iterator.ts'
 import { HDate } from '@hebcal/hdate'
-import { containsRef } from '../calendar-model/ref-utils.ts'
+import { compareRefs, containsRef } from '../calendar-model/ref-utils.ts'
 import {
   fromISODateString,
   last,
@@ -24,6 +24,7 @@ import { loadScroll, ScrollResolver } from '../location.ts'
 /** Information to render a single page from a scroll. */
 export interface RenderedPageInfo {
   type: 'page'
+  pageNumber: number
   lines: RenderedLineInfo[]
 }
 
@@ -58,6 +59,8 @@ export interface RenderedLineInfo {
    * This is computed dynamically based on the current leining.
    */
   labels: string[]
+  /** The עליות that begin in this line. */
+  aliyahStarts: LeiningAliyah[]
   /**
    * The LeiningRun containing the first פסוק that begins in this line.
    * May be null for the first lines on a page, if they are part of the
@@ -194,20 +197,22 @@ export abstract class ScrollViewModel {
   ): Promise<number>
 
   private async fetchPage(contentIndex: number): Promise<RenderedEntry | null> {
-    const pageNumber = await this.pageNumberFromContentIndex(contentIndex)
-    if (typeof pageNumber === 'object') return pageNumber
-    if (!pageNumber || pageNumber <= 0) return null
+    const pageNumberEntry = await this.pageNumberFromContentIndex(contentIndex)
+    if (typeof pageNumberEntry === 'object') return pageNumberEntry
+    if (!pageNumberEntry || pageNumberEntry <= 0) return null
 
 
     let page: { default: LineType[] }
     if (import.meta.env?.MODE)
       // Vite dynamic imports doesn't support the second parameter
       page = await import(
-        `../data/pages/${this.relevantRuns[0].scroll}/${pageNumber}.json`
+        /* @vite-ignore */
+        `../data/pages/${this.relevantRuns[0].scroll}/${pageNumberEntry}.json`
       )
     else
       page = await import(
-        `../data/pages/${this.relevantRuns[0].scroll}/${pageNumber}.json`,
+        /* @vite-ignore */
+        `../data/pages/${this.relevantRuns[0].scroll}/${pageNumberEntry}.json`,
         // Node.js requires the second parameter.
         { with: { type: 'json' } }
       )
@@ -219,16 +224,23 @@ export abstract class ScrollViewModel {
       const verses = rawLine.verses.map(toRef)
 
       if (verses.length) [run, aliyot] = this.findContainingAliyot(verses, run)
+      const aliyahStarts =
+        run?.aliyot.filter(
+          (aliyah) =>
+            aliyah.index &&
+            verses.some((verse) => compareRefs(aliyah.start, verse) === 0)
+        ) ?? []
 
       return {
         ...rawLine,
         verses,
         run,
         aliyot,
+        aliyahStarts,
         labels: labeller.getLabelsForLine(run, verses),
       }
     })
-    return { type: 'page', lines }
+    return { type: 'page', pageNumber: pageNumberEntry, lines }
   }
 
   private findContainingAliyot(

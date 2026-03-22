@@ -1,5 +1,10 @@
 import test from 'ava'
-import { generateUrl, parseUrl } from './url-parser.ts'
+import {
+  AppRoute,
+  generateAboutUrl,
+  generateUrl,
+  parseUrl,
+} from './url-parser.ts'
 import { ScrollViewModel } from '../scroll-view-model.ts'
 import { renderLine } from '../test-utils.ts'
 import { LeiningGenerator } from '../../calendar-model/generator.ts'
@@ -37,45 +42,54 @@ test('Next', (t) => {
   t.truthy(parseUrl(generator, '/next'))
 })
 
+test('About', (t) => {
+  t.deepEqual(parseUrl(generator, '/about'), { view: 'about' })
+  t.is(generateAboutUrl(), '#/about')
+})
+
 test('Run ID for פרשת נצבים', async (t) => {
   t.snapshot(
     await renderStartingLine(
-      parseUrl(generator, '/run/2025-09-20:shacharis,main')
+      toModel(parseUrl(generator, '/run/2025-09-20:shacharis,main'))
     )
   )
 })
 test('Run ID for אסתר', async (t) => {
   t.snapshot(
     await renderStartingLine(
-      parseUrl(generator, '/run/2025-03-14:megillah,megillah')
+      toModel(parseUrl(generator, '/run/2025-03-14:megillah,megillah'))
     )
   )
 })
 
 test('Valid location reference in במדבר', async (t) => {
-  t.snapshot(await renderStartingLine(parseUrl(generator, '/r/4-13-1')))
+  t.snapshot(
+    await renderStartingLine(toModel(parseUrl(generator, '/r/4-13-1')))
+  )
 })
 
 test('Trailing slash okay', async (t) => {
   t.is(
-    await renderStartingLine(parseUrl(generator, '/r/4-13-1/')),
-    await renderStartingLine(parseUrl(generator, '/r/4-13-1'))
+    await renderStartingLine(toModel(parseUrl(generator, '/r/4-13-1/'))),
+    await renderStartingLine(toModel(parseUrl(generator, '/r/4-13-1')))
   )
 })
 
 test('Generated URLs round-trip', async (t) => {
   t.is(
     await renderStartingLine(
-      parseUrl(
+      toModel(
+        parseUrl(
         generator,
         generateUrl(generator.parseId('2025-09-20:shacharis,main')!).replace(
           /^#/,
           ''
         )
       )
+      )
     ),
     await renderStartingLine(
-      parseUrl(generator, '/run/2025-09-20:shacharis,main')
+      toModel(parseUrl(generator, '/run/2025-09-20:shacharis,main'))
     )
   )
 })
@@ -86,4 +100,9 @@ async function renderStartingLine(model: ScrollViewModel | null) {
   const { page, lineNumber } = await model.startingLocation
   if (page.type !== 'page') throw new Error('First page should be a page')
   return renderLine(page.lines[lineNumber - 1])
+}
+
+function toModel(route: AppRoute | null) {
+  if (!route || route.view !== 'reader') return null
+  return route.model
 }

@@ -2,9 +2,22 @@ import { LeiningGenerator } from '../../calendar-model/generator.ts'
 import type { LeiningRun } from '../../calendar-model/model-types.ts'
 import { ScrollViewModel } from '../scroll-view-model.ts'
 
+export type AppRoute =
+  | {
+      view: 'reader'
+      model: ScrollViewModel
+    }
+  | {
+      view: 'about'
+    }
+
 /** Generates a URL that points to the beginning of a specific run. */
 export function generateUrl(run: LeiningRun) {
   return `#/run/${run.id}`
+}
+
+export function generateAboutUrl() {
+  return '#/about'
 }
 
 // TODO(decide): Should we support links to a specific עלייה in a run?
@@ -14,10 +27,11 @@ const pathHandlers: Record<
   (
     generator: LeiningGenerator,
     ...pathParts: string[]
-  ) => ScrollViewModel | null
+  ) => AppRoute | null
 > = {
   run(generator, runId) {
-    return ScrollViewModel.forId(generator, runId)
+    const model = ScrollViewModel.forId(generator, runId)
+    return model ? { view: 'reader', model } : null
   },
   /** Legacy URL: Specifies a ref in חומש. */
   r(generator, ref) {
@@ -26,16 +40,25 @@ const pathHandlers: Record<
 
     if (!book || !chapter || !verse) return null
 
-    return ScrollViewModel.forRef(generator, {
-      scroll: 'torah',
-      b: Number(book),
-      c: Number(chapter),
-      v: Number(verse),
-    })
+    return {
+      view: 'reader',
+      model: ScrollViewModel.forRef(generator, {
+        scroll: 'torah',
+        b: Number(book),
+        c: Number(chapter),
+        v: Number(verse),
+      }),
+    }
   },
   /** Legacy URL: The next leining. */
   next(generator) {
-    return ScrollViewModel.forDate(generator, new Date())
+    return {
+      view: 'reader',
+      model: ScrollViewModel.forDate(generator, new Date()),
+    }
+  },
+  about() {
+    return { view: 'about' }
   },
   // TODO(decide): Should we maintain support for Parsha & Holiday URLs?
 }
@@ -44,7 +67,7 @@ const pathHandlers: Record<
 export function parseUrl(
   generator: LeiningGenerator,
   path: string
-): ScrollViewModel | null {
+): AppRoute | null {
   const [urlType, ...pathParts] = path.split('/').filter((p) => p)
   return pathHandlers[urlType]?.(generator, ...pathParts) ?? null
 }

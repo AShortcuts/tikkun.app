@@ -17,6 +17,7 @@ import { toTitleCase } from '../calendar-model/hebcal-conversions.ts'
 const { htmlToElement } = utils
 
 const dateFormat = Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
+const AVAILABLE_SCROLLS = new Set(['torah', 'esther'])
 
 const Parsha = (leining: LeiningInstance) => `
   <li><a
@@ -155,6 +156,7 @@ export default (generator: LeiningGenerator) => {
   const leinings = generator
     .forEntireChumash(new HDate())
     .flatMap((ld) => ld.leinings)
+    .filter((leining) => AVAILABLE_SCROLLS.has(leining.runs[0].scroll))
 
   const searchEmitter = EventEmitter.new<SearchEmitter>()
   const s = Search({

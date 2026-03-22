@@ -13,9 +13,11 @@ export async function loadScroll(name: ScrollName) {
   let toc
   if (import.meta.env?.MODE)
     // Vite dynamic imports doesn't support the second parameter
-    toc = await import(`./data/tables-of-contents/${name}.json`)
+    toc = await import(
+      /* @vite-ignore */ `./data/tables-of-contents/${name}.json`
+    )
   else
-    toc = await import(`./data/tables-of-contents/${name}.json`, {
+    toc = await import(/* @vite-ignore */ `./data/tables-of-contents/${name}.json`, {
       // Node.js requires the second parameter.
       with: { type: 'json' },
     })

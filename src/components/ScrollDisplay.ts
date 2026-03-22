@@ -24,6 +24,7 @@ export class ScrollDisplay {
   readonly rendered: Promise<HTMLElement>
   /** Resolves after we scroll to the starting line. */
   readonly scrolled: Promise<void>
+  private readonly renderedPages = new Map<number, HTMLElement>()
 
   constructor(readonly viewModel: ScrollViewModel, readonly root: HTMLElement) {
     purgeNode(root)
@@ -73,11 +74,48 @@ export class ScrollDisplay {
         node = renderMessageNode(entry)
       } else {
         node = renderPageNode(entry)
+        this.renderedPages.set(entry.pageNumber, node as HTMLElement)
       }
       this.root.insertAdjacentElement(insertPosition, node)
+      this.root.dispatchEvent(
+        new CustomEvent('page-rendered', {
+          detail: {
+            entry,
+            node,
+          },
+        })
+      )
 
       return node
     }
+  }
+
+  getPageNode(pageNumber: number) {
+    return this.renderedPages.get(pageNumber) ?? null
+  }
+
+  getRenderedPageNumbers() {
+    return [...this.renderedPages.keys()].sort((a, b) => a - b)
+  }
+
+  async ensurePageRendered(pageNumber: number) {
+    if (this.renderedPages.has(pageNumber)) return this.renderedPages.get(pageNumber)!
+
+    let attempts = 0
+    while (!this.renderedPages.has(pageNumber) && attempts < 300) {
+      attempts++
+      const rendered = this.getRenderedPageNumbers()
+      const firstPage = rendered[0]
+      const entry =
+        pageNumber < firstPage
+          ? await this.viewModel.fetchPreviousPage()
+          : await this.viewModel.fetchNextPage()
+      if (!entry) break
+      if (pageNumber < firstPage) this.renderPrevious(entry)
+      else this.renderNext(entry)
+    }
+
+    return this.renderedPages.get(pageNumber) ?? null
   }
 }
 

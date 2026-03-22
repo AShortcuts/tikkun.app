@@ -2,6 +2,7 @@
 import { defineConfig } from 'vite'
 
 export default defineConfig({
+  publicDir: 'static',
   test: {
     // *.vitest.ts runs on Vitest in the browser.
     // *.test.ts runs on Ava in Node.

@@ -1,0 +1,353 @@
+.reader-shell {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr) 92px;
+  min-height: 0;
+}
+
+.reader-main {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+.reader-side {
+  position: relative;
+  min-height: 0;
+}
+
+.reader-side.mod-left {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-left: 0.45rem;
+}
+
+.floating-player {
+  position: sticky;
+  top: 96px;
+  display: flex;
+  flex-direction: column;
+  height: fit-content;
+  gap: 0.45rem;
+  padding: 0.6rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--paper-color) 85%, transparent);
+  box-shadow: 0 10px 25px -18px black;
+  border: 1px solid var(--light-accent-color);
+}
+
+.floating-player-button,
+.toolbar-button,
+.parsha-title,
+.aliyah-audio-button {
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.floating-player-button,
+.toolbar-button {
+  border: none;
+  border-radius: 999px;
+  background: var(--light-accent-color);
+  color: var(--text-color);
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.floating-player-button:hover,
+.toolbar-button:hover {
+  background: var(--medium-accent-color);
+}
+
+.floating-player-button.mod-download {
+  text-align: center;
+}
+
+.reader-progress {
+  position: sticky;
+  top: 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  color: var(--light-text-color);
+}
+
+.reader-progress-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.reader-progress-rail {
+  width: 4px;
+  height: 180px;
+  border-radius: 999px;
+  background: var(--light-accent-color);
+  overflow: hidden;
+}
+
+.reader-progress-fill {
+  width: 100%;
+  height: 0%;
+  background: linear-gradient(
+    180deg,
+    hsl(199, 100%, 82%),
+    dodgerblue
+  );
+  border-radius: inherit;
+  transition: height 0.1s linear;
+}
+
+.reader-progress-percent {
+  font-size: 0.75rem;
+}
+
+.reader-corner-controls {
+  position: fixed;
+  bottom: 1.5em;
+  right: 1.5em;
+  z-index: 40;
+}
+
+.settings-pane {
+  position: fixed;
+  top: 60px;
+  right: 1rem;
+  width: min(320px, calc(100vw - 2rem));
+  max-height: calc(100vh - 80px);
+  overflow: auto;
+  z-index: 120;
+  padding: 1rem;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--paper-color) 92%, transparent);
+  border: 1px solid var(--light-accent-color);
+  box-shadow: 0 18px 50px -32px black;
+}
+
+.settings-pane-header,
+.about-card-header,
+.admin-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.settings-form {
+  margin-top: 1rem;
+}
+
+.settings-field {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--text-color);
+}
+
+.settings-field input,
+.settings-field select {
+  width: 100%;
+}
+
+.settings-number-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.settings-number-input span {
+  color: var(--light-text-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-range-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 4.75rem;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.settings-range-input input[type='number'] {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-field.mod-checkbox {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+}
+
+.admin-panel {
+  position: fixed;
+  left: 1rem;
+  bottom: 1rem;
+  z-index: 120;
+  padding: 0.9rem;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--paper-color) 94%, transparent);
+  border: 1px solid var(--light-accent-color);
+  box-shadow: 0 18px 50px -32px black;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.admin-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.export-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  background: rgba(0, 0, 0, 0.45);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.export-card {
+  width: min(780px, 100%);
+  max-height: 80vh;
+  padding: 1rem;
+  border-radius: 24px;
+  background: var(--paper-color);
+}
+
+.export-card textarea {
+  width: 100%;
+  min-height: 320px;
+  border-radius: 16px;
+  border: 1px solid var(--medium-accent-color);
+  background: color-mix(in srgb, var(--paper-color) 95%, black 5%);
+  color: var(--text-color);
+  padding: 1rem;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.about-route {
+  height: 100%;
+  overflow: auto;
+  min-height: 0;
+}
+
+.about-view {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+.about-hero {
+  padding: 1.5rem 0 0.5rem;
+}
+
+.about-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--light-text-color);
+  font-size: 0.8rem;
+}
+
+.about-title {
+  max-width: 16ch;
+  font-size: clamp(2rem, 4vw, 3.6rem);
+  line-height: 0.95;
+  color: var(--page-ink-color);
+}
+
+.about-copy {
+  max-width: 65ch;
+  color: var(--text-color);
+  line-height: 1.6;
+}
+
+.about-card {
+  background: color-mix(in srgb, var(--paper-color) 92%, transparent);
+  border: 1px solid var(--light-accent-color);
+  border-radius: 24px;
+  padding: 1.25rem;
+}
+
+.about-table-wrap {
+  overflow: auto;
+}
+
+.about-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.about-table th,
+.about-table td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.8rem 0.6rem;
+  border-bottom: 1px solid var(--light-accent-color);
+}
+
+.about-table td[dir='rtl'] {
+  text-align: right;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.18rem 0.65rem;
+  font-size: 0.8rem;
+  background: var(--light-accent-color);
+}
+
+.status-pill.mod-done,
+.status-pill.mod-completed {
+  background: rgba(53, 145, 92, 0.14);
+  color: rgb(53, 145, 92);
+}
+
+.status-pill.mod-in-progress {
+  background: rgba(209, 168, 23, 0.16);
+  color: rgb(154, 113, 10);
+}
+
+.status-pill.mod-queued,
+.status-pill.mod-pending-audio,
+.status-pill.mod-redo-please {
+  background: rgba(42, 89, 166, 0.12);
+  color: rgb(42, 89, 166);
+}
+
+@media screen and (max-width: 900px) {
+  .reader-shell {
+    grid-template-columns: 56px minmax(0, 1fr) 56px;
+  }
+
+  .settings-pane {
+    left: 1rem;
+    right: 1rem;
+    width: auto;
+  }
+}
+
+@media screen and (max-width: 700px) {
+  .reader-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .reader-side.mod-left,
+  .reader-side.mod-right {
+    display: none;
+  }
+
+  .about-view {
+    padding-inline: 0.85rem;
+  }
+}

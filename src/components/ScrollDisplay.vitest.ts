@@ -131,7 +131,7 @@ async function renderRun(runId: string) {
 }
 
 function getAliyahLabel(lineEl: HTMLTableRowElement) {
-  return lineEl.querySelector('[data-target-id="aliyot-range"]')?.textContent
+  return lineEl.querySelector('.aliyah-label-text')?.textContent
 }
 
 function textFromLine(lineEl: HTMLTableRowElement) {

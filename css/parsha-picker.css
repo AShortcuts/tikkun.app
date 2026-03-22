@@ -99,22 +99,26 @@
   max-width: 960px;
   margin-right: auto;
   margin-left: auto;
+  direction: rtl;
 }
 
 .section-heading {
   color: var(--text-color);
   border-bottom: 1px solid var(--medium-accent-color);
-  padding-right: 16px;
+  padding-right: 0;
   padding-bottom: 1em;
   font-size: 3em;
   padding-bottom: 0.2em;
   margin-bottom: 1em;
+  text-align: center;
 }
 
 .parsha-books {
   display: flex;
+  flex-direction: row;
   list-style: none;
   margin-bottom: 3em;
+  justify-content: center;
 }
 
 @media screen and (max-width: 700px) {
@@ -146,6 +150,7 @@
   border-radius: var(--button-border-radius);
   box-sizing: border-box;
   width: 100%;
+  text-align: center;
 }
 
 .parsha-books.mod-emphasize-first-in-group li:first-child > .parsha {

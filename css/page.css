@@ -1,4 +1,13 @@
 .tikkun-page {
+  --indicator-padding-right: 0;
+  --indicator-padding-left: 0;
+  --verse-indicator-right: -6ch;
+  --aliyah-indicator-right: 0;
+  --aliyah-indicator-max-width: 20ch;
+  --aliyah-indicator-transform: translateX(calc(14ch + 100%));
+}
+
+.tikkun-page {
   display: flex;
   justify-content: center;
   font-family: Shlomosemistam;
@@ -12,25 +21,45 @@
 
 @media screen and (max-width: 900px) {
   .tikkun-page {
-    font-size: 0.9em;
+    --verse-indicator-right: -5.25ch;
+    --aliyah-indicator-max-width: 18ch;
+    --aliyah-indicator-transform: translateX(calc(12ch + 100%));
+    font-size: 0.96em;
   }
 }
 
 @media screen and (max-width: 800px) {
   .tikkun-page {
-    font-size: 0.8em;
+    --indicator-padding-right: 11.75ch;
+    --verse-indicator-right: 6.55ch;
+    --aliyah-indicator-right: 0.2ch;
+    --aliyah-indicator-max-width: 10.6ch;
+    --aliyah-indicator-transform: none;
+    font-size: 0.92em;
   }
 }
 
 @media screen and (max-width: 700px) {
   .tikkun-page {
-    font-size: 0.7em;
+    --indicator-padding-right: 9.95ch;
+    --indicator-padding-left: 5.2ch;
+    --verse-indicator-right: 5.35ch;
+    --aliyah-indicator-right: 0.2ch;
+    --aliyah-indicator-max-width: 8.8ch;
+    --aliyah-indicator-transform: none;
+    font-size: 0.87em;
   }
 }
 
 @media screen and (max-width: 600px) {
   .tikkun-page {
-    font-size: 0.6em;
+    --indicator-padding-right: 8.75ch;
+    --indicator-padding-left: 4.6ch;
+    --verse-indicator-right: 4.55ch;
+    --aliyah-indicator-right: 0.2ch;
+    --aliyah-indicator-max-width: 7.6ch;
+    --aliyah-indicator-transform: none;
+    font-size: 0.82em;
   }
 }
 
@@ -61,6 +90,8 @@
   line-height: 100%;
   display: flex;
   justify-content: space-between;
+  padding-left: var(--indicator-padding-left);
+  padding-right: var(--indicator-padding-right);
 }
 
 .line.mod-petucha {
@@ -86,6 +117,23 @@
 
 .fragment {
   width: 100%;
+}
+
+.word {
+  display: inline-block;
+  border-radius: var(--reader-highlight-radius);
+  transition:
+    background-color 0.1s ease,
+    outline 0.1s linear,
+    box-shadow 0.1s ease;
+}
+
+.word.is-active-word {
+  outline: var(--reader-highlight-outline-width) solid
+    var(--reader-highlight-outline-color);
+  background: var(--reader-highlight-fill-tint);
+  box-shadow: 0 0 0 var(--reader-highlight-glow) var(--reader-highlight-fill-tint);
+  outline-offset: var(--reader-highlight-outline-offset);
 }
 
 .tikkun-book.mod-annotations-off .fragment.mod-annotations-on,
@@ -119,16 +167,20 @@
 }
 
 .location-indicator.mod-verses {
-  right: -6ch;
+  right: var(--verse-indicator-right);
   color: var(--verses-color);
 }
 
 .location-indicator.mod-aliyot {
-  right: 0;
+  right: var(--aliyah-indicator-right);
   color: hsla(203, 100%, 50%, 0.75);
-  max-width: 8ch;
-  transform: translateX(calc(9ch + 100%));
+  max-width: var(--aliyah-indicator-max-width);
+  transform: var(--aliyah-indicator-transform);
   text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  align-items: flex-start;
 }
 
 .ktiv-kri {
@@ -137,4 +189,31 @@
   border: 1px solid var(--medium-accent-color);
   border-radius: 8px;
   position: relative;
+}
+
+.aliyah-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 999px;
+  background: var(--light-accent-color);
+  white-space: nowrap;
+}
+
+.aliyah-audio-button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.aliyah-audio-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.aliyah-audio-button.is-active {
+  color: hsl(24, 89%, 48%);
 }

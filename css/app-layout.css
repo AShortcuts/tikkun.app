@@ -1,7 +1,8 @@
 .app {
-  height: 100%;
+  height: var(--app-height, 100vh);
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .app-toolbar {
@@ -9,10 +10,15 @@
   flex-shrink: 0;
   box-shadow: 0 0 8px -4px black;
   padding: 5px 0;
+  position: sticky;
+  top: 0;
+  background: color-mix(in srgb, var(--paper-color) 94%, transparent);
+  backdrop-filter: blur(18px);
   z-index: 100;
 }
 
 .app-body {
-  height: calc(100% - var(--header-height));
+  flex: 1;
+  min-height: 0;
   position: relative;
 }
