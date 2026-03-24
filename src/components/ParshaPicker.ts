@@ -11,8 +11,7 @@ import {
 } from '../calendar-model/model-types.ts'
 import { generateUrl } from '../view-model/navigation/url-parser.ts'
 import { isVezosHabracha } from '../view-model/scroll-view-model.ts'
-import { last } from '../calendar-model/utils.ts'
-import { toTitleCase } from '../calendar-model/hebcal-conversions.ts'
+import renderLeiningTitle from './render-leining-title.ts'
 
 const { htmlToElement } = utils
 
@@ -24,7 +23,7 @@ const Parsha = (leining: LeiningInstance) => `
     class="parsha"
     href="${generateUrl(leining.runs[0])}"
   >
-    ${renderTitle(leining)}
+    ${renderLeiningTitle(leining)}
   </a></li>
   `
 const Book = (book: LeiningInstance[]) => `
@@ -42,7 +41,7 @@ const ComingUpReading = (obj: LeiningInstance, index: number) => {
       <a
         href="${index === 0 ? '#/next' : generateUrl(obj.runs[0])}"
         class="coming-up-button"
-      >${renderTitle(obj, { forCalendar: true })}</a>
+      >${renderLeiningTitle(obj, { forCalendar: true })}</a>
       <time class="coming-up-date">${dateFormat.format(obj.date.date)}</time>
     </div>
   </li>
@@ -62,19 +61,65 @@ const ComingUp = (comingUpReadings: LeiningInstance[]) => `
   </section>
 `
 
-const holidayGroupStarts = ['ראש השנה א׳', 'סוכות א׳', 'שבועות א׳', 'פסח א׳']
+const holidayColumnOrder = ['rosh-hashanah', 'sukkot', 'pesach', 'chanukah'] as const
+
+function holidayColumnFor(leining: LeiningInstance) {
+  const title = leining.date.title.he
+
+  if (
+    title.startsWith('סוכות') ||
+    title.startsWith('הושענא רבה') ||
+    title.startsWith('שמיני עצרת') ||
+    title.startsWith('שמחת תורה')
+  ) {
+    return 'sukkot'
+  }
+
+  if (
+    title.startsWith('פסח') ||
+    title.startsWith('שביעי של פסח') ||
+    title.startsWith('פורים') ||
+    title.startsWith('שושן פורים') ||
+    title.startsWith('שבועות') ||
+    title.startsWith('עשרה בטבת') ||
+    title.startsWith('שבעה עשר בתמוז') ||
+    title.startsWith('צום תמוז') ||
+    title.startsWith('תשעה באב')
+  ) {
+    return 'pesach'
+  }
+
+  if (title.startsWith('חנוכה') || title.startsWith('ראש חודש')) {
+    return 'chanukah'
+  }
+
+  return 'rosh-hashanah'
+}
+
 const groupHolidays = (leinings: LeiningInstance[]) => {
-  const groups: LeiningInstance[][] = [[]]
+  const groups = Object.fromEntries(
+    holidayColumnOrder.map((key) => [key, [] as LeiningInstance[]])
+  ) as Record<(typeof holidayColumnOrder)[number], LeiningInstance[]>
+
   for (const leining of leinings) {
     if (leining.isParsha) continue
+    if (leining.id === LeiningInstanceId.Megillah) continue
+    if (leining.runs[0].scroll !== 'torah') continue
     // Only include the first ראש חודש
-    if (last(groups).length && leining.date.title.he.startsWith('ראש חודש'))
+    if (
+      leining.date.title.he.startsWith('ראש חודש') &&
+      groups.chanukah.some((existing) =>
+        existing.date.title.he.startsWith('ראש חודש')
+      )
+    ) {
       continue
+    }
     if (leining.date.title.he.startsWith('תענית אסתר')) continue
-    if (holidayGroupStarts.includes(leining.date.title.he)) groups.push([])
-    last(groups).push(leining)
+
+    groups[holidayColumnFor(leining)].push(leining)
   }
-  return groups
+
+  return holidayColumnOrder.map((column) => groups[column]).filter((group) => group.length)
 }
 
 const Browse = (leinings: LeiningInstance[]) => `
@@ -95,7 +140,7 @@ const Browse = (leinings: LeiningInstance[]) => `
     </ol>
 
     <h2 class="section-heading">חגים</h2>
-    <ol class="parsha-books">
+    <ol class="parsha-books mod-holidays">
       ${groupHolidays(leinings)
         .map(
           (col) => `
@@ -134,20 +179,6 @@ const search = (leinings: LeiningInstance[], query: string) => {
   if (!results.length) return [NoResults()]
 
   return results.filter(top(5)).map((result) => ParshaResult(result))
-}
-
-function renderTitle(obj: LeiningInstance, opts?: { forCalendar?: boolean }) {
-  if (obj.id === LeiningInstanceId.Megillah)
-    return Locale.gettext(toTitleCase(obj.runs[0].scroll), 'he-x-nonikud')
-
-  let title = obj.date.title.he.replace('פרשת ', '')
-  if (obj.id !== LeiningInstanceId.Shacharis) title += `: ${obj.id}`
-
-  // In the holiday listing, don't include the month name.
-  // In the Upcoming section, do include it.
-  if (!opts?.forCalendar && title.startsWith('ראש חודש')) return 'ראש חודש'
-
-  return title
 }
 
 declare function gtag(type: 'event', eventName: string, payload: unknown): void

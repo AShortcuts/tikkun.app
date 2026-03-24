@@ -1,6 +1,7 @@
 import { LeiningInstance } from '../calendar-model/model-types.ts'
 import { generateUrl } from '../view-model/navigation/url-parser.ts'
 import utils from './utils.ts'
+import renderLeiningTitle from './render-leining-title.ts'
 
 const { htmlToElement } = utils
 
@@ -39,11 +40,11 @@ const ParshaResult = ({
     <p class="search-result-tag mod-hebrew" data-target-class="result-hebrew">${
       match.index === 0
         ? decorateString({
-            string: item.date.title.he,
+            string: renderLeiningTitle(item),
             atIndexes: match.indexes,
             withDecoration: strongify,
           })
-        : item.date.title.he
+        : renderLeiningTitle(item)
     }: ${item.id}
     </p>
     <p class="search-result-tag">${

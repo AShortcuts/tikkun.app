@@ -257,6 +257,10 @@ function getTitleEl() {
   return document.querySelector<HTMLElement>('[data-target-id="parsha-title"]')!
 }
 
+function formatTopBarTitle(title: string | undefined) {
+  return title?.replace(/^פרשת /, '') ?? 'About this Project'
+}
+
 function isEditableTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false
   return (
@@ -915,6 +919,15 @@ function renderRoute(route: AppRoute, audioController: AudioController) {
   app.jumpTo(route.model)
 }
 
+function navigateToHash(hash: string, audioController: AudioController) {
+  if (location.hash === hash) {
+    const route = parseUrl(generator, hash.replace(/^#/, ''))
+    if (route) renderRoute(route, audioController)
+    return
+  }
+  location.hash = hash
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const book = getBook()
   const toggle = document.querySelector<HTMLInputElement>(
@@ -940,7 +953,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!display?.viewModel) return
     topBarModel.setLine(display.viewModel, range)
     const run = topBarModel.info.currentRun
-    titleEl.textContent = run?.leining.date.title.he ?? 'About this Project'
+    titleEl.textContent = formatTopBarTitle(run?.leining.date.title.he)
     updateReaderProgress()
   })
 
@@ -1077,8 +1090,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   document
     .querySelector('[data-target-id="about-link"]')!
     .addEventListener('click', () => {
-      if (location.hash !== generateAboutUrl()) location.hash = generateAboutUrl()
+      navigateToHash(generateAboutUrl(), audioController)
     })
+
+  document.addEventListener('click', (event) => {
+    const link = (event.target as HTMLElement).closest<HTMLAnchorElement>(
+      'a[href^="#/"]'
+    )
+    if (!link) return
+
+    const href = link.getAttribute('href')
+    if (!href || href === location.hash) {
+      event.preventDefault()
+      navigateToHash(href ?? location.hash, audioController)
+    }
+  })
 
   document
     .querySelector('[data-target-id="export-close"]')!

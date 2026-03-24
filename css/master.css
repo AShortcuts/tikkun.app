@@ -136,7 +136,7 @@ ol {
 .tikkun-book {
   padding-top: 1em;
   padding-bottom: 5em; /* basically some scroll overflow so that when you get to the end of a Scroll, you can scroll past the annotations toggle so that it doesn't block the last few lines of text */
-  font-size: 1.75em;
+  font-size: 1.8rem;
   height: 100%;
   min-height: 0;
   overflow-y: auto;
