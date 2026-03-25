@@ -1,4 +1,3 @@
-import '/css/master.css'
 import InfiniteScroller from './infinite-scroller.ts'
 import ParshaPicker from './components/ParshaPicker.ts'
 import utils from './components/utils.ts'
@@ -30,10 +29,12 @@ import {
   getCuesForRecording,
   listNarrators,
 } from './audio/library.ts'
+import { cueFileRelativePath, formatCueFileJson } from './audio/cue-file.ts'
 import { AudioController, ActiveAudioSession } from './reading/audio-controller.ts'
 import { HighlightController, cueKey } from './reading/highlight-controller.ts'
 import { adjustStartingLineTokens } from './reading/aliyah-token-sequence.ts'
 import type { CueExportPayload, WordCue } from './audio/types.ts'
+import { verifyAdminPassword } from './admin/access.ts'
 
 declare function gtag(
   name: 'event',
@@ -42,7 +43,6 @@ declare function gtag(
 ): void
 
 const { whenKey } = utils
-const ADMIN_PASSWORD = 'admin'
 
 const generator = new LeiningGenerator({
   ashkenazi: true,
@@ -56,6 +56,7 @@ let lastReaderHash = '#/next'
 let progressFrame = 0
 let deferredProgressFrame = 0
 let progressAnchorLoadPromise: Promise<void> | null = null
+let cueNavigationIndex: number | null = null
 
 const adminState: {
   unlocked: boolean
@@ -256,12 +257,16 @@ function getBook() {
   return document.querySelector<HTMLElement>('[data-target-id="tikkun-book"]')!
 }
 
+function focusReaderSurface() {
+  getBook().focus({ preventScroll: true })
+}
+
 function getTitleEl() {
   return document.querySelector<HTMLElement>('[data-target-id="parsha-title"]')!
 }
 
 function formatTopBarTitle(title: string | undefined) {
-  return title?.replace(/^פרשת /, '') ?? 'About this Project'
+  return title?.replace(/^פרשת /, '') ?? 'Tikkun'
 }
 
 function isEditableTarget(target: EventTarget | null) {
@@ -498,7 +503,8 @@ async function startPlaybackForButton(
   adminState.cues = []
   adminState.tokenPointer = -1
   adminState.recording = false
-  updateAdminCounter(tokenKeys.length)
+  cueNavigationIndex = session.cues.length ? 0 : null
+  syncAdminPanelState(audioController)
 
   if (session.cues.length) {
     audioController.seek(session.cues[0].timeStart)
@@ -530,6 +536,7 @@ async function syncCurrentSessionHighlight(
       audioController.audio.currentTime
     )
     if (cueIndex >= 0) {
+      cueNavigationIndex = cueIndex
       await highlightController.activateCue(session.cues[cueIndex], {
         scroll: readerPreferences.autoScrollWithPlayback,
       })
@@ -554,12 +561,12 @@ function stepPlayback(
   if (!session) return
 
   if (session.cues.length) {
-    const currentCueIndex = highlightController.getCueIndex(
-      session.cues,
-      audioController.audio.currentTime
-    )
+    const currentCueIndex =
+      cueNavigationIndex ??
+      highlightController.getCueIndex(session.cues, audioController.audio.currentTime)
     const targetCue = session.cues[Math.max(0, currentCueIndex + delta)]
     if (!targetCue) return
+    cueNavigationIndex = session.cues.indexOf(targetCue)
     audioController.seek(targetCue.timeStart)
     highlightController.activateCue(targetCue, {
       scroll: readerPreferences.autoScrollWithPlayback,
@@ -574,12 +581,14 @@ function stepPlayback(
 
 async function replayAliyahFromStart(
   audioController: AudioController,
-  highlightController: HighlightController
+  highlightController: HighlightController,
+  { restartAudio = true }: { restartAudio?: boolean } = {}
 ) {
   const session = audioController.session
   if (!session) return
 
   if (session.cues.length) {
+    cueNavigationIndex = 0
     await highlightController.activateCue(session.cues[0], { scroll: true })
   } else if (session.tokenKeys[0]) {
     await highlightController.activateTokenKey(session.tokenKeys[0], {
@@ -587,7 +596,9 @@ async function replayAliyahFromStart(
     })
   }
 
-  await audioController.replayFromStart()
+  if (restartAudio) {
+    await audioController.replayFromStart()
+  }
 }
 
 function updateReaderProgress() {
@@ -664,27 +675,86 @@ function updateAdminCounter(tokenCount: number) {
   const counter = document.querySelector<HTMLElement>(
     '[data-target-id="admin-cue-count"]'
   )!
-  counter.textContent = `${adminState.cues.length} / ${tokenCount} cues`
+  const pointer = adminState.tokenPointer >= 0 ? adminState.tokenPointer + 1 : 0
+  counter.textContent = `${adminState.cues.length} / ${tokenCount} cues · ${pointer}`
 }
 
 function syncAdminRecordButton() {
-  const button = document.querySelector<HTMLElement>('[data-target-id="admin-record"]')!
+  const button = document.querySelector<HTMLButtonElement>(
+    '[data-target-id="admin-record"]'
+  )!
   button.textContent = adminState.recording ? 'Stop Recording' : 'Record/Edit Cues'
 }
 
-function resetAdminRecorder(highlightController: HighlightController) {
+function syncAdminPanelState(audioController?: AudioController | null) {
+  const session = audioController?.session ?? null
+  const tokenCount = session?.tokenKeys.length ?? 0
+  const hasSession = Boolean(session && tokenCount)
+  const hasCues = adminState.cues.length > 0
+  const canStepBack = hasSession && adminState.tokenPointer >= 0
+  const counter = document.querySelector<HTMLElement>(
+    '[data-target-id="admin-cue-count"]'
+  )!
+  const status = document.querySelector<HTMLElement>('[data-target-id="admin-status"]')!
+  const recordButton = document.querySelector<HTMLButtonElement>(
+    '[data-target-id="admin-record"]'
+  )!
+  const stepBackButton = document.querySelector<HTMLButtonElement>(
+    '[data-target-id="admin-step-back"]'
+  )!
+  const undoButton = document.querySelector<HTMLButtonElement>(
+    '[data-target-id="admin-undo"]'
+  )!
+  const resetButton = document.querySelector<HTMLButtonElement>(
+    '[data-target-id="admin-reset"]'
+  )!
+  const exportButton = document.querySelector<HTMLButtonElement>(
+    '[data-target-id="admin-export"]'
+  )!
+
+  if (!hasSession) {
+    counter.textContent = '0 cues'
+    status.textContent = 'Select an aliyah and press play to start cue authoring.'
+  } else if (adminState.recording) {
+    const pointer = adminState.tokenPointer >= 0 ? adminState.tokenPointer + 1 : 1
+    status.textContent = `${session!.recording.title}: recording live. Use Space or Right Arrow to record cue ${pointer}; Left Arrow steps back.`
+    updateAdminCounter(tokenCount)
+  } else {
+    const pointer = adminState.tokenPointer >= 0 ? adminState.tokenPointer + 1 : 0
+    status.textContent = `${session!.recording.title}: ready to author. ${
+      hasCues
+        ? `Resume from cue ${pointer || 1} or export the current set.`
+        : 'Press Record/Edit Cues to begin.'
+    }`
+    updateAdminCounter(tokenCount)
+  }
+
+  recordButton.disabled = !hasSession
+  stepBackButton.disabled = !canStepBack
+  undoButton.disabled = !hasCues
+  resetButton.disabled = !hasCues && !adminState.recording && adminState.tokenPointer < 0
+  exportButton.disabled = !hasSession || !hasCues
+  syncAdminRecordButton()
+}
+
+async function resetAdminRecorder(
+  audioController: AudioController,
+  highlightController: HighlightController
+) {
   adminState.cues = []
   adminState.tokenPointer = -1
   adminState.recording = false
-  updateAdminCounter(audioControllerGlobal?.session?.tokenKeys.length ?? 0)
-  syncAdminRecordButton()
-  highlightController.clear()
+  cueNavigationIndex = audioController.session?.cues.length ? 0 : null
+  syncAdminPanelState(audioControllerGlobal)
+  await replayAliyahFromStart(audioController, highlightController, {
+    restartAudio: false,
+  })
 }
 
 let audioControllerGlobal: AudioController | null = null
 let highlightControllerGlobal: HighlightController | null = null
 
-function exportAdminCues(audioController: AudioController) {
+async function exportAdminCues(audioController: AudioController) {
   const session = audioController.session
   if (!session) return
 
@@ -702,12 +772,29 @@ function exportAdminCues(audioController: AudioController) {
   }
 
   const modal = document.querySelector<HTMLElement>('[data-target-id="export-modal"]')!
+  const status = document.querySelector<HTMLElement>(
+    '[data-target-id="export-copy-status"]'
+  )!
+  const targetPath = document.querySelector<HTMLElement>(
+    '[data-target-id="export-target-path"]'
+  )!
   const textarea = document.querySelector<HTMLTextAreaElement>(
     '[data-target-id="export-text"]'
   )!
-  textarea.value = JSON.stringify(payload, null, 2)
+  const exportPath = cueFileRelativePath(session.recording)
+  const serialized = formatCueFileJson(payload)
+  targetPath.textContent = exportPath
+  textarea.value = serialized
   modal.classList.remove('u-hidden')
   setTimeout(() => textarea.select(), 0)
+  try {
+    await navigator.clipboard.writeText(serialized)
+    status.textContent = `Copied to clipboard. Paste into ${exportPath}.`
+  } catch {
+    status.textContent =
+      `Automatic clipboard copy was blocked. Paste the JSON below into ${exportPath}.`
+  }
+  syncAdminPanelState(audioController)
 }
 
 function recordNextCue(
@@ -717,46 +804,58 @@ function recordNextCue(
   const session = audioController.session
   if (!session) return
 
-  const nextIndex = adminState.tokenPointer + 1
-  const tokenKey = session.tokenKeys[nextIndex]
+  const currentIndex =
+    adminState.tokenPointer >= 0
+      ? adminState.tokenPointer
+      : Math.max(highlightController.getActiveIndex(), 0)
+  const tokenKey = session.tokenKeys[currentIndex]
   if (!tokenKey) return
 
-  adminState.tokenPointer = nextIndex
   const [pageNumber, lineIndex, fragmentIndex, wordIndex] = tokenKey
     .split(':')
     .map(Number)
-  adminState.cues[nextIndex] = {
+  adminState.cues[currentIndex] = {
     timeStart: Number(audioController.audio.currentTime.toFixed(3)),
     pageNumber,
     lineIndex,
     fragmentIndex,
     wordIndex,
   }
-  highlightController.activateTokenKey(tokenKey, {
+  const nextTokenKey = session.tokenKeys[currentIndex + 1] ?? tokenKey
+  adminState.tokenPointer = Math.min(currentIndex + 1, session.tokenKeys.length - 1)
+  highlightController.activateTokenKey(nextTokenKey, {
     scroll: readerPreferences.autoScrollWithPlayback,
   })
-  updateAdminCounter(session.tokenKeys.length)
+  syncAdminPanelState(audioController)
 }
 
 function stepAdminBack(highlightController: HighlightController) {
+  const session = audioControllerGlobal?.session
+  if (!session?.tokenKeys.length) return
   if (adminState.tokenPointer <= 0) {
-    adminState.tokenPointer = -1
-    highlightController.clear()
+    adminState.tokenPointer = 0
+    highlightController.activateTokenKey(session.tokenKeys[0], {
+      scroll: readerPreferences.autoScrollWithPlayback,
+    })
+    syncAdminPanelState(audioControllerGlobal)
     return
   }
   adminState.tokenPointer -= 1
-  const tokenKey = audioControllerGlobal?.session?.tokenKeys[adminState.tokenPointer]
+  const tokenKey = session.tokenKeys[adminState.tokenPointer]
   if (!tokenKey) return
   highlightController.activateTokenKey(tokenKey, {
     scroll: readerPreferences.autoScrollWithPlayback,
   })
+  syncAdminPanelState(audioControllerGlobal)
 }
 
 function undoLastAdminCue(highlightController: HighlightController) {
   adminState.cues.pop()
-  adminState.tokenPointer = adminState.cues.length - 1
+  adminState.tokenPointer = adminState.cues.length
   const tokenKey =
-    audioControllerGlobal?.session?.tokenKeys[adminState.tokenPointer] ?? null
+    audioControllerGlobal?.session?.tokenKeys[adminState.tokenPointer] ??
+    audioControllerGlobal?.session?.tokenKeys[0] ??
+    null
   if (tokenKey) {
     highlightController.activateTokenKey(tokenKey, {
       scroll: readerPreferences.autoScrollWithPlayback,
@@ -764,7 +863,7 @@ function undoLastAdminCue(highlightController: HighlightController) {
   } else {
     highlightController.clear()
   }
-  updateAdminCounter(audioControllerGlobal?.session?.tokenKeys.length ?? 0)
+  syncAdminPanelState(audioControllerGlobal)
 }
 
 function setupSettingsPane(audioController: AudioController) {
@@ -808,6 +907,9 @@ function setupSettingsPane(audioController: AudioController) {
   const autoScroll = document.querySelector<HTMLInputElement>(
     '[data-target-id="settings-auto-scroll"]'
   )!
+  const disableShiftHide = document.querySelector<HTMLInputElement>(
+    '[data-target-id="settings-disable-shift-hide"]'
+  )!
   const themeModeButtons = [
     ...document.querySelectorAll<HTMLButtonElement>('[data-theme-mode]'),
   ]
@@ -840,6 +942,7 @@ function setupSettingsPane(audioController: AudioController) {
     glow.value = `${readerPreferences.glow}`
     glowValue.value = `${readerPreferences.glow}`
     autoScroll.checked = readerPreferences.autoScrollWithPlayback
+    disableShiftHide.checked = readerPreferences.disableShiftNekudotHide
     for (const button of themeModeButtons) {
       const isActive = button.dataset.themeMode === readerPreferences.themeMode
       button.classList.toggle('is-active', isActive)
@@ -925,6 +1028,9 @@ function setupSettingsPane(audioController: AudioController) {
   autoScroll.addEventListener('change', () =>
     applyUpdates({ autoScrollWithPlayback: autoScroll.checked })
   )
+  disableShiftHide.addEventListener('change', () =>
+    applyUpdates({ disableShiftNekudotHide: disableShiftHide.checked })
+  )
   for (const button of themeModeButtons) {
     button.addEventListener('click', () => {
       const themeMode = button.dataset.themeMode as ThemeMode | undefined
@@ -954,7 +1060,7 @@ function renderRoute(route: AppRoute, audioController: AudioController) {
     readerShell.classList.add('u-hidden')
     aboutView.classList.remove('u-hidden')
     aboutView.innerHTML = AboutPage()
-    titleEl.textContent = 'About this Project'
+    titleEl.textContent = 'Tikkun'
     return
   }
 
@@ -1042,12 +1148,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     syncCurrentSessionHighlight(audioController, highlightController)
   })
 
-  book.addEventListener('click', (event) => {
+  book.addEventListener('click', async (event) => {
     const target = event.target as HTMLElement
     const playButton = target.closest<HTMLButtonElement>('[data-audio-button="true"]')
     if (playButton) {
       event.preventDefault()
-      startPlaybackForButton(playButton, audioController, highlightController)
+      await startPlaybackForButton(playButton, audioController, highlightController)
+      focusReaderSurface()
       return
     }
 
@@ -1057,6 +1164,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!tokenKey) return
     const cue = audioController.session.cues.find((candidate) => cueKey(candidate) === tokenKey)
     if (cue) {
+      cueNavigationIndex = audioController.session.cues.indexOf(cue)
       audioController.seek(cue.timeStart)
       audioController.play()
       highlightController.activateCue(cue, {
@@ -1072,11 +1180,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   audioController.on('playback-updated', () => {
     updateFloatingPlayer(audioController)
     refreshInlineAudioButtons(audioController)
+    syncAdminPanelState(audioController)
   })
   audioController.on('session-loaded', (session) => {
+    cueNavigationIndex = session.cues.length ? 0 : null
     highlightController.setSequence(session.tokenKeys)
     updateFloatingPlayer(audioController)
     refreshInlineAudioButtons(audioController)
+    syncAdminPanelState(audioController)
   })
   audioController.on('time-updated', async ({ currentTime }) => {
     if (adminState.recording) return
@@ -1084,6 +1195,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!session?.cues.length) return
     const cueIndex = highlightController.getCueIndex(session.cues, currentTime)
     if (cueIndex < 0) return
+    cueNavigationIndex = cueIndex
     await highlightController.activateCue(session.cues[cueIndex], {
       scroll: readerPreferences.autoScrollWithPlayback,
     })
@@ -1091,22 +1203,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document
     .querySelector('[data-target-id="floating-play"]')!
-    .addEventListener('click', () => audioController.togglePlayback())
+    .addEventListener('click', async () => {
+      await audioController.togglePlayback()
+      focusReaderSurface()
+    })
   document
     .querySelector('[data-target-id="floating-prev"]')!
-    .addEventListener('click', () =>
+    .addEventListener('click', () => {
       stepPlayback(-1, audioController, highlightController)
-    )
+      focusReaderSurface()
+    })
   document
     .querySelector('[data-target-id="floating-next"]')!
-    .addEventListener('click', () =>
+    .addEventListener('click', () => {
       stepPlayback(1, audioController, highlightController)
-    )
+      focusReaderSurface()
+    })
   document
     .querySelector('[data-target-id="floating-replay"]')!
-    .addEventListener('click', () =>
-      replayAliyahFromStart(audioController, highlightController)
-    )
+    .addEventListener('click', async () => {
+      await replayAliyahFromStart(audioController, highlightController)
+      focusReaderSurface()
+    })
 
   toggle.addEventListener('change', () =>
     toggleAnnotations(() => !toggle.checked)
@@ -1114,11 +1232,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.addEventListener(
     'keydown',
-    whenKey('Shift', () => toggleAnnotations(() => toggle.checked))
+    whenKey('Shift', () => {
+      if (readerPreferences.disableShiftNekudotHide) return
+      toggleAnnotations(() => toggle.checked)
+    })
   )
   document.addEventListener(
     'keyup',
-    whenKey('Shift', () => toggleAnnotations(() => toggle.checked))
+    whenKey('Shift', () => {
+      if (readerPreferences.disableShiftNekudotHide) return
+      toggleAnnotations(() => toggle.checked)
+    })
   )
 
   titleEl.addEventListener('click', toggleParshaPicker)
@@ -1171,7 +1295,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     .querySelector('[data-target-id="admin-record"]')!
     .addEventListener('click', () => {
       adminState.recording = !adminState.recording
-      syncAdminRecordButton()
+      if (adminState.recording) {
+        adminState.tokenPointer = Math.max(highlightController.getActiveIndex(), 0)
+      }
+      syncAdminPanelState(audioController)
     })
   document
     .querySelector('[data-target-id="admin-step-back"]')!
@@ -1181,22 +1308,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     .addEventListener('click', () => undoLastAdminCue(highlightController))
   document
     .querySelector('[data-target-id="admin-reset"]')!
-    .addEventListener('click', () => resetAdminRecorder(highlightController))
+    .addEventListener('click', () =>
+      resetAdminRecorder(audioController, highlightController)
+    )
   document
     .querySelector('[data-target-id="admin-export"]')!
-    .addEventListener('click', () => exportAdminCues(audioController))
+    .addEventListener('click', () => void exportAdminCues(audioController))
 
   document.addEventListener('keydown', (event) => {
     if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'a') {
       event.preventDefault()
       if (!adminState.unlocked) {
         const provided = window.prompt('Admin password')
-        if (provided !== ADMIN_PASSWORD) return
+        if (!provided || !verifyAdminPassword(provided)) return
         adminState.unlocked = true
       }
       document
         .querySelector<HTMLElement>('[data-target-id="admin-panel"]')!
         .classList.toggle('u-hidden')
+      syncAdminPanelState(audioController)
       return
     }
 
@@ -1243,7 +1373,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   })
 
   setupSettingsPane(audioController)
-  syncAdminRecordButton()
+  syncAdminPanelState(audioController)
 
   listenForRevealGesture(book)
   setAppHeight()

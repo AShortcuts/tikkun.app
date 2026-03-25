@@ -254,10 +254,23 @@
   gap: 0.8rem;
 }
 
+.admin-panel-status {
+  max-width: 30ch;
+  color: var(--light-text-color);
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
 .admin-panel-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+.admin-panel .toolbar-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: var(--light-accent-color);
 }
 
 .export-modal {
@@ -287,6 +300,20 @@
   color: var(--text-color);
   padding: 1rem;
   font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.export-copy-status {
+  color: var(--light-text-color);
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
+.export-target-path {
+  color: var(--text-color);
+  font-size: 0.9rem;
+  line-height: 1.35;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  word-break: break-word;
 }
 
 .about-route {

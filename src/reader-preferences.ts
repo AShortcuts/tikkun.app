@@ -14,6 +14,7 @@ export interface ReaderPreferences {
   radius: number
   glow: number
   autoScrollWithPlayback: boolean
+  disableShiftNekudotHide: boolean
   themeMode: ThemeMode
 }
 
@@ -27,6 +28,7 @@ export const defaultReaderPreferences: ReaderPreferences = {
   radius: 4,
   glow: 3.5,
   autoScrollWithPlayback: true,
+  disableShiftNekudotHide: false,
   themeMode: 'automatic',
 }
 
@@ -87,7 +89,7 @@ export function applyReaderPreferences(preferences: ReaderPreferences) {
     '--reader-highlight-outline-width',
     `${preferences.outlineWidth}px`
   )
-  root.style.setProperty('--reader-highlight-radius', `${preferences.radius}px`)
+  root.style.setProperty('--reader-highlight-border-radius', `${preferences.radius}px`)
   root.style.setProperty('--reader-highlight-glow', `${preferences.glow}px`)
   root.style.setProperty(
     '--reader-highlight-outline-offset',

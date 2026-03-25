@@ -1,0 +1,62 @@
+{
+  "audioId": "bereshit-1",
+  "audioFormat": "m4a",
+  "narratorId": "yoni-davidov",
+  "parshaSlug": "bereshit",
+  "aliyah": 1,
+  "tokenCount": 406,
+  "cueCount": 7,
+  "tokenizationVersion": "v1",
+  "audioVersion": "Source file: בראשית א׳.m4a",
+  "cues": [
+    {
+      "timeStart": 1.5,
+      "pageNumber": 1,
+      "lineIndex": 0,
+      "fragmentIndex": 0,
+      "wordIndex": 0
+    },
+    {
+      "timeStart": 3.6,
+      "pageNumber": 1,
+      "lineIndex": 0,
+      "fragmentIndex": 0,
+      "wordIndex": 1
+    },
+    {
+      "timeStart": 4.4,
+      "pageNumber": 1,
+      "lineIndex": 0,
+      "fragmentIndex": 0,
+      "wordIndex": 2
+    },
+    {
+      "timeStart": 5.598,
+      "pageNumber": 1,
+      "lineIndex": 0,
+      "fragmentIndex": 0,
+      "wordIndex": 3
+    },
+    {
+      "timeStart": 6.112,
+      "pageNumber": 1,
+      "lineIndex": 0,
+      "fragmentIndex": 0,
+      "wordIndex": 4
+    },
+    {
+      "timeStart": 8.197,
+      "pageNumber": 1,
+      "lineIndex": 0,
+      "fragmentIndex": 0,
+      "wordIndex": 5
+    },
+    {
+      "timeStart": 9.332,
+      "pageNumber": 1,
+      "lineIndex": 0,
+      "fragmentIndex": 0,
+      "wordIndex": 6
+    }
+  ]
+}

@@ -1,7 +1,54 @@
 <!DOCTYPE html>
-<html>
+<html data-reader-theme="automatic">
 
 <head>
+  <script>
+    ;(() => {
+      const storageKey = 'tikkun.reader-preferences.v3'
+      const defaultTheme = 'automatic'
+      const validThemes = new Set(['automatic', 'light', 'dark'])
+      const raw = window.localStorage.getItem(storageKey)
+      if (!raw) return
+
+      try {
+        const parsed = JSON.parse(raw)
+        const themeMode = parsed?.themeMode
+        if (validThemes.has(themeMode)) {
+          document.documentElement.dataset.readerTheme = themeMode
+        }
+      } catch {
+        document.documentElement.dataset.readerTheme = defaultTheme
+      }
+    })()
+  </script>
+  <style>
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      background: oklch(98.5% 0 0);
+      color-scheme: light;
+      overflow: hidden;
+    }
+
+    .u-hidden {
+      display: none !important;
+    }
+
+    html[data-reader-theme='dark'],
+    html[data-reader-theme='dark'] body {
+      background: oklch(25% 0 0);
+      color-scheme: dark;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      html[data-reader-theme='automatic'],
+      html[data-reader-theme='automatic'] body {
+        background: oklch(25% 0 0);
+        color-scheme: dark;
+      }
+    }
+  </style>
   <!-- Global site tag (gtag.js) - Google Analytics -->
   <script>
     ; (function () {
@@ -42,6 +89,7 @@
   <link rel="mask-icon" href="/assets/images/safari-pinned-tab.svg" color="#000000" />
 
   <title>tikkun.io</title>
+  <link rel="stylesheet" href="/css/master.css" />
 </head>
 
 <body>
@@ -84,7 +132,7 @@
         </div>
 
         <div class="reader-main" style="direction: rtl">
-          <div class="tikkun-book mod-annotations-on" data-target-id="tikkun-book"></div>
+          <div class="tikkun-book mod-annotations-on" data-target-id="tikkun-book" tabindex="-1"></div>
           <div class="" data-target-id="parsha-picker"></div>
         </div>
 
@@ -183,12 +231,19 @@
           <input data-target-id="settings-auto-scroll" type="checkbox" />
           <span>Auto-scroll with playback</span>
         </label>
+        <label class="settings-field mod-checkbox">
+          <input data-target-id="settings-disable-shift-hide" type="checkbox" />
+          <span>Disable Shift key for nekudot hiding</span>
+        </label>
       </form>
     </aside>
     <aside class="admin-panel u-hidden" data-target-id="admin-panel">
       <div class="admin-panel-header">
         <strong>Admin Cue Mode</strong>
         <span data-target-id="admin-cue-count">0 cues</span>
+      </div>
+      <div class="admin-panel-status" data-target-id="admin-status">
+        Select an aliyah and press play to start cue authoring.
       </div>
       <div class="admin-panel-actions">
         <button type="button" class="toolbar-button" data-target-id="admin-record">Record/Edit Cues</button>
@@ -204,6 +259,8 @@
           <h2>Export Cues</h2>
           <button class="toolbar-button" type="button" data-target-id="export-close">Close</button>
         </div>
+        <div class="export-target-path" data-target-id="export-target-path"></div>
+        <div class="export-copy-status" data-target-id="export-copy-status"></div>
         <textarea data-target-id="export-text" spellcheck="false"></textarea>
       </div>
     </div>
