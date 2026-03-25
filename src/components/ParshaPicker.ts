@@ -4,7 +4,7 @@ import ParshaResult, { NoResults } from './ParshaResult.ts'
 import Search, { SearchEmitter } from './Search.ts'
 import EventEmitter from '../event-emitter.ts'
 import { LeiningGenerator } from '../calendar-model/generator.ts'
-import { HDate, Locale } from '@hebcal/hdate'
+import { HDate } from '@hebcal/hdate'
 import {
   LeiningInstance,
   LeiningInstanceId,
@@ -180,9 +180,6 @@ const search = (leinings: LeiningInstance[], query: string) => {
 
   return results.filter(top(5)).map((result) => ParshaResult(result))
 }
-
-declare function gtag(type: 'event', eventName: string, payload: unknown): void
-
 export default (generator: LeiningGenerator) => {
   const leinings = generator
     .forEntireChumash(new HDate())
@@ -211,33 +208,9 @@ export default (generator: LeiningGenerator) => {
     </div>
   `)
 
-  ;[
-    ...self.querySelectorAll('[data-target-class="coming-up-reading"]'),
-  ].forEach((comingUpReading, index) => {
-    comingUpReading.addEventListener('click', () => {
-      gtag('event', 'coming_up_selection', {
-        event_category: 'navigation',
-        event_label: ['due up', 'on deck', 'in the hole'][index],
-      })
-    })
-  })
-
-  searchEmitter.on('selection', (selected) => {
-    gtag('event', 'search_selection', {
-      event_category: 'navigation',
-      event_label: selected
-        .querySelector('[data-target-class="result-hebrew"]')
-        .textContent.trim(),
-    })
-  })
-
-  searchEmitter.on('search', (query) => {
+  searchEmitter.on('search', () => {
     self.querySelector('.browse').classList.add('u-hidden')
     self.querySelector('#coming-up').classList.add('u-hidden')
-    gtag('event', 'search', {
-      event_category: 'navigation',
-      event_label: query,
-    })
   })
 
   searchEmitter.on('clear', () => {
@@ -248,16 +221,6 @@ export default (generator: LeiningGenerator) => {
   self
     .querySelector('#search')
     .parentNode.replaceChild(s.node, self.querySelector('#search'))
-  ;[...self.querySelectorAll('[data-target-id="parsha"]')].forEach((parsha) => {
-    parsha.addEventListener('click', (e) => {
-      const target = e.target as Element
-
-      gtag('event', 'browse_selection', {
-        event_category: 'navigation',
-        event_label: target.textContent.trim(),
-      })
-    })
-  })
 
   return {
     node: self,

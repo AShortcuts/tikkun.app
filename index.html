@@ -2,6 +2,16 @@
 <html data-reader-theme="automatic">
 
 <head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Practice torah reading using this online tikkun." />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="tikkun.app" />
+  <title>tikkun.app</title>
+  <link rel="icon" type="image/png" href="/assets/images/android-chrome-192x192.png" sizes="192x192" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/apple-touch-icon.png" />
+  <link rel="mask-icon" href="/assets/images/safari-pinned-tab.svg" color="#000000" />
+  <link rel="stylesheet" href="/css/master.css" />
   <script>
     ;(() => {
       const storageKey = 'tikkun.reader-preferences.v3'
@@ -49,47 +59,6 @@
       }
     }
   </style>
-  <!-- Global site tag (gtag.js) - Google Analytics -->
-  <script>
-    ; (function () {
-      var script = document.createElement('script')
-
-      var trackingId = window.location.href.includes('localhost')
-        ? 'G-LHD6GSE2LN'
-        : 'G-37262L90KC'
-
-      script.src = 'https://www.googletagmanager.com/gtag/js?id=' + trackingId
-
-      document.querySelector('head').appendChild(script)
-    })()
-  </script>
-  <script>
-    window.dataLayer = window.dataLayer || []
-    function gtag() {
-      dataLayer.push(arguments)
-    }
-    gtag('js', new Date())
-
-    gtag(
-      'config',
-      window.location.href.includes('localhost')
-        ? 'G-LHD6GSE2LN'
-        : 'G-37262L90KC'
-    )
-  </script>
-
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Practice torah reading using this online tikkun." />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-title" content="tikkun.io" />
-
-  <link rel="icon" type="image/png" href="/assets/images/android-chrome-192x192.png" sizes="192x192" />
-  <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/apple-touch-icon.png" />
-  <link rel="mask-icon" href="/assets/images/safari-pinned-tab.svg" color="#000000" />
-
-  <title>tikkun.io</title>
-  <link rel="stylesheet" href="/css/master.css" />
 </head>
 
 <body>
@@ -165,9 +134,7 @@
       <div class="settings-pane-header">
         <h2>Reader Settings</h2>
         <div class="settings-pane-header-actions">
-          <button class="toolbar-button mod-icon-label" type="button" data-target-id="settings-reset-highlight">
-            <span>Reset Defaults</span>
-          </button>
+          <button class="toolbar-button mod-icon-label" type="button" data-target-id="settings-reset-highlight" aria-label="Reset highlight settings" title="Reset highlight settings"></button>
           <button class="toolbar-button" type="button" data-target-id="settings-close">Close</button>
         </div>
       </div>
@@ -184,14 +151,14 @@
             <button class="settings-segmented-option" type="button" data-theme-mode="automatic">Automatic</button>
           </div>
         </div>
-        <label class="settings-field">
+        <label class="settings-field mod-inline-compact">
           <span>Playback rate</span>
           <div class="settings-number-input">
             <input data-target-id="settings-playback-rate" type="number" min="0.5" max="2" step="0.05" inputmode="decimal" />
             <span>x</span>
           </div>
         </label>
-        <label class="settings-field">
+        <label class="settings-field mod-inline-compact">
           <span>Highlight fill</span>
           <input data-target-id="settings-highlight-fill" type="color" />
         </label>
@@ -202,7 +169,7 @@
             <input data-target-id="settings-highlight-opacity-value" type="number" min="0.05" max="0.45" step="0.01" inputmode="decimal" />
           </div>
         </label>
-        <label class="settings-field">
+        <label class="settings-field mod-inline-compact">
           <span>Outline color</span>
           <input data-target-id="settings-outline-color" type="color" />
         </label>

@@ -36,12 +36,6 @@ import { adjustStartingLineTokens } from './reading/aliyah-token-sequence.ts'
 import type { CueExportPayload, WordCue } from './audio/types.ts'
 import { verifyAdminPassword } from './admin/access.ts'
 
-declare function gtag(
-  name: 'event',
-  label: string,
-  payload: Record<string, unknown>
-): void
-
 const { whenKey } = utils
 
 const generator = new LeiningGenerator({
@@ -111,10 +105,6 @@ const showParshaPicker = () => {
   const jumper = ParshaPicker(generator)
 
   document.querySelector('[data-target-id="reader-shell"]')!.appendChild(jumper.node)
-
-  gtag('event', 'view', {
-    event_category: 'navigation',
-  })
 
   jumper.onMount()
 }
@@ -303,10 +293,7 @@ function getAliyahProgressAnchors() {
       const rect = line.getBoundingClientRect()
       const label = line.querySelector('.aliyah-label-text')?.textContent?.trim() ?? '—'
       const aliyahStarts = (line.dataset.aliyahStarts ?? '').split(',')
-      const progressLabel =
-        aliyahStarts.includes('1') && !label.endsWith('ראשון')
-          ? `${label} ראשון`
-          : label
+      const progressLabel = aliyahStarts.includes('1') ? 'ראשון' : label
       return {
         line,
         label: progressLabel,
@@ -924,9 +911,7 @@ function setupSettingsPane(audioController: AudioController) {
     )
     .join('')
 
-  resetHighlightButton.innerHTML = `<span>Reset Defaults</span>${iconMarkup(
-    'replay'
-  )}`
+  resetHighlightButton.innerHTML = iconMarkup('replay')
 
   const syncForm = () => {
     narratorSelect.value = readerPreferences.narratorId
