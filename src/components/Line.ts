@@ -2,6 +2,7 @@ import type { LeiningAliyah } from '../calendar-model/model-types.ts'
 import type { RenderedLineInfo } from '../view-model/scroll-view-model.ts'
 import displayRange from '../display-range.ts'
 import textFilter from '../text-filter.ts'
+import { iconMarkup } from './icons.ts'
 
 const petuchaClass = (isPetucha: boolean) => (isPetucha ? 'mod-petucha' : '')
 const setumaClass = (column: unknown[]) =>
@@ -44,6 +45,9 @@ const renderWords = ({
     })
     .join(' ')
 
+const addLabelBreakOpportunities = (label: string) =>
+  label.replace(/([־-])/g, '$1<wbr>')
+
 const renderLabelBadge = (
   label: string,
   runId: string | undefined,
@@ -64,10 +68,10 @@ const renderLabelBadge = (
             data-run-id="${runId}"
             data-aliyah-index="${aliyah.index}"
             aria-label="Play ${label}"
-          >▶</button>`
+          >${iconMarkup('play')}</button>`
         : ''
     }
-    <span class="aliyah-label-text">${label}</span>
+    <span class="aliyah-label-text">${addLabelBreakOpportunities(label)}</span>
   </span>
 `
 
@@ -98,42 +102,48 @@ const Line = ({
     }
   >
     <td class="line ${petuchaClass(isPetucha)}">
-      ${text
-        .map(
-          (column, columnIndex) => `
-        <div class="column">
-          ${column
-            .map(
-              (fragment, fragmentIndex) => `
-            <span class="fragment ${setumaClass(
-              column
-            )} mod-annotations-on">${renderWords({
-                text: textFilter({ text: fragment, annotated: true }),
-                pageNumber,
-                lineIndex,
-                fragmentIndex: columnIndex * 100 + fragmentIndex,
-              })}</span>
-            <span class="fragment ${setumaClass(
-              column
-            )} mod-annotations-off">${renderWords({
-                text: textFilter({ text: fragment, annotated: false }),
-                pageNumber,
-                lineIndex,
-                fragmentIndex: columnIndex * 100 + fragmentIndex,
-              })}</span>
-          `
-            )
-            .join('')}
-        </div>
-      `
-        )
-        .join('')}
-      <span class="location-indicator mod-verses">${displayRange.asVersesRange(
-        verses
-      )}</span>
-      <span class="location-indicator mod-aliyot" data-target-id="aliyot-range">${labels
-        .map((label, idx) => renderLabelBadge(label, run?.id, aliyahStarts[idx]))
-        .join('')}</span>
+      <div class="line-content">
+        ${text
+          .map(
+            (column, columnIndex) => `
+          <div class="column">
+            ${column
+              .map(
+                (fragment, fragmentIndex) => `
+              <span class="fragment ${setumaClass(
+                column
+              )} mod-annotations-on">${renderWords({
+                  text: textFilter({ text: fragment, annotated: true }),
+                  pageNumber,
+                  lineIndex,
+                  fragmentIndex: columnIndex * 100 + fragmentIndex,
+                })}</span>
+              <span class="fragment ${setumaClass(
+                column
+              )} mod-annotations-off">${renderWords({
+                  text: textFilter({ text: fragment, annotated: false }),
+                  pageNumber,
+                  lineIndex,
+                  fragmentIndex: columnIndex * 100 + fragmentIndex,
+                })}</span>
+            `
+              )
+              .join('')}
+          </div>
+        `
+          )
+          .join('')}
+      </div>
+      <div class="line-gutter mod-verses">
+        <span class="location-indicator mod-verses">${displayRange.asVersesRange(
+          verses
+        )}</span>
+      </div>
+      <div class="line-gutter mod-aliyot">
+        <span class="location-indicator mod-aliyot" data-target-id="aliyot-range">${labels
+          .map((label, idx) => renderLabelBadge(label, run?.id, aliyahStarts[idx]))
+          .join('')}</span>
+      </div>
     </td>
   </tr>
 `

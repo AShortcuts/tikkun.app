@@ -1,10 +1,7 @@
 .tikkun-page {
-  --indicator-padding-right: 0;
-  --indicator-padding-left: 0;
-  --verse-indicator-right: -6ch;
-  --aliyah-indicator-right: 0;
-  --aliyah-indicator-max-width: 20ch;
-  --aliyah-indicator-transform: translateX(calc(14ch + 100%));
+  --verse-column-width: 3.75ch;
+  --aliyah-column-width: 8.5ch;
+  --aliyah-indicator-max-width: var(--aliyah-column-width);
 }
 
 .tikkun-page {
@@ -19,47 +16,49 @@
   transition: transform var(--pull-transform);
 }
 
-@media screen and (max-width: 900px) {
+@media screen and (max-width: 1050px) {
   .tikkun-page {
-    --verse-indicator-right: -5.25ch;
-    --aliyah-indicator-max-width: 18ch;
-    --aliyah-indicator-transform: translateX(calc(12ch + 100%));
+    --verse-column-width: 3.35ch;
+    --aliyah-column-width: 9.2ch;
     font-size: 1.65rem;
   }
 }
 
-@media screen and (max-width: 800px) {
+@media screen and (max-width: 950px) {
   .tikkun-page {
-    --indicator-padding-right: 8.75ch;
-    --verse-indicator-right: 6.55ch;
-    --aliyah-indicator-right: 0.2ch;
-    --aliyah-indicator-max-width: 10.6ch;
-    --aliyah-indicator-transform: none;
-    font-size: 1.5rem;
+    --verse-column-width: 3.05ch;
+    --aliyah-column-width: 7.6ch;
+    font-size: 1.4rem;
   }
 }
 
-@media screen and (max-width: 700px) {
+@media screen and (max-width: 850px) {
   .tikkun-page {
-    --indicator-padding-right: 8.75ch;
-    --indicator-padding-left: 5.2ch;
-    --verse-indicator-right: 5.35ch;
-    --aliyah-indicator-right: 0.2ch;
-    --aliyah-indicator-max-width: 8.8ch;
-    --aliyah-indicator-transform: none;
-    font-size: 1.35rem;
+    --verse-column-width: 2.95ch;
+    --aliyah-column-width: 7ch;
+    font-size: 1.15rem;
+  }
+
+  .aliyah-badge {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.2rem;
+  }
+
+  .aliyah-label-text {
+    grid-row: 1;
+  }
+
+  .aliyah-audio-button {
+    grid-row: 2;
+    justify-self: start;
   }
 }
 
-@media screen and (max-width: 600px) {
+@media screen and (max-width: 750px) {
   .tikkun-page {
-    --indicator-padding-right: 7.75ch;
-    --indicator-padding-left: 4.6ch;
-    --verse-indicator-right: 4.55ch;
-    --aliyah-indicator-right: 0.2ch;
-    --aliyah-indicator-max-width: 7.6ch;
-    --aliyah-indicator-transform: none;
-    font-size: 1.1rem;
+    --verse-column-width: 2.5ch;
+    --aliyah-column-width: 5.35ch;
+    font-size: 1rem;
   }
 }
 
@@ -85,17 +84,49 @@
 }
 
 .line {
-  position: relative;
-  text-align: justify;
+  direction: ltr;
   line-height: 100%;
-  display: flex;
-  justify-content: space-between;
-  padding-left: var(--indicator-padding-left);
-  padding-right: var(--indicator-padding-right);
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr)
+    var(--verse-column-width)
+    minmax(0, var(--aliyah-column-width));
+  align-items: start;
 }
 
-.line.mod-petucha {
+.line-content {
+  direction: rtl;
+  grid-column: 1;
+  text-align: justify;
+  display: flex;
+  justify-content: space-between;
+  min-width: 0;
+  width: 100%;
+  padding-left: calc((var(--verse-column-width) + var(--aliyah-column-width)) * 0.4);
+}
+
+.line.mod-petucha .line-content {
   text-align: start;
+}
+
+.line-gutter {
+  position: relative;
+  min-height: 1em;
+}
+
+.line-gutter.mod-verses {
+  grid-column: 2;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.line-gutter.mod-aliyot {
+  grid-column: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+  padding-left: 0.85ch;
 }
 
 .column {
@@ -120,7 +151,7 @@
 }
 
 .word {
-  display: inline-block;
+  display: inline;
   border-radius: var(--reader-highlight-radius);
   transition:
     background-color 0.1s ease,
@@ -152,7 +183,6 @@
 }
 
 .location-indicator {
-  position: absolute;
   font-family: sans-serif;
   font-size: 0.8em;
 
@@ -167,15 +197,14 @@
 }
 
 .location-indicator.mod-verses {
-  right: var(--verse-indicator-right);
+  position: static;
   color: var(--verses-color);
 }
 
 .location-indicator.mod-aliyot {
-  right: var(--aliyah-indicator-right);
-  color: hsla(203, 100%, 50%, 0.75);
+  position: static;
+  color: oklch(65% 0.2 250 / 0.75);
   max-width: var(--aliyah-indicator-max-width);
-  transform: var(--aliyah-indicator-transform);
   text-align: right;
   display: flex;
   flex-direction: column;
@@ -192,21 +221,52 @@
 }
 
 .aliyah-badge {
-  display: inline-flex;
-  align-items: center;
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
   gap: 0.35rem;
-  padding: 0.15rem 0.4rem;
-  border-radius: 999px;
-  background: var(--light-accent-color);
-  white-space: nowrap;
+  max-width: 100%;
+}
+
+.aliyah-label-text {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  line-height: 1.1;
+  text-align: left;
+  hyphens: manual;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .aliyah-audio-button {
   border: none;
-  background: transparent;
-  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+  padding: 0.22rem 0.46rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, dodgerblue 14%, transparent);
+  color: hsl(206, 100%, 49%);
   cursor: pointer;
   line-height: 1;
+  flex: none;
+}
+
+.ui-icon {
+  width: 1rem;
+  height: 1rem;
+  display: block;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  flex: none;
+  pointer-events: none;
 }
 
 .aliyah-audio-button:disabled {
@@ -214,6 +274,28 @@
   cursor: not-allowed;
 }
 
+.aliyah-audio-button:hover {
+  background: color-mix(in srgb, dodgerblue 20%, transparent);
+}
+
 .aliyah-audio-button.is-active {
-  color: hsl(24, 89%, 48%);
+  color: hsl(42, 82%, 42%);
+  background: color-mix(in srgb, hsl(48, 100%, 62%) 18%, transparent);
+}
+
+@media screen and (max-width: 500px) {
+  .line {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .line-content {
+    padding-left: 0;
+  }
+
+  .line-gutter.mod-verses,
+  .line-gutter.mod-aliyot,
+  .location-indicator.mod-verses,
+  .location-indicator.mod-aliyot {
+    display: none;
+  }
 }

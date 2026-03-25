@@ -13,14 +13,17 @@ import {
   parseUrl,
 } from './view-model/navigation/url-parser.ts'
 import AboutPage from './components/AboutPage.ts'
+import { iconMarkup, type IconName } from './components/icons.ts'
 import {
   applyReaderPreferences,
+  defaultHighlightPreferences,
   defaultReaderPreferences,
   loadReaderPreferences,
   mergeReaderPreferences,
   ReaderPreferences,
   saveReaderPreferences,
   TOKENIZATION_VERSION,
+  ThemeMode,
 } from './reader-preferences.ts'
 import {
   findRecordingForRun,
@@ -281,6 +284,11 @@ function getAliyahMarkerElements() {
   ]
 }
 
+function setControlIcon(element: HTMLElement | null, icon: IconName) {
+  if (!element) return
+  element.innerHTML = iconMarkup(icon)
+}
+
 function getAliyahProgressAnchors() {
   const book = getBook()
   const bookRect = book.getBoundingClientRect()
@@ -288,11 +296,15 @@ function getAliyahProgressAnchors() {
   return [...book.querySelectorAll<HTMLElement>('[data-line-index][data-aliyah-starts]')]
     .map((line) => {
       const rect = line.getBoundingClientRect()
-      const label =
-        line.querySelector('.aliyah-label-text')?.textContent?.trim() ?? '—'
+      const label = line.querySelector('.aliyah-label-text')?.textContent?.trim() ?? '—'
+      const aliyahStarts = (line.dataset.aliyahStarts ?? '').split(',')
+      const progressLabel =
+        aliyahStarts.includes('1') && !label.endsWith('ראשון')
+          ? `${label} ראשון`
+          : label
       return {
         line,
-        label,
+        label: progressLabel,
         center:
           book.scrollTop + (rect.top - bookRect.top) + rect.height / 2,
       }
@@ -349,14 +361,23 @@ function refreshInlineAudioButtons(audioController: AudioController) {
   for (const button of getAudioButtonElements()) {
     const state = getSessionButtonState(button)
     const available = Boolean(state?.recording)
-    button.disabled = !available
-    button.title = available
-      ? `Play ${state!.lineInfo.labels[0] ?? 'aliyah'}`
-      : 'Recording unavailable'
-    button.classList.toggle('is-active', Boolean(
+    const isCurrentSession = Boolean(
       available &&
         audioController.session?.recording.id === state?.recording?.id
-    ))
+    )
+    const isPlayingCurrentSession = Boolean(
+      isCurrentSession && !audioController.audio.paused
+    )
+
+    button.disabled = !available
+    setControlIcon(button, isPlayingCurrentSession ? 'pause' : 'play')
+    button.title = !available
+      ? 'Recording unavailable'
+      : `${isPlayingCurrentSession ? 'Pause' : 'Play'} ${
+          state!.lineInfo.labels[0] ?? 'aliyah'
+        }`
+    button.setAttribute('aria-label', button.title)
+    button.classList.toggle('is-active', isPlayingCurrentSession)
   }
 }
 
@@ -434,7 +455,7 @@ function updateFloatingPlayer(audioController: AudioController) {
   const activeSession = audioController.session
 
   player.classList.toggle('u-hidden', !activeSession)
-  playButton.textContent = audioController.audio.paused ? '▶' : '❚❚'
+  setControlIcon(playButton, audioController.audio.paused ? 'play' : 'pause')
 
   if (activeSession) {
     downloadLink.href = activeSession.recording.downloadSrc
@@ -787,6 +808,12 @@ function setupSettingsPane(audioController: AudioController) {
   const autoScroll = document.querySelector<HTMLInputElement>(
     '[data-target-id="settings-auto-scroll"]'
   )!
+  const themeModeButtons = [
+    ...document.querySelectorAll<HTMLButtonElement>('[data-theme-mode]'),
+  ]
+  const resetHighlightButton = document.querySelector<HTMLButtonElement>(
+    '[data-target-id="settings-reset-highlight"]'
+  )!
 
   narratorSelect.innerHTML = listNarrators()
     .map(
@@ -794,6 +821,10 @@ function setupSettingsPane(audioController: AudioController) {
         `<option value="${narrator.id}">${narrator.displayName}</option>`
     )
     .join('')
+
+  resetHighlightButton.innerHTML = `<span>Reset Defaults</span>${iconMarkup(
+    'replay'
+  )}`
 
   const syncForm = () => {
     narratorSelect.value = readerPreferences.narratorId
@@ -809,6 +840,11 @@ function setupSettingsPane(audioController: AudioController) {
     glow.value = `${readerPreferences.glow}`
     glowValue.value = `${readerPreferences.glow}`
     autoScroll.checked = readerPreferences.autoScrollWithPlayback
+    for (const button of themeModeButtons) {
+      const isActive = button.dataset.themeMode === readerPreferences.themeMode
+      button.classList.toggle('is-active', isActive)
+      button.setAttribute('aria-pressed', `${isActive}`)
+    }
     audioController.audio.playbackRate = readerPreferences.playbackRate
   }
 
@@ -889,6 +925,16 @@ function setupSettingsPane(audioController: AudioController) {
   autoScroll.addEventListener('change', () =>
     applyUpdates({ autoScrollWithPlayback: autoScroll.checked })
   )
+  for (const button of themeModeButtons) {
+    button.addEventListener('click', () => {
+      const themeMode = button.dataset.themeMode as ThemeMode | undefined
+      if (!themeMode) return
+      applyUpdates({ themeMode })
+    })
+  }
+  resetHighlightButton.addEventListener('click', () =>
+    applyUpdates({ ...defaultHighlightPreferences })
+  )
 
   document
     .querySelector('[data-target-id="settings-toggle"]')!
@@ -948,6 +994,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   const viewportTracker = new ViewportTracker(book)
   const topBarModel = new TopBarTracker()
   const titleEl = getTitleEl()
+
+  setControlIcon(document.querySelector('[data-target-id="floating-prev"]'), 'previous')
+  setControlIcon(document.querySelector('[data-target-id="floating-play"]'), 'play')
+  setControlIcon(document.querySelector('[data-target-id="floating-next"]'), 'next')
+  setControlIcon(document.querySelector('[data-target-id="floating-replay"]'), 'replay')
+  setControlIcon(document.querySelector('[data-target-id="floating-download"]'), 'download')
 
   viewportTracker.on('viewport-updated', (range) => {
     if (!display?.viewModel) return
@@ -1024,6 +1076,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   audioController.on('session-loaded', (session) => {
     highlightController.setSequence(session.tokenKeys)
     updateFloatingPlayer(audioController)
+    refreshInlineAudioButtons(audioController)
   })
   audioController.on('time-updated', async ({ currentTime }) => {
     if (adminState.recording) return

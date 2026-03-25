@@ -3,8 +3,13 @@
   --tooltip-text-color: white;
 }
 
+html[data-reader-theme='dark'] [data-tooltip] {
+  --tooltip-background-color: hsl(0, 0%, 80%);
+  --tooltip-text-color: black;
+}
+
 @media (prefers-color-scheme: dark) {
-  [data-tooltip] {
+  html[data-reader-theme='automatic'] [data-tooltip] {
     --tooltip-background-color: hsl(0, 0%, 80%);
     --tooltip-text-color: black;
   }

@@ -75,11 +75,11 @@
       <section class="reader-shell" data-target-id="reader-shell">
         <div class="reader-side mod-left">
           <div class="floating-player u-hidden" data-target-id="floating-player">
-            <button class="floating-player-button" data-target-id="floating-prev" type="button" title="Previous cue">←</button>
-            <button class="floating-player-button" data-target-id="floating-play" type="button" title="Play or pause">▶</button>
-            <button class="floating-player-button" data-target-id="floating-next" type="button" title="Next cue">→</button>
-            <button class="floating-player-button" data-target-id="floating-replay" type="button" title="Replay current cue">↺</button>
-            <a class="floating-player-button mod-download" data-target-id="floating-download" href="#" download title="Download current recording">↓</a>
+            <button class="floating-player-button" data-target-id="floating-prev" type="button" title="Previous cue" aria-label="Previous cue"></button>
+            <button class="floating-player-button" data-target-id="floating-play" type="button" title="Play or pause" aria-label="Play or pause"></button>
+            <button class="floating-player-button" data-target-id="floating-next" type="button" title="Next cue" aria-label="Next cue"></button>
+            <button class="floating-player-button" data-target-id="floating-replay" type="button" title="Replay current cue" aria-label="Replay current cue"></button>
+            <a class="floating-player-button mod-download" data-target-id="floating-download" href="#" download title="Download current recording" aria-label="Download current recording"></a>
           </div>
         </div>
 
@@ -116,13 +116,26 @@
     <aside class="settings-pane u-hidden" data-target-id="settings-pane">
       <div class="settings-pane-header">
         <h2>Reader Settings</h2>
-        <button class="toolbar-button" type="button" data-target-id="settings-close">Close</button>
+        <div class="settings-pane-header-actions">
+          <button class="toolbar-button mod-icon-label" type="button" data-target-id="settings-reset-highlight">
+            <span>Reset Defaults</span>
+          </button>
+          <button class="toolbar-button" type="button" data-target-id="settings-close">Close</button>
+        </div>
       </div>
       <form class="settings-form stack medium" data-target-id="settings-form">
         <label class="settings-field">
           <span>Narrator</span>
           <select data-target-id="settings-narrator"></select>
         </label>
+        <div class="settings-field">
+          <span>Theme</span>
+          <div class="settings-segmented-control" data-target-id="settings-theme-mode">
+            <button class="settings-segmented-option" type="button" data-theme-mode="light">Light</button>
+            <button class="settings-segmented-option" type="button" data-theme-mode="dark">Dark</button>
+            <button class="settings-segmented-option" type="button" data-theme-mode="automatic">Automatic</button>
+          </div>
+        </div>
         <label class="settings-field">
           <span>Playback rate</span>
           <div class="settings-number-input">

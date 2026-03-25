@@ -33,7 +33,7 @@
   display: inline-block;
   border-radius: var(--button-border-radius);
   color: var(--text-color);
-  border: 1px solid hsla(0, 0%, 0%, 0);
+  border: 1px solid oklch(0% 0 0 / 0);
   width: 30ch;
 }
 

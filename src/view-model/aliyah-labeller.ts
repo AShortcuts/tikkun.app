@@ -96,7 +96,7 @@ export function aliyahName(
   if (index === 'Maftir') return 'מפטיר'
   if (index < 1 || index > aliyahStrings.length) return ''
 
-  if (!isEnd && index === 1) return run.leining.date.title.he
+  if (!isEnd && index === 1) return run.leining.date.title.he.replace(/^פרשת /, '')
   if (run.leining.date.title.he === 'שמחת תורה') {
     if (index === 6) return `חתן תורה`
     if (index === 7) return `חתן בראשית`

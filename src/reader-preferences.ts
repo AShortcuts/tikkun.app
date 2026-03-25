@@ -1,6 +1,8 @@
-const STORAGE_KEY = 'tikkun.reader-preferences.v2'
+const STORAGE_KEY = 'tikkun.reader-preferences.v3'
 
 export const TOKENIZATION_VERSION = 'v1'
+
+export type ThemeMode = 'automatic' | 'light' | 'dark'
 
 export interface ReaderPreferences {
   narratorId: string
@@ -12,6 +14,7 @@ export interface ReaderPreferences {
   radius: number
   glow: number
   autoScrollWithPlayback: boolean
+  themeMode: ThemeMode
 }
 
 export const defaultReaderPreferences: ReaderPreferences = {
@@ -24,7 +27,17 @@ export const defaultReaderPreferences: ReaderPreferences = {
   radius: 4,
   glow: 3.5,
   autoScrollWithPlayback: true,
+  themeMode: 'automatic',
 }
+
+export const defaultHighlightPreferences = {
+  highlightFill: defaultReaderPreferences.highlightFill,
+  highlightOpacity: defaultReaderPreferences.highlightOpacity,
+  outlineColor: defaultReaderPreferences.outlineColor,
+  outlineWidth: defaultReaderPreferences.outlineWidth,
+  radius: defaultReaderPreferences.radius,
+  glow: defaultReaderPreferences.glow,
+} as const
 
 export function loadReaderPreferences(): ReaderPreferences {
   try {
@@ -57,6 +70,8 @@ export function mergeReaderPreferences(
 export function applyReaderPreferences(preferences: ReaderPreferences) {
   const root = document.documentElement
   const fillTint = toRgba(preferences.highlightFill, preferences.highlightOpacity)
+
+  root.dataset.readerTheme = preferences.themeMode
 
   root.style.setProperty('--reader-highlight-fill', preferences.highlightFill)
   root.style.setProperty('--reader-highlight-fill-tint', fillTint)
