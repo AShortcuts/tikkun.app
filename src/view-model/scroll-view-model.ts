@@ -21,6 +21,23 @@ import {
 import { AliyahLabeller } from './aliyah-labeller.ts'
 import { loadScroll, ScrollResolver } from '../location.ts'
 
+type PageLoader = () => Promise<LineType[]>
+
+let pageLoaders: Record<string, PageLoader> | null | undefined
+
+function getBundledPageLoaders() {
+  if (pageLoaders !== undefined) return pageLoaders
+  if (typeof import.meta.glob !== 'function') {
+    pageLoaders = null
+    return pageLoaders
+  }
+
+  pageLoaders = import.meta.glob<LineType[]>('../data/pages/*/*.json', {
+    import: 'default',
+  })
+  return pageLoaders
+}
+
 /** Information to render a single page from a scroll. */
 export interface RenderedPageInfo {
   type: 'page'
@@ -201,26 +218,35 @@ export abstract class ScrollViewModel {
     if (typeof pageNumberEntry === 'object') return pageNumberEntry
     if (!pageNumberEntry || pageNumberEntry <= 0) return null
 
+    const pageLoader =
+      getBundledPageLoaders()?.[
+        `../data/pages/${this.relevantRuns[0].scroll}/${pageNumberEntry}.json`
+      ]
 
-    let page: { default: LineType[] }
-    if (import.meta.env?.MODE)
+    let pageLines: LineType[]
+    if (pageLoader) {
+      pageLines = await pageLoader()
+    } else if (import.meta.env?.MODE) {
       // Vite dynamic imports doesn't support the second parameter
-      page = await import(
+      const page = await import(
         /* @vite-ignore */
         `../data/pages/${this.relevantRuns[0].scroll}/${pageNumberEntry}.json`
       )
-    else
-      page = await import(
+      pageLines = page.default
+    } else {
+      const page = await import(
         /* @vite-ignore */
         `../data/pages/${this.relevantRuns[0].scroll}/${pageNumberEntry}.json`,
         // Node.js requires the second parameter.
         { with: { type: 'json' } }
       )
+      pageLines = page.default
+    }
 
     let run: LeiningRun | undefined
     let aliyot: LeiningAliyah[] = []
     const labeller = new AliyahLabeller()
-    const lines: RenderedLineInfo[] = page.default.map((rawLine) => {
+    const lines: RenderedLineInfo[] = pageLines.map((rawLine) => {
       const verses = rawLine.verses.map(toRef)
 
       if (verses.length) [run, aliyot] = this.findContainingAliyot(verses, run)

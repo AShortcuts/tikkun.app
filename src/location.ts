@@ -7,8 +7,28 @@ type AppleSauce = {
 }
 
 type TOC = Record<string, Record<string, Record<string, AppleSauce>>>
+type TOCLoader = () => Promise<TOC>
+
+let tocLoaders: Record<string, TOCLoader> | null | undefined
+
+function getBundledTOCLoaders() {
+  if (tocLoaders !== undefined) return tocLoaders
+  if (typeof import.meta.glob !== 'function') {
+    tocLoaders = null
+    return tocLoaders
+  }
+
+  tocLoaders = import.meta.glob<TOC>('./data/tables-of-contents/*.json', {
+    import: 'default',
+  })
+  return tocLoaders
+}
 
 export async function loadScroll(name: ScrollName) {
+  const tocLoader =
+    getBundledTOCLoaders()?.[`./data/tables-of-contents/${name}.json`]
+  if (tocLoader) return new ScrollResolver(name, await tocLoader())
+
   // TODO(https://github.com/vitejs/vite/issues/18582): Delete this workaround.
   let toc
   if (import.meta.env?.MODE)
