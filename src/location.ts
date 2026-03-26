@@ -9,24 +9,17 @@ type AppleSauce = {
 type TOC = Record<string, Record<string, Record<string, AppleSauce>>>
 type TOCLoader = () => Promise<TOC>
 
-let tocLoaders: Record<string, TOCLoader> | null | undefined
+const isNodeRuntime =
+  typeof process !== 'undefined' && Boolean(process.versions?.node)
 
-function getBundledTOCLoaders() {
-  if (tocLoaders !== undefined) return tocLoaders
-  if (typeof import.meta.glob !== 'function') {
-    tocLoaders = null
-    return tocLoaders
-  }
-
-  tocLoaders = import.meta.glob<TOC>('./data/tables-of-contents/*.json', {
-    import: 'default',
-  })
-  return tocLoaders
-}
+const tocLoaders: Record<string, TOCLoader> | null = isNodeRuntime
+  ? null
+  : import.meta.glob<TOC>('./data/tables-of-contents/*.json', {
+      import: 'default',
+    })
 
 export async function loadScroll(name: ScrollName) {
-  const tocLoader =
-    getBundledTOCLoaders()?.[`./data/tables-of-contents/${name}.json`]
+  const tocLoader = tocLoaders?.[`./data/tables-of-contents/${name}.json`]
   if (tocLoader) return new ScrollResolver(name, await tocLoader())
 
   // TODO(https://github.com/vitejs/vite/issues/18582): Delete this workaround.

@@ -23,20 +23,14 @@ import { loadScroll, ScrollResolver } from '../location.ts'
 
 type PageLoader = () => Promise<LineType[]>
 
-let pageLoaders: Record<string, PageLoader> | null | undefined
+const isNodeRuntime =
+  typeof process !== 'undefined' && Boolean(process.versions?.node)
 
-function getBundledPageLoaders() {
-  if (pageLoaders !== undefined) return pageLoaders
-  if (typeof import.meta.glob !== 'function') {
-    pageLoaders = null
-    return pageLoaders
-  }
-
-  pageLoaders = import.meta.glob<LineType[]>('../data/pages/*/*.json', {
-    import: 'default',
-  })
-  return pageLoaders
-}
+const pageLoaders: Record<string, PageLoader> | null = isNodeRuntime
+  ? null
+  : import.meta.glob<LineType[]>('../data/pages/*/*.json', {
+      import: 'default',
+    })
 
 /** Information to render a single page from a scroll. */
 export interface RenderedPageInfo {
@@ -219,7 +213,7 @@ export abstract class ScrollViewModel {
     if (!pageNumberEntry || pageNumberEntry <= 0) return null
 
     const pageLoader =
-      getBundledPageLoaders()?.[
+      pageLoaders?.[
         `../data/pages/${this.relevantRuns[0].scroll}/${pageNumberEntry}.json`
       ]
 
