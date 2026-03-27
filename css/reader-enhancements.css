@@ -28,6 +28,7 @@
 }
 
 .floating-player {
+  --audio-progress-ratio: 0;
   position: sticky;
   top: 96px;
   display: flex;
@@ -81,6 +82,13 @@
   text-align: center;
 }
 
+.floating-player-button:disabled,
+.floating-player-button[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: default;
+  pointer-events: none;
+}
+
 .reader-progress {
   position: sticky;
   top: 96px;
@@ -119,6 +127,10 @@
 
 .reader-progress-percent {
   font-size: 0.75rem;
+}
+
+.reader-progress-mobile {
+  display: none;
 }
 
 .reader-corner-controls {
@@ -532,9 +544,85 @@
     grid-template-columns: 1fr;
   }
 
-  .reader-side.mod-left,
+  .reader-side.mod-left {
+    display: contents;
+  }
+
   .reader-side.mod-right {
     display: none;
+  }
+
+  .reader-progress-mobile {
+    position: relative;
+    left: 0;
+    right: 0;
+    display: block;
+    height: 4px;
+    background: color-mix(in srgb, var(--text-color) 10%, transparent);
+    pointer-events: none;
+  }
+
+  .reader-progress-mobile-fill {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, hsl(199, 100%, 82%), dodgerblue);
+    transition: width 0.1s linear;
+  }
+
+  .floating-player {
+    position: fixed;
+    top: auto;
+    left: 50%;
+    bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    z-index: 80;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    width: max-content;
+    max-width: calc(100vw - 1.7rem);
+    padding: 0.95rem 0.7rem 0.7rem;
+    border-radius: 24px;
+    background: color-mix(in srgb, var(--paper-color) 92%, transparent);
+    box-shadow: 0 18px 40px -26px black;
+    backdrop-filter: blur(18px) saturate(130%);
+    overflow: hidden;
+  }
+
+  .floating-player::after,
+  .floating-player::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 4px;
+    width: 100%;
+  }
+
+  .floating-player::after {
+    background: color-mix(in srgb, var(--text-color) 10%, transparent);
+  }
+
+  .floating-player::before {
+    background: linear-gradient(90deg, hsl(45, 100%, 80%), hsl(33, 100%, 55%));
+    transform: scaleX(var(--audio-progress-ratio));
+    transform-origin: left center;
+  }
+
+  .floating-player-button {
+    flex: 0 0 auto;
+    width: 2.75rem;
+    min-height: 2.75rem;
+  }
+
+  .floating-player-button.mod-download {
+    width: 2.75rem;
+  }
+
+  .reader-corner-controls {
+    bottom: calc(6.75rem + env(safe-area-inset-bottom, 0px));
+    right: 0.85rem;
   }
 
   .about-view {

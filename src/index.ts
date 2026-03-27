@@ -440,7 +440,18 @@ async function collectAliyahTokenKeys({
 
 function updateFloatingPlayer(audioController: AudioController) {
   const player = document.querySelector<HTMLElement>('[data-target-id="floating-player"]')!
-  const playButton = document.querySelector<HTMLElement>('[data-target-id="floating-play"]')!
+  const prevButton = document.querySelector<HTMLButtonElement>(
+    '[data-target-id="floating-prev"]'
+  )!
+  const playButton = document.querySelector<HTMLButtonElement>(
+    '[data-target-id="floating-play"]'
+  )!
+  const nextButton = document.querySelector<HTMLButtonElement>(
+    '[data-target-id="floating-next"]'
+  )!
+  const replayButton = document.querySelector<HTMLButtonElement>(
+    '[data-target-id="floating-replay"]'
+  )!
   const downloadLink = document.querySelector<HTMLAnchorElement>(
     '[data-target-id="floating-download"]'
   )!
@@ -448,6 +459,11 @@ function updateFloatingPlayer(audioController: AudioController) {
 
   player.classList.toggle('u-hidden', !activeSession)
   setControlIcon(playButton, audioController.audio.paused ? 'play' : 'pause')
+  for (const button of [prevButton, playButton, nextButton, replayButton]) {
+    button.disabled = !activeSession
+  }
+  downloadLink.setAttribute('aria-disabled', activeSession ? 'false' : 'true')
+  downloadLink.tabIndex = activeSession ? 0 : -1
 
   if (activeSession) {
     downloadLink.href = activeSession.recording.downloadSrc
@@ -456,6 +472,21 @@ function updateFloatingPlayer(audioController: AudioController) {
     downloadLink.href = '#'
     downloadLink.removeAttribute('download')
   }
+
+  updateFloatingPlayerAudioProgress(audioController)
+}
+
+function updateFloatingPlayerAudioProgress(audioController: AudioController) {
+  const player = document.querySelector<HTMLElement>('[data-target-id="floating-player"]')
+  if (!player) return
+
+  const { currentTime, duration } = audioController.audio
+  const progress =
+    audioController.session && Number.isFinite(duration) && duration > 0
+      ? Math.max(0, Math.min(1, currentTime / duration))
+      : 0
+
+  player.style.setProperty('--audio-progress-ratio', `${progress}`)
 }
 
 async function startPlaybackForButton(
@@ -598,6 +629,9 @@ function updateReaderProgress() {
   const percent = document.querySelector<HTMLElement>(
     '[data-target-id="reader-progress-percent"]'
   )!
+  const mobileFill = document.querySelector<HTMLElement>(
+    '[data-target-id="reader-progress-mobile-fill"]'
+  )
   const book = getBook()
   const anchors = getAliyahProgressAnchors()
 
@@ -605,6 +639,7 @@ function updateReaderProgress() {
     label.textContent = 'Loading'
     fill.style.height = '0%'
     percent.textContent = '0%'
+    mobileFill?.style.setProperty('width', '0%')
     return
   }
 
@@ -629,6 +664,7 @@ function updateReaderProgress() {
     }
     fill.style.height = '0%'
     percent.textContent = '0%'
+    mobileFill?.style.setProperty('width', '0%')
     return
   }
 
@@ -641,6 +677,7 @@ function updateReaderProgress() {
   )
   fill.style.height = `${Math.round(progress * 100)}%`
   percent.textContent = `${Math.round(progress * 100)}%`
+  mobileFill?.style.setProperty('width', `${Math.round(progress * 100)}%`)
 }
 
 function scheduleDeferredProgressRefresh() {
@@ -1091,6 +1128,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setControlIcon(document.querySelector('[data-target-id="floating-next"]'), 'next')
   setControlIcon(document.querySelector('[data-target-id="floating-replay"]'), 'replay')
   setControlIcon(document.querySelector('[data-target-id="floating-download"]'), 'download')
+  updateFloatingPlayer(audioController)
 
   viewportTracker.on('viewport-updated', (range) => {
     if (!display?.viewModel) return
@@ -1175,6 +1213,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     syncAdminPanelState(audioController)
   })
   audioController.on('time-updated', async ({ currentTime }) => {
+    updateFloatingPlayerAudioProgress(audioController)
     if (adminState.recording) return
     const session = audioController.session
     if (!session?.cues.length) return
@@ -1185,6 +1224,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       scroll: readerPreferences.autoScrollWithPlayback,
     })
   })
+  for (const eventName of ['loadedmetadata', 'durationchange', 'emptied'] as const) {
+    audioElement.addEventListener(eventName, () =>
+      updateFloatingPlayerAudioProgress(audioController)
+    )
+  }
 
   document
     .querySelector('[data-target-id="floating-play"]')!

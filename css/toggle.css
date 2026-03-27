@@ -2,6 +2,7 @@
   font-family: ShlomosemiStam;
   border: none;
   border-radius: 50%; /* no border, but setting the border-radius allows the focused highlight to fit the button nicely */
+  cursor: pointer;
 }
 
 .toggle {
