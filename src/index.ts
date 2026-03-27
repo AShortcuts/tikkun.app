@@ -30,6 +30,7 @@ import {
   listNarrators,
 } from './audio/library.ts'
 import { cueFileRelativePath, formatCueFileJson } from './audio/cue-file.ts'
+import { normalizeFirstCueStart } from './audio/normalize-first-cue.ts'
 import { AudioController, ActiveAudioSession } from './reading/audio-controller.ts'
 import { HighlightController, cueKey } from './reading/highlight-controller.ts'
 import { adjustStartingLineTokens } from './reading/aliyah-token-sequence.ts'
@@ -845,7 +846,7 @@ async function exportAdminCues(audioController: AudioController) {
     cueCount: adminState.cues.length,
     tokenizationVersion: TOKENIZATION_VERSION,
     audioVersion: session.recording.notes,
-    cues: adminState.cues,
+    cues: normalizeFirstCueStart(adminState.cues),
   }
 
   const modal = document.querySelector<HTMLElement>('[data-target-id="export-modal"]')!

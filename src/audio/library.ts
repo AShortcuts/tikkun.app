@@ -6,6 +6,7 @@ import {
   audioRecordings,
 } from '../data/audio-manifest.generated.ts'
 import type { AudioNarrator, AudioRecording, WordCue } from './types.ts'
+import { normalizeFirstCueStart } from './normalize-first-cue.ts'
 
 export function listNarrators(): AudioNarrator[] {
   return audioNarrators
@@ -45,5 +46,5 @@ export function findRecordingForRun({
 }
 
 export function getCuesForRecording(recording: AudioRecording): WordCue[] {
-  return audioCuePayloadsByAudioId[recording.id]?.cues ?? []
+  return normalizeFirstCueStart(audioCuePayloadsByAudioId[recording.id]?.cues ?? [])
 }
