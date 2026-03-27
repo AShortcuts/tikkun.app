@@ -940,6 +940,9 @@ function mountAdminEditorUi() {
       <div class="admin-panel-draft" data-target-id="admin-draft-status">
         Drafts autosave locally per recording.
       </div>
+      <div class="admin-panel-draft" data-target-id="admin-sync-note" hidden>
+        To visualize synced autoplay highlighting, press 'Stop Recording'.
+      </div>
       <div class="admin-panel-actions mod-secondary">
         <button type="button" class="toolbar-button" data-target-id="admin-prev-saved">Prev Saved</button>
         <button type="button" class="toolbar-button" data-target-id="admin-play-current">Play Current</button>
@@ -1257,6 +1260,7 @@ function syncAdminPanelState(audioController?: AudioController | null) {
   const draftStatus = document.querySelector<HTMLElement>(
     '[data-target-id="admin-draft-status"]'
   )
+  const syncNote = document.querySelector<HTMLElement>('[data-target-id="admin-sync-note"]')
   const nudgeButtons = [
     ...document.querySelectorAll<HTMLButtonElement>('[data-admin-nudge]'),
   ]
@@ -1310,6 +1314,9 @@ function syncAdminPanelState(audioController?: AudioController | null) {
   if (draftStatus) {
     draftStatus.textContent = getAdminDraftStatusText(audioController)
   }
+  if (syncNote) {
+    syncNote.hidden = !adminState.recording
+  }
   renderAdminCueList(audioController)
   syncAdminRecordButton()
 }
@@ -1355,6 +1362,16 @@ async function exportAdminCues(audioController: AudioController) {
   const session = audioController.session
   if (!session) return
 
+  const exportCues = normalizeFirstCueStart(adminState.cues).map((cue, index) => ({
+    cueNumber: index + 1,
+    timeStart: cue.timeStart,
+    ...(cue.timeEnd === undefined ? {} : { timeEnd: cue.timeEnd }),
+    pageNumber: cue.pageNumber,
+    lineIndex: cue.lineIndex,
+    fragmentIndex: cue.fragmentIndex,
+    wordIndex: cue.wordIndex,
+  }))
+
   const payload: CueExportPayload = {
     audioId: session.recording.id,
     audioFormat: session.recording.format,
@@ -1362,10 +1379,10 @@ async function exportAdminCues(audioController: AudioController) {
     parshaSlug: session.recording.parshaSlug,
     aliyah: session.recording.aliyah,
     tokenCount: session.tokenKeys.length,
-    cueCount: adminState.cues.length,
+    cueCount: exportCues.length,
     tokenizationVersion: TOKENIZATION_VERSION,
     audioVersion: session.recording.notes,
-    cues: normalizeFirstCueStart(adminState.cues),
+    cues: exportCues,
   }
 
   const modal = document.querySelector<HTMLElement>('[data-target-id="export-modal"]')!

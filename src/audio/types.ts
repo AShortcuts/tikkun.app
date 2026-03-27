@@ -9,6 +9,7 @@ export interface AudioNarrator {
 }
 
 export interface WordCue {
+  cueNumber?: number
   timeStart: number
   timeEnd?: number
   pageNumber: number

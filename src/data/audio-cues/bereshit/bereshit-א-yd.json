@@ -5,11 +5,12 @@
   "parshaSlug": "bereshit",
   "aliyah": 1,
   "tokenCount": 406,
-  "cueCount": 19,
+  "cueCount": 26,
   "tokenizationVersion": "v1",
   "audioVersion": "Source file: בראשית א׳.m4a",
   "cues": [
     {
+      "cueNumber": 1,
       "timeStart": 0,
       "pageNumber": 1,
       "lineIndex": 0,
@@ -17,128 +18,202 @@
       "wordIndex": 0
     },
     {
-      "timeStart": 3.487,
+      "cueNumber": 2,
+      "timeStart": 3.513,
       "pageNumber": 1,
       "lineIndex": 0,
       "fragmentIndex": 0,
       "wordIndex": 1
     },
     {
-      "timeStart": 4.149,
+      "cueNumber": 3,
+      "timeStart": 4.031,
       "pageNumber": 1,
       "lineIndex": 0,
       "fragmentIndex": 0,
       "wordIndex": 2
     },
     {
-      "timeStart": 5.529,
+      "cueNumber": 4,
+      "timeStart": 5.436,
       "pageNumber": 1,
       "lineIndex": 0,
       "fragmentIndex": 0,
       "wordIndex": 3
     },
     {
-      "timeStart": 6.044,
+      "cueNumber": 5,
+      "timeStart": 5.986,
       "pageNumber": 1,
       "lineIndex": 0,
       "fragmentIndex": 0,
       "wordIndex": 4
     },
     {
-      "timeStart": 8.498,
+      "cueNumber": 6,
+      "timeStart": 8.267,
       "pageNumber": 1,
       "lineIndex": 0,
       "fragmentIndex": 0,
       "wordIndex": 5
     },
     {
-      "timeStart": 9.173,
+      "cueNumber": 7,
+      "timeStart": 9.263,
       "pageNumber": 1,
       "lineIndex": 0,
       "fragmentIndex": 0,
       "wordIndex": 6
     },
     {
-      "timeStart": 11.732,
+      "cueNumber": 8,
+      "timeStart": 11.964,
       "pageNumber": 1,
       "lineIndex": 1,
       "fragmentIndex": 0,
       "wordIndex": 0
     },
     {
-      "timeStart": 16.223,
+      "cueNumber": 9,
+      "timeStart": 15.809,
       "pageNumber": 1,
       "lineIndex": 1,
       "fragmentIndex": 0,
       "wordIndex": 1
     },
     {
-      "timeStart": 16.791,
+      "cueNumber": 10,
+      "timeStart": 16.685,
       "pageNumber": 1,
       "lineIndex": 1,
       "fragmentIndex": 0,
       "wordIndex": 2
     },
     {
-      "timeStart": 17.484,
+      "cueNumber": 11,
+      "timeStart": 17.303,
       "pageNumber": 1,
       "lineIndex": 1,
       "fragmentIndex": 0,
       "wordIndex": 3
     },
     {
-      "timeStart": 19.151,
+      "cueNumber": 12,
+      "timeStart": 19.02,
       "pageNumber": 1,
       "lineIndex": 1,
       "fragmentIndex": 0,
       "wordIndex": 4
     },
     {
-      "timeStart": 21.248,
+      "cueNumber": 13,
+      "timeStart": 21.071,
       "pageNumber": 1,
       "lineIndex": 1,
       "fragmentIndex": 0,
       "wordIndex": 5
     },
     {
-      "timeStart": 21.723,
+      "cueNumber": 14,
+      "timeStart": 21.679,
       "pageNumber": 1,
       "lineIndex": 1,
       "fragmentIndex": 0,
       "wordIndex": 6
     },
     {
-      "timeStart": 23.13,
+      "cueNumber": 15,
+      "timeStart": 22.802,
       "pageNumber": 1,
       "lineIndex": 1,
       "fragmentIndex": 0,
       "wordIndex": 7
     },
     {
-      "timeStart": 23.515,
+      "cueNumber": 16,
+      "timeStart": 23.454,
       "pageNumber": 1,
       "lineIndex": 2,
       "fragmentIndex": 0,
       "wordIndex": 0
     },
     {
-      "timeStart": 25.397,
+      "cueNumber": 17,
+      "timeStart": 25.451,
       "pageNumber": 1,
       "lineIndex": 2,
       "fragmentIndex": 0,
       "wordIndex": 1
     },
     {
-      "timeStart": 28.206,
+      "cueNumber": 18,
+      "timeStart": 28.17,
       "pageNumber": 1,
       "lineIndex": 2,
       "fragmentIndex": 0,
       "wordIndex": 2
     },
     {
-      "timeStart": 28.981,
+      "cueNumber": 19,
+      "timeStart": 29.194,
       "pageNumber": 1,
       "lineIndex": 2,
+      "fragmentIndex": 0,
+      "wordIndex": 3
+    },
+    {
+      "cueNumber": 20,
+      "timeStart": 31.362,
+      "pageNumber": 1,
+      "lineIndex": 2,
+      "fragmentIndex": 0,
+      "wordIndex": 4
+    },
+    {
+      "cueNumber": 21,
+      "timeStart": 31.935,
+      "pageNumber": 1,
+      "lineIndex": 2,
+      "fragmentIndex": 0,
+      "wordIndex": 5
+    },
+    {
+      "cueNumber": 22,
+      "timeStart": 34.076,
+      "pageNumber": 1,
+      "lineIndex": 2,
+      "fragmentIndex": 0,
+      "wordIndex": 6
+    },
+    {
+      "cueNumber": 23,
+      "timeStart": 34.51,
+      "pageNumber": 1,
+      "lineIndex": 3,
+      "fragmentIndex": 0,
+      "wordIndex": 0
+    },
+    {
+      "cueNumber": 24,
+      "timeStart": 35.602,
+      "pageNumber": 1,
+      "lineIndex": 3,
+      "fragmentIndex": 0,
+      "wordIndex": 1
+    },
+    {
+      "cueNumber": 25,
+      "timeStart": 39.978,
+      "pageNumber": 1,
+      "lineIndex": 3,
+      "fragmentIndex": 0,
+      "wordIndex": 2
+    },
+    {
+      "cueNumber": 26,
+      "timeStart": 41.602,
+      "pageNumber": 1,
+      "lineIndex": 3,
       "fragmentIndex": 0,
       "wordIndex": 3
     }
