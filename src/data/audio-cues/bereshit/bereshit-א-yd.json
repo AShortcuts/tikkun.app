@@ -5,12 +5,12 @@
   "parshaSlug": "bereshit",
   "aliyah": 1,
   "tokenCount": 406,
-  "cueCount": 7,
+  "cueCount": 18,
   "tokenizationVersion": "v1",
   "audioVersion": "Source file: בראשית א׳.m4a",
   "cues": [
     {
-      "timeStart": 1.5,
+      "timeStart": 0,
       "pageNumber": 1,
       "lineIndex": 0,
       "fragmentIndex": 0,
@@ -57,6 +57,90 @@
       "lineIndex": 0,
       "fragmentIndex": 0,
       "wordIndex": 6
+    },
+    {
+      "timeStart": 9.589,
+      "pageNumber": 1,
+      "lineIndex": 1,
+      "fragmentIndex": 0,
+      "wordIndex": 0
+    },
+    {
+      "timeStart": 10.083,
+      "pageNumber": 1,
+      "lineIndex": 1,
+      "fragmentIndex": 0,
+      "wordIndex": 1
+    },
+    {
+      "timeStart": 10.521,
+      "pageNumber": 1,
+      "lineIndex": 1,
+      "fragmentIndex": 0,
+      "wordIndex": 2
+    },
+    {
+      "timeStart": 11.275,
+      "pageNumber": 1,
+      "lineIndex": 1,
+      "fragmentIndex": 0,
+      "wordIndex": 3
+    },
+    {
+      "timeStart": 11.665,
+      "pageNumber": 1,
+      "lineIndex": 1,
+      "fragmentIndex": 0,
+      "wordIndex": 4
+    },
+    {
+      "timeStart": 12.244,
+      "pageNumber": 1,
+      "lineIndex": 1,
+      "fragmentIndex": 0,
+      "wordIndex": 5
+    },
+    {
+      "timeStart": 12.648,
+      "pageNumber": 1,
+      "lineIndex": 1,
+      "fragmentIndex": 0,
+      "wordIndex": 6
+    },
+    {
+      "timeStart": 13.136,
+      "pageNumber": 1,
+      "lineIndex": 1,
+      "fragmentIndex": 0,
+      "wordIndex": 7
+    },
+    {
+      "timeStart": 13.888,
+      "pageNumber": 1,
+      "lineIndex": 2,
+      "fragmentIndex": 0,
+      "wordIndex": 0
+    },
+    {
+      "timeStart": 14.33,
+      "pageNumber": 1,
+      "lineIndex": 2,
+      "fragmentIndex": 0,
+      "wordIndex": 1
+    },
+    {
+      "timeStart": 14.674,
+      "pageNumber": 1,
+      "lineIndex": 2,
+      "fragmentIndex": 0,
+      "wordIndex": 2
+    },
+    {
+      "timeStart": 15.1,
+      "pageNumber": 1,
+      "lineIndex": 2,
+      "fragmentIndex": 0,
+      "wordIndex": 3
     }
   ]
 }

@@ -202,7 +202,7 @@
     -6px -6px 14px -16px color-mix(in srgb, white 24%, transparent);
 }
 
-.settings-field > span:first-child {
+.settings-field>span:first-child {
   font-size: 0.76rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -367,7 +367,7 @@
   column-gap: 0.75rem;
 }
 
-.settings-field.mod-inline-compact > span:first-child {
+.settings-field.mod-inline-compact>span:first-child {
   margin: 0;
 }
 
@@ -672,16 +672,19 @@
     right: 0.85rem;
   }
 
-  .reader-corner-controls.mod-raised {
-    bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
-  }
-
   .about-view {
     padding-inline: 0.85rem;
   }
+
   .settings-pane {
     left: 1rem;
     right: 1rem;
     width: auto;
+  }
+
+  @media screen and (max-width: 550px) {
+    .reader-corner-controls.mod-raised {
+      bottom: calc(8rem + env(safe-area-inset-bottom, 0px));
+    }
   }
 }
