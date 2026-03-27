@@ -42,6 +42,16 @@
   border: 1px solid var(--light-accent-color);
 }
 
+.floating-player-meta {
+  display: none;
+}
+
+.floating-player-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
 .floating-player-button,
 .toolbar-button,
 .parsha-title,
@@ -566,7 +576,6 @@
     width: 0%;
     height: 100%;
     background: linear-gradient(90deg, hsl(199, 100%, 82%), dodgerblue);
-    transition: width 0.1s linear;
   }
 
   .floating-player {
@@ -576,10 +585,10 @@
     bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
     transform: translateX(-50%);
     z-index: 80;
-    flex-direction: row;
-    align-items: center;
-    justify-content: center;
-    gap: 0.55rem;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 0.65rem;
     width: max-content;
     max-width: calc(100vw - 1.7rem);
     padding: 0.95rem 0.7rem 0.7rem;
@@ -588,6 +597,42 @@
     box-shadow: 0 18px 40px -26px black;
     backdrop-filter: blur(18px) saturate(130%);
     overflow: hidden;
+  }
+
+  .floating-player-meta {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, auto));
+    justify-content: center;
+    gap: 0.18rem 0.9rem;
+    padding-top: 0.15rem;
+    color: var(--light-text-color);
+    font-size: 0.68rem;
+    line-height: 1.15;
+    text-align: start;
+  }
+
+  .floating-player-meta-item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.32rem;
+    white-space: nowrap;
+  }
+
+  .floating-player-meta-label {
+    font-size: 0.56rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--text-color) 40%, transparent);
+  }
+
+  .floating-player-meta-value {
+    color: var(--text-color);
+  }
+
+  .floating-player-controls {
+    flex-direction: row;
+    justify-content: center;
+    gap: 0.55rem;
   }
 
   .floating-player::after,
@@ -608,6 +653,7 @@
     background: linear-gradient(90deg, hsl(45, 100%, 80%), hsl(33, 100%, 55%));
     transform: scaleX(var(--audio-progress-ratio));
     transform-origin: left center;
+    transition: transform 0.1s linear;
   }
 
   .floating-player-button {
@@ -621,8 +667,12 @@
   }
 
   .reader-corner-controls {
-    bottom: calc(6.75rem + env(safe-area-inset-bottom, 0px));
+    bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
     right: 0.85rem;
+  }
+
+  .reader-corner-controls.mod-raised {
+    bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
   }
 
   .about-view {

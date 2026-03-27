@@ -284,18 +284,27 @@
 }
 
 @media screen and (max-width: 500px) {
-  .line {
+  /* .line {
     grid-template-columns: minmax(0, 1fr);
-  }
+  } */
 
   .line-content {
     padding-left: 0;
   }
 
+  /* .line-gutter.mod-aliyot,
+  .location-indicator.mod-aliyot, */
   .line-gutter.mod-verses,
-  .line-gutter.mod-aliyot,
-  .location-indicator.mod-verses,
-  .location-indicator.mod-aliyot {
+  .location-indicator.mod-verses {
     display: none;
+  }
+
+  .line-gutter.mod-aliyot {
+    padding-left: 0;
+  }
+
+  .tikkun-page {
+    --verse-column-width: 1.2ch;
+    --aliyah-column-width: 1.2ch;
   }
 }

@@ -96,11 +96,31 @@
       <section class="reader-shell" data-target-id="reader-shell">
         <div class="reader-side mod-left">
           <div class="floating-player u-hidden" data-target-id="floating-player">
-            <button class="floating-player-button" data-target-id="floating-replay" type="button" title="Replay current cue" aria-label="Replay current cue"></button>
-            <button class="floating-player-button" data-target-id="floating-next" type="button" title="Next cue" aria-label="Next cue"></button>
-            <button class="floating-player-button" data-target-id="floating-play" type="button" title="Play or pause" aria-label="Play or pause"></button>
-            <button class="floating-player-button" data-target-id="floating-prev" type="button" title="Previous cue" aria-label="Previous cue"></button>
-            <a class="floating-player-button mod-download" data-target-id="floating-download" href="#" download title="Download current recording" aria-label="Download current recording"></a>
+            <div class="floating-player-meta" data-target-id="floating-player-meta" aria-hidden="true">
+              <span class="floating-player-meta-item">
+                <span class="floating-player-meta-label">Parsha</span>
+                <span class="floating-player-meta-value" data-target-id="floating-meta-parsha">—</span>
+              </span>
+              <span class="floating-player-meta-item">
+                <span class="floating-player-meta-label">Aliyah</span>
+                <span class="floating-player-meta-value" data-target-id="floating-meta-aliyah">—</span>
+              </span>
+              <span class="floating-player-meta-item">
+                <span class="floating-player-meta-label">Progress</span>
+                <span class="floating-player-meta-value" data-target-id="floating-meta-cues">0/0</span>
+              </span>
+              <span class="floating-player-meta-item">
+                <span class="floating-player-meta-label">Duration</span>
+                <span class="floating-player-meta-value" data-target-id="floating-meta-duration">0:00/0:00</span>
+              </span>
+            </div>
+            <div class="floating-player-controls">
+              <button class="floating-player-button" data-target-id="floating-replay" type="button" title="Replay current cue" aria-label="Replay current cue"></button>
+              <button class="floating-player-button" data-target-id="floating-next" type="button" title="Next cue" aria-label="Next cue"></button>
+              <button class="floating-player-button" data-target-id="floating-play" type="button" title="Play or pause" aria-label="Play or pause"></button>
+              <button class="floating-player-button" data-target-id="floating-prev" type="button" title="Previous cue" aria-label="Previous cue"></button>
+              <a class="floating-player-button mod-download" data-target-id="floating-download" href="#" download title="Download current recording" aria-label="Download current recording"></a>
+            </div>
           </div>
         </div>
 

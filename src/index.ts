@@ -35,6 +35,7 @@ import { HighlightController, cueKey } from './reading/highlight-controller.ts'
 import { adjustStartingLineTokens } from './reading/aliyah-token-sequence.ts'
 import type { CueExportPayload, WordCue } from './audio/types.ts'
 import { verifyAdminPassword } from './admin/access.ts'
+import hebrewNumeral from './hebrew-numeral.ts'
 
 const { whenKey } = utils
 
@@ -440,6 +441,7 @@ async function collectAliyahTokenKeys({
 
 function updateFloatingPlayer(audioController: AudioController) {
   const player = document.querySelector<HTMLElement>('[data-target-id="floating-player"]')!
+  const cornerControls = document.querySelector<HTMLElement>('.reader-corner-controls')
   const prevButton = document.querySelector<HTMLButtonElement>(
     '[data-target-id="floating-prev"]'
   )!
@@ -458,6 +460,7 @@ function updateFloatingPlayer(audioController: AudioController) {
   const activeSession = audioController.session
 
   player.classList.toggle('u-hidden', !activeSession)
+  cornerControls?.classList.toggle('mod-raised', Boolean(activeSession))
   setControlIcon(playButton, audioController.audio.paused ? 'play' : 'pause')
   for (const button of [prevButton, playButton, nextButton, replayButton]) {
     button.disabled = !activeSession
@@ -474,6 +477,7 @@ function updateFloatingPlayer(audioController: AudioController) {
   }
 
   updateFloatingPlayerAudioProgress(audioController)
+  updateFloatingPlayerMeta(audioController)
 }
 
 function updateFloatingPlayerAudioProgress(audioController: AudioController) {
@@ -487,6 +491,55 @@ function updateFloatingPlayerAudioProgress(audioController: AudioController) {
       : 0
 
   player.style.setProperty('--audio-progress-ratio', `${progress}`)
+}
+
+function formatDuration(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds < 0) return '0:00'
+
+  const totalSeconds = Math.floor(seconds)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const secs = totalSeconds % 60
+
+  if (hours > 0) return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+  return `${minutes}:${String(secs).padStart(2, '0')}`
+}
+
+function getCurrentCueIndex(session: ActiveAudioSession, currentTime: number) {
+  let cueIndex = -1
+  for (let i = 0; i < session.cues.length; i++) {
+    if (session.cues[i].timeStart <= currentTime) cueIndex = i
+    else break
+  }
+  return cueIndex
+}
+
+function updateFloatingPlayerMeta(audioController: AudioController) {
+  const parsha = document.querySelector<HTMLElement>('[data-target-id="floating-meta-parsha"]')
+  const aliyah = document.querySelector<HTMLElement>('[data-target-id="floating-meta-aliyah"]')
+  const cues = document.querySelector<HTMLElement>('[data-target-id="floating-meta-cues"]')
+  const duration = document.querySelector<HTMLElement>('[data-target-id="floating-meta-duration"]')
+  const session = audioController.session
+
+  if (!parsha || !aliyah || !cues || !duration) return
+
+  if (!session) {
+    parsha.textContent = '—'
+    aliyah.textContent = '—'
+    cues.textContent = '0/0'
+    duration.textContent = '0:00/0:00'
+    return
+  }
+
+  const cueIndex = getCurrentCueIndex(session, audioController.audio.currentTime)
+  const currentCue = session.cues.length ? Math.max(cueIndex + 1, 1) : 0
+
+  parsha.textContent = session.recording.parshaName
+  aliyah.textContent = hebrewNumeral(session.recording.aliyah)
+  cues.textContent = `${currentCue}/${session.cues.length}`
+  duration.textContent = `${formatDuration(audioController.audio.currentTime)}/${formatDuration(
+    audioController.audio.duration
+  )}`
 }
 
 async function startPlaybackForButton(
@@ -1214,6 +1267,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   })
   audioController.on('time-updated', async ({ currentTime }) => {
     updateFloatingPlayerAudioProgress(audioController)
+    updateFloatingPlayerMeta(audioController)
     if (adminState.recording) return
     const session = audioController.session
     if (!session?.cues.length) return
@@ -1225,9 +1279,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     })
   })
   for (const eventName of ['loadedmetadata', 'durationchange', 'emptied'] as const) {
-    audioElement.addEventListener(eventName, () =>
+    audioElement.addEventListener(eventName, () => {
       updateFloatingPlayerAudioProgress(audioController)
-    )
+      updateFloatingPlayerMeta(audioController)
+    })
   }
 
   document
