@@ -935,12 +935,25 @@
   gap: 0.55rem;
 }
 
+.analytics-graph-stage {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 0.45rem;
+}
+
 .analytics-graph-header {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 0.5rem 0.9rem;
   align-items: center;
+}
+
+.analytics-graph-header .analytics-legend {
+  margin-left: auto;
+  justify-content: flex-end;
 }
 
 .analytics-graph-labels {
@@ -954,6 +967,7 @@
 .analytics-graph svg {
   display: block;
   width: 100%;
+  grid-column: 2;
   height: auto;
   border-radius: 18px;
   background:
@@ -995,18 +1009,83 @@
   stroke-linejoin: round;
 }
 
+.analytics-graph-point {
+  fill: color-mix(in srgb, var(--medium-accent-color) 88%, black 12%);
+  stroke: color-mix(in srgb, var(--paper-color) 94%, transparent);
+  stroke-width: 2;
+  transition:
+    r 120ms ease,
+    fill 120ms ease,
+    opacity 120ms ease;
+}
+
+.analytics-graph-point.is-active {
+  r: 5.5px;
+  fill: color-mix(in srgb, var(--medium-accent-color) 100%, black 2%);
+}
+
 .analytics-graph-outlier {
   fill: hsl(19, 92%, 54%);
   stroke: color-mix(in srgb, var(--paper-color) 94%, transparent);
   stroke-width: 2;
 }
 
+.analytics-graph-focus-line {
+  stroke: color-mix(in srgb, var(--medium-accent-color) 35%, transparent);
+  stroke-width: 2;
+}
+
+.analytics-graph-focus-point {
+  fill: color-mix(in srgb, var(--paper-color) 98%, transparent);
+  stroke: color-mix(in srgb, var(--medium-accent-color) 92%, black 8%);
+  stroke-width: 3;
+}
+
+.analytics-graph-tooltip {
+  position: absolute;
+  left: var(--analytics-tooltip-x, 0px);
+  top: var(--analytics-tooltip-y, 0px);
+  transform: translate(-50%, calc(-100% - 12px));
+  display: grid;
+  gap: 0.16rem;
+  min-width: 11rem;
+  max-width: 15rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--medium-accent-color) 20%, transparent);
+  background: color-mix(in srgb, var(--paper-color) 96%, transparent);
+  box-shadow: 0 14px 30px -22px black;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.analytics-graph-tooltip[hidden] {
+  display: none;
+}
+
+.analytics-graph-tooltip strong {
+  color: var(--page-ink-color);
+}
+
+.analytics-graph-tooltip span {
+  color: var(--light-text-color);
+  line-height: 1.3;
+}
+
 .analytics-axis-title {
   font-size: 0.78rem;
 }
 
-.analytics-axis-title-x {
-  text-align: center;
+.analytics-axis-title-y {
+  grid-column: 1;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  line-height: 1;
 }
 
 .analytics-legend i.mod-line {
@@ -1027,7 +1106,15 @@
   background: hsl(19, 92%, 54%);
 }
 
-.analytics-graph-caption {
+.analytics-graph-axis-caption {
+  margin: 0;
+  color: var(--light-text-color);
+  text-align: center;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+}
+
+.analytics-graph-copy {
   margin: 0;
   color: var(--light-text-color);
   line-height: 1.5;
