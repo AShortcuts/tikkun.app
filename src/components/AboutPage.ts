@@ -129,7 +129,7 @@ export default function AboutPage() {
           <table class="about-table">
             <thead>
               <tr>
-                <th>Narrator</th>
+                <th>Ba'al Koreh</th>
                 <th>Parsha</th>
                 <th>Aliyot available</th>
                 <th>Formats</th>

@@ -409,6 +409,105 @@
   gap: 0.5rem;
 }
 
+.admin-panel-actions.mod-secondary {
+  gap: 0.4rem;
+}
+
+.admin-panel-actions.mod-timing .toolbar-button {
+  min-width: 4.8rem;
+}
+
+.admin-panel-draft {
+  max-width: 34ch;
+  color: var(--light-text-color);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.admin-cue-list {
+  display: grid;
+  gap: 0.35rem;
+  max-height: min(36vh, 340px);
+  overflow: auto;
+  padding-right: 0.15rem;
+}
+
+.admin-cue-empty {
+  max-width: 34ch;
+  color: var(--light-text-color);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.admin-cue-row {
+  display: grid;
+  grid-template-columns: 2.6rem minmax(0, 1fr) auto auto;
+  gap: 0.45rem 0.6rem;
+  align-items: center;
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--light-accent-color);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--paper-color) 96%, transparent);
+  color: var(--text-color);
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-cue-row:hover {
+  background: color-mix(in srgb, var(--paper-color) 88%, var(--medium-accent-color));
+}
+
+.admin-cue-row.is-selected {
+  border-color: dodgerblue;
+  box-shadow: 0 0 0 1px color-mix(in srgb, dodgerblue 45%, transparent);
+}
+
+.admin-cue-row.is-current {
+  background: color-mix(in srgb, var(--paper-color) 84%, hsl(199, 100%, 82%));
+}
+
+.admin-cue-row.mod-warning {
+  border-color: color-mix(in srgb, goldenrod 55%, var(--light-accent-color));
+}
+
+.admin-cue-row.mod-invalid {
+  border-color: color-mix(in srgb, firebrick 60%, var(--light-accent-color));
+}
+
+.admin-cue-index,
+.admin-cue-time,
+.admin-cue-delta,
+.admin-cue-note {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.78rem;
+}
+
+.admin-cue-index {
+  color: var(--light-text-color);
+}
+
+.admin-cue-token {
+  min-width: 0;
+  font-size: 0.88rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-cue-time {
+  color: var(--text-color);
+}
+
+.admin-cue-delta {
+  color: var(--light-text-color);
+}
+
+.admin-cue-note {
+  grid-column: 2 / -1;
+  color: var(--light-text-color);
+}
+
 .admin-panel .toolbar-button:disabled {
   opacity: 0.45;
   cursor: not-allowed;

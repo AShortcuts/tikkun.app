@@ -53,17 +53,147 @@ let progressFrame = 0
 let deferredProgressFrame = 0
 let progressAnchorLoadPromise: Promise<void> | null = null
 let cueNavigationIndex: number | null = null
+let lastAdminRenderedCueCount = 0
+let lastAdminFollowedCueIndex = -1
+const ADMIN_DRAFT_STORAGE_PREFIX = 'tikkun-admin-draft:'
+const ADMIN_SESSION_UNLOCKED_KEY = 'tikkun-admin-unlocked'
+const ADMIN_SESSION_PANEL_OPEN_KEY = 'tikkun-admin-panel-open'
+const adminDraftTimeFormat = Intl.DateTimeFormat(undefined, {
+  hour: 'numeric',
+  minute: '2-digit',
+})
 
 const adminState: {
   unlocked: boolean
   recording: boolean
   tokenPointer: number
   cues: WordCue[]
+  sourceCues: WordCue[]
+  draftOrigin: 'none' | 'published' | 'local'
+  draftSavedAt: number | null
 } = {
   unlocked: false,
   recording: false,
   tokenPointer: -1,
   cues: [],
+  sourceCues: [],
+  draftOrigin: 'none',
+  draftSavedAt: null,
+}
+
+type AdminDraftPayload = {
+  audioId: string
+  tokenCount: number
+  tokenPointer: number
+  tokenizationVersion: string
+  updatedAt: number
+  cues: WordCue[]
+}
+
+const cloneCue = (cue: WordCue): WordCue => ({ ...cue })
+const cloneCues = (cues: WordCue[]) => cues.map(cloneCue)
+
+const getAdminDraftStorageKey = (audioId: string) =>
+  `${ADMIN_DRAFT_STORAGE_PREFIX}${audioId}`
+
+const roundCueTime = (value: number) => Number(value.toFixed(3))
+
+const formatCueTimestamp = (seconds: number) => {
+  const milliseconds = Math.max(0, Math.round(seconds * 1000))
+  const wholeSeconds = Math.floor(milliseconds / 1000)
+  return `${formatDuration(wholeSeconds)}.${String(milliseconds % 1000).padStart(3, '0')}`
+}
+
+const cueFromTokenKey = (tokenKey: string, timeStart: number): WordCue => {
+  const [pageNumber, lineIndex, fragmentIndex, wordIndex] = tokenKey
+    .split(':')
+    .map(Number)
+
+  return {
+    timeStart: roundCueTime(timeStart),
+    pageNumber,
+    lineIndex,
+    fragmentIndex,
+    wordIndex,
+  }
+}
+
+const assignAdminCues = (
+  cues: WordCue[],
+  audioController?: AudioController | null
+) => {
+  adminState.cues = cues
+  const session = (audioController ?? audioControllerGlobal)?.session
+  if (session) session.cues = cues
+}
+
+const getAdminSession = (audioController?: AudioController | null) =>
+  (audioController ?? audioControllerGlobal)?.session ?? null
+
+function loadAdminDraft(
+  audioId: string,
+  tokenCount: number
+): AdminDraftPayload | null {
+  const rawDraft = window.localStorage.getItem(getAdminDraftStorageKey(audioId))
+  if (!rawDraft) return null
+
+  let parsedDraft: unknown
+  try {
+    parsedDraft = JSON.parse(rawDraft)
+  } catch (error) {
+    console.error(`Failed to parse admin draft for ${audioId}`, error)
+    window.localStorage.removeItem(getAdminDraftStorageKey(audioId))
+    return null
+  }
+
+  if (!parsedDraft || typeof parsedDraft !== 'object') {
+    window.localStorage.removeItem(getAdminDraftStorageKey(audioId))
+    return null
+  }
+
+  const draft = parsedDraft as Partial<AdminDraftPayload>
+  if (
+    draft.audioId !== audioId ||
+    draft.tokenizationVersion !== TOKENIZATION_VERSION ||
+    draft.tokenCount !== tokenCount ||
+    !Array.isArray(draft.cues) ||
+    typeof draft.updatedAt !== 'number'
+  ) {
+    window.localStorage.removeItem(getAdminDraftStorageKey(audioId))
+    return null
+  }
+
+  return {
+    audioId,
+    tokenCount,
+    tokenPointer:
+      typeof draft.tokenPointer === 'number'
+        ? Math.max(-1, Math.min(draft.tokenPointer, tokenCount - 1))
+        : -1,
+    tokenizationVersion: TOKENIZATION_VERSION,
+    updatedAt: draft.updatedAt,
+    cues: cloneCues((draft.cues.filter(Boolean) as WordCue[]).slice(0, tokenCount)),
+  }
+}
+
+function saveAdminDraft(audioController?: AudioController | null) {
+  const session = getAdminSession(audioController)
+  if (!session) return
+
+  const storageKey = getAdminDraftStorageKey(session.recording.id)
+  const updatedAt = Date.now()
+  const payload: AdminDraftPayload = {
+    audioId: session.recording.id,
+    tokenCount: session.tokenKeys.length,
+    tokenPointer: adminState.tokenPointer,
+    tokenizationVersion: TOKENIZATION_VERSION,
+    updatedAt,
+    cues: cloneCues(adminState.cues),
+  }
+
+  window.localStorage.setItem(storageKey, JSON.stringify(payload))
+  adminState.draftOrigin = 'local'
+  adminState.draftSavedAt = updatedAt
 }
 
 const app = {
@@ -96,6 +226,41 @@ const setVisibility = ({
   node.classList.toggle('mod-animated', !visible)
 }
 
+const getAdminPanel = () =>
+  document.querySelector<HTMLElement>('[data-target-id="admin-panel"]')
+
+function persistAdminAccessState() {
+  window.sessionStorage.setItem(
+    ADMIN_SESSION_UNLOCKED_KEY,
+    adminState.unlocked ? '1' : '0'
+  )
+  window.sessionStorage.setItem(
+    ADMIN_SESSION_PANEL_OPEN_KEY,
+    getAdminPanel()?.classList.contains('u-hidden') ? '0' : '1'
+  )
+}
+
+function setAdminPanelVisible(
+  visible: boolean,
+  audioController?: AudioController | null
+) {
+  const panel = getAdminPanel()
+  if (!panel) return
+  panel.classList.toggle('u-hidden', !visible)
+  persistAdminAccessState()
+  syncAdminPanelState(audioController)
+}
+
+const syncReaderProgressVisibility = () => {
+  const visible =
+    parseCurrentRoute()?.view === 'reader' && !isShowingParshaPicker()
+
+  ;[
+    '[data-target-id="reader-progress"]',
+    '[data-target-id="reader-progress-mobile"]',
+  ].forEach((selector) => setVisibility({ selector, visible }))
+}
+
 const showParshaPicker = () => {
   ;[
     { selector: '[data-test-id="annotations-toggle"]', visible: false },
@@ -109,6 +274,7 @@ const showParshaPicker = () => {
   document.querySelector('[data-target-id="reader-shell"]')!.appendChild(jumper.node)
 
   jumper.onMount()
+  syncReaderProgressVisibility()
 }
 
 const hideParshaPicker = () => {
@@ -125,6 +291,8 @@ const hideParshaPicker = () => {
       .querySelector('[data-target-id="reader-shell"]')!
       .removeChild(picker)
   }
+
+  syncReaderProgressVisibility()
 }
 
 const isShowingParshaPicker = () =>
@@ -564,7 +732,7 @@ async function startPlaybackForButton(
 
   const session: ActiveAudioSession = {
     recording: state.recording,
-    cues: getCuesForRecording(state.recording),
+    cues: cloneCues(getCuesForRecording(state.recording)),
     runId: state.lineInfo.run.id,
     aliyahIndex: state.aliyahIndex,
     tokenKeys,
@@ -572,8 +740,13 @@ async function startPlaybackForButton(
 
   await audioController.loadSession(session)
   highlightController.setSequence(tokenKeys)
-  adminState.cues = []
-  adminState.tokenPointer = -1
+  adminState.sourceCues = cloneCues(session.cues)
+  const draft = loadAdminDraft(session.recording.id, tokenKeys.length)
+  assignAdminCues(draft?.cues ?? cloneCues(adminState.sourceCues), audioController)
+  adminState.tokenPointer =
+    draft?.tokenPointer ?? getAdminResumeTokenPointer(tokenKeys.length)
+  adminState.draftOrigin = draft ? 'local' : adminState.sourceCues.length ? 'published' : 'none'
+  adminState.draftSavedAt = draft?.updatedAt ?? null
   adminState.recording = false
   cueNavigationIndex = session.cues.length ? 0 : null
   syncAdminPanelState(audioController)
@@ -757,6 +930,286 @@ function updateAdminCounter(tokenCount: number) {
   counter.textContent = `${adminState.cues.length} / ${tokenCount} cues · ${pointer}`
 }
 
+function mountAdminEditorUi() {
+  const panel = document.querySelector<HTMLElement>('[data-target-id="admin-panel"]')
+  if (!panel || panel.querySelector('[data-target-id="admin-draft-status"]')) return
+
+  panel.insertAdjacentHTML(
+    'beforeend',
+    `
+      <div class="admin-panel-draft" data-target-id="admin-draft-status">
+        Drafts autosave locally per recording.
+      </div>
+      <div class="admin-panel-actions mod-secondary">
+        <button type="button" class="toolbar-button" data-target-id="admin-prev-saved">Prev Saved</button>
+        <button type="button" class="toolbar-button" data-target-id="admin-play-current">Play Current</button>
+        <button type="button" class="toolbar-button" data-target-id="admin-next-saved">Next Saved</button>
+        <button type="button" class="toolbar-button" data-target-id="admin-trim-here">Trim From Here</button>
+      </div>
+      <div class="admin-panel-actions mod-secondary mod-timing">
+        <button type="button" class="toolbar-button" data-admin-nudge="-0.25">-250ms</button>
+        <button type="button" class="toolbar-button" data-admin-nudge="-0.05">-50ms</button>
+        <button type="button" class="toolbar-button" data-admin-nudge="0.05">+50ms</button>
+        <button type="button" class="toolbar-button" data-admin-nudge="0.25">+250ms</button>
+      </div>
+      <div class="admin-cue-list" data-target-id="admin-cue-list"></div>
+    `
+  )
+}
+
+function getAdminSelectedTokenIndex(
+  highlightController: HighlightController | null = highlightControllerGlobal
+) {
+  const session = getAdminSession()
+  if (!session?.tokenKeys.length) return -1
+  if (adminState.tokenPointer >= 0) {
+    return Math.min(adminState.tokenPointer, session.tokenKeys.length - 1)
+  }
+
+  const activeIndex = highlightController?.getActiveIndex() ?? -1
+  if (activeIndex < 0) return -1
+  return Math.min(activeIndex, session.tokenKeys.length - 1)
+}
+
+function getEditableAdminCueIndex(
+  highlightController: HighlightController | null = highlightControllerGlobal
+) {
+  if (!adminState.cues.length) return -1
+
+  const selectedTokenIndex = getAdminSelectedTokenIndex(highlightController)
+  if (selectedTokenIndex >= 0 && selectedTokenIndex < adminState.cues.length) {
+    return selectedTokenIndex
+  }
+
+  return adminState.cues.length - 1
+}
+
+function getAdminResumeTokenPointer(tokenCount: number) {
+  if (!tokenCount) return -1
+  return adminState.cues.length < tokenCount
+    ? adminState.cues.length
+    : tokenCount - 1
+}
+
+function isSeededFirstCuePreview(
+  session: ActiveAudioSession,
+  activeIndex: number
+) {
+  if (activeIndex !== 0 || adminState.tokenPointer !== 1 || adminState.cues.length !== 1) {
+    return false
+  }
+
+  const firstCue = adminState.cues[0]
+  return Boolean(
+    firstCue &&
+      firstCue.timeStart === 0 &&
+      session.tokenKeys[0] &&
+      cueKey(firstCue) === session.tokenKeys[0]
+  )
+}
+
+async function selectAdminTokenIndex(
+  index: number,
+  highlightController: HighlightController,
+  {
+    play = false,
+    seekToCue = true,
+  }: { play?: boolean; seekToCue?: boolean } = {}
+) {
+  const audioController = audioControllerGlobal
+  const session = audioController?.session
+  if (!audioController || !session?.tokenKeys.length) return
+
+  const clampedIndex = Math.max(0, Math.min(index, session.tokenKeys.length - 1))
+  adminState.tokenPointer = clampedIndex
+
+  const cue = adminState.cues[clampedIndex]
+  if (seekToCue && cue) {
+    audioController.pause()
+    audioController.seek(cue.timeStart)
+    cueNavigationIndex = clampedIndex
+  } else if (!play) {
+    audioController.pause()
+  }
+
+  await highlightController.activateTokenKey(session.tokenKeys[clampedIndex], {
+    scroll: readerPreferences.autoScrollWithPlayback,
+  })
+
+  if (play && cue) {
+    await audioController.play()
+  }
+
+  updateFloatingPlayer(audioController)
+  syncAdminPanelState(audioController)
+}
+
+function getAdminTokenLabel(index: number) {
+  const session = getAdminSession()
+  const cue = adminState.cues[index]
+  const tokenKey = session?.tokenKeys[index]
+
+  if (tokenKey) {
+    const token = document.querySelector<HTMLElement>(`[data-token-key="${tokenKey}"]`)
+    const tokenText = token?.textContent?.trim().replace(/\s+/g, ' ')
+    if (tokenText) return tokenText
+  }
+
+  if (!cue) return `Cue ${index + 1}`
+
+  return `Page ${cue.pageNumber} · Line ${cue.lineIndex + 1} · Word ${cue.wordIndex + 1}`
+}
+
+function getAdminDraftStatusText(audioController?: AudioController | null) {
+  const session = getAdminSession(audioController)
+  if (!session) return 'Drafts autosave locally per recording.'
+
+  if (adminState.draftOrigin === 'local' && adminState.draftSavedAt) {
+    return `Local draft active for ${session.recording.title}. Last saved ${adminDraftTimeFormat.format(adminState.draftSavedAt)}.`
+  }
+
+  if (adminState.sourceCues.length) {
+    return `Published cues loaded for ${session.recording.title}. Local edits autosave in this browser.`
+  }
+
+  return `${session.recording.title} has no saved cues yet. Local edits autosave in this browser.`
+}
+
+function syncAdminCueListViewport(list: HTMLElement, followCueIndex: number) {
+  const rows = Array.from(list.querySelectorAll<HTMLElement>('.admin-cue-row'))
+  if (!rows.length) {
+    list.style.maxHeight = ''
+    lastAdminRenderedCueCount = 0
+    lastAdminFollowedCueIndex = -1
+    return
+  }
+
+  const visibleRows = rows.slice(0, 5)
+  const listStyles = window.getComputedStyle(list)
+  const rowGap = Number.parseFloat(listStyles.rowGap || listStyles.gap || '0') || 0
+  const viewportHeight =
+    visibleRows.reduce((height, row) => height + row.offsetHeight, 0) +
+    rowGap * Math.max(visibleRows.length - 1, 0)
+
+  list.style.maxHeight = `${Math.ceil(viewportHeight)}px`
+
+  const shouldFollow =
+    followCueIndex >= 0 &&
+    followCueIndex < rows.length &&
+    (followCueIndex !== lastAdminFollowedCueIndex ||
+      rows.length !== lastAdminRenderedCueCount)
+
+  if (shouldFollow) {
+    rows[followCueIndex]?.scrollIntoView({
+      block: 'nearest',
+    })
+    lastAdminFollowedCueIndex = followCueIndex
+  }
+
+  lastAdminRenderedCueCount = rows.length
+}
+
+function renderAdminCueList(audioController?: AudioController | null) {
+  const list = document.querySelector<HTMLElement>('[data-target-id="admin-cue-list"]')
+  if (!list) return
+
+  const session = getAdminSession(audioController)
+  list.replaceChildren()
+
+  const emptyState = document.createElement('div')
+  emptyState.className = 'admin-cue-empty'
+
+  if (!session) {
+    list.style.maxHeight = ''
+    emptyState.textContent = 'Select an aliyah to load cues.'
+    list.appendChild(emptyState)
+    lastAdminRenderedCueCount = 0
+    lastAdminFollowedCueIndex = -1
+    return
+  }
+
+  if (!adminState.cues.length) {
+    list.style.maxHeight = ''
+    emptyState.textContent = 'No cues saved yet. Start recording, then use the timing controls to refine.'
+    list.appendChild(emptyState)
+    lastAdminRenderedCueCount = 0
+    lastAdminFollowedCueIndex = -1
+    return
+  }
+
+  const selectedCueIndex = getEditableAdminCueIndex()
+  const currentTime = (audioController ?? audioControllerGlobal)?.audio.currentTime ?? 0
+  const playingCueIndex =
+    session.cues.length && highlightControllerGlobal
+      ? highlightControllerGlobal.getCueIndex(session.cues, currentTime)
+      : -1
+
+  let previousCue: WordCue | null = null
+  adminState.cues.forEach((cue, index) => {
+    if (!cue) return
+
+    const row = document.createElement('button')
+    row.type = 'button'
+    row.className = 'admin-cue-row'
+    row.dataset.adminCueIndex = `${index}`
+
+    if (index === selectedCueIndex) row.classList.add('is-selected')
+    if (index === playingCueIndex) row.classList.add('is-current')
+
+    const deltaText = previousCue
+      ? `+${(cue.timeStart - previousCue.timeStart).toFixed(3)}s`
+      : 'start'
+    let noteText = ''
+    if (previousCue) {
+      const gap = cue.timeStart - previousCue.timeStart
+      if (gap <= 0) {
+        noteText = 'Out of order'
+        row.classList.add('mod-invalid')
+      } else if (gap > 8) {
+        noteText = `Long gap ${gap.toFixed(3)}s`
+        row.classList.add('mod-warning')
+      }
+    }
+
+    const indexEl = document.createElement('span')
+    indexEl.className = 'admin-cue-index'
+    indexEl.textContent = `${index + 1}`
+
+    const tokenEl = document.createElement('span')
+    tokenEl.className = 'admin-cue-token'
+    tokenEl.textContent = getAdminTokenLabel(index)
+
+    const timeEl = document.createElement('span')
+    timeEl.className = 'admin-cue-time'
+    timeEl.textContent = formatCueTimestamp(cue.timeStart)
+
+    const deltaEl = document.createElement('span')
+    deltaEl.className = 'admin-cue-delta'
+    deltaEl.textContent = deltaText
+
+    row.append(indexEl, tokenEl, timeEl, deltaEl)
+
+    if (noteText) {
+      const noteEl = document.createElement('span')
+      noteEl.className = 'admin-cue-note'
+      noteEl.textContent = noteText
+      row.append(noteEl)
+    }
+
+    row.title = `${getAdminTokenLabel(index)} at ${formatCueTimestamp(cue.timeStart)}`
+    list.appendChild(row)
+    if (cue) previousCue = cue
+  })
+
+  const followCueIndex = adminState.recording
+    ? adminState.cues.length - 1
+    : playingCueIndex >= 0
+      ? playingCueIndex
+      : selectedCueIndex
+
+  syncAdminCueListViewport(list, followCueIndex)
+}
+
 function syncAdminRecordButton() {
   const button = document.querySelector<HTMLButtonElement>(
     '[data-target-id="admin-record"]'
@@ -789,21 +1242,56 @@ function syncAdminPanelState(audioController?: AudioController | null) {
   const exportButton = document.querySelector<HTMLButtonElement>(
     '[data-target-id="admin-export"]'
   )!
+  const prevSavedButton = document.querySelector<HTMLButtonElement>(
+    '[data-target-id="admin-prev-saved"]'
+  )
+  const playCurrentButton = document.querySelector<HTMLButtonElement>(
+    '[data-target-id="admin-play-current"]'
+  )
+  const nextSavedButton = document.querySelector<HTMLButtonElement>(
+    '[data-target-id="admin-next-saved"]'
+  )
+  const trimHereButton = document.querySelector<HTMLButtonElement>(
+    '[data-target-id="admin-trim-here"]'
+  )
+  const draftStatus = document.querySelector<HTMLElement>(
+    '[data-target-id="admin-draft-status"]'
+  )
+  const nudgeButtons = [
+    ...document.querySelectorAll<HTMLButtonElement>('[data-admin-nudge]'),
+  ]
+  const selectedCueIndex = getEditableAdminCueIndex()
+  const hasSelectedCue = selectedCueIndex >= 0
+  const hasNextSavedCue =
+    hasSelectedCue && selectedCueIndex < adminState.cues.length - 1
+  const hasPreviousSavedCue = hasSelectedCue && selectedCueIndex > 0
 
   if (!hasSession) {
     counter.textContent = '0 cues'
     status.textContent = 'Select an aliyah and press play to start cue authoring.'
   } else if (adminState.recording) {
-    const pointer = adminState.tokenPointer >= 0 ? adminState.tokenPointer + 1 : 1
-    status.textContent = `${session!.recording.title}: recording live. Use Space or Right Arrow to record cue ${pointer}; Left Arrow steps back.`
+    const pointer =
+      Math.max(
+        1,
+        Math.min(
+          (adminState.tokenPointer >= 0 ? adminState.tokenPointer : adminState.cues.length) +
+            1,
+          tokenCount
+        )
+      ) || 1
+    status.textContent = `${session!.recording.title}: recording live on token ${pointer}. Space or Right Arrow stamps the current cue; Left Arrow steps back.`
+    updateAdminCounter(tokenCount)
+  } else if (adminState.cues.length === tokenCount && tokenCount > 0) {
+    status.textContent = `${session!.recording.title}: all ${tokenCount} tokens have cues. Select a saved cue to audition or nudge, or export when ready.`
     updateAdminCounter(tokenCount)
   } else {
-    const pointer = adminState.tokenPointer >= 0 ? adminState.tokenPointer + 1 : 0
-    status.textContent = `${session!.recording.title}: ready to author. ${
-      hasCues
-        ? `Resume from cue ${pointer || 1} or export the current set.`
-        : 'Press Record/Edit Cues to begin.'
-    }`
+    const pointer =
+      adminState.cues.length < tokenCount
+        ? Math.min(adminState.cues.length + 1, tokenCount)
+        : tokenCount
+    status.textContent = hasCues
+      ? `${session!.recording.title}: ${adminState.cues.length}/${tokenCount} cues saved. Resume from token ${pointer}, or select a saved cue to refine it.`
+      : `${session!.recording.title}: ready to author. Press Record/Edit Cues to begin.`
     updateAdminCounter(tokenCount)
   }
 
@@ -812,6 +1300,17 @@ function syncAdminPanelState(audioController?: AudioController | null) {
   undoButton.disabled = !hasCues
   resetButton.disabled = !hasCues && !adminState.recording && adminState.tokenPointer < 0
   exportButton.disabled = !hasSession || !hasCues
+  if (prevSavedButton) prevSavedButton.disabled = !hasPreviousSavedCue
+  if (playCurrentButton) playCurrentButton.disabled = !hasSelectedCue
+  if (nextSavedButton) nextSavedButton.disabled = !hasNextSavedCue
+  if (trimHereButton) trimHereButton.disabled = !hasSelectedCue
+  for (const button of nudgeButtons) {
+    button.disabled = !hasSelectedCue
+  }
+  if (draftStatus) {
+    draftStatus.textContent = getAdminDraftStatusText(audioController)
+  }
+  renderAdminCueList(audioController)
   syncAdminRecordButton()
 }
 
@@ -819,14 +1318,34 @@ async function resetAdminRecorder(
   audioController: AudioController,
   highlightController: HighlightController
 ) {
-  adminState.cues = []
-  adminState.tokenPointer = -1
-  adminState.recording = false
-  cueNavigationIndex = audioController.session?.cues.length ? 0 : null
+  const session = audioController.session
+  if (!session) return
+
+  const startingCues = session.tokenKeys[0] ? [cueFromTokenKey(session.tokenKeys[0], 0)] : []
+  assignAdminCues(startingCues, audioController)
+  adminState.tokenPointer =
+    session.tokenKeys.length > 1 ? 1 : session.tokenKeys.length ? 0 : -1
+  adminState.recording = session.tokenKeys.length > 1
+  cueNavigationIndex = startingCues.length ? 0 : null
+
+  audioController.pause()
+  audioController.seek(0)
+
+  const activeTokenKey = session.tokenKeys[0] ?? null
+
+  if (activeTokenKey) {
+    await highlightController.activateTokenKey(activeTokenKey, {
+      scroll: true,
+    })
+  } else {
+    highlightController.clear()
+  }
+
+  focusReaderSurface()
+  saveAdminDraft(audioController)
+  await audioController.play()
+  updateFloatingPlayer(audioController)
   syncAdminPanelState(audioControllerGlobal)
-  await replayAliyahFromStart(audioController, highlightController, {
-    restartAudio: false,
-  })
 }
 
 let audioControllerGlobal: AudioController | null = null
@@ -882,10 +1401,15 @@ function recordNextCue(
   const session = audioController.session
   if (!session) return
 
+  const activeIndex = highlightController.getActiveIndex()
   const currentIndex =
-    adminState.tokenPointer >= 0
+    isSeededFirstCuePreview(session, activeIndex)
       ? adminState.tokenPointer
-      : Math.max(highlightController.getActiveIndex(), 0)
+      : activeIndex >= 0
+        ? Math.min(activeIndex + 1, session.tokenKeys.length - 1)
+        : adminState.tokenPointer >= 0
+          ? adminState.tokenPointer
+        : 0
   const tokenKey = session.tokenKeys[currentIndex]
   if (!tokenKey) return
 
@@ -899,37 +1423,30 @@ function recordNextCue(
     fragmentIndex,
     wordIndex,
   }
-  const nextTokenKey = session.tokenKeys[currentIndex + 1] ?? tokenKey
   adminState.tokenPointer = Math.min(currentIndex + 1, session.tokenKeys.length - 1)
-  highlightController.activateTokenKey(nextTokenKey, {
+  highlightController.activateTokenKey(tokenKey, {
     scroll: readerPreferences.autoScrollWithPlayback,
   })
+  saveAdminDraft(audioController)
+  updateFloatingPlayer(audioController)
   syncAdminPanelState(audioController)
 }
 
 function stepAdminBack(highlightController: HighlightController) {
   const session = audioControllerGlobal?.session
   if (!session?.tokenKeys.length) return
-  if (adminState.tokenPointer <= 0) {
-    adminState.tokenPointer = 0
-    highlightController.activateTokenKey(session.tokenKeys[0], {
-      scroll: readerPreferences.autoScrollWithPlayback,
-    })
-    syncAdminPanelState(audioControllerGlobal)
-    return
-  }
-  adminState.tokenPointer -= 1
-  const tokenKey = session.tokenKeys[adminState.tokenPointer]
-  if (!tokenKey) return
-  highlightController.activateTokenKey(tokenKey, {
-    scroll: readerPreferences.autoScrollWithPlayback,
-  })
-  syncAdminPanelState(audioControllerGlobal)
+  const targetIndex =
+    adminState.tokenPointer <= 0 ? 0 : Math.max(0, adminState.tokenPointer - 1)
+  void selectAdminTokenIndex(targetIndex, highlightController)
 }
 
 function undoLastAdminCue(highlightController: HighlightController) {
+  const session = audioControllerGlobal?.session
   adminState.cues.pop()
   adminState.tokenPointer = adminState.cues.length
+    ? Math.min(adminState.cues.length, (session?.tokenKeys.length ?? 1) - 1)
+    : -1
+  saveAdminDraft(audioControllerGlobal)
   const tokenKey =
     audioControllerGlobal?.session?.tokenKeys[adminState.tokenPointer] ??
     audioControllerGlobal?.session?.tokenKeys[0] ??
@@ -941,7 +1458,74 @@ function undoLastAdminCue(highlightController: HighlightController) {
   } else {
     highlightController.clear()
   }
+  updateFloatingPlayer(audioControllerGlobal!)
   syncAdminPanelState(audioControllerGlobal)
+}
+
+function trimAdminCuesFromSelection(highlightController: HighlightController) {
+  const audioController = audioControllerGlobal
+  const session = audioController?.session
+  if (!audioController || !session) return
+
+  const selectedCueIndex = getEditableAdminCueIndex(highlightController)
+  if (selectedCueIndex < 0) return
+
+  assignAdminCues(adminState.cues.slice(0, selectedCueIndex), audioController)
+  adminState.tokenPointer = Math.min(selectedCueIndex, session.tokenKeys.length - 1)
+  adminState.recording = false
+  saveAdminDraft(audioController)
+  void selectAdminTokenIndex(adminState.tokenPointer, highlightController, {
+    seekToCue: false,
+  })
+}
+
+function nudgeAdminCue(
+  deltaSeconds: number,
+  highlightController: HighlightController
+) {
+  const audioController = audioControllerGlobal
+  const session = audioController?.session
+  if (!audioController || !session) return
+
+  const selectedCueIndex = getEditableAdminCueIndex(highlightController)
+  const cue = selectedCueIndex >= 0 ? adminState.cues[selectedCueIndex] : null
+  if (!cue) return
+
+  const previousTime =
+    selectedCueIndex > 0 ? adminState.cues[selectedCueIndex - 1].timeStart + 0.01 : 0
+  const nextTime =
+    selectedCueIndex < adminState.cues.length - 1
+      ? adminState.cues[selectedCueIndex + 1].timeStart - 0.01
+      : Number.isFinite(audioController.audio.duration) && audioController.audio.duration > 0
+        ? audioController.audio.duration
+        : Number.POSITIVE_INFINITY
+  const proposedTime = cue.timeStart + deltaSeconds
+  const boundedTime =
+    nextTime >= previousTime
+      ? Math.max(previousTime, Math.min(nextTime, proposedTime))
+      : proposedTime
+
+  cue.timeStart = roundCueTime(boundedTime)
+  audioController.pause()
+  audioController.seek(cue.timeStart)
+  cueNavigationIndex = selectedCueIndex
+  saveAdminDraft(audioController)
+  void highlightController.activateCue(cue, {
+    scroll: readerPreferences.autoScrollWithPlayback,
+  })
+  updateFloatingPlayer(audioController)
+  syncAdminPanelState(audioController)
+}
+
+function restoreAdminAccessState(audioController: AudioController) {
+  adminState.unlocked =
+    window.sessionStorage.getItem(ADMIN_SESSION_UNLOCKED_KEY) === '1'
+
+  const shouldShowPanel =
+    adminState.unlocked &&
+    window.sessionStorage.getItem(ADMIN_SESSION_PANEL_OPEN_KEY) === '1'
+
+  setAdminPanelVisible(shouldShowPanel, audioController)
 }
 
 function setupSettingsPane(audioController: AudioController) {
@@ -1136,7 +1720,8 @@ function renderRoute(route: AppRoute, audioController: AudioController) {
     readerShell.classList.add('u-hidden')
     aboutView.classList.remove('u-hidden')
     aboutView.innerHTML = AboutPage()
-    titleEl.textContent = 'Tikkun'
+    titleEl.textContent = 'תיקון קוראים'
+    syncReaderProgressVisibility()
     return
   }
 
@@ -1144,6 +1729,7 @@ function renderRoute(route: AppRoute, audioController: AudioController) {
   aboutView.classList.add('u-hidden')
   aboutView.innerHTML = ''
   lastReaderHash = location.hash || lastReaderHash
+  syncReaderProgressVisibility()
   app.jumpTo(route.model)
 }
 
@@ -1154,6 +1740,15 @@ function navigateToHash(hash: string, audioController: AudioController) {
     return
   }
   location.hash = hash
+}
+
+function toggleAboutRoute(audioController: AudioController) {
+  if (parseCurrentRoute()?.view === 'about') {
+    navigateToHash(lastReaderHash, audioController)
+    return
+  }
+
+  navigateToHash(generateAboutUrl(), audioController)
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -1172,6 +1767,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   audioControllerGlobal = audioController
   const highlightController = new HighlightController(book)
   highlightControllerGlobal = highlightController
+  mountAdminEditorUi()
 
   const viewportTracker = new ViewportTracker(book)
   const topBarModel = new TopBarTracker()
@@ -1269,6 +1865,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   audioController.on('time-updated', async ({ currentTime }) => {
     updateFloatingPlayerAudioProgress(audioController)
     updateFloatingPlayerMeta(audioController)
+    const adminPanel = document.querySelector<HTMLElement>(
+      '[data-target-id="admin-panel"]'
+    )
+    if (adminPanel && !adminPanel.classList.contains('u-hidden')) {
+      renderAdminCueList(audioController)
+    }
     if (adminState.recording) return
     const session = audioController.session
     if (!session?.cues.length) return
@@ -1352,7 +1954,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document
     .querySelector('[data-target-id="about-link"]')!
     .addEventListener('click', () => {
-      navigateToHash(generateAboutUrl(), audioController)
+      toggleAboutRoute(audioController)
     })
 
   document.addEventListener('click', (event) => {
@@ -1380,8 +1982,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     .querySelector('[data-target-id="admin-record"]')!
     .addEventListener('click', () => {
       adminState.recording = !adminState.recording
-      if (adminState.recording) {
-        adminState.tokenPointer = Math.max(highlightController.getActiveIndex(), 0)
+      if (adminState.recording && adminState.tokenPointer < 0) {
+        const activeIndex = Math.max(highlightController.getActiveIndex(), 0)
+        adminState.tokenPointer = Math.min(activeIndex, adminState.cues.length)
+      } else if (!adminState.recording) {
+        audioController.pause()
+        updateFloatingPlayer(audioController)
       }
       syncAdminPanelState(audioController)
     })
@@ -1399,6 +2005,49 @@ document.addEventListener('DOMContentLoaded', async () => {
   document
     .querySelector('[data-target-id="admin-export"]')!
     .addEventListener('click', () => void exportAdminCues(audioController))
+  document
+    .querySelector('[data-target-id="admin-prev-saved"]')!
+    .addEventListener('click', () => {
+      const selectedCueIndex = getEditableAdminCueIndex(highlightController)
+      if (selectedCueIndex <= 0) return
+      void selectAdminTokenIndex(selectedCueIndex - 1, highlightController)
+    })
+  document
+    .querySelector('[data-target-id="admin-play-current"]')!
+    .addEventListener('click', () => {
+      const selectedCueIndex = getEditableAdminCueIndex(highlightController)
+      if (selectedCueIndex < 0) return
+      void selectAdminTokenIndex(selectedCueIndex, highlightController, {
+        play: true,
+      })
+    })
+  document
+    .querySelector('[data-target-id="admin-next-saved"]')!
+    .addEventListener('click', () => {
+      const selectedCueIndex = getEditableAdminCueIndex(highlightController)
+      if (selectedCueIndex < 0 || selectedCueIndex >= adminState.cues.length - 1)
+        return
+      void selectAdminTokenIndex(selectedCueIndex + 1, highlightController)
+    })
+  document
+    .querySelector('[data-target-id="admin-trim-here"]')!
+    .addEventListener('click', () => trimAdminCuesFromSelection(highlightController))
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-admin-nudge]')) {
+    button.addEventListener('click', () =>
+      nudgeAdminCue(Number(button.dataset.adminNudge), highlightController)
+    )
+  }
+  document
+    .querySelector('[data-target-id="admin-cue-list"]')!
+    .addEventListener('click', (event) => {
+      const row = (event.target as HTMLElement).closest<HTMLElement>(
+        '[data-admin-cue-index]'
+      )
+      if (!row) return
+      const cueIndex = Number(row.dataset.adminCueIndex)
+      if (!Number.isFinite(cueIndex)) return
+      void selectAdminTokenIndex(cueIndex, highlightController)
+    })
 
   document.addEventListener('keydown', (event) => {
     if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'a') {
@@ -1408,10 +2057,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!provided || !verifyAdminPassword(provided)) return
         adminState.unlocked = true
       }
-      document
-        .querySelector<HTMLElement>('[data-target-id="admin-panel"]')!
-        .classList.toggle('u-hidden')
-      syncAdminPanelState(audioController)
+      const isHidden = getAdminPanel()?.classList.contains('u-hidden') ?? true
+      setAdminPanelVisible(isHidden, audioController)
       return
     }
 
@@ -1458,6 +2105,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   })
 
   setupSettingsPane(audioController)
+  restoreAdminAccessState(audioController)
   syncAdminPanelState(audioController)
 
   listenForRevealGesture(book)
