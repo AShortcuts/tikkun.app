@@ -18,7 +18,8 @@
   bottom: 0;
   background-color: var(--paper-color);
   overflow: auto;
-  -webkit-overflow-scrolling: touch; /*https://css-tricks.com/snippets/css/momentum-scrolling-on-ios-overflow-elements/*/
+  -webkit-overflow-scrolling: touch;
+  /*https://css-tricks.com/snippets/css/momentum-scrolling-on-ios-overflow-elements/*/
   height: 100%;
   animation: fade-in 0.2s forwards;
   padding: 2em 0;
@@ -46,7 +47,7 @@
   padding: 0.5em 1em;
 }
 
-.search-bar > *:not(:first-child) {
+.search-bar>*:not(:first-child) {
   margin-left: 1em;
 }
 
@@ -141,6 +142,11 @@
   .parsha-books.mod-holidays {
     display: block;
   }
+
+  .section-heading {
+    text-align: center;
+    font-size: 2.75em;
+  }
 }
 
 .parsha-book {
@@ -166,11 +172,12 @@
   border: none;
   border-radius: var(--button-border-radius);
   box-sizing: border-box;
-  width: 100%;
+  width: calc(100% - 1.5rem);
+  margin-inline: auto;
   text-align: center;
 }
 
-.parsha-books.mod-emphasize-first-in-group li:first-child > .parsha {
+.parsha-books.mod-emphasize-first-in-group li:first-child>.parsha {
   font-weight: bolder;
 }
 
