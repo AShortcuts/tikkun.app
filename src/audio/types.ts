@@ -44,5 +44,6 @@ export interface CueExportPayload {
   cueCount: number
   tokenizationVersion: string
   audioVersion?: string
+  savedAt?: string
   cues: WordCue[]
 }

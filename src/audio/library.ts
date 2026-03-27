@@ -48,3 +48,24 @@ export function findRecordingForRun({
 export function getCuesForRecording(recording: AudioRecording): WordCue[] {
   return normalizeFirstCueStart(audioCuePayloadsByAudioId[recording.id]?.cues ?? [])
 }
+
+export function getCueSavedAtForRecording(recording: AudioRecording) {
+  const savedAt = audioCuePayloadsByAudioId[recording.id]?.savedAt
+  if (typeof savedAt !== 'string') return null
+
+  const parsed = Date.parse(savedAt)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+export function getCueProgressForRecording(recording: AudioRecording) {
+  const payload = audioCuePayloadsByAudioId[recording.id]
+  const cueCount = payload?.cueCount ?? payload?.cues.length ?? 0
+  const tokenCount = payload?.tokenCount ?? 0
+
+  return {
+    cueCount,
+    tokenCount,
+    isUnfinished: cueCount > 0 && tokenCount > 0 && cueCount < tokenCount,
+    isComplete: cueCount > 0 && tokenCount > 0 && cueCount >= tokenCount,
+  }
+}

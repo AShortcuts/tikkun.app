@@ -3,6 +3,7 @@ import {
   recordingProgressRows,
 } from '../data/about-progress.ts'
 import { listRecordings, listNarrators } from '../audio/library.ts'
+import { generateCueAnalyticsUrl } from '../view-model/navigation/url-parser.ts'
 
 const statusClass = (status: string) =>
   `status-pill mod-${status.toLowerCase().replace(/[^a-z]+/g, '-')}`
@@ -40,12 +41,15 @@ export default function AboutPage() {
     <section class="about-view stack large">
       <div class="about-hero stack small">
         <p class="about-eyebrow">About this Project</p>
-        <h1 class="about-title">A reader-first tikkun with audio, progress tracking, and cue authoring built around real preparation workflow.</h1>
+        <h1 class="about-title">A reader-first tikkun with professional audio and highlight tracking built around real preparation workflow.</h1>
         <p class="about-copy">
           This project pairs the existing tikkun text experience with narrator-based aliyah recordings,
           synced highlighting, and an internal cue-authoring workflow so recordings and visuals can be
           expanded deliberately over time.
         </p>
+        <div class="about-actions">
+          <a class="about-link-button" href="${generateCueAnalyticsUrl()}">Cue analytics</a>
+        </div>
       </div>
 
       <section class="about-card stack small">

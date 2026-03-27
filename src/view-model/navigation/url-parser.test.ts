@@ -1,10 +1,11 @@
 import test from 'ava'
 import {
-  AppRoute,
   generateAboutUrl,
+  generateCueAnalyticsUrl,
   generateUrl,
   parseUrl,
 } from './url-parser.ts'
+import type { AppRoute } from './url-parser.ts'
 import { ScrollViewModel } from '../scroll-view-model.ts'
 import { renderLine } from '../test-utils.ts'
 import { LeiningGenerator } from '../../calendar-model/generator.ts'
@@ -45,6 +46,13 @@ test('Next', (t) => {
 test('About', (t) => {
   t.deepEqual(parseUrl(generator, '/about'), { view: 'about' })
   t.is(generateAboutUrl(), '#/about')
+})
+
+test('Cue analytics', (t) => {
+  t.deepEqual(parseUrl(generator, '/about/cue-analytics'), {
+    view: 'cue-analytics',
+  })
+  t.is(generateCueAnalyticsUrl(), '#/about/cue-analytics')
 })
 
 test('Run ID for פרשת נצבים', async (t) => {

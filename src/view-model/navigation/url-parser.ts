@@ -10,6 +10,9 @@ export type AppRoute =
   | {
       view: 'about'
     }
+  | {
+      view: 'cue-analytics'
+    }
 
 /** Generates a URL that points to the beginning of a specific run. */
 export function generateUrl(run: LeiningRun) {
@@ -18,6 +21,10 @@ export function generateUrl(run: LeiningRun) {
 
 export function generateAboutUrl() {
   return '#/about'
+}
+
+export function generateCueAnalyticsUrl() {
+  return '#/about/cue-analytics'
 }
 
 // TODO(decide): Should we support links to a specific עלייה in a run?
@@ -57,8 +64,10 @@ const pathHandlers: Record<
       model: ScrollViewModel.forDate(generator, new Date()),
     }
   },
-  about() {
-    return { view: 'about' }
+  about(_generator, page) {
+    if (!page) return { view: 'about' }
+    if (page === 'cue-analytics') return { view: 'cue-analytics' }
+    return null
   },
   // TODO(decide): Should we maintain support for Parsha & Holiday URLs?
 }
