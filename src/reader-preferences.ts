@@ -1,6 +1,6 @@
 const STORAGE_KEY = 'tikkun.reader-preferences.v3'
 
-export const TOKENIZATION_VERSION = 'v1'
+export const TOKENIZATION_VERSION = 'v2'
 
 export type ThemeMode = 'automatic' | 'light' | 'dark'
 

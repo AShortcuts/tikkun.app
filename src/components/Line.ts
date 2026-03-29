@@ -7,6 +7,7 @@ import { iconMarkup } from './icons.ts'
 const petuchaClass = (isPetucha: boolean) => (isPetucha ? 'mod-petucha' : '')
 const setumaClass = (column: unknown[]) =>
   column.length > 1 ? 'mod-setuma' : ''
+const inlineWordJoiners = new Set(['׀'])
 
 const stripKriMarkers = (word: string) => word.replace(/[{}]/g, '')
 
@@ -15,10 +16,26 @@ const tokenizeWords = (text: string) =>
     .trim()
     .split(/\s+/)
     .filter(Boolean)
-    .map((word) => ({
-      text: stripKriMarkers(word),
-      isKri: /[{}]/.test(word),
-    }))
+    .reduce<{ text: string; isKri: boolean }[]>(
+      (words, rawWord) => {
+        const word = stripKriMarkers(rawWord)
+
+        if (inlineWordJoiners.has(word) && words.length) {
+          words[words.length - 1] = {
+            ...words[words.length - 1],
+            text: `${words[words.length - 1].text} ${word}`,
+          }
+          return words
+        }
+
+        words.push({
+          text: word,
+          isKri: /[{}]/.test(rawWord),
+        })
+        return words
+      },
+      []
+    )
 
 const renderWords = ({
   text,

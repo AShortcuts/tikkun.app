@@ -1992,12 +1992,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     .querySelector('[data-target-id="admin-record"]')!
     .addEventListener('click', () => {
       adminState.recording = !adminState.recording
+      const resumeDraftWrap = document.querySelector<HTMLElement>(
+        '[data-target-id="admin-resume-wrap"]'
+      )
       if (adminState.recording && adminState.tokenPointer < 0) {
         const activeIndex = Math.max(highlightController.getActiveIndex(), 0)
         adminState.tokenPointer = Math.min(activeIndex, adminState.cues.length)
       } else if (!adminState.recording) {
         audioController.pause()
         updateFloatingPlayer(audioController)
+      }
+      if (resumeDraftWrap) {
+        resumeDraftWrap.hidden = adminState.recording
       }
       syncAdminPanelState(audioController)
     })
