@@ -177,6 +177,11 @@ const setVisibility = ({
 const getAdminPanel = () =>
   document.querySelector<HTMLElement>('[data-target-id="admin-panel"]')
 
+const isAdminPanelVisible = () => {
+  const panel = getAdminPanel()
+  return Boolean(panel && !panel.classList.contains('u-hidden'))
+}
+
 function persistAdminAccessState() {
   window.sessionStorage.setItem(
     ADMIN_SESSION_UNLOCKED_KEY,
@@ -969,8 +974,15 @@ async function selectAdminTokenIndex(
   highlightController: HighlightController,
   {
     play = false,
+    preservePlayback = false,
     seekToCue = true,
-  }: { play?: boolean; seekToCue?: boolean } = {}
+    focusRow = false,
+  }: {
+    play?: boolean
+    preservePlayback?: boolean
+    seekToCue?: boolean
+    focusRow?: boolean
+  } = {}
 ) {
   const audioController = audioControllerGlobal
   const session = audioController?.session
@@ -981,10 +993,10 @@ async function selectAdminTokenIndex(
 
   const cue = adminState.cues[clampedIndex]
   if (seekToCue && cue) {
-    audioController.pause()
+    if (!preservePlayback) audioController.pause()
     audioController.seek(cue.timeStart)
     cueNavigationIndex = clampedIndex
-  } else if (!play) {
+  } else if (!play && !preservePlayback) {
     audioController.pause()
   }
 
@@ -992,12 +1004,15 @@ async function selectAdminTokenIndex(
     scroll: readerPreferences.autoScrollWithPlayback,
   })
 
-  if (play && cue) {
+  if (play && cue && audioController.audio.paused) {
     await audioController.play()
   }
 
   updateFloatingPlayer(audioController)
   syncAdminPanelState(audioController)
+  if (focusRow) {
+    focusAdminCueRow(getEditableAdminCueIndex(highlightController))
+  }
 }
 
 function getAdminTokenLabel(index: number) {
@@ -1066,6 +1081,14 @@ function syncAdminCueListViewport(list: HTMLElement, followCueIndex: number) {
   }
 
   lastAdminRenderedCueCount = rows.length
+}
+
+function focusAdminCueRow(index: number) {
+  if (index < 0) return
+  const row = document.querySelector<HTMLElement>(
+    `[data-target-id="admin-cue-list"] [data-admin-cue-index="${index}"]`
+  )
+  row?.focus({ preventScroll: true })
 }
 
 function renderAdminCueList(audioController?: AudioController | null) {
@@ -1845,7 +1868,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!word || !audioController.session) return
     const tokenKey = highlightController.getTokenKeyFromElement(word)
     if (!tokenKey) return
+    const tokenIndex = audioController.session.tokenKeys.indexOf(tokenKey)
     const cue = audioController.session.cues.find((candidate) => cueKey(candidate) === tokenKey)
+    const isPlaying = !audioController.audio.paused
+    if (
+      adminState.unlocked &&
+      isAdminPanelVisible() &&
+      !adminState.recording &&
+      tokenIndex >= 0
+    ) {
+      event.preventDefault()
+      await selectAdminTokenIndex(tokenIndex, highlightController, {
+        play: isPlaying && Boolean(cue),
+        preservePlayback: isPlaying,
+        seekToCue: Boolean(cue),
+        focusRow: true,
+      })
+      return
+    }
+
     if (cue) {
       cueNavigationIndex = audioController.session.cues.indexOf(cue)
       audioController.seek(cue.timeStart)

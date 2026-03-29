@@ -445,7 +445,7 @@
 
 .admin-cue-row {
   display: grid;
-  grid-template-columns: 2.6rem minmax(0, 1fr) auto auto;
+  grid-template-columns: 1.5rem minmax(0, 1fr) auto auto;
   gap: 0.45rem 0.6rem;
   align-items: center;
   width: 100%;
@@ -465,6 +465,11 @@
 .admin-cue-row.is-selected {
   border-color: dodgerblue;
   box-shadow: 0 0 0 1px color-mix(in srgb, dodgerblue 45%, transparent);
+}
+
+.admin-cue-row:focus-visible {
+  outline: 2px solid color-mix(in srgb, dodgerblue 75%, white);
+  outline-offset: 2px;
 }
 
 .admin-cue-row.is-current {
@@ -497,6 +502,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-align: right;
 }
 
 .admin-cue-time {

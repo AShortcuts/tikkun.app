@@ -44,7 +44,7 @@ Only run this when you want to refresh the Yoni Davidov source recordings on the
 npm run audio:sync
 ```
 
-That command copies the `.m4a` files into `static/audio/yoni-davidov/` and regenerates `src/data/audio-manifest.generated.ts`.
+That command copies supported source audio files such as `.m4a` and `.mp3` into `static/audio/yoni-davidov/` and regenerates `src/data/audio-manifest.generated.ts`.
 
 The generated manifest is deterministic and grouped by parsha so diffs stay reviewable in git.
 

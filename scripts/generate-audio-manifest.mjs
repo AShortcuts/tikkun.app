@@ -26,6 +26,11 @@ const numberWords = {
   '7th': 7,
 }
 
+const extensionScores = {
+  m4a: 2,
+  mp3: 1,
+}
+
 const slugify = (value) =>
   value
     .replace(/[^a-zA-Z0-9\s]/g, '')
@@ -36,13 +41,24 @@ const toPublicUrl = (...segments) =>
   encodeURI(`/audio/yoni-davidov/${segments.join('/')}`)
 
 const inferAliyah = (filename) => {
+  const stem = path.basename(filename, path.extname(filename))
+  const normalizedStem = stem.replace(/\(fixed\)/gi, ' ').trim()
+
   const english = Object.entries(numberWords).find(([needle]) =>
-    filename.includes(needle)
+    normalizedStem.includes(needle)
   )
   if (english) return english[1]
 
-  const hebrewMatch = filename.match(/([אבגדהוז])[׳'’]/)
+  const trailingDigit = normalizedStem.match(
+    /(?:^|[\s_-])([1-7])(?:\s+aliyah)?$/i
+  )
+  if (trailingDigit) return Number(trailingDigit[1])
+
+  const hebrewMatch = normalizedStem.match(/([אבגדהוז])[׳'’]/)
   if (hebrewMatch) return hebrewOrdinals[hebrewMatch[1]]
+
+  const trailingHebrew = normalizedStem.match(/(?:^|[\s_-])[׳'’]?([אבגדהוז])$/)
+  if (trailingHebrew) return hebrewOrdinals[trailingHebrew[1]]
 
   return null
 }
@@ -69,7 +85,10 @@ for (const folder of folders) {
   }))
     .filter((entry) => entry.isFile())
     .map((entry) => entry.name)
-    .filter((name) => /\.m4a$/i.test(name))
+    .filter((name) => {
+      const ext = path.extname(name).replace(/^\./, '').toLowerCase()
+      return ext in extensionScores
+    })
 
   for (const filename of files) {
     await cp(
@@ -87,8 +106,7 @@ for (const folder of folders) {
     if (!aliyah) continue
     const ext = path.extname(filename).replace(/^\./, '').toLowerCase()
     const current = byAliyah.get(aliyah)
-    const score =
-      (filename.includes('(fixed)') ? 5 : 0) + (ext === 'm4a' ? 2 : 1)
+    const score = (filename.includes('(fixed)') ? 5 : 0) + extensionScores[ext]
     if (!current || score > current.score) {
       byAliyah.set(aliyah, {
         score,
