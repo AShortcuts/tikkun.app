@@ -5,10 +5,10 @@
   "parshaSlug": "bereshit",
   "aliyah": 2,
   "tokenCount": 183,
-  "cueCount": 98,
+  "cueCount": 114,
   "tokenizationVersion": "v2",
   "audioVersion": "Source file:  (fixed) ’בראשית ב.m4a",
-  "savedAt": "2026-03-29T03:58:18.785Z",
+  "savedAt": "2026-04-15T20:56:54.670Z",
   "cues": [
     {
       "cueNumber": 1,
@@ -793,6 +793,134 @@
       "lineIndex": 33,
       "fragmentIndex": 0,
       "wordIndex": 6
+    },
+    {
+      "cueNumber": 99,
+      "timeStart": 181.284,
+      "pageNumber": 2,
+      "lineIndex": 34,
+      "fragmentIndex": 0,
+      "wordIndex": 0
+    },
+    {
+      "cueNumber": 100,
+      "timeStart": 182.842,
+      "pageNumber": 2,
+      "lineIndex": 34,
+      "fragmentIndex": 0,
+      "wordIndex": 1
+    },
+    {
+      "cueNumber": 101,
+      "timeStart": 183.674,
+      "pageNumber": 2,
+      "lineIndex": 34,
+      "fragmentIndex": 0,
+      "wordIndex": 2
+    },
+    {
+      "cueNumber": 102,
+      "timeStart": 185.163,
+      "pageNumber": 2,
+      "lineIndex": 34,
+      "fragmentIndex": 0,
+      "wordIndex": 3
+    },
+    {
+      "cueNumber": 103,
+      "timeStart": 186.065,
+      "pageNumber": 2,
+      "lineIndex": 34,
+      "fragmentIndex": 0,
+      "wordIndex": 4
+    },
+    {
+      "cueNumber": 104,
+      "timeStart": 186.52,
+      "pageNumber": 2,
+      "lineIndex": 34,
+      "fragmentIndex": 0,
+      "wordIndex": 5
+    },
+    {
+      "cueNumber": 105,
+      "timeStart": 188.307,
+      "pageNumber": 2,
+      "lineIndex": 34,
+      "fragmentIndex": 0,
+      "wordIndex": 6
+    },
+    {
+      "cueNumber": 106,
+      "timeStart": 189.01,
+      "pageNumber": 2,
+      "lineIndex": 34,
+      "fragmentIndex": 0,
+      "wordIndex": 7
+    },
+    {
+      "cueNumber": 107,
+      "timeStart": 190.946,
+      "pageNumber": 2,
+      "lineIndex": 35,
+      "fragmentIndex": 0,
+      "wordIndex": 0
+    },
+    {
+      "cueNumber": 108,
+      "timeStart": 193.996,
+      "pageNumber": 2,
+      "lineIndex": 35,
+      "fragmentIndex": 0,
+      "wordIndex": 1
+    },
+    {
+      "cueNumber": 109,
+      "timeStart": 195.642,
+      "pageNumber": 2,
+      "lineIndex": 35,
+      "fragmentIndex": 0,
+      "wordIndex": 2
+    },
+    {
+      "cueNumber": 110,
+      "timeStart": 196.692,
+      "pageNumber": 2,
+      "lineIndex": 35,
+      "fragmentIndex": 0,
+      "wordIndex": 3
+    },
+    {
+      "cueNumber": 111,
+      "timeStart": 197.073,
+      "pageNumber": 2,
+      "lineIndex": 35,
+      "fragmentIndex": 0,
+      "wordIndex": 4
+    },
+    {
+      "cueNumber": 112,
+      "timeStart": 199.102,
+      "pageNumber": 2,
+      "lineIndex": 35,
+      "fragmentIndex": 0,
+      "wordIndex": 5
+    },
+    {
+      "cueNumber": 113,
+      "timeStart": 200.864,
+      "pageNumber": 2,
+      "lineIndex": 35,
+      "fragmentIndex": 0,
+      "wordIndex": 6
+    },
+    {
+      "cueNumber": 114,
+      "timeStart": 201.44,
+      "pageNumber": 2,
+      "lineIndex": 36,
+      "fragmentIndex": 0,
+      "wordIndex": 0
     }
   ]
 }

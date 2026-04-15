@@ -12,23 +12,55 @@ export interface ActiveAudioSession {
 type AudioControllerEvents = {
   'session-loaded': ActiveAudioSession
   'playback-updated': { playing: boolean }
+  'frame-updated': { currentTime: number }
   'time-updated': { currentTime: number }
 }
 
 export class AudioController extends EventEmitter<AudioControllerEvents> {
   private activeSession: ActiveAudioSession | null = null
+  private playbackFrame = 0
+
+  private readonly pumpPlaybackFrame = () => {
+    if (this.audio.paused || this.audio.ended) {
+      this.playbackFrame = 0
+      return
+    }
+
+    this.emit('frame-updated', { currentTime: this.audio.currentTime })
+    this.playbackFrame = requestAnimationFrame(this.pumpPlaybackFrame)
+  }
 
   constructor(readonly audio: HTMLAudioElement) {
     super()
-    audio.addEventListener('play', () =>
+    audio.addEventListener('play', () => {
+      this.startPlaybackFrameLoop()
       this.emit('playback-updated', { playing: true })
-    )
-    audio.addEventListener('pause', () =>
+    })
+    audio.addEventListener('pause', () => {
+      this.stopPlaybackFrameLoop()
       this.emit('playback-updated', { playing: false })
+    })
+    audio.addEventListener('ended', () => {
+      this.stopPlaybackFrameLoop()
+      this.emit('frame-updated', { currentTime: audio.currentTime })
+    })
+    audio.addEventListener('seeked', () =>
+      this.emit('frame-updated', { currentTime: audio.currentTime })
     )
     audio.addEventListener('timeupdate', () =>
       this.emit('time-updated', { currentTime: audio.currentTime })
     )
+  }
+
+  private startPlaybackFrameLoop() {
+    if (this.playbackFrame) return
+    this.playbackFrame = requestAnimationFrame(this.pumpPlaybackFrame)
+  }
+
+  private stopPlaybackFrameLoop() {
+    if (!this.playbackFrame) return
+    cancelAnimationFrame(this.playbackFrame)
+    this.playbackFrame = 0
   }
 
   get session() {

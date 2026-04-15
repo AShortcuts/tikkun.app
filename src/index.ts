@@ -1891,7 +1891,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     refreshInlineAudioButtons(audioController)
     syncAdminPanelState(audioController)
   })
-  audioController.on('time-updated', async ({ currentTime }) => {
+  audioController.on('time-updated', () => {
     updateFloatingPlayerAudioProgress(audioController)
     updateFloatingPlayerMeta(audioController)
     const adminPanel = document.querySelector<HTMLElement>(
@@ -1900,13 +1900,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (adminPanel && !adminPanel.classList.contains('u-hidden')) {
       renderAdminCueList(audioController)
     }
+  })
+  audioController.on('frame-updated', ({ currentTime }) => {
     if (adminState.recording) return
     const session = audioController.session
     if (!session?.cues.length) return
+
     const cueIndex = highlightController.getCueIndex(session.cues, currentTime)
     if (cueIndex < 0) return
+
     cueNavigationIndex = cueIndex
-    await highlightController.activateCue(session.cues[cueIndex], {
+    const cue = session.cues[cueIndex]
+    if (highlightController.getActiveTokenKey() === cueKey(cue)) return
+
+    void highlightController.activateCue(cue, {
       scroll: readerPreferences.autoScrollWithPlayback,
     })
   })
