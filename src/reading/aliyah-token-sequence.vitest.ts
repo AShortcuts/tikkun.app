@@ -1,5 +1,8 @@
 import { expect, test } from 'vitest'
-import { adjustStartingLineTokens } from './aliyah-token-sequence.ts'
+import {
+  adjustStartingLineTokens,
+  collectTokenKeysForAliyahRange,
+} from './aliyah-token-sequence.ts'
 
 const createWord = (text: string) => {
   const node = document.createElement('span')
@@ -44,4 +47,46 @@ test('starts from the word after the first sof pasuk when the previous line cont
       previousLineWords,
     }).map((word) => word.textContent)
   ).toEqual(['התחלה', 'המשך'])
+})
+
+test('collects aliyah token keys from line rows only', () => {
+  const book = document.createElement('div')
+  book.innerHTML = `
+    <table>
+      <tr data-class="line" data-line-index="0">
+        <td>
+          <span class="fragment mod-annotations-on">
+            <span class="word" data-line-index="0" data-token-key="0:0:0:0">לפני</span>
+            <span class="word" data-line-index="0" data-token-key="0:0:0:1">התחלה</span>
+          </span>
+        </td>
+      </tr>
+      <tr data-class="line" data-line-index="1">
+        <td>
+          <span class="fragment mod-annotations-on">
+            <span class="word" data-line-index="1" data-token-key="0:1:0:0">קודם</span>
+            <span class="word" data-line-index="1" data-token-key="0:1:0:1">פסוק׃</span>
+            <span class="word" data-line-index="1" data-token-key="0:1:0:2">ויקרא</span>
+            <span class="word" data-line-index="1" data-token-key="0:1:0:3">האדם</span>
+          </span>
+        </td>
+      </tr>
+      <tr data-class="line" data-line-index="2">
+        <td>
+          <span class="fragment mod-annotations-on">
+            <span class="word" data-line-index="2" data-token-key="0:2:0:0">שמות</span>
+          </span>
+        </td>
+      </tr>
+    </table>
+  `
+
+  const lines = [...book.querySelectorAll<HTMLElement>('[data-class="line"]')]
+  expect(
+    collectTokenKeysForAliyahRange({
+      book,
+      startLine: lines[1],
+      endLine: lines[2],
+    })
+  ).toEqual(['0:1:0:2', '0:1:0:3'])
 })

@@ -35,7 +35,7 @@ import { cueFileRelativePath, formatCueFileJson } from './audio/cue-file.ts'
 import { normalizeFirstCueStart } from './audio/normalize-first-cue.ts'
 import { AudioController, ActiveAudioSession } from './reading/audio-controller.ts'
 import { HighlightController, cueKey } from './reading/highlight-controller.ts'
-import { adjustStartingLineTokens } from './reading/aliyah-token-sequence.ts'
+import { collectTokenKeysForAliyahRange } from './reading/aliyah-token-sequence.ts'
 import type { CueExportPayload, WordCue } from './audio/types.ts'
 import { verifyAdminPassword } from './admin/access.ts'
 import {
@@ -529,37 +529,15 @@ async function collectAliyahTokenKeys({
 
   if (!marker) return []
 
-  const lines = [...getBook().querySelectorAll<HTMLElement>('[data-line-index]')]
-  const startLine = marker.closest<HTMLElement>('[data-line-index]')
-  const endLine = nextMarker?.closest<HTMLElement>('[data-line-index]') ?? null
-  const startIndex = startLine ? lines.indexOf(startLine) : -1
-  const endIndex = endLine ? lines.indexOf(endLine) : lines.length
-  if (startIndex < 0) return []
+  const startLine = marker.closest<HTMLElement>('[data-class="line"]')
+  const endLine = nextMarker?.closest<HTMLElement>('[data-class="line"]') ?? null
+  if (!startLine) return []
 
-  return lines
-    .slice(startIndex, endIndex)
-    .flatMap((line, index) => {
-      const currentLineWords = [
-        ...line.querySelectorAll<HTMLElement>('.fragment.mod-annotations-on .word'),
-      ]
-      if (index !== 0) return currentLineWords
-
-      const previousLineWords =
-        startIndex > 0
-          ? [
-              ...lines[startIndex - 1].querySelectorAll<HTMLElement>(
-                '.fragment.mod-annotations-on .word'
-              ),
-            ]
-          : []
-
-      return adjustStartingLineTokens({
-        currentLineWords,
-        previousLineWords,
-      })
-    })
-    .map((word) => word.dataset.tokenKey)
-    .filter((key): key is string => Boolean(key))
+  return collectTokenKeysForAliyahRange({
+    book: getBook(),
+    startLine,
+    endLine,
+  })
 }
 
 function updateFloatingPlayer(audioController: AudioController) {
