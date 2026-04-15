@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest'
 import {
+  adjustEndingLineTokens,
   adjustStartingLineTokens,
   collectTokenKeysForAliyahRange,
 } from './aliyah-token-sequence.ts'
@@ -49,32 +50,49 @@ test('starts from the word after the first sof pasuk when the previous line cont
   ).toEqual(['התחלה', 'המשך'])
 })
 
-test('collects token keys from the starting line onward without an aliyah cutoff', () => {
+test('keeps words through the first sof pasuk when the next aliyah starts mid-line', () => {
+  const previousLineWords = [createWord('מילה')]
+  const currentLineWords = [
+    createWord('קודם'),
+    createWord('פסוק׃'),
+    createWord('התחלה'),
+    createWord('המשך'),
+  ]
+
+  expect(
+    adjustEndingLineTokens({
+      currentLineWords,
+      previousLineWords,
+    }).map((word) => word.textContent)
+  ).toEqual(['קודם', 'פסוק׃'])
+})
+
+test('collects aliyah token keys from line rows only', () => {
   const book = document.createElement('div')
   book.innerHTML = `
     <table>
       <tr data-class="line" data-line-index="0">
         <td>
           <span class="fragment mod-annotations-on">
-            <span class="word" data-token-key="0:0:0:0">לפני</span>
-            <span class="word" data-token-key="0:0:0:1">התחלה</span>
+            <span class="word" data-line-index="0" data-token-key="0:0:0:0">לפני</span>
+            <span class="word" data-line-index="0" data-token-key="0:0:0:1">התחלה</span>
           </span>
         </td>
       </tr>
       <tr data-class="line" data-line-index="1">
         <td>
           <span class="fragment mod-annotations-on">
-            <span class="word" data-token-key="0:1:0:0">קודם</span>
-            <span class="word" data-token-key="0:1:0:1">פסוק׃</span>
-            <span class="word" data-token-key="0:1:0:2">ויקרא</span>
-            <span class="word" data-token-key="0:1:0:3">האדם</span>
+            <span class="word" data-line-index="1" data-token-key="0:1:0:0">קודם</span>
+            <span class="word" data-line-index="1" data-token-key="0:1:0:1">פסוק׃</span>
+            <span class="word" data-line-index="1" data-token-key="0:1:0:2">ויקרא</span>
+            <span class="word" data-line-index="1" data-token-key="0:1:0:3">האדם</span>
           </span>
         </td>
       </tr>
       <tr data-class="line" data-line-index="2">
         <td>
           <span class="fragment mod-annotations-on">
-            <span class="word" data-token-key="0:2:0:0">שמות</span>
+            <span class="word" data-line-index="2" data-token-key="0:2:0:0">שמות</span>
           </span>
         </td>
       </tr>
@@ -86,6 +104,41 @@ test('collects token keys from the starting line onward without an aliyah cutoff
     collectTokenKeysForAliyahRange({
       book,
       startLine: lines[1],
+      endLine: lines[2],
     })
-  ).toEqual(['0:1:0:2', '0:1:0:3', '0:2:0:0'])
+  ).toEqual(['0:1:0:2', '0:1:0:3'])
+})
+
+test('keeps the shared line prefix when the next aliyah begins mid-line', () => {
+  const book = document.createElement('div')
+  book.innerHTML = `
+    <table>
+      <tr data-class="line" data-line-index="0">
+        <td>
+          <span class="fragment mod-annotations-on">
+            <span class="word" data-token-key="0:0:0:0">פתיחה</span>
+          </span>
+        </td>
+      </tr>
+      <tr data-class="line" data-line-index="1">
+        <td>
+          <span class="fragment mod-annotations-on">
+            <span class="word" data-token-key="0:1:0:0">לפני</span>
+            <span class="word" data-token-key="0:1:0:1">סיום׃</span>
+            <span class="word" data-token-key="0:1:0:2">תחילת</span>
+            <span class="word" data-token-key="0:1:0:3">עלייה</span>
+          </span>
+        </td>
+      </tr>
+    </table>
+  `
+
+  const lines = [...book.querySelectorAll<HTMLElement>('[data-class="line"]')]
+  expect(
+    collectTokenKeysForAliyahRange({
+      book,
+      startLine: lines[0],
+      endLine: lines[1],
+    })
+  ).toEqual(['0:0:0:0', '0:1:0:0', '0:1:0:1'])
 })

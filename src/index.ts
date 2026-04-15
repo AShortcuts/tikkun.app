@@ -509,14 +509,32 @@ async function collectAliyahTokenKeys({
   )
   if (!marker) return []
 
-  if (!marker) return []
+  let markers = getAliyahMarkerElements()
+  let markerIndex = markers.indexOf(marker)
+  let nextMarker = markers[markerIndex + 1] ?? null
+
+  while (!nextMarker) {
+    const renderedPages = display.getRenderedPageNumbers()
+    const lastPage = renderedPages[renderedPages.length - 1]
+    const loaded = await display.ensurePageRendered(lastPage + 1)
+    if (!loaded) break
+    markers = getAliyahMarkerElements()
+    marker = document.querySelector<HTMLElement>(
+      `[data-aliyah-marker="true"][data-run-id="${runId}"][data-aliyah-index="${aliyahIndex}"]`
+    )
+    if (!marker) break
+    markerIndex = markers.indexOf(marker)
+    nextMarker = markers[markerIndex + 1] ?? null
+  }
 
   const startLine = marker.closest<HTMLElement>('[data-class="line"]')
+  const endLine = nextMarker?.closest<HTMLElement>('[data-class="line"]') ?? null
   if (!startLine) return []
 
   return collectTokenKeysForAliyahRange({
     book: getBook(),
     startLine,
+    endLine,
   })
 }
 
