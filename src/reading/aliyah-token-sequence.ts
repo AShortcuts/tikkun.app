@@ -28,19 +28,16 @@ export function adjustStartingLineTokens({
 export function collectTokenKeysForAliyahRange({
   book,
   startLine,
-  endLine,
 }: {
   book: ParentNode
   startLine: HTMLElement
-  endLine?: HTMLElement | null
 }) {
   const lines = [...book.querySelectorAll<HTMLElement>('[data-class="line"]')]
   const startIndex = lines.indexOf(startLine)
-  const endIndex = endLine ? lines.indexOf(endLine) : lines.length
   if (startIndex < 0) return []
 
   return lines
-    .slice(startIndex, endIndex < 0 ? lines.length : endIndex)
+    .slice(startIndex)
     .flatMap((line, index) => {
       const currentLineWords = annotatedWordsIn(line)
       if (index !== 0) return currentLineWords

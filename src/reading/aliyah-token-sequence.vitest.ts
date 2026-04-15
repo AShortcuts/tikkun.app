@@ -49,32 +49,32 @@ test('starts from the word after the first sof pasuk when the previous line cont
   ).toEqual(['התחלה', 'המשך'])
 })
 
-test('collects aliyah token keys from line rows only', () => {
+test('collects token keys from the starting line onward without an aliyah cutoff', () => {
   const book = document.createElement('div')
   book.innerHTML = `
     <table>
       <tr data-class="line" data-line-index="0">
         <td>
           <span class="fragment mod-annotations-on">
-            <span class="word" data-line-index="0" data-token-key="0:0:0:0">לפני</span>
-            <span class="word" data-line-index="0" data-token-key="0:0:0:1">התחלה</span>
+            <span class="word" data-token-key="0:0:0:0">לפני</span>
+            <span class="word" data-token-key="0:0:0:1">התחלה</span>
           </span>
         </td>
       </tr>
       <tr data-class="line" data-line-index="1">
         <td>
           <span class="fragment mod-annotations-on">
-            <span class="word" data-line-index="1" data-token-key="0:1:0:0">קודם</span>
-            <span class="word" data-line-index="1" data-token-key="0:1:0:1">פסוק׃</span>
-            <span class="word" data-line-index="1" data-token-key="0:1:0:2">ויקרא</span>
-            <span class="word" data-line-index="1" data-token-key="0:1:0:3">האדם</span>
+            <span class="word" data-token-key="0:1:0:0">קודם</span>
+            <span class="word" data-token-key="0:1:0:1">פסוק׃</span>
+            <span class="word" data-token-key="0:1:0:2">ויקרא</span>
+            <span class="word" data-token-key="0:1:0:3">האדם</span>
           </span>
         </td>
       </tr>
       <tr data-class="line" data-line-index="2">
         <td>
           <span class="fragment mod-annotations-on">
-            <span class="word" data-line-index="2" data-token-key="0:2:0:0">שמות</span>
+            <span class="word" data-token-key="0:2:0:0">שמות</span>
           </span>
         </td>
       </tr>
@@ -86,7 +86,6 @@ test('collects aliyah token keys from line rows only', () => {
     collectTokenKeysForAliyahRange({
       book,
       startLine: lines[1],
-      endLine: lines[2],
     })
-  ).toEqual(['0:1:0:2', '0:1:0:3'])
+  ).toEqual(['0:1:0:2', '0:1:0:3', '0:2:0:0'])
 })

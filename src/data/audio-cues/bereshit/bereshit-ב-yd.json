@@ -4,11 +4,11 @@
   "narratorId": "yoni-davidov",
   "parshaSlug": "bereshit",
   "aliyah": 2,
-  "tokenCount": 183,
-  "cueCount": 114,
+  "tokenCount": 462,
+  "cueCount": 188,
   "tokenizationVersion": "v2",
   "audioVersion": "Source file:  (fixed) ’בראשית ב.m4a",
-  "savedAt": "2026-04-15T20:56:54.670Z",
+  "savedAt": "2026-04-15T22:04:22.801Z",
   "cues": [
     {
       "cueNumber": 1,
@@ -921,6 +921,598 @@
       "lineIndex": 36,
       "fragmentIndex": 0,
       "wordIndex": 0
+    },
+    {
+      "cueNumber": 115,
+      "timeStart": 203.761,
+      "pageNumber": 2,
+      "lineIndex": 36,
+      "fragmentIndex": 0,
+      "wordIndex": 1
+    },
+    {
+      "cueNumber": 116,
+      "timeStart": 204.572,
+      "pageNumber": 2,
+      "lineIndex": 36,
+      "fragmentIndex": 0,
+      "wordIndex": 2
+    },
+    {
+      "cueNumber": 117,
+      "timeStart": 204.992,
+      "pageNumber": 2,
+      "lineIndex": 36,
+      "fragmentIndex": 0,
+      "wordIndex": 3
+    },
+    {
+      "cueNumber": 118,
+      "timeStart": 205.886,
+      "pageNumber": 2,
+      "lineIndex": 36,
+      "fragmentIndex": 0,
+      "wordIndex": 4
+    },
+    {
+      "cueNumber": 119,
+      "timeStart": 207.838,
+      "pageNumber": 2,
+      "lineIndex": 36,
+      "fragmentIndex": 0,
+      "wordIndex": 5
+    },
+    {
+      "cueNumber": 120,
+      "timeStart": 208.224,
+      "pageNumber": 2,
+      "lineIndex": 36,
+      "fragmentIndex": 0,
+      "wordIndex": 6
+    },
+    {
+      "cueNumber": 121,
+      "timeStart": 210.101,
+      "pageNumber": 2,
+      "lineIndex": 37,
+      "fragmentIndex": 0,
+      "wordIndex": 0
+    },
+    {
+      "cueNumber": 122,
+      "timeStart": 210.477,
+      "pageNumber": 2,
+      "lineIndex": 37,
+      "fragmentIndex": 0,
+      "wordIndex": 1
+    },
+    {
+      "cueNumber": 123,
+      "timeStart": 211.827,
+      "pageNumber": 2,
+      "lineIndex": 37,
+      "fragmentIndex": 0,
+      "wordIndex": 2
+    },
+    {
+      "cueNumber": 124,
+      "timeStart": 212.58,
+      "pageNumber": 2,
+      "lineIndex": 37,
+      "fragmentIndex": 0,
+      "wordIndex": 3
+    },
+    {
+      "cueNumber": 125,
+      "timeStart": 215.155,
+      "pageNumber": 2,
+      "lineIndex": 37,
+      "fragmentIndex": 0,
+      "wordIndex": 4
+    },
+    {
+      "cueNumber": 126,
+      "timeStart": 215.599,
+      "pageNumber": 2,
+      "lineIndex": 37,
+      "fragmentIndex": 0,
+      "wordIndex": 5
+    },
+    {
+      "cueNumber": 127,
+      "timeStart": 218.15,
+      "pageNumber": 2,
+      "lineIndex": 37,
+      "fragmentIndex": 0,
+      "wordIndex": 6
+    },
+    {
+      "cueNumber": 128,
+      "timeStart": 219.657,
+      "pageNumber": 2,
+      "lineIndex": 38,
+      "fragmentIndex": 0,
+      "wordIndex": 0
+    },
+    {
+      "cueNumber": 129,
+      "timeStart": 220.209,
+      "pageNumber": 2,
+      "lineIndex": 38,
+      "fragmentIndex": 0,
+      "wordIndex": 1
+    },
+    {
+      "cueNumber": 130,
+      "timeStart": 221.616,
+      "pageNumber": 2,
+      "lineIndex": 38,
+      "fragmentIndex": 0,
+      "wordIndex": 2
+    },
+    {
+      "cueNumber": 131,
+      "timeStart": 223.177,
+      "pageNumber": 2,
+      "lineIndex": 38,
+      "fragmentIndex": 0,
+      "wordIndex": 3
+    },
+    {
+      "cueNumber": 132,
+      "timeStart": 224.274,
+      "pageNumber": 2,
+      "lineIndex": 38,
+      "fragmentIndex": 0,
+      "wordIndex": 4
+    },
+    {
+      "cueNumber": 133,
+      "timeStart": 226.581,
+      "pageNumber": 2,
+      "lineIndex": 38,
+      "fragmentIndex": 0,
+      "wordIndex": 5
+    },
+    {
+      "cueNumber": 134,
+      "timeStart": 228.903,
+      "pageNumber": 2,
+      "lineIndex": 39,
+      "fragmentIndex": 0,
+      "wordIndex": 0
+    },
+    {
+      "cueNumber": 135,
+      "timeStart": 231.627,
+      "pageNumber": 2,
+      "lineIndex": 39,
+      "fragmentIndex": 0,
+      "wordIndex": 1
+    },
+    {
+      "cueNumber": 136,
+      "timeStart": 232.11,
+      "pageNumber": 2,
+      "lineIndex": 39,
+      "fragmentIndex": 0,
+      "wordIndex": 2
+    },
+    {
+      "cueNumber": 137,
+      "timeStart": 232.502,
+      "pageNumber": 2,
+      "lineIndex": 39,
+      "fragmentIndex": 0,
+      "wordIndex": 3
+    },
+    {
+      "cueNumber": 138,
+      "timeStart": 234.81,
+      "pageNumber": 2,
+      "lineIndex": 39,
+      "fragmentIndex": 0,
+      "wordIndex": 4
+    },
+    {
+      "cueNumber": 139,
+      "timeStart": 236.901,
+      "pageNumber": 2,
+      "lineIndex": 39,
+      "fragmentIndex": 0,
+      "wordIndex": 5
+    },
+    {
+      "cueNumber": 140,
+      "timeStart": 238.31,
+      "pageNumber": 2,
+      "lineIndex": 40,
+      "fragmentIndex": 0,
+      "wordIndex": 0
+    },
+    {
+      "cueNumber": 141,
+      "timeStart": 239.116,
+      "pageNumber": 2,
+      "lineIndex": 40,
+      "fragmentIndex": 0,
+      "wordIndex": 1
+    },
+    {
+      "cueNumber": 142,
+      "timeStart": 241.135,
+      "pageNumber": 2,
+      "lineIndex": 40,
+      "fragmentIndex": 0,
+      "wordIndex": 2
+    },
+    {
+      "cueNumber": 143,
+      "timeStart": 241.669,
+      "pageNumber": 2,
+      "lineIndex": 40,
+      "fragmentIndex": 0,
+      "wordIndex": 3
+    },
+    {
+      "cueNumber": 144,
+      "timeStart": 243.777,
+      "pageNumber": 2,
+      "lineIndex": 40,
+      "fragmentIndex": 0,
+      "wordIndex": 4
+    },
+    {
+      "cueNumber": 145,
+      "timeStart": 247.322,
+      "pageNumber": 2,
+      "lineIndex": 40,
+      "fragmentIndex": 0,
+      "wordIndex": 5
+    },
+    {
+      "cueNumber": 146,
+      "timeStart": 249.083,
+      "pageNumber": 2,
+      "lineIndex": 40,
+      "fragmentIndex": 0,
+      "wordIndex": 6
+    },
+    {
+      "cueNumber": 147,
+      "timeStart": 249.355,
+      "pageNumber": 2,
+      "lineIndex": 40,
+      "fragmentIndex": 0,
+      "wordIndex": 7
+    },
+    {
+      "cueNumber": 148,
+      "timeStart": 250.914,
+      "pageNumber": 2,
+      "lineIndex": 41,
+      "fragmentIndex": 0,
+      "wordIndex": 0
+    },
+    {
+      "cueNumber": 149,
+      "timeStart": 251.141,
+      "pageNumber": 2,
+      "lineIndex": 41,
+      "fragmentIndex": 0,
+      "wordIndex": 1
+    },
+    {
+      "cueNumber": 150,
+      "timeStart": 252.674,
+      "pageNumber": 2,
+      "lineIndex": 41,
+      "fragmentIndex": 0,
+      "wordIndex": 2
+    },
+    {
+      "cueNumber": 151,
+      "timeStart": 253.945,
+      "pageNumber": 2,
+      "lineIndex": 41,
+      "fragmentIndex": 0,
+      "wordIndex": 3
+    },
+    {
+      "cueNumber": 152,
+      "timeStart": 256.877,
+      "pageNumber": 2,
+      "lineIndex": 41,
+      "fragmentIndex": 0,
+      "wordIndex": 4
+    },
+    {
+      "cueNumber": 153,
+      "timeStart": 258.922,
+      "pageNumber": 2,
+      "lineIndex": 41,
+      "fragmentIndex": 0,
+      "wordIndex": 5
+    },
+    {
+      "cueNumber": 154,
+      "timeStart": 259.75,
+      "pageNumber": 2,
+      "lineIndex": 41,
+      "fragmentIndex": 0,
+      "wordIndex": 6
+    },
+    {
+      "cueNumber": 155,
+      "timeStart": 261.153,
+      "pageNumber": 2,
+      "lineIndex": 41,
+      "fragmentIndex": 0,
+      "wordIndex": 7
+    },
+    {
+      "cueNumber": 156,
+      "timeStart": 262.071,
+      "pageNumber": 2,
+      "lineIndex": 41,
+      "fragmentIndex": 0,
+      "wordIndex": 8
+    },
+    {
+      "cueNumber": 157,
+      "timeStart": 264.535,
+      "pageNumber": 3,
+      "lineIndex": 0,
+      "fragmentIndex": 0,
+      "wordIndex": 0
+    },
+    {
+      "cueNumber": 158,
+      "timeStart": 268.401,
+      "pageNumber": 3,
+      "lineIndex": 0,
+      "fragmentIndex": 0,
+      "wordIndex": 1
+    },
+    {
+      "cueNumber": 159,
+      "timeStart": 268.827,
+      "pageNumber": 3,
+      "lineIndex": 0,
+      "fragmentIndex": 0,
+      "wordIndex": 2
+    },
+    {
+      "cueNumber": 160,
+      "timeStart": 271.279,
+      "pageNumber": 3,
+      "lineIndex": 0,
+      "fragmentIndex": 0,
+      "wordIndex": 3
+    },
+    {
+      "cueNumber": 161,
+      "timeStart": 274.523,
+      "pageNumber": 3,
+      "lineIndex": 0,
+      "fragmentIndex": 0,
+      "wordIndex": 4
+    },
+    {
+      "cueNumber": 162,
+      "timeStart": 275.004,
+      "pageNumber": 3,
+      "lineIndex": 0,
+      "fragmentIndex": 0,
+      "wordIndex": 5
+    },
+    {
+      "cueNumber": 163,
+      "timeStart": 276.53,
+      "pageNumber": 3,
+      "lineIndex": 0,
+      "fragmentIndex": 0,
+      "wordIndex": 6
+    },
+    {
+      "cueNumber": 164,
+      "timeStart": 278.449,
+      "pageNumber": 3,
+      "lineIndex": 1,
+      "fragmentIndex": 0,
+      "wordIndex": 0
+    },
+    {
+      "cueNumber": 165,
+      "timeStart": 279.899,
+      "pageNumber": 3,
+      "lineIndex": 1,
+      "fragmentIndex": 0,
+      "wordIndex": 1
+    },
+    {
+      "cueNumber": 166,
+      "timeStart": 282.068,
+      "pageNumber": 3,
+      "lineIndex": 1,
+      "fragmentIndex": 0,
+      "wordIndex": 2
+    },
+    {
+      "cueNumber": 167,
+      "timeStart": 285.348,
+      "pageNumber": 3,
+      "lineIndex": 1,
+      "fragmentIndex": 0,
+      "wordIndex": 3
+    },
+    {
+      "cueNumber": 168,
+      "timeStart": 290.85,
+      "pageNumber": 3,
+      "lineIndex": 1,
+      "fragmentIndex": 0,
+      "wordIndex": 4
+    },
+    {
+      "cueNumber": 169,
+      "timeStart": 293.708,
+      "pageNumber": 3,
+      "lineIndex": 1,
+      "fragmentIndex": 0,
+      "wordIndex": 5
+    },
+    {
+      "cueNumber": 170,
+      "timeStart": 297.62,
+      "pageNumber": 3,
+      "lineIndex": 1,
+      "fragmentIndex": 0,
+      "wordIndex": 6
+    },
+    {
+      "cueNumber": 171,
+      "timeStart": 301.866,
+      "pageNumber": 3,
+      "lineIndex": 2,
+      "fragmentIndex": 0,
+      "wordIndex": 0
+    },
+    {
+      "cueNumber": 172,
+      "timeStart": 302.578,
+      "pageNumber": 3,
+      "lineIndex": 2,
+      "fragmentIndex": 0,
+      "wordIndex": 1
+    },
+    {
+      "cueNumber": 173,
+      "timeStart": 302.972,
+      "pageNumber": 3,
+      "lineIndex": 2,
+      "fragmentIndex": 0,
+      "wordIndex": 2
+    },
+    {
+      "cueNumber": 174,
+      "timeStart": 303.406,
+      "pageNumber": 3,
+      "lineIndex": 2,
+      "fragmentIndex": 0,
+      "wordIndex": 3
+    },
+    {
+      "cueNumber": 175,
+      "timeStart": 303.98,
+      "pageNumber": 3,
+      "lineIndex": 2,
+      "fragmentIndex": 0,
+      "wordIndex": 4
+    },
+    {
+      "cueNumber": 176,
+      "timeStart": 305.512,
+      "pageNumber": 3,
+      "lineIndex": 2,
+      "fragmentIndex": 0,
+      "wordIndex": 5
+    },
+    {
+      "cueNumber": 177,
+      "timeStart": 306.612,
+      "pageNumber": 3,
+      "lineIndex": 2,
+      "fragmentIndex": 0,
+      "wordIndex": 6
+    },
+    {
+      "cueNumber": 178,
+      "timeStart": 307.093,
+      "pageNumber": 3,
+      "lineIndex": 3,
+      "fragmentIndex": 0,
+      "wordIndex": 0
+    },
+    {
+      "cueNumber": 179,
+      "timeStart": 308.863,
+      "pageNumber": 3,
+      "lineIndex": 3,
+      "fragmentIndex": 0,
+      "wordIndex": 1
+    },
+    {
+      "cueNumber": 180,
+      "timeStart": 310.44,
+      "pageNumber": 3,
+      "lineIndex": 3,
+      "fragmentIndex": 0,
+      "wordIndex": 2
+    },
+    {
+      "cueNumber": 181,
+      "timeStart": 311.948,
+      "pageNumber": 3,
+      "lineIndex": 3,
+      "fragmentIndex": 0,
+      "wordIndex": 3
+    },
+    {
+      "cueNumber": 182,
+      "timeStart": 316.475,
+      "pageNumber": 3,
+      "lineIndex": 3,
+      "fragmentIndex": 0,
+      "wordIndex": 4
+    },
+    {
+      "cueNumber": 183,
+      "timeStart": 317.52,
+      "pageNumber": 3,
+      "lineIndex": 3,
+      "fragmentIndex": 0,
+      "wordIndex": 5
+    },
+    {
+      "cueNumber": 184,
+      "timeStart": 319.562,
+      "pageNumber": 3,
+      "lineIndex": 4,
+      "fragmentIndex": 0,
+      "wordIndex": 0
+    },
+    {
+      "cueNumber": 185,
+      "timeStart": 321.7,
+      "pageNumber": 3,
+      "lineIndex": 4,
+      "fragmentIndex": 0,
+      "wordIndex": 1
+    },
+    {
+      "cueNumber": 186,
+      "timeStart": 322.048,
+      "pageNumber": 3,
+      "lineIndex": 4,
+      "fragmentIndex": 0,
+      "wordIndex": 2
+    },
+    {
+      "cueNumber": 187,
+      "timeStart": 326.316,
+      "pageNumber": 3,
+      "lineIndex": 4,
+      "fragmentIndex": 0,
+      "wordIndex": 3
+    },
+    {
+      "cueNumber": 188,
+      "timeStart": 326.67,
+      "pageNumber": 3,
+      "lineIndex": 4,
+      "fragmentIndex": 0,
+      "wordIndex": 4
     }
   ]
 }
