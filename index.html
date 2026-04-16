@@ -96,23 +96,37 @@
       <section class="reader-shell" data-target-id="reader-shell">
         <div class="reader-side mod-left">
           <div class="floating-player u-hidden" data-target-id="floating-player">
-            <div class="floating-player-meta" data-target-id="floating-player-meta" aria-hidden="true">
-              <span class="floating-player-meta-item">
-                <span class="floating-player-meta-label">Parsha</span>
-                <span class="floating-player-meta-value" data-target-id="floating-meta-parsha">—</span>
-              </span>
-              <span class="floating-player-meta-item">
-                <span class="floating-player-meta-label">Aliyah</span>
-                <span class="floating-player-meta-value" data-target-id="floating-meta-aliyah">—</span>
-              </span>
-              <span class="floating-player-meta-item">
-                <span class="floating-player-meta-label">Progress</span>
-                <span class="floating-player-meta-value" data-target-id="floating-meta-cues">0/0</span>
-              </span>
-              <span class="floating-player-meta-item">
-                <span class="floating-player-meta-label">Duration</span>
-                <span class="floating-player-meta-value" data-target-id="floating-meta-duration">0:00/0:00</span>
-              </span>
+            <div class="floating-player-details" data-target-id="floating-player-details">
+              <div class="floating-player-meta" data-target-id="floating-player-meta">
+                <span class="floating-player-meta-item">
+                  <span class="floating-player-meta-label">Parsha</span>
+                  <span class="floating-player-meta-value" data-target-id="floating-meta-parsha">—</span>
+                </span>
+                <span class="floating-player-meta-item">
+                  <span class="floating-player-meta-label">Aliyah</span>
+                  <span class="floating-player-meta-value" data-target-id="floating-meta-aliyah">—</span>
+                </span>
+              </div>
+              <div class="floating-player-progress-list">
+                <div class="floating-player-progress-item">
+                  <div class="floating-player-progress-head">
+                    <span class="floating-player-progress-label">Cue Progress</span>
+                    <span class="floating-player-progress-value" data-target-id="floating-meta-cues">0/0</span>
+                  </div>
+                  <div class="floating-player-progress-track">
+                    <div class="floating-player-progress-fill mod-cues"></div>
+                  </div>
+                </div>
+                <div class="floating-player-progress-item">
+                  <div class="floating-player-progress-head">
+                    <span class="floating-player-progress-label">Audio Progress</span>
+                    <span class="floating-player-progress-value" data-target-id="floating-meta-duration">0:00/0:00</span>
+                  </div>
+                  <div class="floating-player-progress-track">
+                    <div class="floating-player-progress-fill mod-audio"></div>
+                  </div>
+                </div>
+              </div>
             </div>
             <div class="floating-player-controls">
               <button class="floating-player-button" data-target-id="floating-replay" type="button" title="Replay current cue" aria-label="Replay current cue"></button>

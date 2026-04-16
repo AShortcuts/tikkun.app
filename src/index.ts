@@ -63,6 +63,8 @@ let cueNavigationIndex: number | null = null
 let lastAdminRenderedCueCount = 0
 let lastAdminFollowedCueIndex = -1
 let exportDownloadUrl: string | null = null
+let floatingPlayerExpanded = false
+const floatingPlayerDesktopMediaQuery = window.matchMedia('(min-width: 701px)')
 const ADMIN_SESSION_UNLOCKED_KEY = 'tikkun-admin-unlocked'
 const ADMIN_SESSION_PANEL_OPEN_KEY = 'tikkun-admin-panel-open'
 const adminDraftTimeFormat = Intl.DateTimeFormat(undefined, {
@@ -581,6 +583,9 @@ function updateFloatingPlayer(audioController: AudioController) {
   const activeSession = audioController.session
 
   player.classList.toggle('u-hidden', !activeSession)
+  if (!activeSession) {
+    setFloatingPlayerExpanded(false)
+  }
   cornerControls?.classList.toggle('mod-raised', Boolean(activeSession))
   setControlIcon(playButton, audioController.audio.paused ? 'play' : 'pause')
   for (const button of [prevButton, playButton, nextButton, replayButton]) {
@@ -601,6 +606,23 @@ function updateFloatingPlayer(audioController: AudioController) {
   updateFloatingPlayerMeta(audioController)
 }
 
+function setFloatingPlayerExpanded(expanded: boolean) {
+  const player = document.querySelector<HTMLElement>('[data-target-id="floating-player"]')
+  if (!player) return
+
+  const canExpand = floatingPlayerDesktopMediaQuery.matches
+  const nextExpanded = canExpand ? expanded : false
+  floatingPlayerExpanded = nextExpanded
+
+  player.classList.toggle('is-expanded', nextExpanded)
+  player.classList.toggle('mod-expandable', canExpand)
+  player.title = !canExpand
+    ? ''
+    : nextExpanded
+      ? 'Click to collapse player progress'
+      : 'Click to show player progress'
+}
+
 function updateFloatingPlayerAudioProgress(audioController: AudioController) {
   const player = document.querySelector<HTMLElement>('[data-target-id="floating-player"]')
   if (!player) return
@@ -612,6 +634,20 @@ function updateFloatingPlayerAudioProgress(audioController: AudioController) {
       : 0
 
   player.style.setProperty('--audio-progress-ratio', `${progress}`)
+
+  const cueProgress =
+    audioController.session?.cues.length
+      ? Math.max(
+          0,
+          Math.min(
+            1,
+            Math.max(getCurrentCueIndex(audioController.session, currentTime) + 1, 1) /
+              audioController.session.cues.length
+          )
+        )
+      : 0
+
+  player.style.setProperty('--cue-progress-ratio', `${cueProgress}`)
 }
 
 function formatDuration(seconds: number) {
@@ -647,8 +683,8 @@ function updateFloatingPlayerMeta(audioController: AudioController) {
   if (!session) {
     parsha.textContent = '—'
     aliyah.textContent = '—'
-    cues.textContent = '0/0'
-    duration.textContent = '0:00/0:00'
+    cues.textContent = '0 / 0'
+    duration.textContent = '0:00 / 0:00'
     return
   }
 
@@ -657,8 +693,8 @@ function updateFloatingPlayerMeta(audioController: AudioController) {
 
   parsha.textContent = session.recording.parshaName
   aliyah.textContent = hebrewNumeral(session.recording.aliyah)
-  cues.textContent = `${currentCue}/${session.cues.length}`
-  duration.textContent = `${formatDuration(audioController.audio.currentTime)}/${formatDuration(
+  cues.textContent = `${currentCue} / ${session.cues.length}`
+  duration.textContent = `${formatDuration(audioController.audio.currentTime)} / ${formatDuration(
     audioController.audio.duration
   )}`
 }
@@ -2004,6 +2040,26 @@ document.addEventListener('DOMContentLoaded', async () => {
       await replayAliyahFromStart(audioController, highlightController)
       focusReaderSurface()
     })
+  document
+    .querySelector('[data-target-id="floating-player"]')!
+    .addEventListener('click', (event) => {
+      const target = event.target as HTMLElement
+      if (target.closest('.floating-player-button')) return
+      if (!audioController.session) return
+      if (!floatingPlayerDesktopMediaQuery.matches) return
+
+      setFloatingPlayerExpanded(!floatingPlayerExpanded)
+      focusReaderSurface()
+    })
+
+  floatingPlayerDesktopMediaQuery.addEventListener('change', () => {
+    if (!floatingPlayerDesktopMediaQuery.matches) {
+      setFloatingPlayerExpanded(false)
+      return
+    }
+
+    setFloatingPlayerExpanded(floatingPlayerExpanded)
+  })
 
   toggle.addEventListener('change', () =>
     toggleAnnotations(() => !toggle.checked)
