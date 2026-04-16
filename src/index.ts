@@ -62,6 +62,7 @@ let progressAnchorLoadPromise: Promise<void> | null = null
 let cueNavigationIndex: number | null = null
 let lastAdminRenderedCueCount = 0
 let lastAdminFollowedCueIndex = -1
+let exportDownloadUrl: string | null = null
 const ADMIN_SESSION_UNLOCKED_KEY = 'tikkun-admin-unlocked'
 const ADMIN_SESSION_PANEL_OPEN_KEY = 'tikkun-admin-panel-open'
 const adminDraftTimeFormat = Intl.DateTimeFormat(undefined, {
@@ -123,6 +124,27 @@ const assignAdminCues = (
 
 const getAdminSession = (audioController?: AudioController | null) =>
   (audioController ?? audioControllerGlobal)?.session ?? null
+
+function resetExportDownloadLink() {
+  if (exportDownloadUrl) {
+    URL.revokeObjectURL(exportDownloadUrl)
+    exportDownloadUrl = null
+  }
+
+  const downloadLink = document.querySelector<HTMLAnchorElement>(
+    '[data-target-id="export-download"]'
+  )
+  if (!downloadLink) return
+  downloadLink.removeAttribute('href')
+  downloadLink.removeAttribute('download')
+}
+
+function hideExportModal() {
+  document
+    .querySelector<HTMLElement>('[data-target-id="export-modal"]')!
+    .classList.add('u-hidden')
+  resetExportDownloadLink()
+}
 
 function saveAdminDraft(audioController?: AudioController | null) {
   const session = getAdminSession(audioController)
@@ -650,6 +672,32 @@ async function startPlaybackForButton(
   if (!state?.recording || !state.lineInfo.run) return
 
   if (audioController.session?.recording.id === state.recording.id) {
+    if (audioController.audio.paused) {
+      const session = audioController.session
+      const activeTokenKey = highlightController.getActiveTokenKey()
+      const cueIndex = session?.cues.length
+        ? highlightController.getCueIndex(session.cues, audioController.audio.currentTime)
+        : -1
+
+      if (session?.cues.length && cueIndex >= 0) {
+        await highlightController.activateCue(session.cues[cueIndex], {
+          scroll: true,
+        })
+      } else if (activeTokenKey) {
+        await highlightController.activateTokenKey(activeTokenKey, {
+          scroll: true,
+        })
+      } else if (session?.cues[0]) {
+        await highlightController.activateCue(session.cues[0], {
+          scroll: true,
+        })
+      } else if (session?.tokenKeys[0]) {
+        await highlightController.activateTokenKey(session.tokenKeys[0], {
+          scroll: true,
+        })
+      }
+    }
+
     await audioController.togglePlayback()
     updateFloatingPlayer(audioController)
     return
@@ -1098,7 +1146,7 @@ function renderAdminCueList(audioController?: AudioController | null) {
   const selectedCueIndex = getEditableAdminCueIndex()
   const currentTime = (audioController ?? audioControllerGlobal)?.audio.currentTime ?? 0
   const playingCueIndex =
-    session.cues.length && highlightControllerGlobal
+    !adminState.recording && session.cues.length && highlightControllerGlobal
       ? highlightControllerGlobal.getCueIndex(session.cues, currentTime)
       : -1
 
@@ -1384,8 +1432,18 @@ async function exportAdminCues(audioController: AudioController) {
   const textarea = document.querySelector<HTMLTextAreaElement>(
     '[data-target-id="export-text"]'
   )!
+  const downloadLink = document.querySelector<HTMLAnchorElement>(
+    '[data-target-id="export-download"]'
+  )!
   const exportPath = cueFileRelativePath(session.recording)
+  const exportFileName = exportPath.split('/').pop() ?? 'audio-cues.json'
   const serialized = formatCueFileJson(payload)
+  resetExportDownloadLink()
+  exportDownloadUrl = URL.createObjectURL(
+    new Blob([serialized], { type: 'application/json' })
+  )
+  downloadLink.href = exportDownloadUrl
+  downloadLink.download = exportFileName
   targetPath.textContent = exportPath
   textarea.value = serialized
   modal.classList.remove('u-hidden')
@@ -1979,9 +2037,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       document
         .querySelector<HTMLElement>('[data-target-id="settings-pane"]')!
         .classList.add('u-hidden')
-      document
-        .querySelector<HTMLElement>('[data-target-id="export-modal"]')!
-        .classList.add('u-hidden')
+      hideExportModal()
     })
   )
 
@@ -2006,15 +2062,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document
     .querySelector('[data-target-id="export-close"]')!
-    .addEventListener('click', () =>
-      document
-        .querySelector<HTMLElement>('[data-target-id="export-modal"]')!
-        .classList.add('u-hidden')
-    )
+    .addEventListener('click', hideExportModal)
 
   document
     .querySelector('[data-target-id="admin-record"]')!
-    .addEventListener('click', () => {
+    .addEventListener('click', async () => {
+      if (!adminState.recording && !adminState.cues.length) {
+        await resetAdminRecorder(audioController, highlightController)
+        return
+      }
+
       adminState.recording = !adminState.recording
       const resumeDraftWrap = document.querySelector<HTMLElement>(
         '[data-target-id="admin-resume-wrap"]'

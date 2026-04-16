@@ -542,6 +542,11 @@
   background: var(--paper-color);
 }
 
+.export-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .export-card textarea {
   width: 100%;
   min-height: 320px;

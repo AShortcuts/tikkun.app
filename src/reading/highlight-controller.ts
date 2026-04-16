@@ -168,8 +168,7 @@ export class HighlightController {
   }
 
   private scrollTokenIntoView(element: HTMLElement) {
-    const offsetParent = element.offsetParent as HTMLElement | null
-    const relativeTop = element.offsetTop + (offsetParent?.offsetTop ?? 0)
+    const relativeTop = this.getElementTopWithinBook(element)
     const targetTop =
       relativeTop + element.offsetHeight / 2 - this.book.clientHeight / 2
 
@@ -177,6 +176,24 @@ export class HighlightController {
       top: Math.max(0, targetTop),
       behavior: 'smooth',
     })
+  }
+
+  private getElementTopWithinBook(element: HTMLElement) {
+    let top = 0
+    let current: HTMLElement | null = element
+
+    while (current && current !== this.book) {
+      top += current.offsetTop
+      current = current.offsetParent as HTMLElement | null
+    }
+
+    if (current === this.book) {
+      return top
+    }
+
+    const bookRect = this.book.getBoundingClientRect()
+    const elementRect = element.getBoundingClientRect()
+    return this.book.scrollTop + (elementRect.top - bookRect.top)
   }
 
   private indexTokenElements(root: ParentNode) {

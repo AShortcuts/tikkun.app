@@ -5,6 +5,7 @@ import { HighlightController } from './highlight-controller.ts'
 function createBookStub() {
   return {
     addEventListener() {},
+    scrollTop: 0,
     querySelectorAll(): HTMLElement[] {
       return []
     },
@@ -30,9 +31,9 @@ function createTokenElement(tokenKey: string) {
   const classes = new Set<string>()
   return {
     dataset: { tokenKey },
-    offsetTop: 180,
+    offsetTop: 140,
     offsetHeight: 20,
-    offsetParent: { offsetTop: 0 },
+    offsetParent: { offsetTop: 40 },
     classList: {
       add(className: string) {
         classes.add(className)
@@ -68,6 +69,7 @@ function createBookWithTokens(tokenKeys: string[]) {
   return {
     addEventListener() {},
     clientHeight: 100,
+    scrollTop: 25,
     querySelectorAll(selector: string): HTMLElement[] {
       const match = selector.match(/\[data-token-key="(.+)"\]/)
       if (!match) return []
@@ -142,6 +144,7 @@ function createBookWithVisibleTokens(tokenKeys: string[]) {
   return {
     addEventListener() {},
     clientHeight: 100,
+    scrollTop: 0,
     querySelectorAll(selector: string): HTMLElement[] {
       const match = selector.match(/\[data-token-key="(.+)"\]/)
       if (!match) return []
@@ -208,6 +211,10 @@ test('scrolls whenever the highlighted token changes', async (t) => {
 
   await controller.activateTokenKey('12:7:0:2', { scroll: true })
   t.is(book.scrollCalls.length, 1)
+  t.deepEqual(book.scrollCalls[0], {
+    top: 165,
+    behavior: 'smooth',
+  })
 
   await controller.activateTokenKey('12:7:0:3', { scroll: true })
   t.is(book.scrollCalls.length, 2)
@@ -229,4 +236,75 @@ test('recenters even when the next highlighted token is already visible', async 
   await controller.activateTokenKey('12:7:0:3', { scroll: true })
 
   t.is(book.scrollCalls.length, 2)
+})
+
+test('uses offset parent chain to center tokens inside the book', async (t) => {
+  const scrollCalls: unknown[] = []
+  const book = {
+    addEventListener() {},
+    clientHeight: 100,
+    scrollTop: 0,
+    querySelectorAll(): HTMLElement[] {
+      return [token]
+    },
+    scrollTo(options: unknown) {
+      scrollCalls.push(options)
+    },
+    getBoundingClientRect() {
+      return {
+        top: 0,
+        bottom: 100,
+        left: 0,
+        right: 100,
+        width: 100,
+        height: 100,
+        x: 0,
+        y: 0,
+        toJSON() {
+          return {}
+        },
+      }
+    },
+  } as unknown as HTMLElement
+
+  const page = { offsetTop: 30, offsetParent: book }
+  const line = { offsetTop: 80, offsetParent: page }
+  const token = {
+    dataset: { tokenKey: '12:7:0:2' },
+    offsetTop: 50,
+    offsetHeight: 20,
+    offsetParent: line,
+    classList: {
+      add() {},
+      remove() {},
+      contains() {
+        return false
+      },
+    },
+    getBoundingClientRect() {
+      return {
+        top: 0,
+        bottom: 20,
+        left: 0,
+        right: 10,
+        width: 10,
+        height: 20,
+        x: 0,
+        y: 0,
+        toJSON() {
+          return {}
+        },
+      }
+    },
+  } as unknown as HTMLElement
+
+  const controller = new HighlightController(book)
+  await controller.activateTokenKey('12:7:0:2', { scroll: true })
+
+  t.deepEqual(scrollCalls, [
+    {
+      top: 120,
+      behavior: 'smooth',
+    },
+  ])
 })
