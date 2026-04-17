@@ -117,11 +117,11 @@ test('Parsha slug resolves exact solo Nitzavim only', async (t) => {
 
 test('Esther slug resolves to the megillah run', async (t) => {
   const route = toReaderRoute(
-    parseUrl(generator, '/parsha/esther', { now: new Date('2025-01-01') })
+    parseUrl(generator, '/parsha/megillah-esther', { now: new Date('2025-01-01') })
   )
 
   t.truthy(route)
-  t.is(route?.canonicalHash, '#/parsha/esther')
+  t.is(route?.canonicalHash, '#/parsha/megillah-esther')
   t.is(
     await renderStartingLineForRoute(route),
     await renderStartingLineForRoute(
@@ -130,14 +130,14 @@ test('Esther slug resolves to the megillah run', async (t) => {
   )
 })
 
-test('Esther aliases canonicalize to esther', async (t) => {
-  for (const slug of ['/parsha/megillah-esther', '/parsha/megillat-esther']) {
+test('Esther aliases canonicalize to megillah-esther', async (t) => {
+  for (const slug of ['/parsha/esther', '/parsha/megillat-esther']) {
     const route = toReaderRoute(
       parseUrl(generator, slug, { now: new Date('2025-01-01') })
     )
 
     t.truthy(route)
-    t.is(route?.canonicalHash, '#/parsha/esther')
+    t.is(route?.canonicalHash, '#/parsha/megillah-esther')
     t.is(
       await renderStartingLineForRoute(route),
       await renderStartingLineForRoute(

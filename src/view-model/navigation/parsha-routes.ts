@@ -22,7 +22,7 @@ type WeeklyParshaRoute = {
 
 type MegillahRoute = {
   kind: 'megillah'
-  canonicalSlug: 'esther'
+  canonicalSlug: 'megillah-esther'
   aliases: string[]
 }
 
@@ -93,8 +93,8 @@ const parshaRouteSpecs: ParshaRouteSpec[] = [
   ...weeklyParshaRoutes,
   {
     kind: 'megillah',
-    canonicalSlug: 'esther',
-    aliases: ['megillah-esther', 'megillat-esther'],
+    canonicalSlug: 'megillah-esther',
+    aliases: ['esther', 'megillat-esther', 'ester', 'megillah-ester'],
   },
 ]
 
@@ -169,7 +169,7 @@ export function semanticParshaUrlForLeining(leining: LeiningInstance): string | 
     leining.runs.some((run) => run.type === LeiningRunType.Megillah) &&
     titleSlug(leining.date.title.en) === PURIM_TITLE_SLUG
   ) {
-    return generateParshaUrl('esther')
+    return generateParshaUrl('megillah-esther')
   }
 
   if (!leining.isParsha || leining.id !== LeiningInstanceId.Shacharis) return null

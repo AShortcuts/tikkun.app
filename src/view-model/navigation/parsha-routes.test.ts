@@ -38,7 +38,7 @@ test('weekly parsha links use semantic parsha routes', (t) => {
 test('esther links use semantic parsha routes', (t) => {
   const esther = findLeining('2025-03-14', (title) => title === 'Purim')
 
-  t.is(semanticParshaUrlForLeining(esther), '#/parsha/esther')
+  t.is(semanticParshaUrlForLeining(esther), '#/parsha/megillah-esther')
 })
 
 test('holiday links keep dated run routes', (t) => {
