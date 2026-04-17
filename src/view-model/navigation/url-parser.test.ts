@@ -55,6 +55,102 @@ test('Cue analytics', (t) => {
   t.is(generateCueAnalyticsUrl(), '#/about/cue-analytics')
 })
 
+test('Parsha slug resolves Bereshit', async (t) => {
+  const route = toReaderRoute(
+    parseUrl(generator, '/parsha/beresheet', { now: new Date('2024-10-01') })
+  )
+
+  t.truthy(route)
+  t.is(route?.canonicalHash, '#/parsha/beresheet')
+  t.is(
+    await renderStartingLineForRoute(route),
+    await renderStartingLineForRoute(
+      toReaderRoute(parseUrl(generator, '/run/2024-10-26:shacharis,main'))
+    )
+  )
+})
+
+test('Parsha alias canonicalizes Bereshit', async (t) => {
+  const route = toReaderRoute(
+    parseUrl(generator, '/parsha/bereshit', { now: new Date('2024-10-01') })
+  )
+
+  t.truthy(route)
+  t.is(route?.canonicalHash, '#/parsha/beresheet')
+  t.is(
+    await renderStartingLineForRoute(route),
+    await renderStartingLineForRoute(
+      toReaderRoute(parseUrl(generator, '/run/2024-10-26:shacharis,main'))
+    )
+  )
+})
+
+test('Parsha slug resolves exact solo Vayelech only', async (t) => {
+  const route = toReaderRoute(
+    parseUrl(generator, '/parsha/vayelech', { now: new Date('2026-01-01') })
+  )
+
+  t.truthy(route)
+  t.is(route?.canonicalHash, '#/parsha/vayelech')
+  t.is(
+    await renderStartingLineForRoute(route),
+    await renderStartingLineForRoute(
+      toReaderRoute(parseUrl(generator, '/run/2029-09-15:shacharis,main'))
+    )
+  )
+})
+
+test('Parsha slug resolves exact solo Nitzavim only', async (t) => {
+  const route = toReaderRoute(
+    parseUrl(generator, '/parsha/nitzavim', { now: new Date('2026-01-01') })
+  )
+
+  t.truthy(route)
+  t.is(route?.canonicalHash, '#/parsha/nitzavim')
+  t.is(
+    await renderStartingLineForRoute(route),
+    await renderStartingLineForRoute(
+      toReaderRoute(parseUrl(generator, '/run/2029-09-08:shacharis,main'))
+    )
+  )
+})
+
+test('Esther slug resolves to the megillah run', async (t) => {
+  const route = toReaderRoute(
+    parseUrl(generator, '/parsha/esther', { now: new Date('2025-01-01') })
+  )
+
+  t.truthy(route)
+  t.is(route?.canonicalHash, '#/parsha/esther')
+  t.is(
+    await renderStartingLineForRoute(route),
+    await renderStartingLineForRoute(
+      toReaderRoute(parseUrl(generator, '/run/2025-03-14:megillah,megillah'))
+    )
+  )
+})
+
+test('Esther aliases canonicalize to esther', async (t) => {
+  for (const slug of ['/parsha/megillah-esther', '/parsha/megillat-esther']) {
+    const route = toReaderRoute(
+      parseUrl(generator, slug, { now: new Date('2025-01-01') })
+    )
+
+    t.truthy(route)
+    t.is(route?.canonicalHash, '#/parsha/esther')
+    t.is(
+      await renderStartingLineForRoute(route),
+      await renderStartingLineForRoute(
+        toReaderRoute(parseUrl(generator, '/run/2025-03-14:megillah,megillah'))
+      )
+    )
+  }
+})
+
+test('Unknown parsha slug is ignored', (t) => {
+  t.falsy(parseUrl(generator, '/parsha/not-a-real-parsha'))
+})
+
 test('Run ID for פרשת נצבים', async (t) => {
   t.snapshot(
     await renderStartingLine(
@@ -113,4 +209,16 @@ async function renderStartingLine(model: ScrollViewModel | null) {
 function toModel(route: AppRoute | null) {
   if (!route || route.view !== 'reader') return null
   return route.model
+}
+
+function toReaderRoute(route: AppRoute | null) {
+  if (!route || route.view !== 'reader') return null
+  return route
+}
+
+async function renderStartingLineForRoute(route: AppRoute | null) {
+  if (!route || route.view !== 'reader') throw new Error('URL did not parse.')
+  const { page, lineNumber } = await route.model.startingLocation
+  if (page.type !== 'page') throw new Error('First page should be a page')
+  return renderLine(page.lines[lineNumber - 1])
 }

@@ -12,16 +12,26 @@ import {
 import { generateUrl } from '../view-model/navigation/url-parser.ts'
 import { isVezosHabracha } from '../view-model/scroll-view-model.ts'
 import renderLeiningTitle from './render-leining-title.ts'
+import {
+  generateTorahReferenceHash,
+  listTorahBooks,
+  listTorahChapters,
+  listTorahVerses,
+} from './torah-reference.ts'
+import { semanticParshaUrlForLeining } from '../view-model/navigation/parsha-routes.ts'
 
 const { htmlToElement } = utils
 
 const dateFormat = Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
 const AVAILABLE_SCROLLS = new Set(['torah', 'esther'])
 
+const navigationHrefForLeining = (leining: LeiningInstance) =>
+  semanticParshaUrlForLeining(leining) ?? generateUrl(leining.runs[0])
+
 const Parsha = (leining: LeiningInstance) => `
   <li><a
     class="parsha"
-    href="${generateUrl(leining.runs[0])}"
+    href="${navigationHrefForLeining(leining)}"
   >
     ${renderLeiningTitle(leining)}
   </a></li>
@@ -39,7 +49,7 @@ const ComingUpReading = (obj: LeiningInstance, index: number) => {
   <li style="display: table-cell; width: calc(100% / 3); padding: 0 0.5em;">
     <div class="stack small" style="display: flex; flex-direction: column; align-items: center;">
       <a
-        href="${index === 0 ? '#/next' : generateUrl(obj.runs[0])}"
+        href="${index === 0 ? '#/next' : navigationHrefForLeining(obj)}"
         class="coming-up-button"
       >${renderLeiningTitle(obj, { forCalendar: true })}</a>
       <time class="coming-up-date">${dateFormat.format(obj.date.date)}</time>
@@ -170,6 +180,56 @@ const Browse = (leinings: LeiningInstance[]) => `
 
 const top = (n: number) => (_: unknown, i: number) => i < n
 
+const TorahReferencePicker = () => {
+  const [firstBook] = listTorahBooks()
+  const chapters = listTorahChapters(firstBook.number)
+  const firstChapter = chapters[0]
+  const verses = listTorahVerses(firstBook.number, firstChapter)
+
+  return `
+    <section class="torah-reference-panel" dir="ltr">
+      <div class="stack medium">
+        <div class="torah-reference-header">
+          <label class="section-label">Go to Torah reference</label>
+          <p class="torah-reference-copy">Jump straight to a chapter and verse in the Torah.</p>
+        </div>
+        <form class="torah-reference-form" data-target-id="torah-reference-form">
+          <div class="torah-reference-grid">
+            <label class="torah-reference-field">
+              <span>Sefer</span>
+              <select data-target-id="torah-book-select">
+                ${listTorahBooks()
+                  .map(
+                    (book) =>
+                      `<option value="${book.number}">${book.label} · ${book.hebrew}</option>`
+                  )
+                  .join('')}
+              </select>
+            </label>
+            <label class="torah-reference-field">
+              <span>Chapter</span>
+              <select data-target-id="torah-chapter-select">
+                ${chapters
+                  .map((chapter) => `<option value="${chapter}">${chapter}</option>`)
+                  .join('')}
+              </select>
+            </label>
+            <label class="torah-reference-field">
+              <span>Verse</span>
+              <select data-target-id="torah-verse-select">
+                ${verses
+                  .map((verse) => `<option value="${verse}">${verse}</option>`)
+                  .join('')}
+              </select>
+            </label>
+          </div>
+          <button class="torah-reference-button" type="submit">Go</button>
+        </form>
+      </div>
+    </section>
+  `
+}
+
 const search = (leinings: LeiningInstance[], query: string) => {
   const results = fuzzy(leinings, query, (o) => [
     o.date.title.he,
@@ -178,7 +238,14 @@ const search = (leinings: LeiningInstance[], query: string) => {
 
   if (!results.length) return [NoResults()]
 
-  return results.filter(top(5)).map((result) => ParshaResult(result))
+  return results
+    .filter(top(5))
+    .map((result) =>
+      ParshaResult({
+        ...result,
+        href: navigationHrefForLeining(result.item),
+      })
+    )
 }
 export default (generator: LeiningGenerator) => {
   const leinings = generator
@@ -202,6 +269,7 @@ export default (generator: LeiningGenerator) => {
         <div class="centerize">
           <div id="search" style="display: inline-block;"></div>
         </div>
+        ${TorahReferencePicker()}
         ${ComingUp(comingUpReadings)}
         ${Browse(leinings)}
       </div>
@@ -221,6 +289,73 @@ export default (generator: LeiningGenerator) => {
   self
     .querySelector('#search')
     .parentNode.replaceChild(s.node, self.querySelector('#search'))
+
+  const torahReferenceForm = self.querySelector<HTMLFormElement>(
+    '[data-target-id="torah-reference-form"]'
+  )
+  const bookSelect = self.querySelector<HTMLSelectElement>(
+    '[data-target-id="torah-book-select"]'
+  )
+  const chapterSelect = self.querySelector<HTMLSelectElement>(
+    '[data-target-id="torah-chapter-select"]'
+  )
+  const verseSelect = self.querySelector<HTMLSelectElement>(
+    '[data-target-id="torah-verse-select"]'
+  )
+
+  if (!torahReferenceForm || !bookSelect || !chapterSelect || !verseSelect) {
+    throw new Error('Torah reference picker failed to mount.')
+  }
+
+  const setNumericOptions = (
+    select: HTMLSelectElement,
+    values: number[],
+    selectedValue?: number
+  ) => {
+    select.innerHTML = values
+      .map((value) => `<option value="${value}">${value}</option>`)
+      .join('')
+
+    if (!values.length) return
+
+    const nextValue = values.includes(selectedValue ?? Number.NaN)
+      ? selectedValue!
+      : values[0]
+    select.value = String(nextValue)
+  }
+
+  const syncVerseOptions = () => {
+    setNumericOptions(
+      verseSelect,
+      listTorahVerses(Number(bookSelect.value), Number(chapterSelect.value)),
+      Number(verseSelect.value)
+    )
+  }
+
+  const syncChapterOptions = () => {
+    setNumericOptions(
+      chapterSelect,
+      listTorahChapters(Number(bookSelect.value)),
+      Number(chapterSelect.value)
+    )
+    syncVerseOptions()
+  }
+
+  bookSelect.addEventListener('change', syncChapterOptions)
+  chapterSelect.addEventListener('change', syncVerseOptions)
+  torahReferenceForm.addEventListener('submit', (event) => {
+    event.preventDefault()
+    const nextHash = generateTorahReferenceHash({
+      book: Number(bookSelect.value),
+      chapter: Number(chapterSelect.value),
+      verse: Number(verseSelect.value),
+    })
+    if (location.hash === nextHash) {
+      window.dispatchEvent(new Event('hashchange'))
+      return
+    }
+    location.hash = nextHash
+  })
 
   return {
     node: self,

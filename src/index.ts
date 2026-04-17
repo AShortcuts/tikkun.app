@@ -1830,7 +1830,10 @@ function renderRoute(route: AppRoute, audioController: AudioController) {
   readerShell.classList.remove('u-hidden')
   aboutView.classList.add('u-hidden')
   aboutView.innerHTML = ''
-  lastReaderHash = location.hash || lastReaderHash
+  if (route.canonicalHash && location.hash !== route.canonicalHash) {
+    history.replaceState(null, '', route.canonicalHash)
+  }
+  lastReaderHash = (route.canonicalHash ?? location.hash) || lastReaderHash
   syncReaderProgressVisibility()
   app.jumpTo(route.model)
 }

@@ -138,18 +138,19 @@ export abstract class ScrollViewModel {
   /** Creates the appropriate `ScrollViewModel` subclass for a particular `LeiningRun` */
   static forId(
     generator: LeiningGenerator,
-    runId: string
+    runId: string,
+    initialRef?: RefWithScroll
   ): ScrollViewModel | null {
     const run = generator.parseId(runId)
     if (!run) return null
     // Always render the full מגילה.
     if (run.type === LeiningRunType.Megillah)
-      return new FullScrollViewModel(generator, run)
+      return new FullScrollViewModel(generator, run, initialRef)
     // For the פרשה itself, render all of חומש.
     if (run.leining.isParsha && run.type === LeiningRunType.Main)
-      return new FullScrollViewModel(generator, run)
+      return new FullScrollViewModel(generator, run, initialRef)
     // For any part of יום טוב, special מפטיר, or הפתרה, only render relevant parts.
-    return new HolidayViewModel(generator, run)
+    return new HolidayViewModel(generator, run, initialRef)
   }
 
   /** Creates the appropriate `ScrollViewModel` subclass for the first leining on or after a date. */
@@ -180,7 +181,7 @@ export abstract class ScrollViewModel {
       allRuns.find((r) => r.scroll === ref.scroll && containsRef(r, ref)) ??
       allRuns[0]
 
-    return ScrollViewModel.forId(generator, run.id)
+    return ScrollViewModel.forId(generator, run.id, ref)
   }
 
   async fetchPreviousPage(): Promise<RenderedEntry | null> {
@@ -283,11 +284,15 @@ export abstract class ScrollViewModel {
 /** A view that includes the entire scroll.  Used for regular פרשיות and any מגילה. */
 class FullScrollViewModel extends ScrollViewModel {
   private readonly pageCount: Promise<number>
-  constructor(generator: LeiningGenerator, run: LeiningRun) {
+  constructor(
+    generator: LeiningGenerator,
+    run: LeiningRun,
+    initialRef: RefWithScroll = run.aliyot[0].start
+  ) {
     super(
       generator,
       FullScrollViewModel.calculateRuns(generator, run),
-      run.aliyot[0].start
+      initialRef
     )
     this.pageCount = this.resolver.then((r) => r.getPageCount())
   }
@@ -342,12 +347,16 @@ type ContentPageEntry = number | RenderedMessageInfo
 class HolidayViewModel extends ScrollViewModel {
   private readonly pages: Promise<ContentPageEntry[]>
 
-  constructor(generator: LeiningGenerator, run: LeiningRun) {
+  constructor(
+    generator: LeiningGenerator,
+    run: LeiningRun,
+    initialRef: RefWithScroll = run.aliyot[0].start
+  ) {
     // TODO(decide): Should this include the whole LeiningDate?
     super(
       generator,
       run.leining.runs.filter((r) => r.scroll === run.scroll),
-      run.aliyot[0].start
+      initialRef
     )
     this.pages = this.fetchPages()
   }

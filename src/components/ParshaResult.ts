@@ -31,12 +31,14 @@ const strongify = (c: string) => `<strong>${c}</strong>`
 const ParshaResult = ({
   match,
   item,
+  href,
 }: {
   match: { index: number; indexes: number[] }
   item: LeiningInstance
+  href: string
 }) =>
   htmlToElement(`
-  <a data-target-class="parsha-result" href="${generateUrl(item.runs[0])}">
+  <a data-target-class="parsha-result" href="${href}">
     <p class="search-result-tag mod-hebrew" data-target-class="result-hebrew">${
       match.index === 0
         ? decorateString({
