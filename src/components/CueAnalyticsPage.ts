@@ -8,18 +8,31 @@ import {
   type CueAnalyticsRecord,
   type CueIntervalSample,
 } from '../audio/cue-analytics.ts'
-import { getCueProgressForRecording, listRecordings } from '../audio/library.ts'
-import { readAdminDraftSummary } from '../admin/draft-storage.ts'
+import {
+  getCueProgressForRecording,
+  listRecordings,
+} from '../audio/library.ts'
+import { loadAdminDraft, readAdminDraftSummary } from '../admin/draft-storage.ts'
+import type { WordCue } from '../audio/types.ts'
 import hebrewNumeral from '../hebrew-numeral.ts'
 import { generateAboutUrl } from '../view-model/navigation/url-parser.ts'
 
 const numberFormatter = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 0,
 })
+const analyticsTimeFormat = new Intl.DateTimeFormat(undefined, {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+})
 
 function formatSeconds(seconds: number) {
   if (!Number.isFinite(seconds) || seconds <= 0) return '0.00s'
   return `${seconds.toFixed(2)}s`
+}
+
+function formatSignedSeconds(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds === 0) return '0.00s'
+  return `${seconds > 0 ? '+' : '-'}${Math.abs(seconds).toFixed(2)}s`
 }
 
 function formatWordsPerMinute(wordsPerMinute: number) {
@@ -35,16 +48,35 @@ function formatTimedSpan(seconds: number) {
   return `${minutes}:${String(remainder).padStart(2, '0')}`
 }
 
+function formatUpdatedAt(timestamp: number | null) {
+  return timestamp ? analyticsTimeFormat.format(timestamp) : 'Unknown save time'
+}
+
 function describeSelection(parshaName: string | null, aliyah: number | null) {
   if (parshaName && aliyah) return `${parshaName}, aliyah ${hebrewNumeral(aliyah)}`
   if (parshaName) return `${parshaName}, all available aliyot`
   if (aliyah) return `all parshiot, aliyah ${hebrewNumeral(aliyah)}`
-  return 'all authored cue data'
+  return 'all cue timing data'
 }
 
 function getPointDatasetValue(point: Element, key: string) {
   const value = point.getAttribute(`data-${key}`)
   return value ?? ''
+}
+
+function getSourceLabel(record: CueAnalyticsRecord) {
+  return record.cueSource === 'draft' ? 'Local draft' : 'Published cues'
+}
+
+function describeThreshold(sample: CueIntervalSample) {
+  if (sample.outlierDirection === 'invalid') return 'Cue timestamps moved backward.'
+  if (!sample.thresholdGap || !sample.thresholdDirection) return 'No review threshold crossed.'
+
+  return `Review threshold ${sample.thresholdDirection === 'above' ? '>' : '<'} ${formatSeconds(sample.thresholdGap)}`
+}
+
+function describeDeviation(sample: CueIntervalSample) {
+  return `${formatSignedSeconds(sample.deviationSeconds)} vs median gap ${formatSeconds(sample.localMedianGap)}`
 }
 
 function bindAnalyticsGraphInteractions(scope: ParentNode) {
@@ -89,7 +121,9 @@ function bindAnalyticsGraphInteractions(scope: ParentNode) {
       const previousCueNumber = getPointDatasetValue(point, 'previous-cue-number')
       const gap = getPointDatasetValue(point, 'gap')
       const pace = getPointDatasetValue(point, 'pace')
-      const outlierLabel = getPointDatasetValue(point, 'outlier-label')
+      const reviewLabel = getPointDatasetValue(point, 'review-label')
+      const threshold = getPointDatasetValue(point, 'threshold')
+      const deviation = getPointDatasetValue(point, 'deviation')
 
       focusLine.setAttribute('x1', `${x}`)
       focusLine.setAttribute('x2', `${x}`)
@@ -103,7 +137,9 @@ function bindAnalyticsGraphInteractions(scope: ParentNode) {
       tooltip.innerHTML = `
         <strong>Cue ${previousCueNumber} → ${cueNumber}</strong>
         <span>${gap}s gap · ${pace} wpm</span>
-        <span>${outlierLabel || 'Within expected range'}</span>
+        <span>${reviewLabel || 'Within expected range'}</span>
+        <span>${threshold}</span>
+        <span>${deviation}</span>
       `
       tooltip.hidden = false
 
@@ -193,7 +229,7 @@ function renderGraph(samples: CueIntervalSample[], averageWordsPerMinute: number
         <div class="analytics-legend" aria-label="Chart legend">
           <span><i class="mod-line"></i>Pace trace</span>
           <span><i class="mod-average"></i>Average pace</span>
-          <span><i class="mod-outlier"></i>Outlier transition</span>
+          <span><i class="mod-outlier"></i>Review outlier</span>
         </div>
       </div>
       <div class="analytics-graph-stage">
@@ -201,7 +237,7 @@ function renderGraph(samples: CueIntervalSample[], averageWordsPerMinute: number
       <svg
         viewBox="0 0 ${width} ${height}"
         role="img"
-        aria-label="Word speed graph with average pace and outlier markers"
+        aria-label="Word speed graph with average pace and review markers"
         data-analytics-graph-svg
         data-graph-left="${paddingLeft}"
         data-graph-right="${width - paddingRight}"
@@ -248,13 +284,15 @@ function renderGraph(samples: CueIntervalSample[], averageWordsPerMinute: number
         <path d="${areaPath}" class="analytics-graph-fill" />
         <path d="${linePath}" class="analytics-graph-line" />
         ${points
-          .map(
-            (point) => `
+          .map((point) => {
+            const pointClass = point.sample.isOutlier ? ' analytics-graph-outlier' : ''
+
+            return `
               <circle
                 cx="${point.x.toFixed(2)}"
                 cy="${point.y.toFixed(2)}"
                 r="${point.sample.isOutlier ? '4.5' : '3.4'}"
-                class="analytics-graph-point${point.sample.isOutlier ? ' analytics-graph-outlier' : ''}"
+                class="analytics-graph-point${pointClass}"
                 data-analytics-graph-point
                 data-x="${point.x.toFixed(2)}"
                 data-y="${point.y.toFixed(2)}"
@@ -262,15 +300,13 @@ function renderGraph(samples: CueIntervalSample[], averageWordsPerMinute: number
                 data-previous-cue-number="${point.sample.previousCueNumber}"
                 data-gap="${point.sample.gap.toFixed(2)}"
                 data-pace="${Math.round(point.sample.wordsPerMinute)}"
-                data-outlier-label="${point.sample.outlierDirection === 'slow'
-                  ? 'Long pause outlier'
-                  : point.sample.outlierDirection === 'fast'
-                    ? 'Compressed transition outlier'
-                    : ''}"
+                data-review-label="${point.sample.reviewLabel}"
+                data-threshold="${describeThreshold(point.sample)}"
+                data-deviation="${describeDeviation(point.sample)}"
                 tabindex="0"
               />
             `
-          )
+          })
           .join('')}
         <circle
           cx="${paddingLeft}"
@@ -285,8 +321,17 @@ function renderGraph(samples: CueIntervalSample[], averageWordsPerMinute: number
       </div>
       <p class="analytics-graph-axis-caption">Cue progression through the aliyah</p>
       <p class="analytics-graph-copy">
-        Each point represents the pace between two consecutive cues. Outlier markers flag unusually slow or compressed transitions relative to this recording.
+        Each point represents the pace between two consecutive cues. Review markers only appear for out-of-order timestamps or unusually long pauses.
       </p>
+    </div>
+  `
+}
+
+function renderLoadingState(copy: string) {
+  return `
+    <div class="about-card-header">
+      <h2>Loading cue analytics</h2>
+      <p>${copy}</p>
     </div>
   `
 }
@@ -298,7 +343,7 @@ function renderOverview(records: CueAnalyticsRecord[], selectionLabel: string) {
     return `
       <div class="about-card-header">
         <h2>Selection overview</h2>
-        <p>No cue JSON files match ${selectionLabel} yet. Use the coverage view below to see which audio recordings still need cue files.</p>
+        <p>No cue timing data matches ${selectionLabel} yet. Use the coverage view below to find recordings that still need cue work.</p>
       </div>
     `
   }
@@ -326,12 +371,12 @@ function renderOverview(records: CueAnalyticsRecord[], selectionLabel: string) {
         <strong class="analytics-stat-value">${formatSeconds(overview.medianGap)}</strong>
       </div>
       <div class="analytics-summary-item">
-        <span class="analytics-stat-label">Longest pause</span>
-        <strong class="analytics-stat-value">${formatSeconds(overview.longestGap)}</strong>
+        <span class="analytics-stat-label">Review transitions</span>
+        <strong class="analytics-stat-value">${overview.outlierCount}</strong>
       </div>
       <div class="analytics-summary-item">
-        <span class="analytics-stat-label">Outlier transitions</span>
-        <strong class="analytics-stat-value">${overview.outlierCount}</strong>
+        <span class="analytics-stat-label">Invalid transitions</span>
+        <strong class="analytics-stat-value">${overview.invalidTransitionCount}</strong>
       </div>
     </div>
   `
@@ -344,7 +389,7 @@ function renderAliyahAverages(summaries: CueAnalyticsAliyahSummary[], selectionL
     return `
       <div class="about-card-header">
         <h2>Average by aliyah</h2>
-        <p>No authored cue files are available for ${selectionLabel} yet.</p>
+        <p>No cue timing data is available for ${selectionLabel} yet.</p>
       </div>
     `
   }
@@ -371,12 +416,12 @@ function renderAliyahAverages(summaries: CueAnalyticsAliyahSummary[], selectionL
                   <dd>${formatSeconds(summary.medianGap)}</dd>
                 </div>
                 <div>
-                  <dt>Average span</dt>
-                  <dd>${formatTimedSpan(summary.averageDuration)}</dd>
+                  <dt>Review transitions</dt>
+                  <dd>${summary.outlierCount}</dd>
                 </div>
                 <div>
-                  <dt>Outliers</dt>
-                  <dd>${summary.outlierCount}</dd>
+                  <dt>Longest gap</dt>
+                  <dd>${formatSeconds(summary.longestGap)}</dd>
                 </div>
               </dl>
             </article>
@@ -401,11 +446,11 @@ function renderCoverage(
   return `
     <div class="about-card-header">
       <h2>Coverage by parsha</h2>
-      <p>This is the operational view: every parsha with available audio, how many aliyot already have cue JSON, and exactly which ones still need authoring.</p>
+      <p>This is the operational view: every parsha with available audio, how many aliyot already have cue timing, and exactly which ones still need authoring.</p>
     </div>
     <div class="analytics-coverage-legend">
-      <span><i class="mod-draft"></i>Unfinished cues</span>
-      <span><i class="mod-cued"></i>Completed cues</span>
+      <span><i class="mod-draft"></i>Local draft active</span>
+      <span><i class="mod-cued"></i>Completed timing</span>
       <span><i class="mod-missing"></i>Audio present, cue file missing</span>
       <span><i class="mod-empty"></i>No audio in this slot</span>
     </div>
@@ -422,10 +467,10 @@ function renderCoverage(
               ? ''
               : summary.availableAliyot.includes(selectedAliyah)
                 ? draftAliyot.includes(selectedAliyah)
-                  ? `Aliyah ${hebrewNumeral(selectedAliyah)} is unfinished.`
+                  ? `Aliyah ${hebrewNumeral(selectedAliyah)} currently uses a local draft.`
                   : completeAliyot.includes(selectedAliyah)
-                  ? `Aliyah ${hebrewNumeral(selectedAliyah)} already has cues.`
-                  : `Aliyah ${hebrewNumeral(selectedAliyah)} has audio and still needs a cue JSON file.`
+                    ? `Aliyah ${hebrewNumeral(selectedAliyah)} already has cue timing.`
+                    : `Aliyah ${hebrewNumeral(selectedAliyah)} has audio and still needs cue timing.`
                 : `Aliyah ${hebrewNumeral(selectedAliyah)} has no audio recording in this parsha.`
 
           return `
@@ -433,7 +478,7 @@ function renderCoverage(
               <div class="analytics-coverage-header">
                 <div>
                   <h3>${summary.parshaName}</h3>
-                  <p>${completeAliyot.length} complete · ${draftAliyot.length} unfinished · ${missingAliyot.length} missing${selectedAliyahStatus ? ` · ${selectedAliyahStatus}` : ''}</p>
+                  <p>${completeAliyot.length} complete · ${draftAliyot.length} draft · ${missingAliyot.length} missing${selectedAliyahStatus ? ` · ${selectedAliyahStatus}` : ''}</p>
                 </div>
                 <dl class="analytics-coverage-stats">
                   <div>
@@ -456,10 +501,10 @@ function renderCoverage(
                     const state = draftAliyot.includes(aliyah)
                       ? 'mod-draft'
                       : completeAliyot.includes(aliyah)
-                      ? 'mod-cued'
-                      : summary.availableAliyot.includes(aliyah)
-                        ? 'mod-missing'
-                        : 'mod-empty'
+                        ? 'mod-cued'
+                        : summary.availableAliyot.includes(aliyah)
+                          ? 'mod-missing'
+                          : 'mod-empty'
                     const selectedClass =
                       selectedAliyah === aliyah ? ' is-selected' : ''
                     return `
@@ -478,7 +523,7 @@ function renderCoverage(
   `
 }
 
-function renderOutliers(records: CueAnalyticsRecord[], selectionLabel: string) {
+function renderTransitionReview(records: CueAnalyticsRecord[], selectionLabel: string) {
   const outliers = records
     .flatMap((record) =>
       record.intervalSamples
@@ -494,16 +539,16 @@ function renderOutliers(records: CueAnalyticsRecord[], selectionLabel: string) {
   if (!outliers.length) {
     return `
       <div class="about-card-header">
-        <h2>Outlier review</h2>
-        <p>No unusual interval outliers were detected in ${selectionLabel}. That usually means the cue spacing is relatively even.</p>
+        <h2>Transition review</h2>
+        <p>No review transitions were detected in ${selectionLabel}. Only obvious problems are shown here, so this usually means the cue spacing is stable.</p>
       </div>
     `
   }
 
   return `
     <div class="about-card-header">
-      <h2>Outlier review</h2>
-      <p>These are the cue transitions most likely to deserve a second look in ${selectionLabel}.</p>
+      <h2>Transition review</h2>
+      <p>These are the transitions worth checking in ${selectionLabel}. This list is intentionally conservative: only out-of-order cues and very long pauses are shown.</p>
     </div>
     <div class="analytics-outlier-list">
       ${outliers
@@ -512,12 +557,13 @@ function renderOutliers(records: CueAnalyticsRecord[], selectionLabel: string) {
             <article class="analytics-outlier-row">
               <div>
                 <p class="analytics-outlier-title">${record.recording.parshaName} · Aliyah ${hebrewNumeral(record.recording.aliyah)}</p>
-                <p class="analytics-outlier-copy">Cue ${sample.previousCueNumber} → ${sample.cueNumber} · ${record.narratorName}</p>
+                <p class="analytics-outlier-copy">Cue ${sample.previousCueNumber} → ${sample.cueNumber} · ${record.narratorName} · ${getSourceLabel(record)}</p>
+                <p class="analytics-outlier-copy">${describeThreshold(sample)} · ${describeDeviation(sample)}</p>
               </div>
               <div class="analytics-outlier-metrics">
                 <strong>${formatSeconds(sample.gap)}</strong>
                 <span>${formatWordsPerMinute(sample.wordsPerMinute)}</span>
-                <span>${sample.outlierDirection === 'slow' ? 'Long pause outlier' : 'Compressed transition outlier'}</span>
+                <span>${sample.reviewLabel}</span>
               </div>
             </article>
           `
@@ -534,10 +580,10 @@ function renderRecordModule(record: CueAnalyticsRecord) {
         <div>
           <p class="about-eyebrow">Aliyah ${hebrewNumeral(record.recording.aliyah)}</p>
           <h2>${record.recording.parshaName} · ${record.recording.title}</h2>
-          <p class="about-copy analytics-meta">${record.narratorName} · ${record.cueCount} cues · ${formatTimedSpan(record.totalDuration)} timed span</p>
+          <p class="about-copy analytics-meta">${record.narratorName} · ${getSourceLabel(record)} · ${record.cueCount} cues · ${formatTimedSpan(record.totalDuration)} timed span · ${formatUpdatedAt(record.cueUpdatedAt)}</p>
         </div>
         <div class="analytics-module-callout">
-          <span class="analytics-stat-label">Outliers</span>
+          <span class="analytics-stat-label">Review transitions</span>
           <strong class="analytics-stat-value">${record.outlierCount}</strong>
         </div>
       </div>
@@ -551,12 +597,12 @@ function renderRecordModule(record: CueAnalyticsRecord) {
           <strong class="analytics-stat-value">${formatSeconds(record.medianGap)}</strong>
         </div>
         <div class="analytics-stat">
-          <span class="analytics-stat-label">Longest pause</span>
+          <span class="analytics-stat-label">Longest gap</span>
           <strong class="analytics-stat-value">${formatSeconds(record.longestGap)}</strong>
         </div>
         <div class="analytics-stat">
-          <span class="analytics-stat-label">Fastest transition</span>
-          <strong class="analytics-stat-value">${formatSeconds(record.shortestGap)}</strong>
+          <span class="analytics-stat-label">Invalid transitions</span>
+          <strong class="analytics-stat-value">${record.invalidTransitionCount}</strong>
         </div>
       </div>
       ${renderGraph(record.intervalSamples, record.averageWordsPerMinute)}
@@ -565,9 +611,6 @@ function renderRecordModule(record: CueAnalyticsRecord) {
 }
 
 export default function CueAnalyticsPage() {
-  const records = listCueAnalyticsRecords()
-  const parshaOptions = getCueAnalyticsParshaSummaries(records)
-
   return `
     <section class="about-view analytics-view stack large" data-analytics-root="true">
       <div class="about-hero analytics-hero stack small">
@@ -577,23 +620,15 @@ export default function CueAnalyticsPage() {
         </div>
         <h1 class="about-title analytics-title">A live map of where each aliyah pushes, settles, and lingers.</h1>
         <p class="about-copy">
-          This page reads the authored cue files directly and turns them into something operational:
-          pacing trends, outliers worth checking, and a coverage view that shows which audio recordings
-          still need cue JSON files.
+          This page reads the authored cue timing directly, folds in local drafts, and shows the basics:
+          pacing trends, obvious timing problems worth checking, and which recordings still need cue work.
         </p>
         <section class="about-card analytics-filter-card">
           <div class="analytics-filter-grid">
             <label class="analytics-filter-field">
               <span>Parsha</span>
-              <select data-analytics-filter="parsha">
-                <option value="">All parshiot with audio</option>
-                ${parshaOptions
-                  .map(
-                    (summary) => `
-                      <option value="${summary.parshaSlug}">${summary.parshaName}</option>
-                    `
-                  )
-                  .join('')}
+              <select data-analytics-filter="parsha" disabled>
+                <option value="">Loading parshiot…</option>
               </select>
             </label>
             <label class="analytics-filter-field">
@@ -613,41 +648,27 @@ export default function CueAnalyticsPage() {
         </section>
       </div>
 
-      <section class="about-card analytics-summary-card stack small" data-analytics-section="overview"></section>
-      <section class="about-card stack small" data-analytics-section="coverage"></section>
-      <section class="about-card stack small" data-analytics-section="aliyah-averages"></section>
-      <section class="about-card stack small" data-analytics-section="outliers"></section>
+      <section class="about-card analytics-summary-card stack small" data-analytics-section="overview">
+        ${renderLoadingState('Loading authored cue timing and local drafts…')}
+      </section>
+      <section class="about-card stack small" data-analytics-section="coverage">
+        ${renderLoadingState('Building the coverage view…')}
+      </section>
+      <section class="about-card stack small" data-analytics-section="aliyah-averages">
+        ${renderLoadingState('Calculating aliyah-level averages…')}
+      </section>
+      <section class="about-card stack small" data-analytics-section="outliers">
+        ${renderLoadingState('Reviewing cue transitions…')}
+      </section>
       <section class="analytics-modules stack medium" data-analytics-section="records"></section>
     </section>
   `
 }
 
-export function mountCueAnalyticsPage(container: HTMLElement) {
+export async function mountCueAnalyticsPage(container: HTMLElement) {
   const root = container.querySelector<HTMLElement>('[data-analytics-root="true"]')
   if (!root) return
 
-  const allRecords = listCueAnalyticsRecords().filter((record) => record.intervalCount > 0)
-  const parshaSummaries = getCueAnalyticsParshaSummaries(allRecords)
-  const draftAliyotByParsha = new Map<string, number[]>()
-  const completeAliyotByParsha = new Map<string, number[]>()
-  for (const recording of listRecordings().filter((entry) => entry.status === 'available')) {
-    const cueProgress = getCueProgressForRecording(recording)
-    const draftSummary = readAdminDraftSummary(recording.id)
-    const isUnfinished = Boolean(draftSummary?.isIncomplete || cueProgress.isUnfinished)
-
-    if (isUnfinished) {
-      const existingAliyot = draftAliyotByParsha.get(recording.parshaSlug) ?? []
-      existingAliyot.push(recording.aliyah)
-      draftAliyotByParsha.set(recording.parshaSlug, existingAliyot)
-      continue
-    }
-
-    if (cueProgress.isComplete) {
-      const existingAliyot = completeAliyotByParsha.get(recording.parshaSlug) ?? []
-      existingAliyot.push(recording.aliyah)
-      completeAliyotByParsha.set(recording.parshaSlug, existingAliyot)
-    }
-  }
   const parshaSelect = root.querySelector<HTMLSelectElement>('[data-analytics-filter="parsha"]')
   const aliyahSelect = root.querySelector<HTMLSelectElement>('[data-analytics-filter="aliyah"]')
   const overviewSection = root.querySelector<HTMLElement>('[data-analytics-section="overview"]')
@@ -670,6 +691,65 @@ export function mountCueAnalyticsPage(container: HTMLElement) {
     return
   }
 
+  const availableRecordings = listRecordings().filter((entry) => entry.status === 'available')
+  const cueOverrides = new Map<string, WordCue[]>()
+  const cueSourceByAudioId = new Map<string, 'published' | 'draft'>()
+  const cueUpdatedAtByAudioId = new Map<string, number | null>()
+  const draftAliyotByParsha = new Map<string, number[]>()
+  const completeAliyotByParsha = new Map<string, number[]>()
+
+  for (const recording of availableRecordings) {
+    const draftSummary = readAdminDraftSummary(recording.id)
+    const cueProgress = getCueProgressForRecording(recording)
+
+    if (draftSummary?.cueCount) {
+      const draft = loadAdminDraft(recording.id, draftSummary.tokenCount)
+      if (draft?.cues.length) {
+        cueOverrides.set(recording.id, draft.cues)
+        cueSourceByAudioId.set(recording.id, 'draft')
+        cueUpdatedAtByAudioId.set(recording.id, draft.updatedAt)
+      }
+
+      const targetMap = draftSummary.isIncomplete ? draftAliyotByParsha : completeAliyotByParsha
+      const existingAliyot = targetMap.get(recording.parshaSlug) ?? []
+      existingAliyot.push(recording.aliyah)
+      targetMap.set(recording.parshaSlug, existingAliyot)
+      continue
+    }
+
+    if (cueProgress.isUnfinished) {
+      const existingAliyot = draftAliyotByParsha.get(recording.parshaSlug) ?? []
+      existingAliyot.push(recording.aliyah)
+      draftAliyotByParsha.set(recording.parshaSlug, existingAliyot)
+      continue
+    }
+
+    if (cueProgress.isComplete) {
+      const existingAliyot = completeAliyotByParsha.get(recording.parshaSlug) ?? []
+      existingAliyot.push(recording.aliyah)
+      completeAliyotByParsha.set(recording.parshaSlug, existingAliyot)
+    }
+  }
+
+  const allRecords = listCueAnalyticsRecords({
+    cueOverrides,
+    cueSourceByAudioId,
+    cueUpdatedAtByAudioId,
+  })
+  const parshaSummaries = getCueAnalyticsParshaSummaries(allRecords)
+
+  parshaSelect.innerHTML = `
+    <option value="">All parshiot with audio</option>
+    ${parshaSummaries
+      .map(
+        (summary) => `
+          <option value="${summary.parshaSlug}">${summary.parshaName}</option>
+        `
+      )
+      .join('')}
+  `
+  parshaSelect.disabled = false
+
   const render = () => {
     const selectedParsha = parshaSelect.value
     const selectedAliyah = Number(aliyahSelect.value) || 0
@@ -680,9 +760,10 @@ export function mountCueAnalyticsPage(container: HTMLElement) {
         (!selectedParsha || record.recording.parshaSlug === selectedParsha) &&
         (!selectedAliyah || record.recording.aliyah === selectedAliyah)
     )
+    const visibleAnalyticsRecords = filteredRecords.filter((record) => record.transitionCount > 0)
     const selectionLabel = describeSelection(selectedParshaName, selectedAliyah || null)
 
-    overviewSection.innerHTML = renderOverview(filteredRecords, selectionLabel)
+    overviewSection.innerHTML = renderOverview(visibleAnalyticsRecords, selectionLabel)
     coverageSection.innerHTML = renderCoverage(
       parshaSummaries,
       draftAliyotByParsha,
@@ -691,17 +772,17 @@ export function mountCueAnalyticsPage(container: HTMLElement) {
       selectedAliyah
     )
     aliyahSection.innerHTML = renderAliyahAverages(
-      getCueAnalyticsAliyahSummaries(filteredRecords),
+      getCueAnalyticsAliyahSummaries(visibleAnalyticsRecords),
       selectionLabel
     )
-    outliersSection.innerHTML = renderOutliers(filteredRecords, selectionLabel)
-    recordsSection.innerHTML = filteredRecords.length
-      ? filteredRecords.map(renderRecordModule).join('')
+    outliersSection.innerHTML = renderTransitionReview(visibleAnalyticsRecords, selectionLabel)
+    recordsSection.innerHTML = visibleAnalyticsRecords.length
+      ? visibleAnalyticsRecords.map(renderRecordModule).join('')
       : `
           <section class="about-card stack small analytics-empty-state">
             <div class="about-card-header">
-              <h2>No authored cue files in this slice</h2>
-              <p>Change the filter or use the coverage section above to find audio recordings that still need cue JSON files.</p>
+              <h2>No cue transitions in this slice</h2>
+              <p>Change the filter or use the coverage section above to find recordings that still need cue timing work.</p>
             </div>
           </section>
         `

@@ -1,57 +1,32 @@
-import { getCuesForRecording, listNarrators, listRecordings } from './library.ts'
-import type { AudioRecording, WordCue } from './types.ts'
+import {
+  getCuesForRecording,
+  getCueSavedAtForRecording,
+  listNarrators,
+  listRecordings,
+} from './library.ts'
+import type { WordCue } from './types.ts'
+import {
+  createCueAnalyticsRecord,
+  getCueAnalyticsAliyahSummaries,
+  getCueAnalyticsOverview,
+  type CueAnalyticsAliyahSummary,
+  type CueAnalyticsOverview,
+  type CueAnalyticsRecord,
+  type CueIntervalSample,
+  type CueOutlierDirection,
+  cueAnalyticsCueKey,
+} from './cue-analytics-core.ts'
 
-export interface CueIntervalSample {
-  cueNumber: number
-  previousCueNumber: number
-  gap: number
-  wordsPerMinute: number
-  isOutlier: boolean
-  outlierDirection: 'slow' | 'fast' | null
-  severity: number
-}
-
-export interface CueAnalyticsRecord {
-  recording: AudioRecording
-  narratorName: string
-  cueCount: number
-  intervalCount: number
-  cues: WordCue[]
-  intervals: number[]
-  intervalSamples: CueIntervalSample[]
-  totalDuration: number
-  averageGap: number
-  medianGap: number
-  longestGap: number
-  shortestGap: number
-  averageWordsPerMinute: number
-  outlierCount: number
-  lowerOutlierThreshold: number
-  upperOutlierThreshold: number
-}
-
-export interface CueAnalyticsOverview {
-  recordingCount: number
-  cueCount: number
-  intervalCount: number
-  totalDuration: number
-  averageGap: number
-  medianGap: number
-  averageWordsPerMinute: number
-  longestGap: number
-  outlierCount: number
-}
-
-export interface CueAnalyticsAliyahSummary {
-  aliyah: number
-  recordingCount: number
-  cueCount: number
-  averageDuration: number
-  averageGap: number
-  medianGap: number
-  averageWordsPerMinute: number
-  longestGap: number
-  outlierCount: number
+export {
+  createCueAnalyticsRecord,
+  cueAnalyticsCueKey,
+  getCueAnalyticsAliyahSummaries,
+  getCueAnalyticsOverview,
+  type CueAnalyticsAliyahSummary,
+  type CueAnalyticsOverview,
+  type CueAnalyticsRecord,
+  type CueIntervalSample,
+  type CueOutlierDirection,
 }
 
 export interface CueAnalyticsParshaSummary {
@@ -69,6 +44,7 @@ export interface CueAnalyticsParshaSummary {
   averageWordsPerMinute: number
   longestGap: number
   outlierCount: number
+  structuralPauseCount: number
 }
 
 function sum(values: number[]) {
@@ -88,71 +64,11 @@ function median(values: number[]) {
     : sorted[middle]!
 }
 
-function quartile(values: number[], ratio: number) {
-  if (!values.length) return 0
-  const sorted = [...values].sort((a, b) => a - b)
-  const position = (sorted.length - 1) * ratio
-  const lowerIndex = Math.floor(position)
-  const upperIndex = Math.ceil(position)
-  if (lowerIndex === upperIndex) return sorted[lowerIndex]!
-  const weight = position - lowerIndex
-  return sorted[lowerIndex]! * (1 - weight) + sorted[upperIndex]! * weight
-}
-
-function getIntervals(cues: WordCue[]) {
-  const intervals: number[] = []
-
-  for (let index = 1; index < cues.length; index += 1) {
-    const interval = Number((cues[index]!.timeStart - cues[index - 1]!.timeStart).toFixed(3))
-    if (interval > 0) intervals.push(interval)
-  }
-
-  return intervals
-}
-
-function getOutlierThresholds(intervals: number[]) {
-  if (intervals.length < 4) {
-    return { lower: 0, upper: Number.POSITIVE_INFINITY }
-  }
-
-  const q1 = quartile(intervals, 0.25)
-  const q3 = quartile(intervals, 0.75)
-  const iqr = q3 - q1
-
-  return {
-    lower: Math.max(0, q1 - iqr * 1.5),
-    upper: q3 + iqr * 1.5,
-  }
-}
-
-function createIntervalSamples(
-  cues: WordCue[],
-  intervals: number[],
-  thresholds: { lower: number; upper: number }
-) {
-  return intervals.map((gap, index) => {
-    const isSlowOutlier = gap > thresholds.upper
-    const isFastOutlier = thresholds.lower > 0 && gap < thresholds.lower
-    const outlierDirection = isSlowOutlier ? 'slow' : isFastOutlier ? 'fast' : null
-    const severity = isSlowOutlier
-      ? gap / thresholds.upper
-      : isFastOutlier && thresholds.lower > 0
-        ? thresholds.lower / gap
-        : 0
-
-    return {
-      cueNumber: cues[index + 1]?.cueNumber ?? index + 2,
-      previousCueNumber: cues[index]?.cueNumber ?? index + 1,
-      gap,
-      wordsPerMinute: gap > 0 ? 60 / gap : 0,
-      isOutlier: isSlowOutlier || isFastOutlier,
-      outlierDirection,
-      severity,
-    } satisfies CueIntervalSample
-  })
-}
-
-export function listCueAnalyticsRecords(): CueAnalyticsRecord[] {
+export function listCueAnalyticsRecords(options?: {
+  cueOverrides?: Map<string, WordCue[]>
+  cueSourceByAudioId?: Map<string, 'published' | 'draft'>
+  cueUpdatedAtByAudioId?: Map<string, number | null>
+}) {
   const narratorNames = new Map(
     listNarrators().map((narrator) => [narrator.id, narrator.displayName])
   )
@@ -160,32 +76,18 @@ export function listCueAnalyticsRecords(): CueAnalyticsRecord[] {
   return listRecordings()
     .filter((recording) => recording.status === 'available')
     .map((recording) => {
-      const cues = getCuesForRecording(recording)
-      const intervals = getIntervals(cues)
-      const thresholds = getOutlierThresholds(intervals)
-      const intervalSamples = createIntervalSamples(cues, intervals, thresholds)
-      const totalDuration = intervals.length
-        ? Number((cues[cues.length - 1]!.timeStart - cues[0]!.timeStart).toFixed(3))
-        : 0
+      const cues = options?.cueOverrides?.has(recording.id)
+        ? options.cueOverrides.get(recording.id) ?? []
+        : getCuesForRecording(recording)
 
-      return {
+      return createCueAnalyticsRecord({
         recording,
         narratorName: narratorNames.get(recording.narratorId) ?? recording.narratorId,
-        cueCount: cues.length,
-        intervalCount: intervals.length,
         cues,
-        intervals,
-        intervalSamples,
-        totalDuration,
-        averageGap: average(intervals),
-        medianGap: median(intervals),
-        longestGap: intervals.length ? Math.max(...intervals) : 0,
-        shortestGap: intervals.length ? Math.min(...intervals) : 0,
-        averageWordsPerMinute: intervals.length ? 60 / average(intervals) : 0,
-        outlierCount: intervalSamples.filter((sample) => sample.isOutlier).length,
-        lowerOutlierThreshold: thresholds.lower,
-        upperOutlierThreshold: thresholds.upper,
-      } satisfies CueAnalyticsRecord
+        cueSource: options?.cueSourceByAudioId?.get(recording.id) ?? 'published',
+        cueUpdatedAt:
+          options?.cueUpdatedAtByAudioId?.get(recording.id) ?? getCueSavedAtForRecording(recording),
+      })
     })
     .sort(
       (left, right) =>
@@ -194,48 +96,6 @@ export function listCueAnalyticsRecords(): CueAnalyticsRecord[] {
         left.recording.aliyah - right.recording.aliyah ||
         left.narratorName.localeCompare(right.narratorName)
     )
-}
-
-export function getCueAnalyticsOverview(records: CueAnalyticsRecord[]) {
-  const allIntervals = records.flatMap((record) => record.intervals)
-  const cueCount = records.reduce((total, record) => total + record.cueCount, 0)
-  const totalDuration = records.reduce((total, record) => total + record.totalDuration, 0)
-
-  return {
-    recordingCount: records.length,
-    cueCount,
-    intervalCount: allIntervals.length,
-    totalDuration,
-    averageGap: average(allIntervals),
-    medianGap: median(allIntervals),
-    averageWordsPerMinute: allIntervals.length ? 60 / average(allIntervals) : 0,
-    longestGap: allIntervals.length ? Math.max(...allIntervals) : 0,
-    outlierCount: records.reduce((total, record) => total + record.outlierCount, 0),
-  } satisfies CueAnalyticsOverview
-}
-
-export function getCueAnalyticsAliyahSummaries(records: CueAnalyticsRecord[]) {
-  const summaries: CueAnalyticsAliyahSummary[] = []
-
-  for (let aliyah = 1; aliyah <= 7; aliyah += 1) {
-    const matchingRecords = records.filter(
-      (record) => record.recording.aliyah === aliyah && record.intervalCount > 0
-    )
-    const allIntervals = matchingRecords.flatMap((record) => record.intervals)
-    summaries.push({
-      aliyah,
-      recordingCount: matchingRecords.length,
-      cueCount: matchingRecords.reduce((total, record) => total + record.cueCount, 0),
-      averageDuration: average(matchingRecords.map((record) => record.totalDuration)),
-      averageGap: average(allIntervals),
-      medianGap: median(allIntervals),
-      averageWordsPerMinute: allIntervals.length ? 60 / average(allIntervals) : 0,
-      longestGap: allIntervals.length ? Math.max(...allIntervals) : 0,
-      outlierCount: matchingRecords.reduce((total, record) => total + record.outlierCount, 0),
-    })
-  }
-
-  return summaries
 }
 
 export function getCueAnalyticsParshaSummaries(records: CueAnalyticsRecord[]) {
@@ -258,6 +118,7 @@ export function getCueAnalyticsParshaSummaries(records: CueAnalyticsRecord[]) {
       averageWordsPerMinute: 0,
       longestGap: 0,
       outlierCount: 0,
+      structuralPauseCount: 0,
     }
 
     existing.recordingCount += 1
@@ -291,6 +152,10 @@ export function getCueAnalyticsParshaSummaries(records: CueAnalyticsRecord[]) {
         averageWordsPerMinute: allIntervals.length ? 60 / average(allIntervals) : 0,
         longestGap: allIntervals.length ? Math.max(...allIntervals) : 0,
         outlierCount: matchingRecords.reduce((total, record) => total + record.outlierCount, 0),
+        structuralPauseCount: matchingRecords.reduce(
+          (total, record) => total + record.structuralPauseCount,
+          0
+        ),
       } satisfies CueAnalyticsParshaSummary
     })
     .sort(

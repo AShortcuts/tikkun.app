@@ -29,6 +29,7 @@ import {
   findRecordingForRun,
   getCuesForRecording,
   getCueSavedAtForRecording,
+  listRecordings,
   listNarrators,
 } from './audio/library.ts'
 import { cueFileRelativePath, formatCueFileJson } from './audio/cue-file.ts'
@@ -36,7 +37,7 @@ import { normalizeFirstCueStart } from './audio/normalize-first-cue.ts'
 import { AudioController, ActiveAudioSession } from './reading/audio-controller.ts'
 import { HighlightController, cueKey } from './reading/highlight-controller.ts'
 import { collectTokenKeysForAliyahRange } from './reading/aliyah-token-sequence.ts'
-import type { CueExportPayload, WordCue } from './audio/types.ts'
+import type { AudioRecording, CueExportPayload, WordCue } from './audio/types.ts'
 import { verifyAdminPassword } from './admin/access.ts'
 import {
   getAdminDraftStorageKey,
@@ -531,7 +532,18 @@ async function collectAliyahTokenKeys({
   let marker = document.querySelector<HTMLElement>(
     `[data-aliyah-marker="true"][data-run-id="${runId}"][data-aliyah-index="${aliyahIndex}"]`
   )
-  if (!marker) return []
+  while (!marker) {
+    const renderedPages = display.getRenderedPageNumbers()
+    const lastPage = renderedPages[renderedPages.length - 1]
+    if (!lastPage) return []
+
+    const loaded = await display.ensurePageRendered(lastPage + 1)
+    if (!loaded) return []
+
+    marker = document.querySelector<HTMLElement>(
+      `[data-aliyah-marker="true"][data-run-id="${runId}"][data-aliyah-index="${aliyahIndex}"]`
+    )
+  }
 
   let markers = getAliyahMarkerElements()
   let markerIndex = markers.indexOf(marker)
@@ -560,6 +572,67 @@ async function collectAliyahTokenKeys({
     startLine,
     endLine,
   })
+}
+
+async function loadAudioSessionForRecording(
+  {
+    recording,
+    runId,
+    aliyahIndex,
+  }: {
+    recording: AudioRecording
+    runId: string
+    aliyahIndex: number
+  },
+  audioController: AudioController,
+  highlightController: HighlightController
+) {
+  if (audioController.session?.recording.id === recording.id) {
+    return audioController.session
+  }
+
+  const tokenKeys = await collectAliyahTokenKeys({
+    runId,
+    aliyahIndex,
+  })
+  if (!tokenKeys.length) return null
+
+  const session: ActiveAudioSession = {
+    recording,
+    cues: cloneCues(getCuesForRecording(recording)),
+    runId,
+    aliyahIndex,
+    tokenKeys,
+  }
+
+  await audioController.loadSession(session)
+  highlightController.setSequence(tokenKeys)
+  adminState.sourceCues = cloneCues(session.cues)
+  const draft = loadAdminDraft(session.recording.id, tokenKeys.length)
+  assignAdminCues(draft?.cues ?? cloneCues(adminState.sourceCues), audioController)
+  adminState.tokenPointer =
+    draft?.tokenPointer ?? getAdminResumeTokenPointer(tokenKeys.length)
+  adminState.draftOrigin = draft ? 'local' : adminState.sourceCues.length ? 'published' : 'none'
+  adminState.draftSavedAt =
+    draft?.updatedAt ?? getCueSavedAtForRecording(session.recording) ?? null
+  adminState.recording = false
+  cueNavigationIndex = session.cues.length ? 0 : null
+  syncAdminPanelState(audioController)
+
+  if (session.cues.length) {
+    audioController.seek(session.cues[0].timeStart)
+    await highlightController.activateCue(session.cues[0], {
+      scroll: true,
+    })
+  } else if (tokenKeys[0]) {
+    await highlightController.activateTokenKey(tokenKeys[0], {
+      scroll: true,
+    })
+  }
+
+  updateFloatingPlayer(audioController)
+  refreshInlineAudioButtons(audioController)
+  return session
 }
 
 function updateFloatingPlayer(audioController: AudioController) {
@@ -739,46 +812,17 @@ async function startPlaybackForButton(
     return
   }
 
-  const tokenKeys = await collectAliyahTokenKeys({
-    runId: state.lineInfo.run.id,
-    aliyahIndex: state.aliyahIndex,
-  })
+  const session = await loadAudioSessionForRecording(
+    {
+      recording: state.recording,
+      runId: state.lineInfo.run.id,
+      aliyahIndex: state.aliyahIndex,
+    },
+    audioController,
+    highlightController
+  )
+  if (!session) return
 
-  const session: ActiveAudioSession = {
-    recording: state.recording,
-    cues: cloneCues(getCuesForRecording(state.recording)),
-    runId: state.lineInfo.run.id,
-    aliyahIndex: state.aliyahIndex,
-    tokenKeys,
-  }
-
-  await audioController.loadSession(session)
-  highlightController.setSequence(tokenKeys)
-  adminState.sourceCues = cloneCues(session.cues)
-  const draft = loadAdminDraft(session.recording.id, tokenKeys.length)
-  assignAdminCues(draft?.cues ?? cloneCues(adminState.sourceCues), audioController)
-  adminState.tokenPointer =
-    draft?.tokenPointer ?? getAdminResumeTokenPointer(tokenKeys.length)
-  adminState.draftOrigin = draft ? 'local' : adminState.sourceCues.length ? 'published' : 'none'
-  adminState.draftSavedAt =
-    draft?.updatedAt ?? getCueSavedAtForRecording(session.recording) ?? null
-  adminState.recording = false
-  cueNavigationIndex = session.cues.length ? 0 : null
-  syncAdminPanelState(audioController)
-
-  if (session.cues.length) {
-    audioController.seek(session.cues[0].timeStart)
-    await highlightController.activateCue(session.cues[0], {
-      scroll: true,
-    })
-  } else if (tokenKeys[0]) {
-    await highlightController.activateTokenKey(tokenKeys[0], {
-      scroll: true,
-    })
-  }
-
-  updateFloatingPlayer(audioController)
-  refreshInlineAudioButtons(audioController)
   await audioController.play()
 }
 
