@@ -126,6 +126,14 @@ html[data-reader-theme='light'] {
   color-scheme: light;
 }
 
+html[data-reader-theme='sepia'] body {
+  --paper-color: oklch(90% 17% 90deg);
+}
+
+html[data-reader-theme='sepia'] {
+  color-scheme: light;
+}
+
 html[data-reader-theme='dark'] body {
   --paper-color: oklch(25% 0 0);
   --page-ink-color: oklch(100% 0 0 / 0.8);

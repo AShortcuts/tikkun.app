@@ -18,6 +18,7 @@ import {
   applyReaderPreferences,
   defaultHighlightPreferences,
   defaultReaderPreferences,
+  isThemeMode,
   loadReaderPreferences,
   mergeReaderPreferences,
   ReaderPreferences,
@@ -1837,8 +1838,8 @@ function setupSettingsPane(audioController: AudioController) {
   )
   for (const button of themeModeButtons) {
     button.addEventListener('click', () => {
-      const themeMode = button.dataset.themeMode as ThemeMode | undefined
-      if (!themeMode) return
+      const themeMode = button.dataset.themeMode
+      if (!isThemeMode(themeMode)) return
       applyUpdates({ themeMode })
     })
   }
@@ -1928,6 +1929,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setControlIcon(document.querySelector('[data-target-id="floating-next"]'), 'next')
   setControlIcon(document.querySelector('[data-target-id="floating-replay"]'), 'replay')
   setControlIcon(document.querySelector('[data-target-id="floating-download"]'), 'download')
+  setControlIcon(document.querySelector('[data-target-id="settings-toggle"]'), 'settings2')
   updateFloatingPlayer(audioController)
 
   viewportTracker.on('viewport-updated', (range) => {

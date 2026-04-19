@@ -375,9 +375,10 @@
 }
 
 .settings-segmented-control {
-  display: inline-grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.35rem;
+  width: 100%;
   padding: 0.2rem;
   border-radius: 16px;
   background: color-mix(in srgb, var(--light-accent-color) 78%, transparent);
@@ -431,6 +432,12 @@
   background: rgb(252, 252, 253);
   color: rgb(17, 24, 39);
   border-color: rgba(15, 23, 42, 0.12);
+}
+
+.settings-segmented-option[data-theme-mode='sepia'] {
+  background: oklch(90% 17% 90deg);
+  color: rgb(78, 53, 24);
+  border-color: color-mix(in srgb, saddlebrown 18%, transparent);
 }
 
 @media (prefers-color-scheme: dark) {

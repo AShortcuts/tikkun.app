@@ -1,5 +1,13 @@
-export type IconName = 'play' | 'pause' | 'previous' | 'next' | 'replay' | 'download'
+export type IconName =
+  | 'play'
+  | 'pause'
+  | 'previous'
+  | 'next'
+  | 'replay'
+  | 'download'
+  | 'settings2'
 
+// Icons are from https://lucide.dev/icons v1.0.
 const iconPaths: Record<IconName, string> = {
   play: `
     <path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" fill="currentColor" stroke="none" />
@@ -24,6 +32,12 @@ const iconPaths: Record<IconName, string> = {
     <path d="M12 17V3" />
     <path d="m6 11 6 6 6-6" />
     <path d="M19 21H5" />
+  `,
+  settings2: `
+    <path d="M14 17H5" />
+    <path d="M19 7h-9" />
+    <circle cx="17" cy="17" r="3" />
+    <circle cx="7" cy="7" r="3" />
   `,
 }
 

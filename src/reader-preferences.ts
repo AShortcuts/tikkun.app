@@ -2,7 +2,9 @@ const STORAGE_KEY = 'tikkun.reader-preferences.v3'
 
 export const TOKENIZATION_VERSION = 'v2'
 
-export type ThemeMode = 'automatic' | 'light' | 'dark'
+export const themeModes = ['automatic', 'light', 'sepia', 'dark'] as const
+
+export type ThemeMode = (typeof themeModes)[number]
 
 export interface ReaderPreferences {
   narratorId: string
@@ -41,6 +43,13 @@ export const defaultHighlightPreferences = {
   glow: defaultReaderPreferences.glow,
 } as const
 
+export function isThemeMode(value: unknown): value is ThemeMode {
+  return (
+    typeof value === 'string' &&
+    themeModes.some((themeMode) => themeMode === value)
+  )
+}
+
 export function loadReaderPreferences(): ReaderPreferences {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -49,6 +58,9 @@ export function loadReaderPreferences(): ReaderPreferences {
     return {
       ...defaultReaderPreferences,
       ...parsed,
+      themeMode: isThemeMode(parsed.themeMode)
+        ? parsed.themeMode
+        : defaultReaderPreferences.themeMode,
     }
   } catch {
     return { ...defaultReaderPreferences }
