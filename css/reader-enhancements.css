@@ -1302,6 +1302,39 @@
   border-collapse: collapse;
 }
 
+.about-status-legend {
+  display: inline-grid;
+  gap: 0.6rem;
+  align-items: start;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.75rem;
+}
+
+.about-status-legend div {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.about-status-legend p {
+  margin: 0;
+  color: var(--medium-text-color);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.about-progress-link {
+  margin: 0;
+  color: var(--medium-text-color);
+  font-size: 0.95rem;
+}
+
+.about-progress-link a {
+  color: var(--page-ink-color);
+  font-weight: 700;
+}
+
 .about-table th,
 .about-table td {
   text-align: left;
@@ -1528,9 +1561,9 @@
     width: auto;
   }
 
-  @media screen and (max-width: 550px) {
+  @media screen and (max-width: 450px) {
     .reader-corner-controls.mod-raised {
-      bottom: calc(8rem + env(safe-area-inset-bottom, 0px));
+      bottom: calc(11.4rem + env(safe-area-inset-bottom, 0px));
     }
   }
 }

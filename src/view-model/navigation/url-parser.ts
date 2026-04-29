@@ -30,7 +30,7 @@ export function generateAboutUrl() {
 }
 
 export function generateCueAnalyticsUrl() {
-  return '#/about/cue-analytics'
+  return '#/about/playback-analytics'
 }
 
 // TODO(decide): Should we support links to a specific עלייה in a run?
@@ -89,7 +89,13 @@ const pathHandlers: Record<
   },
   about(_generator, [page]) {
     if (!page) return { view: 'about' }
-    if (page === 'cue-analytics') return { view: 'cue-analytics' }
+    if (
+      page === 'playback-analytics' ||
+      page === 'word-analytics' ||
+      page === 'cue-analytics'
+    ) {
+      return { view: 'cue-analytics' }
+    }
     return null
   },
 }

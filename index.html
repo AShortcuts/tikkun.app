@@ -87,6 +87,8 @@
         </div>
         <div class="toolbar-wrapper mod-right">
           <div class="toolbar-item">
+            <span class="toolbar-current-aliyah-label u-hidden" data-target-id="toolbar-current-aliyah-label">—</span>
+            <button class="aliyah-audio-button toolbar-current-aliyah-audio u-hidden" data-target-id="toolbar-current-aliyah-audio" type="button" aria-label="Play current aliyah" title="Play current aliyah"></button>
             <button class="toolbar-button" data-target-id="settings-toggle" type="button" title="Reader settings" aria-label="Reader settings"></button>
           </div>
         </div>
@@ -114,7 +116,7 @@
               <div class="floating-player-progress-list">
                 <div class="floating-player-progress-item">
                   <div class="floating-player-progress-head">
-                    <span class="floating-player-progress-label">Cue Progress</span>
+                    <span class="floating-player-progress-label">Word Progress</span>
                     <span class="floating-player-progress-value" data-target-id="floating-meta-cues">0/0</span>
                   </div>
                   <div class="floating-player-progress-track">
@@ -133,10 +135,10 @@
               </div>
             </div>
             <div class="floating-player-controls">
-              <button class="floating-player-button" data-target-id="floating-replay" type="button" title="Replay current cue" aria-label="Replay current cue"></button>
-              <button class="floating-player-button" data-target-id="floating-next" type="button" title="Next cue" aria-label="Next cue"></button>
+              <button class="floating-player-button" data-target-id="floating-replay" type="button" title="Replay current Word" aria-label="Replay current Word"></button>
+              <button class="floating-player-button" data-target-id="floating-next" type="button" title="Next Word" aria-label="Next Word"></button>
               <button class="floating-player-button" data-target-id="floating-play" type="button" title="Play or pause" aria-label="Play or pause"></button>
-              <button class="floating-player-button" data-target-id="floating-prev" type="button" title="Previous cue" aria-label="Previous cue"></button>
+              <button class="floating-player-button" data-target-id="floating-prev" type="button" title="Previous Word" aria-label="Previous Word"></button>
               <a class="floating-player-button mod-download" data-target-id="floating-download" href="#" download title="Download current recording" aria-label="Download current recording"></a>
             </div>
           </div>
@@ -176,7 +178,7 @@
         <h2>Reader Settings</h2>
         <div class="settings-pane-header-actions">
           <button class="toolbar-button mod-icon-label" type="button" data-target-id="settings-reset-highlight" aria-label="Reset highlight settings" title="Reset highlight settings"></button>
-          <button class="toolbar-button" type="button" data-target-id="settings-close">Close</button>
+          <button class="toolbar-button mod-icon-label" type="button" data-target-id="settings-close" aria-label="Close reader settings" title="Close reader settings"><svg class="ui-icon lucide lucide-x-icon lucide-x" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg></button>
         </div>
       </div>
       <form class="settings-form stack medium" data-target-id="settings-form">
@@ -248,14 +250,14 @@
     </aside>
     <aside class="admin-panel u-hidden" data-target-id="admin-panel">
       <div class="admin-panel-header">
-        <strong>Admin Cue Mode</strong>
-        <span data-target-id="admin-cue-count">0 cues</span>
+        <strong>Admin Timing Mode</strong>
+        <span data-target-id="admin-cue-count">0 Words</span>
       </div>
       <div class="admin-panel-status" data-target-id="admin-status">
-        Select an aliyah and press play to start cue authoring.
+        Select an aliyah and press play to start timing words.
       </div>
       <div class="admin-panel-actions">
-        <button type="button" class="toolbar-button" data-target-id="admin-record">Record/Edit Cues</button>
+        <button type="button" class="toolbar-button" data-target-id="admin-record">Record/Edit Timing</button>
         <button type="button" class="toolbar-button" data-target-id="admin-step-back">Step Back</button>
         <button type="button" class="toolbar-button" data-target-id="admin-undo">Undo Last</button>
         <button type="button" class="toolbar-button" data-target-id="admin-reset">Start Over</button>
@@ -265,7 +267,7 @@
     <div class="export-modal u-hidden" data-target-id="export-modal">
       <div class="export-card stack small">
         <div class="settings-pane-header">
-          <h2>Export Cues</h2>
+          <h2>Export Timing</h2>
           <button class="toolbar-button" type="button" data-target-id="export-close">Close</button>
         </div>
         <div class="export-actions">

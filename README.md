@@ -1,14 +1,14 @@
 # tikkun.io
 
-> The online tikkun you always wanted, but never had.
+> A practical online tikkun for preparing Torah readings.
 
-The mission is to **make better Torah readers** by providing the tools to maximize the reader's efficiency and preparedness. Your good, old-fashioned tikkunim are great, but in the end, they're static papers. With the dynamic nature of computer programs, we can make an even better tikkun.
+The goal is to help Torah readers prepare faster and more clearly. The site keeps the familiar tikkun format, then adds audio, reader settings, and synced word highlights.
 
 The source text is pulled from the [Sefaria API](https://github.com/Sefaria/Sefaria-Project/wiki/API-Documentation), with some minor overrides as issues are found (such as פתוחה/סתומה discrepancies).
 
 ## Local workflow
 
-This project is kept as a fully contained static site:
+This is a self-contained static site:
 
 - application code lives in `src/`
 - deployable static files and copied audio live in `static/`

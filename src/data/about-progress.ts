@@ -11,52 +11,44 @@ export interface RecordingProgressRow {
   status: RecordingStatus
   comments?: string
   link?: string
-  pendingAudioCount?: number
-  completionPercent?: string
 }
 
 export interface ProjectStatusRow {
   feature: string
-  status: 'Done' | 'In progress' | 'Queued'
+  status: 'In progress' | 'Queued'
   notes: string
   nextMilestone: string
 }
 
 export const projectStatusRows: ProjectStatusRow[] = [
   {
-    feature: 'Reader with synced audio architecture',
+    feature: 'Reader + Audio Sync',
     status: 'In progress',
-    notes: 'Playback, highlighting, and cue-authoring ship together.',
-    nextMilestone: 'Seed curated cues for published aliyot.',
+    notes: 'Audio and word highlight play together.',
+    nextMilestone: 'Implement guardrails.',
   },
   {
-    feature: 'Narrator support',
+    feature: 'Editing settings',
     status: 'In progress',
-    notes: 'Yoni Davidov is the first built-in narrator source.',
-    nextMilestone: 'Add additional baalei koreh through the manifest.',
+    notes: 'Make it easier for others to contribute.',
+    nextMilestone: '',
   },
   {
-    feature: 'Recording downloads',
-    status: 'Done',
-    notes: 'Download links sit next to playback, but stay secondary.',
-    nextMilestone: 'Refine asset hosting for deployment.',
-  },
-  {
-    feature: 'Cue authoring workflow',
-    status: 'Done',
-    notes: 'Hidden admin mode records timestamps and exports copy-ready data.',
-    nextMilestone: 'Add asset hashes when production hosting stabilizes.',
+    feature: 'Timing Review',
+    status: 'Queued',
+    notes: 'Automated checks can help find timing mistakes.',
+    nextMilestone: '',
   },
 ]
 
 export const recordingProgressRows: RecordingProgressRow[] = [
-  { number: 1, parshaEnglish: 'Bereishit', parshaHebrew: 'בְּרֵאשִׁית', status: 'Completed', comments: 'Shared on WhatsApp', pendingAudioCount: 2, completionPercent: '3.7%' },
-  { number: 2, parshaEnglish: 'Noach', parshaHebrew: 'נֹחַ', status: 'Completed', comments: 'Shared on WhatsApp', pendingAudioCount: 7, completionPercent: '13.0%' },
-  { number: 3, parshaEnglish: 'Lech Lecha', parshaHebrew: 'לֶךְ לְךָ', status: 'Completed', comments: 'Shared on WhatsApp', pendingAudioCount: 1, completionPercent: '1.9%' },
+  { number: 1, parshaEnglish: 'Bereishit', parshaHebrew: 'בְּרֵאשִׁית', status: 'Completed' },
+  { number: 2, parshaEnglish: 'Noach', parshaHebrew: 'נֹחַ', status: 'Completed' },
+  { number: 3, parshaEnglish: 'Lech Lecha', parshaHebrew: 'לֶךְ לְךָ', status: 'Completed' },
   { number: 4, parshaEnglish: 'Vayeira', parshaHebrew: 'וַיֵּרָא', status: 'Pending Audio' },
   { number: 5, parshaEnglish: 'Chayei Sarah', parshaHebrew: 'חַיֵּי שָׂרָה', status: 'Pending Audio' },
-  { number: 6, parshaEnglish: 'Toldot', parshaHebrew: 'תּוֹלְדוֹת', status: 'Completed', comments: 'Audio recordings provided by Yoni Davidov' },
-  { number: 7, parshaEnglish: 'Vayetzei', parshaHebrew: 'וַיֵּצֵא', status: 'In progress', comments: 'Videos are done using tikkun.io and recorded by Adam Niyazov' },
+  { number: 6, parshaEnglish: 'Toldot', parshaHebrew: 'תּוֹלְדוֹת', status: 'Completed' },
+  { number: 7, parshaEnglish: 'Vayetzei', parshaHebrew: 'וַיֵּצֵא', status: 'In progress' },
   { number: 8, parshaEnglish: 'Vayishlach', parshaHebrew: 'וַיִּשְׁלַח', status: 'Pending Audio' },
   { number: 9, parshaEnglish: 'Vayeishev', parshaHebrew: 'וַיֵּשֶׁב', status: 'Pending Audio' },
   { number: 10, parshaEnglish: 'Miketz', parshaHebrew: 'מִקֵּץ', status: 'Pending Audio' },
@@ -85,7 +77,7 @@ export const recordingProgressRows: RecordingProgressRow[] = [
   { number: 33, parshaEnglish: 'Bechukotai', parshaHebrew: 'בְּחֻקֹּתַי', status: 'Pending Audio' },
   { number: 34, parshaEnglish: 'Bamidbar', parshaHebrew: 'בְּמִדְבַּר', status: 'Pending Audio' },
   { number: 35, parshaEnglish: 'Naso', parshaHebrew: 'נָשֹׂא', status: 'Redo, please', comments: 'Aliyot 1-3, 5-7 are almost done. Aliyah 4th has different audios put together so it sounds off.' },
-  { number: 36, parshaEnglish: 'Beha’alotecha', parshaHebrew: 'בְּהַעֲלֹתְךָ', status: 'Completed', comments: 'Shared on WhatsApp' },
+  { number: 36, parshaEnglish: 'Beha’alotecha', parshaHebrew: 'בְּהַעֲלֹתְךָ', status: 'Completed' },
   { number: 37, parshaEnglish: 'Shelach', parshaHebrew: 'שְׁלַח', status: 'Pending Audio' },
   { number: 38, parshaEnglish: 'Korach', parshaHebrew: 'קֹרַח', status: 'Pending Audio' },
   { number: 39, parshaEnglish: 'Chukat', parshaHebrew: 'חֻקַּת', status: 'Pending Audio' },
@@ -101,8 +93,8 @@ export const recordingProgressRows: RecordingProgressRow[] = [
   { number: 49, parshaEnglish: 'Ki Teitzei', parshaHebrew: 'כִּי תֵצֵא', status: 'Pending Audio' },
   { number: 50, parshaEnglish: 'Ki Tavo', parshaHebrew: 'כִּי תָבוֹא', status: 'Pending Audio' },
   { number: 51, parshaEnglish: 'Nitzavim', parshaHebrew: 'נִצָּבִים', status: 'Pending Audio' },
-  { number: 52, parshaEnglish: 'Vayeilech', parshaHebrew: 'וַיֵּלֶךְ', status: 'Completed', comments: 'Shared on WhatsApp' },
-  { number: 53, parshaEnglish: 'Ha’azinu', parshaHebrew: 'הַאֲזִינוּ', status: 'Completed', comments: 'Shared on WhatsApp' },
+  { number: 52, parshaEnglish: 'Vayeilech', parshaHebrew: 'וַיֵּלֶךְ', status: 'Completed' },
+  { number: 53, parshaEnglish: 'Ha’azinu', parshaHebrew: 'הַאֲזִינוּ', status: 'Completed' },
   { number: 54, parshaEnglish: "V'zot HaBerachah", parshaHebrew: 'וְזֹאת הַבְּרָכָה', status: 'Pending Audio' },
   { number: null, parshaEnglish: 'Rosh Chodesh', parshaHebrew: 'ראש חודש', status: 'Pending Audio' },
   { number: null, parshaEnglish: 'Parsha Zachor', parshaHebrew: 'פרשת זכור', status: 'Pending Audio' },

@@ -40,22 +40,21 @@ export default function AboutPage() {
   return `
     <section class="about-view stack large">
       <div class="about-hero stack small">
-        <p class="about-eyebrow">About this Project</p>
-        <h1 class="about-title">A reader-first tikkun with professional audio and highlight tracking built around real preparation workflow.</h1>
+        <p class="about-eyebrow">About this project</p>
+        <h1 class="about-title">A practical tikkun for preparing Torah readings with audio synced highlights.</h1>
         <p class="about-copy">
-          This project pairs the existing tikkun text experience with narrator-based aliyah recordings,
-          synced highlighting, and an internal cue-authoring workflow so recordings and visuals can be
-          expanded deliberately over time.
+          This site combines clear Torah text, aliyah recordings, and word-by-word timing by the best ba'al korim
+          so readers can practice and prepare flawlessly anytime, anywhere.
         </p>
         <div class="about-actions">
-          <a class="about-link-button" href="${generateCueAnalyticsUrl()}">Cue analytics</a>
+          <a class="about-link-button" href="${generateCueAnalyticsUrl()}">Playback analytics</a>
         </div>
       </div>
 
       <section class="about-card stack small">
         <div class="about-card-header">
           <h2>Project status</h2>
-          <p>Current implementation progress and next milestones.</p>
+          <p>Current work and next steps.</p>
         </div>
         <div class="about-table-wrap">
           <table class="about-table">
@@ -88,8 +87,26 @@ export default function AboutPage() {
       <section class="about-card stack small">
         <div class="about-card-header">
           <h2>Recording progress</h2>
-          <p>Repo-managed snapshot based on the working Google Sheet tracker for website recordings.</p>
+          <p>A simple snapshot of recording work for the site.</p>
         </div>
+        <div class="about-status-legend" aria-label="Recording status legend">
+          <div>
+            <span class="${statusClass('Completed')}">Completed</span>
+            <p>Highlight sync is done.</p>
+          </div>
+          <div>
+            <span class="${statusClass('In progress')}">In progress</span>
+            <p>Audio files are ready, but highlight sync is not done yet.</p>
+          </div>
+          <div>
+            <span class="${statusClass('Pending Audio')}">Pending Audio</span>
+            <p>Audio recordings are not available yet.</p>
+          </div>
+        </div>
+        <p class="about-progress-link">
+          This is an updated copy of the current progress →
+          <a href="https://docs.google.com/spreadsheets/d/1cLuwv9ZkfomgErWM5QAuP-zev4J_v7Tx8SoGE9cI32E/edit?usp=sharing" target="_blank" rel="noopener noreferrer">Google Sheet</a>
+        </p>
         <div class="about-table-wrap">
           <table class="about-table">
             <thead>
@@ -99,8 +116,6 @@ export default function AboutPage() {
                 <th>Hebrew</th>
                 <th>Status</th>
                 <th>Comments</th>
-                <th>Pending</th>
-                <th>Progress</th>
               </tr>
             </thead>
             <tbody>
@@ -113,8 +128,6 @@ export default function AboutPage() {
                       <td dir="rtl">${row.parshaHebrew}</td>
                       <td><span class="${statusClass(row.status)}">${row.status}</span></td>
                       <td>${row.comments ?? '—'}</td>
-                      <td>${row.pendingAudioCount ?? '—'}</td>
-                      <td>${row.completionPercent ?? '—'}</td>
                     </tr>
                   `
                 )
@@ -127,7 +140,7 @@ export default function AboutPage() {
       <section class="about-card stack small">
         <div class="about-card-header">
           <h2>Current audio catalog</h2>
-          <p>Playback/download availability exposed by the in-app audio manifest.</p>
+          <p>Recordings currently available for playback and download.</p>
         </div>
         <div class="about-table-wrap">
           <table class="about-table">
@@ -137,7 +150,7 @@ export default function AboutPage() {
                 <th>Parsha</th>
                 <th>Aliyot available</th>
                 <th>Formats</th>
-                <th>Cues</th>
+                <th>Timing</th>
                 <th>Notes</th>
               </tr>
             </thead>
@@ -156,7 +169,7 @@ export default function AboutPage() {
                       <td>${row.parshaName}</td>
                       <td>${row.availableAliyot.sort((a, b) => a - b).join(', ')}</td>
                       <td>${[...row.formats].join(', ')}</td>
-                      <td>Manual cue authoring</td>
+                      <td>Manual timing</td>
                       <td>${row.notes[0] ?? '—'}</td>
                     </tr>
                   `
@@ -173,8 +186,8 @@ export default function AboutPage() {
         </div>
         <p class="about-copy">
           Audio recordings are currently seeded from Yoni Davidov’s aliyah collection.
-          Website progress tracking reflects the maintained sheet snapshot, while cue timing
-          is authored manually inside the hidden admin workflow and then hardcoded into the site.
+          Recording progress comes from the maintained tracker. Word timing is added
+          manually in the admin tools and shipped with the site.
         </p>
       </section>
     </section>

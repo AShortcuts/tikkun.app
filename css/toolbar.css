@@ -3,6 +3,7 @@
   height: 100%;
   display: flex;
   align-items: center;
+  gap: 0.4rem;
 }
 
 .toolbar-content {
@@ -40,10 +41,31 @@
   font-size: 1.05rem;
 }
 
+.toolbar-current-aliyah-audio {
+  display: none;
+}
+
+.toolbar-current-aliyah-label {
+  display: none;
+  color: var(--light-text-color);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
 .parsha-title:hover {
   background-color: var(--medium-accent-color);
 }
 
 .parsha-title:active {
   background-color: var(--heavy-accent-color);
+}
+
+@media screen and (max-width: 450px) {
+  .toolbar-current-aliyah-label:not(.u-hidden) {
+    display: inline;
+  }
+
+  .toolbar-current-aliyah-audio:not(.u-hidden) {
+    display: inline-flex;
+  }
 }

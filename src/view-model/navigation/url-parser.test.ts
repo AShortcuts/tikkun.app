@@ -48,11 +48,17 @@ test('About', (t) => {
   t.is(generateAboutUrl(), '#/about')
 })
 
-test('Cue analytics', (t) => {
+test('Playback analytics', (t) => {
+  t.deepEqual(parseUrl(generator, '/about/playback-analytics'), {
+    view: 'cue-analytics',
+  })
+  t.deepEqual(parseUrl(generator, '/about/word-analytics'), {
+    view: 'cue-analytics',
+  })
   t.deepEqual(parseUrl(generator, '/about/cue-analytics'), {
     view: 'cue-analytics',
   })
-  t.is(generateCueAnalyticsUrl(), '#/about/cue-analytics')
+  t.is(generateCueAnalyticsUrl(), '#/about/playback-analytics')
 })
 
 test('Parsha slug resolves Bereshit', async (t) => {

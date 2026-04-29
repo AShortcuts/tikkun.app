@@ -24,13 +24,11 @@ import {
   ReaderPreferences,
   saveReaderPreferences,
   TOKENIZATION_VERSION,
-  ThemeMode,
 } from './reader-preferences.ts'
 import {
   findRecordingForRun,
   getCuesForRecording,
   getCueSavedAtForRecording,
-  listRecordings,
   listNarrators,
 } from './audio/library.ts'
 import { cueFileRelativePath, formatCueFileJson } from './audio/cue-file.ts'
@@ -237,6 +235,7 @@ const syncReaderProgressVisibility = () => {
   ;[
     '[data-target-id="reader-progress"]',
     '[data-target-id="reader-progress-mobile"]',
+    '.reader-corner-controls',
   ].forEach((selector) => setVisibility({ selector, visible }))
 }
 
@@ -443,15 +442,18 @@ function getAliyahProgressAnchors() {
       const rect = line.getBoundingClientRect()
       const label = line.querySelector('.aliyah-label-text')?.textContent?.trim() ?? '—'
       const aliyahStarts = (line.dataset.aliyahStarts ?? '').split(',')
+      const aliyahIndex = Number(aliyahStarts[0]) || 0
+      const lineInfo = getLineInfoFromElement(line)
       const progressLabel = aliyahStarts.includes('1') ? 'ראשון' : label
       return {
         line,
         label: progressLabel,
-        center:
-          book.scrollTop + (rect.top - bookRect.top) + rect.height / 2,
+        run: lineInfo?.run ?? null,
+        aliyahIndex,
+        position: book.scrollTop + (rect.top - bookRect.top),
       }
     })
-    .sort((a, b) => a.center - b.center)
+    .sort((a, b) => a.position - b.position)
 }
 
 async function ensureNextProgressAnchorLoaded(currentIndex: number) {
@@ -521,6 +523,57 @@ function refreshInlineAudioButtons(audioController: AudioController) {
     button.setAttribute('aria-label', button.title)
     button.classList.toggle('is-active', isPlayingCurrentSession)
   }
+}
+
+function getToolbarCurrentAliyahButton() {
+  return document.querySelector<HTMLButtonElement>(
+    '[data-target-id="toolbar-current-aliyah-audio"]'
+  )
+}
+
+function getToolbarCurrentAliyahLabel() {
+  return document.querySelector<HTMLElement>(
+    '[data-target-id="toolbar-current-aliyah-label"]'
+  )
+}
+
+function syncToolbarCurrentAliyahButton(
+  current: ReturnType<typeof getAliyahProgressAnchors>[number] | null,
+  audioController?: AudioController
+) {
+  const button = getToolbarCurrentAliyahButton()
+  const label = getToolbarCurrentAliyahLabel()
+  if (!button || !label) return
+
+  const recording =
+    current?.run && current.aliyahIndex
+      ? findRecordingForRun({
+          narratorId: readerPreferences.narratorId,
+          run: current.run,
+          aliyahIndex: current.aliyahIndex,
+        })
+      : null
+
+  const available = Boolean(current?.run && current.aliyahIndex && recording)
+  const isCurrentSession = Boolean(
+    available && audioController?.session?.recording.id === recording?.id
+  )
+  const isPlayingCurrentSession = Boolean(
+    isCurrentSession && audioController && !audioController.audio.paused
+  )
+
+  button.classList.toggle('u-hidden', !available)
+  label.classList.toggle('u-hidden', !available)
+  label.textContent = current?.label ?? '—'
+  button.disabled = !available
+  button.dataset.runId = current?.run?.id ?? ''
+  button.dataset.aliyahIndex = current?.aliyahIndex ? `${current.aliyahIndex}` : ''
+  setControlIcon(button, isPlayingCurrentSession ? 'pause' : 'play')
+  button.title = available
+    ? `${isPlayingCurrentSession ? 'Pause' : 'Play'} ${current?.label ?? 'aliyah'}`
+    : 'Recording unavailable'
+  button.setAttribute('aria-label', button.title)
+  button.classList.toggle('is-active', isPlayingCurrentSession)
 }
 
 async function collectAliyahTokenKeys({
@@ -678,6 +731,14 @@ function updateFloatingPlayer(audioController: AudioController) {
 
   updateFloatingPlayerAudioProgress(audioController)
   updateFloatingPlayerMeta(audioController)
+  const anchors = getAliyahProgressAnchors()
+  const viewportCenter = getBook().scrollTop + getBook().clientHeight / 2
+  let currentIndex = 0
+  for (let i = 0; i < anchors.length; i++) {
+    if (anchors[i].position <= viewportCenter) currentIndex = i
+    else break
+  }
+  syncToolbarCurrentAliyahButton(anchors[currentIndex] ?? null, audioController)
 }
 
 function setFloatingPlayerExpanded(expanded: boolean) {
@@ -827,6 +888,50 @@ async function startPlaybackForButton(
   await audioController.play()
 }
 
+async function startPlaybackForToolbarCurrentAliyah(
+  button: HTMLButtonElement,
+  audioController: AudioController,
+  highlightController: HighlightController
+) {
+  const runId = button.dataset.runId
+  const aliyahIndex = Number(button.dataset.aliyahIndex)
+  if (!runId || !aliyahIndex) return
+
+  const marker = document.querySelector<HTMLElement>(
+    `[data-aliyah-marker="true"][data-run-id="${runId}"][data-aliyah-index="${aliyahIndex}"]`
+  )
+  if (!marker) return
+
+  const lineInfo = getLineInfoFromElement(marker)
+  if (!lineInfo?.run) return
+
+  const recording = findRecordingForRun({
+    narratorId: readerPreferences.narratorId,
+    run: lineInfo.run,
+    aliyahIndex,
+  })
+  if (!recording) return
+
+  if (audioController.session?.recording.id === recording.id) {
+    await audioController.togglePlayback()
+    updateFloatingPlayer(audioController)
+    return
+  }
+
+  const session = await loadAudioSessionForRecording(
+    {
+      recording,
+      runId,
+      aliyahIndex,
+    },
+    audioController,
+    highlightController
+  )
+  if (!session) return
+
+  await audioController.play()
+}
+
 async function syncCurrentSessionHighlight(
   audioController?: AudioController,
   highlightController?: HighlightController
@@ -927,6 +1032,7 @@ function updateReaderProgress() {
     fill.style.height = '0%'
     percent.textContent = '0%'
     mobileFill?.style.setProperty('width', '0%')
+    syncToolbarCurrentAliyahButton(null, audioControllerGlobal ?? undefined)
     return
   }
 
@@ -934,13 +1040,14 @@ function updateReaderProgress() {
 
   let currentIndex = 0
   for (let i = 0; i < anchors.length; i++) {
-    if (anchors[i].center <= viewportCenter) currentIndex = i
+    if (anchors[i].position <= viewportCenter) currentIndex = i
     else break
   }
 
   const current = anchors[currentIndex]
   const next = anchors[currentIndex + 1]
   label.textContent = current?.label ?? '—'
+  syncToolbarCurrentAliyahButton(current ?? null, audioControllerGlobal ?? undefined)
 
   if (!current || !next) {
     if (current) {
@@ -959,7 +1066,7 @@ function updateReaderProgress() {
     0,
     Math.min(
       1,
-      (viewportCenter - current.center) / (next.center - current.center)
+      (viewportCenter - current.position) / (next.position - current.position)
     )
   )
   fill.style.height = `${Math.round(progress * 100)}%`
@@ -987,7 +1094,7 @@ function updateAdminCounter(tokenCount: number) {
     '[data-target-id="admin-cue-count"]'
   )!
   const pointer = adminState.tokenPointer >= 0 ? adminState.tokenPointer + 1 : 0
-  counter.textContent = `${adminState.cues.length} / ${tokenCount} cues · ${pointer}`
+  counter.textContent = `${adminState.cues.length} / ${tokenCount} Words · ${pointer}`
 }
 
 function mountAdminEditorUi() {
@@ -1131,7 +1238,7 @@ function getAdminTokenLabel(index: number) {
     if (tokenText) return tokenText
   }
 
-  if (!cue) return `Cue ${index + 1}`
+  if (!cue) return `Word ${index + 1}`
 
   return `Page ${cue.pageNumber} · Line ${cue.lineIndex + 1} · Word ${cue.wordIndex + 1}`
 }
@@ -1146,12 +1253,12 @@ function getAdminDraftStatusText(audioController?: AudioController | null) {
 
   if (adminState.sourceCues.length) {
     if (adminState.draftSavedAt) {
-      return `Published cues loaded for ${session.recording.title}. Last saved at ${adminDraftTimeFormat.format(adminState.draftSavedAt)}.`
+      return `Published timing loaded for ${session.recording.title}. Last saved at ${adminDraftTimeFormat.format(adminState.draftSavedAt)}.`
     }
-    return `Published cues loaded for ${session.recording.title}. Last saved time unavailable in cue JSON. Local edits autosave in this browser.`
+    return `Published timing loaded for ${session.recording.title}. Last saved time unavailable. Local edits autosave in this browser.`
   }
 
-  return `${session.recording.title} has no saved cues yet. Local edits autosave in this browser.`
+  return `${session.recording.title} has no saved timing yet. Local edits autosave in this browser.`
 }
 
 function syncAdminCueListViewport(list: HTMLElement, followCueIndex: number) {
@@ -1208,7 +1315,7 @@ function renderAdminCueList(audioController?: AudioController | null) {
 
   if (!session) {
     list.style.maxHeight = ''
-    emptyState.textContent = 'Select an aliyah to load cues.'
+    emptyState.textContent = 'Select an aliyah to load timing.'
     list.appendChild(emptyState)
     lastAdminRenderedCueCount = 0
     lastAdminFollowedCueIndex = -1
@@ -1217,7 +1324,7 @@ function renderAdminCueList(audioController?: AudioController | null) {
 
   if (!adminState.cues.length) {
     list.style.maxHeight = ''
-    emptyState.textContent = 'No cues saved yet. Start recording, then use the timing controls to refine.'
+    emptyState.textContent = 'No timing saved yet. Start recording, then refine it.'
     list.appendChild(emptyState)
     lastAdminRenderedCueCount = 0
     lastAdminFollowedCueIndex = -1
@@ -1301,7 +1408,7 @@ function syncAdminRecordButton() {
   const button = document.querySelector<HTMLButtonElement>(
     '[data-target-id="admin-record"]'
   )!
-  button.textContent = adminState.recording ? 'Stop Recording' : 'Record/Edit Cues'
+  button.textContent = adminState.recording ? 'Stop Recording' : 'Record/Edit Timing'
 }
 
 async function resumeAdminDraft(
@@ -1381,8 +1488,8 @@ function syncAdminPanelState(audioController?: AudioController | null) {
   const hasPreviousSavedCue = hasSelectedCue && selectedCueIndex > 0
 
   if (!hasSession) {
-    counter.textContent = '0 cues'
-    status.textContent = 'Select an aliyah and press play to start cue authoring.'
+    counter.textContent = '0 Words'
+    status.textContent = 'Select an aliyah and press play to start timing words.'
   } else if (adminState.recording) {
     const pointer =
       Math.max(
@@ -1393,10 +1500,10 @@ function syncAdminPanelState(audioController?: AudioController | null) {
           tokenCount
         )
       ) || 1
-    status.textContent = `${session!.recording.title}: recording live on token ${pointer}. Space or Right Arrow stamps the current cue; Left Arrow steps back.`
+    status.textContent = `${session!.recording.title}: recording Word ${pointer}. Space or Right Arrow saves the current time; Left Arrow steps back.`
     updateAdminCounter(tokenCount)
   } else if (adminState.cues.length === tokenCount && tokenCount > 0) {
-    status.textContent = `${session!.recording.title}: all ${tokenCount} tokens have cues. Select a saved cue to audition or nudge, or export when ready.`
+    status.textContent = `${session!.recording.title}: all ${tokenCount} Words are timed. Select one to play, adjust, or export.`
     updateAdminCounter(tokenCount)
   } else {
     const pointer =
@@ -1404,8 +1511,8 @@ function syncAdminPanelState(audioController?: AudioController | null) {
         ? Math.min(adminState.cues.length + 1, tokenCount)
         : tokenCount
     status.textContent = hasCues
-      ? `${session!.recording.title}: ${adminState.cues.length}/${tokenCount} cues saved. Resume from token ${pointer}, or select a saved cue to refine it.`
-      : `${session!.recording.title}: ready to author. Press Record/Edit Cues to begin.`
+      ? `${session!.recording.title}: ${adminState.cues.length}/${tokenCount} Words saved. Resume from Word ${pointer}, or select one to refine.`
+      : `${session!.recording.title}: ready to time. Press Record/Edit Timing to begin.`
     updateAdminCounter(tokenCount)
   }
 
@@ -1418,7 +1525,7 @@ function syncAdminPanelState(audioController?: AudioController | null) {
   if (resumeDraftButton) {
     resumeDraftButton.disabled = !canResumeDraft
     resumeDraftButton.textContent = canResumeDraft
-      ? `Resume Draft from cue ${adminState.cues.length}`
+      ? `Resume Draft from Word ${adminState.cues.length}`
       : 'Resume Draft'
   }
   if (prevSavedButton) prevSavedButton.disabled = !hasPreviousSavedCue
@@ -2087,6 +2194,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     .querySelector('[data-target-id="floating-replay"]')!
     .addEventListener('click', async () => {
       await replayAliyahFromStart(audioController, highlightController)
+      focusReaderSurface()
+    })
+  document
+    .querySelector('[data-target-id="toolbar-current-aliyah-audio"]')!
+    .addEventListener('click', async () => {
+      const button = getToolbarCurrentAliyahButton()
+      if (!button) return
+      await startPlaybackForToolbarCurrentAliyah(
+        button,
+        audioController,
+        highlightController
+      )
       focusReaderSurface()
     })
   document

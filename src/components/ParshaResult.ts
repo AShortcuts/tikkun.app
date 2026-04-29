@@ -1,5 +1,4 @@
 import { LeiningInstance } from '../calendar-model/model-types.ts'
-import { generateUrl } from '../view-model/navigation/url-parser.ts'
 import utils from './utils.ts'
 import renderLeiningTitle from './render-leining-title.ts'
 
