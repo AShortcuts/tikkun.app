@@ -296,24 +296,6 @@
     grid-template-columns: minmax(0, 1fr);
   } */
 
-  .line-gutter.mod-verses,
-  .location-indicator.mod-verses {
-    display: none;
-  }
-
-  .line-gutter.mod-aliyot {
-    padding-left: 0;
-  }
-
-  .tikkun-page {
-    --verse-column-width: 0.8ch;
-    --aliyah-column-width: 4.8ch;
-    --line-content-compensation-width: calc(var(--verse-column-width) + var(--aliyah-column-width));
-    --line-content-nudge: 0.65;
-  }
-}
-
-@media screen and (max-width: 450px) {
   .line-gutter.mod-aliyot,
   .location-indicator.mod-aliyot {
     display: none;
@@ -321,6 +303,19 @@
 
   .tikkun-page {
     --aliyah-column-width: 0ch;
+    --line-content-compensation-width: var(--verse-column-width);
+    --line-content-nudge: 0.65;
+  }
+}
+
+@media screen and (max-width: 450px) {
+  .line-gutter.mod-verses,
+  .location-indicator.mod-verses {
+    display: none;
+  }
+
+  .tikkun-page {
+    --verse-column-width: 0.8ch;
     --line-content-compensation-width: var(--verse-column-width);
   }
 }

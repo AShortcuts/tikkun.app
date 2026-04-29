@@ -176,7 +176,8 @@
 .floating-player-button,
 .toolbar-button,
 .parsha-title,
-.aliyah-audio-button {
+.aliyah-audio-button,
+.floating-player-mobile-dash {
   transition:
     background-color 0.15s ease,
     color 0.15s ease,
@@ -213,8 +214,13 @@
   text-align: center;
 }
 
+.floating-player-mobile-dash {
+  display: none;
+}
+
 .floating-player-button:disabled,
-.floating-player-button[aria-disabled='true'] {
+.floating-player-button[aria-disabled='true'],
+.floating-player-mobile-dash:disabled {
   opacity: 0.45;
   cursor: default;
   pointer-events: none;
@@ -1515,26 +1521,21 @@
     gap: 0.55rem;
   }
 
-  .floating-player::after,
-  .floating-player::before {
-    content: '';
+  .floating-player-mobile-dash {
     position: absolute;
     left: 0;
     top: 0;
-    height: 4px;
+    z-index: 1;
+    display: block;
+    height: 0.85rem;
     width: 100%;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
   }
 
-  .floating-player::after {
-    background: color-mix(in srgb, var(--text-color) 10%, transparent);
-  }
-
-  .floating-player::before {
-    background: linear-gradient(90deg, hsl(45, 100%, 80%), hsl(33, 100%, 55%));
-    transform: scaleX(var(--audio-progress-ratio));
-    transform-origin: left center;
-    transition: transform 0.1s linear;
-  }
+  /* The mobile dash remains a real tap target, but the top audio bar is hidden. */
 
   .floating-player-button {
     flex: 0 0 auto;

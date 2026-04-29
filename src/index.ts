@@ -456,6 +456,25 @@ function getAliyahProgressAnchors() {
     .sort((a, b) => a.position - b.position)
 }
 
+function getAliyahProgressAnchorForElement(element: HTMLElement) {
+  const line = element.closest<HTMLElement>('[data-line-index]')
+  if (!line) return null
+
+  const book = getBook()
+  const bookRect = book.getBoundingClientRect()
+  const lineRect = line.getBoundingClientRect()
+  const linePosition = book.scrollTop + (lineRect.top - bookRect.top)
+  const anchors = getAliyahProgressAnchors()
+  let current = anchors[0] ?? null
+
+  for (const anchor of anchors) {
+    if (anchor.position <= linePosition) current = anchor
+    else break
+  }
+
+  return current
+}
+
 async function ensureNextProgressAnchorLoaded(currentIndex: number) {
   if (!display) return
   if (progressAnchorLoadPromise) return progressAnchorLoadPromise
@@ -698,6 +717,9 @@ function updateFloatingPlayer(audioController: AudioController) {
   const playButton = document.querySelector<HTMLButtonElement>(
     '[data-target-id="floating-play"]'
   )!
+  const mobileDash = document.querySelector<HTMLButtonElement>(
+    '[data-target-id="floating-mobile-toggle"]'
+  )!
   const nextButton = document.querySelector<HTMLButtonElement>(
     '[data-target-id="floating-next"]'
   )!
@@ -714,10 +736,15 @@ function updateFloatingPlayer(audioController: AudioController) {
     setFloatingPlayerExpanded(false)
   }
   cornerControls?.classList.toggle('mod-raised', Boolean(activeSession))
-  setControlIcon(playButton, audioController.audio.paused ? 'play' : 'pause')
+  const isPaused = audioController.audio.paused
+  setControlIcon(playButton, isPaused ? 'play' : 'pause')
   for (const button of [prevButton, playButton, nextButton, replayButton]) {
     button.disabled = !activeSession
   }
+  mobileDash.disabled = !activeSession
+  mobileDash.classList.toggle('is-active', Boolean(activeSession && !isPaused))
+  mobileDash.title = isPaused ? 'Play' : 'Pause'
+  mobileDash.setAttribute('aria-label', mobileDash.title)
   downloadLink.setAttribute('aria-disabled', activeSession ? 'false' : 'true')
   downloadLink.tabIndex = activeSession ? 0 : -1
 
@@ -2110,21 +2137,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         seekToCue: Boolean(cue),
         focusRow: true,
       })
+      syncToolbarCurrentAliyahButton(
+        getAliyahProgressAnchorForElement(word),
+        audioController
+      )
       return
     }
 
+    let activeElement: HTMLElement | null = null
     if (cue) {
       cueNavigationIndex = audioController.session.cues.indexOf(cue)
       audioController.seek(cue.timeStart)
-      audioController.play()
-      highlightController.activateCue(cue, {
+      await audioController.play()
+      activeElement = await highlightController.activateCue(cue, {
         scroll: readerPreferences.autoScrollWithPlayback,
       })
     } else {
-      highlightController.activateTokenKey(tokenKey, {
+      activeElement = await highlightController.activateTokenKey(tokenKey, {
         scroll: readerPreferences.autoScrollWithPlayback,
       })
     }
+    syncToolbarCurrentAliyahButton(
+      getAliyahProgressAnchorForElement(activeElement ?? word),
+      audioController
+    )
   })
 
   audioController.on('playback-updated', () => {
@@ -2174,6 +2210,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document
     .querySelector('[data-target-id="floating-play"]')!
+    .addEventListener('click', async () => {
+      await audioController.togglePlayback()
+      focusReaderSurface()
+    })
+  document
+    .querySelector('[data-target-id="floating-mobile-toggle"]')!
     .addEventListener('click', async () => {
       await audioController.togglePlayback()
       focusReaderSurface()
