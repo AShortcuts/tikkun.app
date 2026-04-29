@@ -1,5 +1,6 @@
-/// <reference types="vite/client" />
 import type { RefWithScroll, ScrollName } from './ref.ts'
+import torahTOC from './data/tables-of-contents/torah.json' with { type: 'json' }
+import estherTOC from './data/tables-of-contents/esther.json' with { type: 'json' }
 
 type AppleSauce = {
   p: number
@@ -7,34 +8,14 @@ type AppleSauce = {
 }
 
 type TOC = Record<string, Record<string, Record<string, AppleSauce>>>
-type TOCLoader = () => Promise<TOC>
 
-const isNodeRuntime =
-  typeof process !== 'undefined' && Boolean(process.versions?.node)
-
-const tocLoaders: Record<string, TOCLoader> | null = isNodeRuntime
-  ? null
-  : import.meta.glob<TOC>('./data/tables-of-contents/*.json', {
-      import: 'default',
-    })
+const scrollTOCs: Record<ScrollName, TOC> = {
+  torah: torahTOC as TOC,
+  esther: estherTOC as TOC,
+}
 
 export async function loadScroll(name: ScrollName) {
-  const tocLoader = tocLoaders?.[`./data/tables-of-contents/${name}.json`]
-  if (tocLoader) return new ScrollResolver(name, await tocLoader())
-
-  // TODO(https://github.com/vitejs/vite/issues/18582): Delete this workaround.
-  let toc
-  if (import.meta.env?.MODE)
-    // Vite dynamic imports doesn't support the second parameter
-    toc = await import(
-      /* @vite-ignore */ `./data/tables-of-contents/${name}.json`
-    )
-  else
-    toc = await import(/* @vite-ignore */ `./data/tables-of-contents/${name}.json`, {
-      // Node.js requires the second parameter.
-      with: { type: 'json' },
-    })
-  return new ScrollResolver(name, toc.default)
+  return new ScrollResolver(name, scrollTOCs[name])
 }
 
 export class ScrollResolver {
