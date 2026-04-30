@@ -323,7 +323,7 @@
   background: color-mix(in srgb, hsl(48, 100%, 62%) 18%, transparent);
 }
 
-@media screen and (max-width: 500px) {
+@media screen and (max-width: 530px) {
   /* .line {
     grid-template-columns: minmax(0, 1fr);
   } */

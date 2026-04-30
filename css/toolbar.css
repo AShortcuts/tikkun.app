@@ -61,7 +61,7 @@
   background-color: var(--heavy-accent-color);
 }
 
-@media screen and (max-width: 500px) {
+@media screen and (max-width: 530px) {
   .toolbar-current-aliyah-label:not(.u-hidden) {
     display: inline;
   }
