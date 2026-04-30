@@ -115,11 +115,22 @@ ol {
   --button-border-radius: 8px;
   --reader-highlight-fill: #ffd700;
   --reader-highlight-fill-tint: rgba(255,255,0,0.15);
+  --reader-highlight-fill-alpha-percent: 15%;
+  --reader-highlight-fill-alpha-inverse-percent: 85%;
   --reader-highlight-outline-color: gold;
   --reader-highlight-outline-width: 2px;
-  --reader-highlight-radius: 4px;
+  --reader-highlight-border-radius: 10px;
+  --reader-highlight-radius: var(--reader-highlight-border-radius);
   --reader-highlight-glow: 3.5px;
   --reader-highlight-outline-offset: 3.5px;
+}
+
+body {
+  --reader-highlight-fill-surface: color-mix(
+    in srgb,
+    var(--paper-color, white) var(--reader-highlight-fill-alpha-inverse-percent),
+    var(--reader-highlight-fill) var(--reader-highlight-fill-alpha-percent)
+  );
 }
 
 html[data-reader-theme='light'] {
@@ -128,6 +139,11 @@ html[data-reader-theme='light'] {
 
 html[data-reader-theme='sepia'] body {
   --paper-color: oklch(90% 17% 90deg);
+  --reader-highlight-fill-surface: color-mix(
+    in srgb,
+    oklch(98.5% 0 0) var(--reader-highlight-fill-alpha-inverse-percent),
+    var(--reader-highlight-fill) var(--reader-highlight-fill-alpha-percent)
+  );
 }
 
 html[data-reader-theme='sepia'] {

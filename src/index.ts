@@ -16,8 +16,8 @@ import CueAnalyticsPage, { mountCueAnalyticsPage } from './components/CueAnalyti
 import { iconMarkup, type IconName } from './components/icons.ts'
 import {
   applyReaderPreferences,
-  defaultHighlightPreferences,
-  defaultReaderPreferences,
+  getDefaultHighlightPreferences,
+  getDefaultReaderPreferences,
   isThemeMode,
   loadReaderPreferences,
   mergeReaderPreferences,
@@ -54,7 +54,7 @@ const generator = new LeiningGenerator({
 })
 
 let display: ScrollDisplay
-let readerPreferences: ReaderPreferences = { ...defaultReaderPreferences }
+let readerPreferences: ReaderPreferences = getDefaultReaderPreferences()
 let lastReaderHash = '#/next'
 let progressFrame = 0
 let deferredProgressFrame = 0
@@ -1833,6 +1833,12 @@ function setupSettingsPane(audioController: AudioController) {
   const outlineWidthValue = document.querySelector<HTMLInputElement>(
     '[data-target-id="settings-outline-width-value"]'
   )!
+  const outlineOffset = document.querySelector<HTMLInputElement>(
+    '[data-target-id="settings-outline-offset"]'
+  )!
+  const outlineOffsetValue = document.querySelector<HTMLInputElement>(
+    '[data-target-id="settings-outline-offset-value"]'
+  )!
   const radius = document.querySelector<HTMLInputElement>(
     '[data-target-id="settings-radius"]'
   )!
@@ -1876,6 +1882,8 @@ function setupSettingsPane(audioController: AudioController) {
     outlineColor.value = readerPreferences.outlineColor
     outlineWidth.value = `${readerPreferences.outlineWidth}`
     outlineWidthValue.value = `${readerPreferences.outlineWidth}`
+    outlineOffset.value = `${readerPreferences.outlineOffset}`
+    outlineOffsetValue.value = `${readerPreferences.outlineOffset}`
     radius.value = `${readerPreferences.radius}`
     radiusValue.value = `${readerPreferences.radius}`
     glow.value = `${readerPreferences.glow}`
@@ -1955,6 +1963,11 @@ function setupSettingsPane(audioController: AudioController) {
     apply: (nextValue) => applyUpdates({ outlineWidth: nextValue }),
   })
   bindRangeValuePair({
+    range: outlineOffset,
+    value: outlineOffsetValue,
+    apply: (nextValue) => applyUpdates({ outlineOffset: nextValue }),
+  })
+  bindRangeValuePair({
     range: radius,
     value: radiusValue,
     apply: (nextValue) => applyUpdates({ radius: nextValue }),
@@ -1978,7 +1991,7 @@ function setupSettingsPane(audioController: AudioController) {
     })
   }
   resetHighlightButton.addEventListener('click', () =>
-    applyUpdates({ ...defaultHighlightPreferences })
+    applyUpdates(getDefaultHighlightPreferences())
   )
 
   document
