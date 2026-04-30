@@ -122,7 +122,7 @@ ol {
   --reader-highlight-border-radius: 10px;
   --reader-highlight-radius: var(--reader-highlight-border-radius);
   --reader-highlight-glow: 3.5px;
-  --reader-highlight-outline-offset: 3.5px;
+  --reader-highlight-outline-offset: 3px;
 }
 
 body {
