@@ -22,3 +22,19 @@
   min-height: 0;
   position: relative;
 }
+
+[data-recording-mode='true'] .app-toolbar,
+[data-recording-mode='true'] [data-test-id='annotations-toggle'],
+[data-recording-mode='true'] [data-target-id='settings-toggle'],
+[data-recording-mode='true'] [data-target-id='settings-pane'],
+[data-recording-mode='true'] [data-target-id='about-link'],
+[data-recording-mode='true'] [data-target-id='admin-panel'],
+[data-recording-mode='true'] [data-target-id='floating-player'],
+[data-recording-mode='true'] .reader-side,
+[data-recording-mode='true'] .reader-corner-controls {
+  display: none !important;
+}
+
+[data-recording-mode='true'] .reader-shell {
+  grid-template-columns: minmax(0, 1fr);
+}

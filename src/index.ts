@@ -30,6 +30,8 @@ import {
   getCuesForRecording,
   getCueSavedAtForRecording,
   listNarrators,
+  listRecordings,
+  parshaSlugForRun,
 } from './audio/library.ts'
 import { cueFileRelativePath, formatCueFileJson } from './audio/cue-file.ts'
 import { normalizeFirstCueStart } from './audio/normalize-first-cue.ts'
@@ -44,6 +46,11 @@ import {
   type AdminDraftPayload,
 } from './admin/draft-storage.ts'
 import hebrewNumeral from './hebrew-numeral.ts'
+import { findVideoForRecording } from './video/library.ts'
+import {
+  applyRecordingModePreferences,
+  getRecordingModeConfig,
+} from './recording-mode.ts'
 
 const { whenKey } = utils
 
@@ -52,6 +59,7 @@ const generator = new LeiningGenerator({
   includeModernHolidays: false,
   israel: false,
 })
+const recordingMode = getRecordingModeConfig()
 
 let display: ScrollDisplay
 let readerPreferences: ReaderPreferences = getDefaultReaderPreferences()
@@ -88,6 +96,30 @@ const adminState: {
   sourceCues: [],
   draftOrigin: 'none',
   draftSavedAt: null,
+}
+
+declare global {
+  interface Window {
+    tikkunRecorder?: {
+      ready: () => Promise<void>
+      loadAudio: (audioId: string) => Promise<ActiveAudioSession | null>
+      renderAt: (seconds: number) => Promise<{
+        audioId: string
+        currentTime: number
+        duration: number
+        activeTokenKey: string | null
+      } | null>
+      play: () => Promise<void>
+      pause: () => void
+      state: () => {
+        ready: boolean
+        audioId: string | null
+        duration: number
+        currentTime: number
+        activeTokenKey: string | null
+      }
+    }
+  }
 }
 
 const cloneCue = (cue: WordCue): WordCue => ({ ...cue })
@@ -708,6 +740,70 @@ async function loadAudioSessionForRecording(
   return session
 }
 
+function waitForAnimationFrame() {
+  return new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+}
+
+async function waitForCurrentAudioMetadata(audioController: AudioController) {
+  if (Number.isFinite(audioController.audio.duration) && audioController.audio.duration > 0) {
+    return
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      cleanup()
+      reject(new Error('Timed out waiting for audio metadata'))
+    }, 15000)
+    const cleanup = () => {
+      window.clearTimeout(timeout)
+      audioController.audio.removeEventListener('loadedmetadata', loaded)
+      audioController.audio.removeEventListener('error', failed)
+    }
+    const loaded = () => {
+      cleanup()
+      resolve()
+    }
+    const failed = () => {
+      cleanup()
+      reject(new Error('Audio metadata failed to load'))
+    }
+
+    audioController.audio.addEventListener('loadedmetadata', loaded, { once: true })
+    audioController.audio.addEventListener('error', failed, { once: true })
+  })
+}
+
+async function loadRecordingSessionByAudioId(
+  audioId: string,
+  audioController: AudioController,
+  highlightController: HighlightController
+) {
+  const recording = listRecordings().find((entry) => entry.id === audioId) ?? null
+  if (!recording) return null
+
+  await display?.rendered
+  await display?.scrolled
+  const run =
+    display?.viewModel.relevantRuns.find(
+      (candidate) => parshaSlugForRun(candidate) === recording.parshaSlug
+    ) ?? null
+  if (!run) return null
+
+  const session = await loadAudioSessionForRecording(
+    {
+      recording,
+      runId: run.id,
+      aliyahIndex: recording.aliyah,
+    },
+    audioController,
+    highlightController
+  )
+  if (!session) return null
+
+  await waitForCurrentAudioMetadata(audioController)
+  return session
+}
+
 function updateFloatingPlayer(audioController: AudioController) {
   const player = document.querySelector<HTMLElement>('[data-target-id="floating-player"]')!
   const cornerControls = document.querySelector<HTMLElement>('.reader-corner-controls')
@@ -729,7 +825,13 @@ function updateFloatingPlayer(audioController: AudioController) {
   const downloadLink = document.querySelector<HTMLAnchorElement>(
     '[data-target-id="floating-download"]'
   )!
+  const videoDownloadLink = document.querySelector<HTMLAnchorElement>(
+    '[data-target-id="floating-video-download"]'
+  )!
   const activeSession = audioController.session
+  const activeVideo = activeSession
+    ? findVideoForRecording(activeSession.recording.id)
+    : null
 
   player.classList.toggle('u-hidden', !activeSession)
   if (!activeSession) {
@@ -747,6 +849,9 @@ function updateFloatingPlayer(audioController: AudioController) {
   mobileDash.setAttribute('aria-label', mobileDash.title)
   downloadLink.setAttribute('aria-disabled', activeSession ? 'false' : 'true')
   downloadLink.tabIndex = activeSession ? 0 : -1
+  videoDownloadLink.classList.toggle('u-hidden', !activeVideo)
+  videoDownloadLink.setAttribute('aria-disabled', activeVideo ? 'false' : 'true')
+  videoDownloadLink.tabIndex = activeVideo ? 0 : -1
 
   if (activeSession) {
     downloadLink.href = activeSession.recording.downloadSrc
@@ -754,6 +859,14 @@ function updateFloatingPlayer(audioController: AudioController) {
   } else {
     downloadLink.href = '#'
     downloadLink.removeAttribute('download')
+  }
+
+  if (activeVideo) {
+    videoDownloadLink.href = activeVideo.downloadSrc
+    videoDownloadLink.download = `${activeVideo.audioId}_${activeVideo.quality}.mp4`
+  } else {
+    videoDownloadLink.href = '#'
+    videoDownloadLink.removeAttribute('download')
   }
 
   updateFloatingPlayerAudioProgress(audioController)
@@ -2058,7 +2171,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     '[data-target-id="reader-audio"]'
   )!
 
-  readerPreferences = loadReaderPreferences()
+  if (recordingMode.enabled) {
+    document.documentElement.dataset.recordingMode = 'true'
+  }
+
+  readerPreferences = recordingMode.enabled
+    ? applyRecordingModePreferences(loadReaderPreferences())
+    : loadReaderPreferences()
   applyReaderPreferences(readerPreferences)
 
   const audioController = new AudioController(audioElement)
@@ -2076,6 +2195,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setControlIcon(document.querySelector('[data-target-id="floating-next"]'), 'next')
   setControlIcon(document.querySelector('[data-target-id="floating-replay"]'), 'replay')
   setControlIcon(document.querySelector('[data-target-id="floating-download"]'), 'download')
+  setControlIcon(document.querySelector('[data-target-id="floating-video-download"]'), 'download')
   setControlIcon(document.querySelector('[data-target-id="settings-toggle"]'), 'settings2')
   updateFloatingPlayer(audioController)
 
@@ -2482,6 +2602,43 @@ document.addEventListener('DOMContentLoaded', async () => {
       stepPlayback(-1, audioController, highlightController)
     }
   })
+
+  if (recordingMode.enabled) {
+    window.tikkunRecorder = {
+      ready: async () => {
+        await display?.rendered
+        await display?.scrolled
+      },
+      loadAudio: (audioId: string) =>
+        loadRecordingSessionByAudioId(audioId, audioController, highlightController),
+      renderAt: async (seconds: number) => {
+        const session = audioController.session
+        if (!session) return null
+
+        audioController.seek(seconds)
+        await syncCurrentSessionHighlight(audioController, highlightController)
+        await waitForAnimationFrame()
+
+        return {
+          audioId: session.recording.id,
+          currentTime: audioController.audio.currentTime,
+          duration: audioController.audio.duration,
+          activeTokenKey: highlightController.getActiveTokenKey(),
+        }
+      },
+      play: async () => {
+        await audioController.play()
+      },
+      pause: () => audioController.pause(),
+      state: () => ({
+        ready: Boolean(display),
+        audioId: audioController.session?.recording.id ?? null,
+        duration: audioController.audio.duration,
+        currentTime: audioController.audio.currentTime,
+        activeTokenKey: highlightController.getActiveTokenKey(),
+      }),
+    }
+  }
 
   setupSettingsPane(audioController)
   restoreAdminAccessState(audioController)

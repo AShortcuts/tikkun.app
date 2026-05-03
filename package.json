@@ -19,6 +19,10 @@
   },
   "scripts": {
     "audio:sync": "node scripts/generate-audio-manifest.mjs",
+    "video:manifest": "node --experimental-transform-types scripts/generate-video-manifest.mjs",
+    "video:record": "node --experimental-transform-types scripts/record-aliyah-videos.mjs",
+    "video:calibrate": "node --experimental-transform-types scripts/record-aliyah-videos.mjs calibrate",
+    "video:cleanup": "node --experimental-transform-types scripts/record-aliyah-videos.mjs cleanup",
     "test": "ava",
     "vitest": "vitest",
     "test:watch": "npm test -- --watch",

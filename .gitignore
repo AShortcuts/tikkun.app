@@ -4,3 +4,8 @@ cypress/screenshots
 download
 dist
 .tsimp
+koofr-video-links.local.json
+video-render-metadata.local.json
+video-render-reports.local.json
+tikkun-video-output/
+*.mp4

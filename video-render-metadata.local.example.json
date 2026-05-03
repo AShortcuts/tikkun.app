@@ -1,0 +1,29 @@
+[
+  {
+    "audioId": "bereshit-1",
+    "narratorId": "yoni-davidov",
+    "narratorInitials": "yd",
+    "parshaSlug": "bereshit",
+    "aliyah": 1,
+    "title": "Bereshit Aliyah 1",
+    "fileName": "bereshit-1_yd_1080p60_a1b2c3d4.mp4",
+    "width": 1920,
+    "height": 1080,
+    "fps": 60,
+    "durationSeconds": 10,
+    "frameCount": 600,
+    "bytes": 10000000,
+    "quality": "1080p60",
+    "generatedAt": "2026-05-03T12:00:00.000Z",
+    "generatedFrom": {
+      "audioHash": "audio-hash",
+      "cueHash": "cue-hash",
+      "appBuildHash": "app-hash"
+    },
+    "validation": {
+      "passed": true,
+      "errors": [],
+      "warnings": []
+    }
+  }
+]
