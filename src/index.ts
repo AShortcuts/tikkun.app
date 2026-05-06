@@ -49,7 +49,9 @@ import hebrewNumeral from './hebrew-numeral.ts'
 import { findVideoForRecording } from './video/library.ts'
 import {
   applyRecordingModePreferences,
+  calculateCaptureRect,
   getRecordingModeConfig,
+  recordingModeAliyahLabel,
 } from './recording-mode.ts'
 
 const { whenKey } = utils
@@ -117,6 +119,13 @@ declare global {
         duration: number
         currentTime: number
         activeTokenKey: string | null
+        scrollTop: number
+      }
+      captureRect: (margin?: number) => {
+        x: number
+        y: number
+        width: number
+        height: number
       }
     }
   }
@@ -463,6 +472,19 @@ function getAliyahMarkerElements() {
 function setControlIcon(element: HTMLElement | null, icon: IconName) {
   if (!element) return
   element.innerHTML = iconMarkup(icon)
+}
+
+function applyRecordingModePageLabels(root: ParentNode) {
+  if (!recordingMode.enabled) return
+
+  root.querySelectorAll<HTMLElement>('[data-aliyah-marker="true"]').forEach((marker) => {
+    const label = marker.querySelector<HTMLElement>('.aliyah-label-text')
+    if (!label) return
+    const aliyahIndex = marker.dataset.aliyahIndex
+      ? Number(marker.dataset.aliyahIndex)
+      : null
+    label.textContent = recordingModeAliyahLabel(label.textContent ?? '', aliyahIndex)
+  })
 }
 
 function getAliyahProgressAnchors() {
@@ -2234,7 +2256,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     rememberLastScrollPositionDebounced()
   })
 
-  book.addEventListener('page-rendered', () => {
+  book.addEventListener('page-rendered', (event) => {
+    const renderedPage = event instanceof CustomEvent ? event.detail?.node : null
+    applyRecordingModePageLabels(renderedPage instanceof Element ? renderedPage : book)
     refreshReaderChrome(audioController)
     scheduleDeferredProgressRefresh()
     syncCurrentSessionHighlight(audioController, highlightController)
@@ -2636,7 +2660,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         duration: audioController.audio.duration,
         currentTime: audioController.audio.currentTime,
         activeTokenKey: highlightController.getActiveTokenKey(),
+        scrollTop: getBook().scrollTop,
       }),
+      captureRect: (margin = 240) => {
+        const table = getBook().querySelector<HTMLElement>('.tikkun-page table')
+        const rect = table?.getBoundingClientRect()
+        return calculateCaptureRect({
+          contentRect: rect
+            ? {
+                x: rect.x,
+                y: rect.y,
+                width: rect.width,
+                height: rect.height,
+              }
+            : null,
+          viewport: {
+            width: window.innerWidth,
+            height: window.innerHeight,
+          },
+          margin,
+        })
+      },
     }
   }
 

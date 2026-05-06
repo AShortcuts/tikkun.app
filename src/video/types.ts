@@ -25,6 +25,14 @@ export interface VideoRenderMetadata {
   frameCount: number
   bytes?: number
   quality: string
+  renderMode?: string
+  capturedFrameCount?: number
+  crop?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
   generatedAt: string
   generatedFrom: VideoGeneratedFrom
   validation: VideoValidationResult
@@ -53,6 +61,14 @@ export interface AliyahVideo {
   frameCount: number
   bytes?: number
   quality: string
+  renderMode?: string
+  capturedFrameCount?: number
+  crop?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
   generatedAt: string
   generatedFrom: VideoGeneratedFrom
 }

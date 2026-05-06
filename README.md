@@ -44,7 +44,7 @@ Only run this when you want to refresh the source recordings on the machine that
 npm run audio:sync
 ```
 
-That command copies supported source audio files such as `.m4a` and `.mp3` into `static/audio/yoni-davidov/` and regenerates `src/data/audio-manifest.generated.ts`.
+That command copies supported source audio files such as `.m4a` and `.mp3` into narrator-specific folders under `static/audio/` and regenerates `src/data/audio-manifest.generated.ts`.
 
 The generated manifest is deterministic and grouped by parsha so diffs stay reviewable in git.
 
@@ -65,7 +65,7 @@ Recommended first run:
 TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=bereshit-2 --concurrency=1
 ```
 
-The recorder starts Vite locally, launches Chromium through Chrome DevTools Protocol, renders at a fixed high-density viewport, captures 30fps frames by default, encodes with FFmpeg, validates the MP4, writes compact local metadata, and deletes temporary frames.
+The recorder starts Vite locally, launches Chromium through Chrome DevTools Protocol, renders at a fixed high-density viewport, captures cue-driven keyframes by default, encodes a 30fps MP4 with FFmpeg, validates the output, writes compact local metadata, and deletes temporary frames. Recording mode hides settings, about, admin controls, annotation toggles, floating UI, and scrollbars; the video is cropped around the reading table with a generous default margin so unused side whitespace is reduced without crowding the text.
 
 Use a custom Chrome executable if the default Chrome path is not correct:
 
@@ -101,6 +101,18 @@ Use 60fps only when you want a smoother premium export and can tolerate longer r
 
 ```sh
 TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=bereshit-2 --concurrency=1 --fps=60
+```
+
+Use full-frame capture only as a fallback when cue-keyframe output looks wrong:
+
+```sh
+TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=bereshit-2 --concurrency=1 --render-mode=full-frames
+```
+
+Disable reading-surface cropping if you need to inspect the full fixed viewport:
+
+```sh
+TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=bereshit-2 --concurrency=1 --no-crop
 ```
 
 If Vite is already running elsewhere, point the recorder at that server:

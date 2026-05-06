@@ -6,6 +6,11 @@ import { execFile, spawn } from 'node:child_process'
 import { Buffer } from 'node:buffer'
 import process from 'node:process'
 import { audioRecordings } from '../src/data/audio-manifest.generated.ts'
+import {
+  buildCueCaptureTimeline,
+  createConcatEntries,
+  renderConcatFile,
+} from '../src/video/cue-keyframes.ts'
 
 const repoRoot = fileURLToPath(new URL('../', import.meta.url))
 const defaultOutputRoot = '/Users/adambh/Koofr/Tikkun Videos'
@@ -27,6 +32,14 @@ const defaults = {
   workRoot: process.env.TIKKUN_VIDEO_WORK_ROOT || defaultWorkRoot,
   baseUrl: 'http://127.0.0.1:4177',
   concurrency: 1,
+  renderMode: 'cue-keyframes',
+  preCueMs: 80,
+  postCueMs: 120,
+  minGapMs: 30,
+  scrollBurstMs: 400,
+  scrollSampleMs: 80,
+  crop: true,
+  cropMargin: 240,
 }
 
 function parseArgs(argv) {
@@ -52,8 +65,12 @@ function parseArgs(argv) {
       options.includeOutput = true
     } else if (arg === '--external-server') {
       options.externalServer = true
+    } else if (arg === '--no-crop') {
+      options.crop = false
     } else if (arg.startsWith('--ids=')) {
       options.ids = arg.slice('--ids='.length).split(',').filter(Boolean)
+    } else if (arg.startsWith('--render-mode=')) {
+      options.renderMode = arg.slice('--render-mode='.length)
     } else if (arg.startsWith('--concurrency=')) {
       options.concurrency = Number(arg.slice('--concurrency='.length))
     } else if (arg.startsWith('--max-concurrency=')) {
@@ -77,6 +94,16 @@ function parseArgs(argv) {
       options.crf = Number(arg.slice('--crf='.length))
     } else if (arg.startsWith('--preset=')) {
       options.preset = arg.slice('--preset='.length)
+    } else if (arg.startsWith('--pre-cue-ms=')) {
+      options.preCueMs = Number(arg.slice('--pre-cue-ms='.length))
+    } else if (arg.startsWith('--post-cue-ms=')) {
+      options.postCueMs = Number(arg.slice('--post-cue-ms='.length))
+    } else if (arg.startsWith('--scroll-burst-ms=')) {
+      options.scrollBurstMs = Number(arg.slice('--scroll-burst-ms='.length))
+    } else if (arg.startsWith('--scroll-sample-ms=')) {
+      options.scrollSampleMs = Number(arg.slice('--scroll-sample-ms='.length))
+    } else if (arg.startsWith('--crop-margin=')) {
+      options.cropMargin = Number(arg.slice('--crop-margin='.length))
     }
   }
 
@@ -85,6 +112,9 @@ function parseArgs(argv) {
   }
   if (!Number.isInteger(options.fps) || options.fps < 24) {
     throw new Error('--fps must be an integer of at least 24')
+  }
+  if (!['cue-keyframes', 'full-frames'].includes(options.renderMode)) {
+    throw new Error('--render-mode must be cue-keyframes or full-frames')
   }
 
   return options
@@ -371,11 +401,22 @@ async function waitUntil(check, label, timeoutMs) {
   throw new Error(`Timed out waiting for ${label}`)
 }
 
-async function captureFrame(client, filePath) {
-  const result = await client.send('Page.captureScreenshot', {
+async function captureFrame(client, filePath, clip = null) {
+  const params = {
     format: 'png',
     captureBeyondViewport: false,
-  })
+  }
+  if (clip) {
+    params.clip = {
+      x: clip.x,
+      y: clip.y,
+      width: clip.width,
+      height: clip.height,
+      scale: 1,
+    }
+  }
+
+  const result = await client.send('Page.captureScreenshot', params)
   await writeFile(filePath, Buffer.from(result.data, 'base64'))
 }
 
@@ -431,6 +472,48 @@ async function encodeVideo({ frameDir, audioPath, outputPath, options }) {
   })
 }
 
+async function encodeConcatVideo({ concatPath, audioPath, outputPath, options }) {
+  const args = [
+    '-y',
+    '-f',
+    'concat',
+    '-safe',
+    '0',
+    '-i',
+    concatPath,
+    '-i',
+    audioPath,
+    '-vf',
+    `fps=${options.fps}`,
+    '-c:v',
+    'libx264',
+    '-preset',
+    options.preset,
+    '-crf',
+    String(options.crf),
+    '-pix_fmt',
+    'yuv420p',
+    '-c:a',
+    'aac',
+    '-b:a',
+    '192k',
+    '-shortest',
+    outputPath,
+  ]
+
+  return new Promise((resolve, reject) => {
+    const ffmpeg = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] })
+    let stderr = ''
+    ffmpeg.stderr.on('data', (chunk) => {
+      stderr += chunk.toString()
+    })
+    ffmpeg.on('close', (code) => {
+      if (code === 0) resolve(stderr)
+      else reject(new Error(`ffmpeg exited ${code}: ${stderr}`))
+    })
+  })
+}
+
 async function ffprobe(outputPath) {
   const stdout = await execFileText('ffprobe', [
     '-v',
@@ -454,6 +537,8 @@ async function validateOutput({
   outputPath,
   expectedDuration,
   expectedFrameCount,
+  expectedWidth,
+  expectedHeight,
   options,
   ffmpegLog,
 }) {
@@ -468,8 +553,8 @@ async function validateOutput({
 
   if (!videoStream) errors.push('missing video stream')
   if (!audioStream) errors.push('missing audio stream')
-  if (videoStream && Number(videoStream.width) !== options.width) errors.push('width mismatch')
-  if (videoStream && Number(videoStream.height) !== options.height) errors.push('height mismatch')
+  if (videoStream && Number(videoStream.width) !== expectedWidth) errors.push('width mismatch')
+  if (videoStream && Number(videoStream.height) !== expectedHeight) errors.push('height mismatch')
   if (Math.abs(actualFps - options.fps) > 0.01) errors.push(`fps mismatch: ${actualFps}`)
   if (Number.isFinite(actualFrames) && Math.abs(actualFrames - expectedFrameCount) > 1) {
     errors.push(`frame count mismatch: ${actualFrames} !== ${expectedFrameCount}`)
@@ -477,9 +562,10 @@ async function validateOutput({
   if (Math.abs(duration - expectedDuration) > 0.35) {
     errors.push(`duration mismatch: ${duration} !== ${expectedDuration}`)
   }
-  if (/drop|dup|non-monotonous|error/i.test(ffmpegLog)) {
-    warnings.push('ffmpeg log contains timing/drop/error wording; inspect report')
-  }
+  if (/\bdrop=\s*[1-9]\d*/i.test(ffmpegLog)) errors.push('ffmpeg reported dropped frames')
+  if (/\bdup=\s*[1-9]\d*/i.test(ffmpegLog)) errors.push('ffmpeg reported duplicated frames')
+  if (/non-monotonous/i.test(ffmpegLog)) errors.push('ffmpeg reported non-monotonous timestamps')
+  if (/\berror\b/i.test(ffmpegLog)) errors.push('ffmpeg log contains error wording')
 
   await execFileText('ffmpeg', ['-v', 'error', '-i', outputPath, '-f', 'null', '-'])
 
@@ -514,6 +600,130 @@ function outputFileName({ recording, quality, generatedFrom }) {
     .digest('hex')
     .slice(0, 8)
   return `${recording.id}_${narratorInitials(recording.narratorId)}_${quality}_${contentHash}.mp4`
+}
+
+async function renderFrameAt({ client, seconds, filePath, options }) {
+  const state = await evaluate(client, `window.tikkunRecorder.renderAt(${seconds})`)
+  const crop = options.crop
+    ? await evaluate(client, `window.tikkunRecorder.captureRect(${options.cropMargin})`)
+    : null
+  await captureFrame(client, filePath, crop)
+  return { state, crop }
+}
+
+async function captureFullFrameSequence({
+  client,
+  frameDir,
+  duration,
+  options,
+}) {
+  const frameCount = Math.ceil(duration * options.fps)
+  const frameLatencies = []
+  let lastCrop = null
+
+  for (let index = 0; index < frameCount; index += 1) {
+    const frameStartedAt = performance.now()
+    const seconds = index / options.fps
+    const result = await renderFrameAt({
+      client,
+      seconds,
+      filePath: path.join(frameDir, `frame-${String(index).padStart(6, '0')}.png`),
+      options,
+    })
+    lastCrop = result.crop
+    frameLatencies.push(Number((performance.now() - frameStartedAt).toFixed(2)))
+  }
+
+  const frameErrors = await validateFrameSequence(frameDir, frameCount)
+  if (frameErrors.length) throw new Error(frameErrors.join('; '))
+
+  return {
+    ffmpegInput: { kind: 'frames', frameDir },
+    frameCount,
+    capturedFrameCount: frameCount,
+    frameLatencies,
+    crop: lastCrop,
+    outputWidth: lastCrop?.width ?? options.width,
+    outputHeight: lastCrop?.height ?? options.height,
+  }
+}
+
+function insertSortedUnique(queue, value, minGapSeconds) {
+  if (queue.some((time) => Math.abs(time - value) < minGapSeconds)) return
+  queue.push(value)
+  queue.sort((left, right) => left - right)
+}
+
+async function captureCueKeyframes({
+  client,
+  frameDir,
+  cues,
+  duration,
+  options,
+}) {
+  const timeline = buildCueCaptureTimeline({
+    cues,
+    durationSeconds: duration,
+    preCueMs: options.preCueMs,
+    postCueMs: options.postCueMs,
+    minGapMs: options.minGapMs,
+  })
+  const queue = [...timeline.captureTimes]
+  const capturedTimes = []
+  const frameLatencies = []
+  const minGapSeconds = options.minGapMs / 1000
+  let previousScrollTop = null
+  let lastCrop = null
+
+  while (queue.length) {
+    const seconds = queue.shift()
+    if (seconds === undefined) break
+    if (capturedTimes.some((time) => Math.abs(time - seconds) < minGapSeconds)) {
+      continue
+    }
+
+    const frameStartedAt = performance.now()
+    const frameIndex = capturedTimes.length
+    const result = await renderFrameAt({
+      client,
+      seconds,
+      filePath: path.join(frameDir, `frame-${String(frameIndex).padStart(6, '0')}.png`),
+      options,
+    })
+    capturedTimes.push(seconds)
+    lastCrop = result.crop
+    frameLatencies.push(Number((performance.now() - frameStartedAt).toFixed(2)))
+
+    const scrollTop = Number(result.state?.scrollTop ?? 0)
+    if (previousScrollTop !== null && Math.abs(scrollTop - previousScrollTop) > 1) {
+      for (
+        let offsetMs = options.scrollSampleMs;
+        offsetMs <= options.scrollBurstMs;
+        offsetMs += options.scrollSampleMs
+      ) {
+        const burstTime = Number(Math.min(duration, seconds + offsetMs / 1000).toFixed(3))
+        insertSortedUnique(queue, burstTime, minGapSeconds)
+      }
+    }
+    previousScrollTop = scrollTop
+  }
+
+  const entries = createConcatEntries({
+    captureTimes: capturedTimes,
+    frameName: (index) => path.join(frameDir, `frame-${String(index).padStart(6, '0')}.png`),
+  })
+  const concatPath = path.join(frameDir, 'frames.concat.txt')
+  await writeFile(concatPath, renderConcatFile(entries))
+
+  return {
+    ffmpegInput: { kind: 'concat', concatPath },
+    frameCount: Math.ceil(duration * options.fps),
+    capturedFrameCount: capturedTimes.length,
+    frameLatencies,
+    crop: lastCrop,
+    outputWidth: lastCrop?.width ?? options.width,
+    outputHeight: lastCrop?.height ?? options.height,
+  }
 }
 
 async function recordOne(recording, options) {
@@ -559,32 +769,37 @@ async function recordOne(recording, options) {
       throw new Error(`invalid audio duration: ${state.duration}`)
     }
 
-    const frameCount = Math.ceil(duration * options.fps)
-    const frameLatencies = []
-    for (let index = 0; index < frameCount; index += 1) {
-      const frameStartedAt = performance.now()
-      const seconds = index / options.fps
-      await evaluate(client, `window.tikkunRecorder.renderAt(${seconds})`)
-      await captureFrame(
-        client,
-        path.join(frameDir, `frame-${String(index).padStart(6, '0')}.png`)
-      )
-      frameLatencies.push(Number((performance.now() - frameStartedAt).toFixed(2)))
-    }
-
-    const frameErrors = await validateFrameSequence(frameDir, frameCount)
-    if (frameErrors.length) throw new Error(frameErrors.join('; '))
-
+    await evaluate(client, `window.tikkunRecorder.renderAt(${session.cues[0].timeStart})`)
     const sample = await activeWordSample(client)
     if (!sample?.text || sample.width <= 0 || sample.height <= 0) {
       throw new Error('active Hebrew word sample was not visible')
     }
 
-    const ffmpegLog = await encodeVideo({ frameDir, audioPath, outputPath, options })
+    const capture =
+      options.renderMode === 'full-frames'
+        ? await captureFullFrameSequence({ client, frameDir, duration, options })
+        : await captureCueKeyframes({ client, frameDir, cues: session.cues, duration, options })
+
+    const ffmpegLog =
+      capture.ffmpegInput.kind === 'concat'
+        ? await encodeConcatVideo({
+            concatPath: capture.ffmpegInput.concatPath,
+            audioPath,
+            outputPath,
+            options,
+          })
+        : await encodeVideo({
+            frameDir: capture.ffmpegInput.frameDir,
+            audioPath,
+            outputPath,
+            options,
+          })
     const validation = await validateOutput({
       outputPath,
       expectedDuration: duration,
-      expectedFrameCount: frameCount,
+      expectedFrameCount: capture.frameCount,
+      expectedWidth: capture.outputWidth,
+      expectedHeight: capture.outputHeight,
       options,
       ffmpegLog,
     })
@@ -598,11 +813,14 @@ async function recordOne(recording, options) {
       aliyah: recording.aliyah,
       title: recording.title,
       fileName,
-      width: options.width,
-      height: options.height,
+      width: capture.outputWidth,
+      height: capture.outputHeight,
       fps: options.fps,
       durationSeconds: Number(duration.toFixed(3)),
-      frameCount,
+      frameCount: capture.frameCount,
+      renderMode: options.renderMode,
+      capturedFrameCount: capture.capturedFrameCount,
+      crop: capture.crop ?? undefined,
       bytes: outputStat.size,
       quality,
       generatedAt: new Date().toISOString(),
@@ -617,9 +835,15 @@ async function recordOne(recording, options) {
         audioId: recording.id,
         ok: validation.passed,
         outputPath,
+        renderMode: options.renderMode,
         renderSeconds: Number(((Date.now() - startedAt) / 1000).toFixed(2)),
-        averageFrameLatencyMs: average(frameLatencies),
-        maxFrameLatencyMs: Math.max(...frameLatencies),
+        frameCount: capture.frameCount,
+        capturedFrameCount: capture.capturedFrameCount,
+        averageFrameLatencyMs: average(capture.frameLatencies),
+        maxFrameLatencyMs: capture.frameLatencies.length
+          ? Math.max(...capture.frameLatencies)
+          : 0,
+        crop: capture.crop ?? undefined,
         outputBytes: outputStat.size,
         validation,
       },

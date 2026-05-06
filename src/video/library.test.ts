@@ -40,6 +40,14 @@ const metadata = (
   frameCount: 300,
   bytes: 10_000_000,
   quality: '1080p30',
+  renderMode: 'cue-keyframes',
+  capturedFrameCount: 42,
+  crop: {
+    x: 268,
+    y: 0,
+    width: 1384,
+    height: 1080,
+  },
   generatedAt: '2026-05-03T12:00:00.000Z',
   generatedFrom: {
     audioHash: 'audio-hash',
@@ -117,6 +125,8 @@ test('video links merge only validated metadata with registered Koofr links', (t
     videoSrc: 'https://koofr.eu/links/video',
     downloadSrc: 'https://koofr.eu/links/download',
     fps: 30,
+    renderMode: 'cue-keyframes',
+    capturedFrameCount: 42,
   })
 })
 

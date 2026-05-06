@@ -4,6 +4,7 @@
   --aliyah-indicator-max-width: var(--aliyah-column-width);
   --line-content-nudge: 0.4;
   --line-content-compensation-width: calc(var(--verse-column-width) + var(--aliyah-column-width));
+  --line-content-shift: 0;
 }
 
 .tikkun-page {
@@ -56,6 +57,7 @@
 @media screen and (max-width: 700px) {
   .tikkun-page {
     --line-content-nudge: 1;
+    --line-content-shift: calc(var(--line-content-compensation-width) * 0.2);
   }
 }
 
@@ -105,6 +107,7 @@
   min-width: 0;
   width: 100%;
   padding-left: calc(var(--line-content-compensation-width) * var(--line-content-nudge));
+  transform: translateX(var(--line-content-shift));
 }
 
 .line.mod-petucha .line-content {
@@ -337,6 +340,7 @@
     --aliyah-column-width: 0ch;
     --line-content-compensation-width: var(--verse-column-width);
     --line-content-nudge: 0.65;
+    --line-content-shift: 0;
   }
 }
 

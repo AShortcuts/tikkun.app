@@ -1,17 +1,25 @@
 [
   {
     "audioId": "bereshit-1",
-    "narratorId": "yoni-davidov",
-    "narratorInitials": "yd",
+    "narratorId": "baal-koreh",
+    "narratorInitials": "bk",
     "parshaSlug": "bereshit",
     "aliyah": 1,
     "title": "Bereshit Aliyah 1",
-    "fileName": "bereshit-1_yd_1080p30_a1b2c3d4.mp4",
+    "fileName": "bereshit-1_bk_1080p30_a1b2c3d4.mp4",
     "width": 1920,
     "height": 1080,
     "fps": 30,
     "durationSeconds": 10,
     "frameCount": 300,
+    "renderMode": "cue-keyframes",
+    "capturedFrameCount": 42,
+    "crop": {
+      "x": 268,
+      "y": 0,
+      "width": 1384,
+      "height": 1080
+    },
     "bytes": 10000000,
     "quality": "1080p30",
     "generatedAt": "2026-05-03T12:00:00.000Z",
