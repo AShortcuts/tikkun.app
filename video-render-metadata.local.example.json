@@ -13,7 +13,7 @@
     "durationSeconds": 10,
     "frameCount": 300,
     "renderMode": "cue-keyframes",
-    "capturedFrameCount": 42,
+    "capturedFrameCount": 120,
     "crop": {
       "x": 268,
       "y": 0,

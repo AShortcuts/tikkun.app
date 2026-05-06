@@ -71,6 +71,28 @@ test('capture rect applies margin and stays inside the viewport', (t) => {
   )
 })
 
+test('capture rect can crop tightly around narrow centered content', (t) => {
+  t.deepEqual(
+    calculateCaptureRect({
+      contentRect: { x: 710, y: 160, width: 500, height: 500 },
+      viewport: { width: 1920, height: 1080 },
+      margin: 48,
+    }),
+    { x: 662, y: 0, width: 596, height: 1080 }
+  )
+})
+
+test('capture rect uses full viewport when content is offscreen', (t) => {
+  t.deepEqual(
+    calculateCaptureRect({
+      contentRect: { x: 300, y: -1400, width: 900, height: 800 },
+      viewport: { width: 1280, height: 720 },
+      margin: 48,
+    }),
+    { x: 0, y: 0, width: 1280, height: 720 }
+  )
+})
+
 test('capture rect uses full viewport when content is unavailable', (t) => {
   t.deepEqual(
     calculateCaptureRect({

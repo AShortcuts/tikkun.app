@@ -1,7 +1,11 @@
 .reader-shell {
+  --reader-side-rail-width: 80px;
   height: 100%;
   display: grid;
-  grid-template-columns: 80px minmax(0, 1fr) 32px;
+  grid-template-columns:
+    var(--reader-side-rail-width)
+    minmax(0, 1fr)
+    var(--reader-side-rail-width);
   min-height: 0;
 }
 
@@ -228,7 +232,7 @@
 
 .reader-progress {
   position: sticky;
-  top: 96px;
+  top: 112px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1566,5 +1570,17 @@
     .reader-corner-controls.mod-raised {
       bottom: calc(11.4rem + env(safe-area-inset-bottom, 0px));
     }
+  }
+}
+
+@media screen and (max-width: 1200px) {
+  .reader-shell {
+    --reader-side-rail-width: 48px;
+  }
+}
+
+@media screen and (max-width: 900px) {
+  .reader-shell {
+    --reader-side-rail-width: 24px;
   }
 }

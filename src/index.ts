@@ -111,6 +111,13 @@ declare global {
         duration: number
         activeTokenKey: string | null
       } | null>
+      settleAt: (seconds: number) => Promise<{
+        audioId: string
+        currentTime: number
+        duration: number
+        activeTokenKey: string | null
+        scrollTop: number
+      } | null>
       play: () => Promise<void>
       pause: () => void
       state: () => {
@@ -636,7 +643,7 @@ function syncToolbarCurrentAliyahButton(
   )
 
   button.classList.toggle('u-hidden', !available)
-  label.classList.toggle('u-hidden', !available)
+  label.classList.toggle('u-hidden', !current)
   label.textContent = current?.label ?? '—'
   button.disabled = !available
   button.dataset.runId = current?.run?.id ?? ''
@@ -2650,6 +2657,43 @@ document.addEventListener('DOMContentLoaded', async () => {
           activeTokenKey: highlightController.getActiveTokenKey(),
         }
       },
+      settleAt: async (seconds: number) => {
+        const session = audioController.session
+        if (!session) return null
+
+        await window.tikkunRecorder?.renderAt(seconds)
+        let stableFrames = 0
+        let previousScrollTop = getBook().scrollTop
+
+        for (let frame = 0; frame < 90; frame += 1) {
+          await waitForAnimationFrame()
+          const scrollTop = getBook().scrollTop
+          const activeWord = getBook().querySelector<HTMLElement>('.word.is-active-word')
+          const activeRect = activeWord?.getBoundingClientRect()
+          const highlightVisible = Boolean(
+            activeRect &&
+              activeRect.top >= 0 &&
+              activeRect.bottom <= window.innerHeight &&
+              activeRect.left >= 0 &&
+              activeRect.right <= window.innerWidth
+          )
+
+          stableFrames =
+            Math.abs(scrollTop - previousScrollTop) < 0.5 && highlightVisible
+              ? stableFrames + 1
+              : 0
+          if (stableFrames >= 6) break
+          previousScrollTop = scrollTop
+        }
+
+        return {
+          audioId: session.recording.id,
+          currentTime: audioController.audio.currentTime,
+          duration: audioController.audio.duration,
+          activeTokenKey: highlightController.getActiveTokenKey(),
+          scrollTop: getBook().scrollTop,
+        }
+      },
       play: async () => {
         await audioController.play()
       },
@@ -2663,8 +2707,56 @@ document.addEventListener('DOMContentLoaded', async () => {
         scrollTop: getBook().scrollTop,
       }),
       captureRect: (margin = 240) => {
-        const table = getBook().querySelector<HTMLElement>('.tikkun-page table')
-        const rect = table?.getBoundingClientRect()
+        const book = getBook()
+        const isVisible = (rect: DOMRect) =>
+          rect.left < window.innerWidth &&
+          rect.right > 0 &&
+          rect.top < window.innerHeight &&
+          rect.bottom > 0
+        const unionRects = (rects: DOMRect[]) => {
+          if (!rects.length) return null
+          const left = Math.min(...rects.map((rect) => rect.left))
+          const top = Math.min(...rects.map((rect) => rect.top))
+          const right = Math.max(...rects.map((rect) => rect.right))
+          const bottom = Math.max(...rects.map((rect) => rect.bottom))
+          return {
+            x: left,
+            y: top,
+            width: right - left,
+            height: bottom - top,
+          }
+        }
+        const pageReadingRect = (page: HTMLElement | null) =>
+          unionRects(
+            page
+              ? [...page.querySelectorAll<HTMLElement>('.line')]
+                  .map((line) => line.getBoundingClientRect())
+                  .filter(isVisible)
+              : []
+          )
+        const activeWord = book.querySelector<HTMLElement>('.word.is-active-word')
+        const activePage = activeWord?.closest<HTMLElement>('.tikkun-page')
+        const activeTable = activePage?.querySelector<HTMLElement>('table') ?? null
+        const activeTableRect = activeTable?.getBoundingClientRect()
+        const visibleTables = [...book.querySelectorAll<HTMLElement>('.tikkun-page table')]
+          .map((table) => ({ table, rect: table.getBoundingClientRect() }))
+          .filter(({ rect }) => isVisible(rect))
+          .sort((left, right) => {
+            const leftVisibleHeight =
+              Math.min(left.rect.bottom, window.innerHeight) - Math.max(left.rect.top, 0)
+            const rightVisibleHeight =
+              Math.min(right.rect.bottom, window.innerHeight) - Math.max(right.rect.top, 0)
+            return rightVisibleHeight - leftVisibleHeight
+          })
+        const table =
+          activeTable && activeTableRect && isVisible(activeTableRect)
+            ? activeTable
+            : visibleTables[0]?.table ?? activeTable
+        const visiblePage = table?.closest<HTMLElement>('.tikkun-page') ?? null
+        const rect =
+          pageReadingRect(activePage ?? null) ??
+          pageReadingRect(visiblePage) ??
+          table?.getBoundingClientRect()
         return calculateCaptureRect({
           contentRect: rect
             ? {

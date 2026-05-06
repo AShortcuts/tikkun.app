@@ -65,7 +65,44 @@ Recommended first run:
 TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=bereshit-2 --concurrency=1
 ```
 
-The recorder starts Vite locally, launches Chromium through Chrome DevTools Protocol, renders at a fixed high-density viewport, captures cue-driven keyframes by default, encodes a 30fps MP4 with FFmpeg, validates the output, writes compact local metadata, and deletes temporary frames. Recording mode hides settings, about, admin controls, annotation toggles, floating UI, and scrollbars; the video is cropped around the reading table with a generous default margin so unused side whitespace is reduced without crowding the text.
+The recorder starts Vite locally, launches Chromium through Chrome DevTools Protocol, renders at a fixed high-density viewport, waits for the first highlighted word to scroll into view, captures cue-keyed frame windows at 30fps by default, holds stable sections with an FFmpeg concat file, muxes the original audio, validates the output, writes compact local metadata, and deletes temporary frames. Recording mode hides settings, about, admin controls, annotation toggles, floating UI, and scrollbars; the video is cropped around the reading table with balanced side cropping so unused side whitespace is reduced without crowding the text.
+
+The default renderer is `cue-keyframes`. It captures exactly one cue frame at each cue start, holds that frame through the stable part of the cue, and captures a short 30fps burst beginning just before the cue ends so highlight and scroll transitions are preserved without full every-frame capture. If that ever needs diagnosis, force the slower every-frame renderer:
+
+```sh
+TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=bereshit-2 --concurrency=1 --render-mode=deterministic-frames
+```
+
+Tune transition bursts only if the highlight or scroll transition needs more or less coverage. `--cue-burst-pre-end-ms` controls how soon before `cue.timeEnd` the burst starts; `--cue-burst-max-ms` caps how long the burst can run before falling back to a held frame:
+
+```sh
+TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=bereshit-2 --concurrency=1 --cue-burst-pre-end-ms=120 --cue-burst-max-ms=500
+```
+
+Video generation flags:
+
+| Flag | Default | Use |
+| --- | --- | --- |
+| `--ids=bereshit-1,bereshit-2` | all available recordings | Limits generation to specific `audioId` values. |
+| `--concurrency=1` | `1` | Runs multiple recordings in parallel after calibration proves it is safe. |
+| `--render-mode=cue-keyframes` | `cue-keyframes` | Uses the fast cue-keyframe/FFmpeg concat renderer. Use `deterministic-frames` for slower every-frame capture. |
+| `--fps=30` | `30` | Sets output FPS. Use `60` only for smoother premium exports. |
+| `--width=1920` | `1920` | Sets the logical browser viewport width. |
+| `--height=1080` | `1080` | Sets the logical browser viewport height. |
+| `--scale=4` | `4` | Sets browser `deviceScaleFactor` for sharper Hebrew text capture. |
+| `--cue-burst-pre-end-ms=120` | `120` | Starts the transition burst this many milliseconds before `cue.timeEnd`. |
+| `--cue-burst-max-ms=500` | `500` | Caps each transition burst before the renderer returns to holding frames. |
+| `--crop-margin=96` | `96` | Adds horizontal margin around the reading table before centered cropping. |
+| `--no-crop` | cropping on | Disables reading-surface cropping and records the full viewport. |
+| `--crf=18` | `18` | Controls H.264 compression quality; lower is larger/better, higher is smaller/lower quality. |
+| `--preset=slow` | `slow` | Sets the FFmpeg x264 preset. Use slower presets for final batches if the time is acceptable. |
+| `--output-root=/path` | `TIKKUN_VIDEO_OUTPUT_ROOT` or Koofr default | Sets the final MP4 output folder. |
+| `--work-root=/path` | `/private/tmp/tikkun-video-render` | Sets the disposable temp frame/work folder. |
+| `--external-server` | off | Reuses an already running app server instead of starting Vite. |
+| `--base-url=http://127.0.0.1:5173` | `http://127.0.0.1:4177` | Points the recorder at a specific local app server and implies `--external-server`. |
+| `--keep-frames` | off | Keeps temporary PNG frames for debugging. |
+| `--max-concurrency=3` | `3` | Sets the highest concurrency level tested by `npm run video:calibrate`. |
+| `--include-output` | off | Used with `npm run video:cleanup` to delete local MP4 outputs as well as temp files. |
 
 Use a custom Chrome executable if the default Chrome path is not correct:
 
@@ -101,12 +138,6 @@ Use 60fps only when you want a smoother premium export and can tolerate longer r
 
 ```sh
 TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=bereshit-2 --concurrency=1 --fps=60
-```
-
-Use full-frame capture only as a fallback when cue-keyframe output looks wrong:
-
-```sh
-TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=bereshit-2 --concurrency=1 --render-mode=full-frames
 ```
 
 Disable reading-surface cropping if you need to inspect the full fixed viewport:

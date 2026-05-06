@@ -48,7 +48,7 @@
 
 .toolbar-current-aliyah-label {
   display: none;
-  color: var(--light-text-color);
+  color: hsl(206, 100%, 49%);
   font-size: 0.85rem;
   white-space: nowrap;
 }

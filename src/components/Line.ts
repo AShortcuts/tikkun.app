@@ -71,7 +71,7 @@ const renderLabelBadge = (
   aliyah: LeiningAliyah | undefined
 ) => `
   <span
-    class="aliyah-badge"
+    class="aliyah-badge${aliyah?.index ? ' mod-with-audio' : ''}"
     ${aliyah?.index ? `data-aliyah-marker="true"` : ''}
     ${runId ? `data-run-id="${runId}"` : ''}
     ${aliyah?.index ? `data-aliyah-index="${aliyah.index}"` : ''}

@@ -1,10 +1,11 @@
 .tikkun-page {
   --verse-column-width: 4ch;
   --aliyah-column-width: 8.5ch;
+  --aliyah-gutter-gap: 0.85ch;
   --aliyah-indicator-max-width: var(--aliyah-column-width);
-  --line-content-nudge: 0.4;
-  --line-content-compensation-width: calc(var(--verse-column-width) + var(--aliyah-column-width));
-  --line-content-shift: 0;
+  --line-side-balance-width: calc(
+    var(--verse-column-width) + var(--aliyah-column-width)
+  );
 }
 
 .tikkun-page {
@@ -19,45 +20,24 @@
   transition: transform var(--pull-transform);
 }
 
-@media screen and (max-width: 1050px) {
+@media screen and (max-width: 1150px) {
   .tikkun-page {
     --aliyah-column-width: 9.2ch;
     font-size: 1.65rem;
   }
 }
 
-@media screen and (max-width: 950px) {
+@media screen and (max-width: 1050px) {
   .tikkun-page {
     --aliyah-column-width: 7.6ch;
     font-size: 1.4rem;
   }
 }
 
-@media screen and (max-width: 800px) {
+@media screen and (max-width: 850px) {
   .tikkun-page {
     --aliyah-column-width: 7ch;
     font-size: 1.15rem;
-  }
-
-  .aliyah-badge {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.2rem;
-  }
-
-  .aliyah-label-text {
-    grid-row: 1;
-  }
-
-  .aliyah-audio-button {
-    grid-row: 2;
-    justify-self: start;
-  }
-}
-
-@media screen and (max-width: 700px) {
-  .tikkun-page {
-    --line-content-nudge: 1;
-    --line-content-shift: calc(var(--line-content-compensation-width) * 0.2);
   }
 }
 
@@ -94,20 +74,21 @@
   line-height: 100%;
   display: grid;
   grid-template-columns:
-    minmax(0, 1fr) var(--verse-column-width) minmax(0, var(--aliyah-column-width));
+    var(--line-side-balance-width)
+    minmax(0, 1fr)
+    var(--verse-column-width)
+    minmax(0, var(--aliyah-column-width));
   align-items: start;
 }
 
 .line-content {
   direction: rtl;
-  grid-column: 1;
+  grid-column: 2;
   text-align: justify;
   display: flex;
   justify-content: space-between;
   min-width: 0;
   width: 100%;
-  padding-left: calc(var(--line-content-compensation-width) * var(--line-content-nudge));
-  transform: translateX(var(--line-content-shift));
 }
 
 .line.mod-petucha .line-content {
@@ -120,18 +101,18 @@
 }
 
 .line-gutter.mod-verses {
-  grid-column: 2;
+  grid-column: 3;
   display: flex;
   justify-content: flex-end;
 }
 
 .line-gutter.mod-aliyot {
-  grid-column: 3;
+  grid-column: 4;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 0.45rem;
-  padding-left: 0.85ch;
+  padding-left: var(--aliyah-gutter-gap);
 }
 
 .column {
@@ -264,11 +245,13 @@
 }
 
 .aliyah-badge {
-  display: inline-grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  gap: 0.35rem;
+  display: inline-block;
+  position: relative;
   max-width: 100%;
+}
+
+.aliyah-badge.mod-with-audio {
+  padding-left: 2.1rem;
 }
 
 .aliyah-label-text {
@@ -299,6 +282,25 @@
   flex: none;
 }
 
+.aliyah-badge .aliyah-audio-button {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+}
+
+@media screen and (max-width: 850px) {
+  .aliyah-badge.mod-with-audio {
+    padding-left: 0;
+  }
+
+  .aliyah-badge .aliyah-audio-button {
+    top: calc(100% + 0.22rem);
+    left: 0;
+    transform: none;
+  }
+}
+
 .ui-icon {
   width: 1rem;
   height: 1rem;
@@ -327,9 +329,6 @@
 }
 
 @media screen and (max-width: 530px) {
-  /* .line {
-    grid-template-columns: minmax(0, 1fr);
-  } */
 
   .line-gutter.mod-aliyot,
   .location-indicator.mod-aliyot {
@@ -338,13 +337,11 @@
 
   .tikkun-page {
     --aliyah-column-width: 0ch;
-    --line-content-compensation-width: var(--verse-column-width);
-    --line-content-nudge: 0.65;
-    --line-content-shift: 0;
+    --aliyah-gutter-gap: 0ch;
   }
 }
 
-@media screen and (max-width: 450px) {
+@media screen and (max-width: 430px) {
 
   .line-gutter.mod-verses,
   .location-indicator.mod-verses {
@@ -352,13 +349,6 @@
   }
 
   .tikkun-page {
-    --verse-column-width: 0.8ch;
-    --line-content-compensation-width: var(--verse-column-width);
-  }
-}
-
-@media screen and (max-width: 450px) {
-  .tikkun-page {
-    --line-content-nudge: 0.2;
+    --verse-column-width: 0ch;
   }
 }

@@ -41,7 +41,7 @@ const metadata = (
   bytes: 10_000_000,
   quality: '1080p30',
   renderMode: 'cue-keyframes',
-  capturedFrameCount: 42,
+  capturedFrameCount: 120,
   crop: {
     x: 268,
     y: 0,
@@ -126,7 +126,7 @@ test('video links merge only validated metadata with registered Koofr links', (t
     downloadSrc: 'https://koofr.eu/links/download',
     fps: 30,
     renderMode: 'cue-keyframes',
-    capturedFrameCount: 42,
+    capturedFrameCount: 120,
   })
 })
 

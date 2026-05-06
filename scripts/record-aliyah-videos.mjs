@@ -7,10 +7,10 @@ import { Buffer } from 'node:buffer'
 import process from 'node:process'
 import { audioRecordings } from '../src/data/audio-manifest.generated.ts'
 import {
-  buildCueCaptureTimeline,
-  createConcatEntries,
-  renderConcatFile,
-} from '../src/video/cue-keyframes.ts'
+  buildCueFramePlan,
+  createCueConcatEntries,
+  renderCueConcatFile,
+} from '../src/video/cue-frame-plan.ts'
 
 const repoRoot = fileURLToPath(new URL('../', import.meta.url))
 const defaultOutputRoot = '/Users/adambh/Koofr/Tikkun Videos'
@@ -24,7 +24,7 @@ let cuePayloadsByAudioId = null
 const defaults = {
   width: 1920,
   height: 1080,
-  deviceScaleFactor: 2,
+  deviceScaleFactor: 4,
   fps: 30,
   crf: 18,
   preset: 'slow',
@@ -33,13 +33,10 @@ const defaults = {
   baseUrl: 'http://127.0.0.1:4177',
   concurrency: 1,
   renderMode: 'cue-keyframes',
-  preCueMs: 80,
-  postCueMs: 120,
-  minGapMs: 30,
-  scrollBurstMs: 400,
-  scrollSampleMs: 80,
+  cueBurstPreEndMs: 120,
+  cueBurstMaxMs: 500,
   crop: true,
-  cropMargin: 240,
+  cropMargin: 96,
 }
 
 function parseArgs(argv) {
@@ -94,14 +91,10 @@ function parseArgs(argv) {
       options.crf = Number(arg.slice('--crf='.length))
     } else if (arg.startsWith('--preset=')) {
       options.preset = arg.slice('--preset='.length)
-    } else if (arg.startsWith('--pre-cue-ms=')) {
-      options.preCueMs = Number(arg.slice('--pre-cue-ms='.length))
-    } else if (arg.startsWith('--post-cue-ms=')) {
-      options.postCueMs = Number(arg.slice('--post-cue-ms='.length))
-    } else if (arg.startsWith('--scroll-burst-ms=')) {
-      options.scrollBurstMs = Number(arg.slice('--scroll-burst-ms='.length))
-    } else if (arg.startsWith('--scroll-sample-ms=')) {
-      options.scrollSampleMs = Number(arg.slice('--scroll-sample-ms='.length))
+    } else if (arg.startsWith('--cue-burst-pre-end-ms=')) {
+      options.cueBurstPreEndMs = Number(arg.slice('--cue-burst-pre-end-ms='.length))
+    } else if (arg.startsWith('--cue-burst-max-ms=')) {
+      options.cueBurstMaxMs = Number(arg.slice('--cue-burst-max-ms='.length))
     } else if (arg.startsWith('--crop-margin=')) {
       options.cropMargin = Number(arg.slice('--crop-margin='.length))
     }
@@ -113,10 +106,15 @@ function parseArgs(argv) {
   if (!Number.isInteger(options.fps) || options.fps < 24) {
     throw new Error('--fps must be an integer of at least 24')
   }
-  if (!['cue-keyframes', 'full-frames'].includes(options.renderMode)) {
-    throw new Error('--render-mode must be cue-keyframes or full-frames')
+  if (!['cue-keyframes', 'deterministic-frames'].includes(options.renderMode)) {
+    throw new Error('--render-mode must be cue-keyframes or deterministic-frames')
   }
-
+  if (!Number.isFinite(options.cueBurstPreEndMs) || options.cueBurstPreEndMs < 0) {
+    throw new Error('--cue-burst-pre-end-ms must be a non-negative number')
+  }
+  if (!Number.isFinite(options.cueBurstMaxMs) || options.cueBurstMaxMs < 0) {
+    throw new Error('--cue-burst-max-ms must be a non-negative number')
+  }
   return options
 }
 
@@ -208,6 +206,18 @@ async function getCuesForRecording(recording) {
 
 async function writeJsonFile(filePath, value) {
   await writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`)
+}
+
+async function pathExists(filePath) {
+  try {
+    await stat(filePath)
+    return true
+  } catch (error) {
+    if (error && typeof error === 'object' && error.code === 'ENOENT') {
+      return false
+    }
+    throw error
+  }
 }
 
 function chromeExecutable() {
@@ -485,6 +495,8 @@ async function encodeConcatVideo({ concatPath, audioPath, outputPath, options })
     audioPath,
     '-vf',
     `fps=${options.fps}`,
+    '-fps_mode',
+    'cfr',
     '-c:v',
     'libx264',
     '-preset',
@@ -563,7 +575,12 @@ async function validateOutput({
     errors.push(`duration mismatch: ${duration} !== ${expectedDuration}`)
   }
   if (/\bdrop=\s*[1-9]\d*/i.test(ffmpegLog)) errors.push('ffmpeg reported dropped frames')
-  if (/\bdup=\s*[1-9]\d*/i.test(ffmpegLog)) errors.push('ffmpeg reported duplicated frames')
+  if (
+    options.renderMode !== 'cue-keyframes' &&
+    /\bdup=\s*[1-9]\d*/i.test(ffmpegLog)
+  ) {
+    errors.push('ffmpeg reported duplicated frames')
+  }
   if (/non-monotonous/i.test(ffmpegLog)) errors.push('ffmpeg reported non-monotonous timestamps')
   if (/\berror\b/i.test(ffmpegLog)) errors.push('ffmpeg log contains error wording')
 
@@ -600,6 +617,57 @@ function outputFileName({ recording, quality, generatedFrom }) {
     .digest('hex')
     .slice(0, 8)
   return `${recording.id}_${narratorInitials(recording.narratorId)}_${quality}_${contentHash}.mp4`
+}
+
+async function nextAvailableOutput({ outputRoot, fileName }) {
+  const extension = path.extname(fileName)
+  const stem = fileName.slice(0, -extension.length)
+
+  for (let index = 1; index < 1000; index += 1) {
+    const candidateName = index === 1 ? fileName : `${stem}-${index}${extension}`
+    const candidatePath = path.join(outputRoot, candidateName)
+    if (!(await pathExists(candidatePath))) {
+      return {
+        fileName: candidateName,
+        outputPath: candidatePath,
+      }
+    }
+  }
+
+  throw new Error(`Could not find an available output filename for ${fileName}`)
+}
+
+function waitForProcessExit(child, timeoutMs) {
+  if (!child || child.exitCode !== null || child.signalCode !== null) {
+    return Promise.resolve()
+  }
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(resolve, timeoutMs)
+    child.once('exit', () => {
+      clearTimeout(timeout)
+      resolve()
+    })
+  })
+}
+
+async function stopChrome(chrome) {
+  if (!chrome) return
+  chrome.kill('SIGTERM')
+  await waitForProcessExit(chrome, 3000)
+  if (chrome.exitCode === null && chrome.signalCode === null) {
+    chrome.kill('SIGKILL')
+    await waitForProcessExit(chrome, 1000)
+  }
+}
+
+async function removeWorkDir(dirPath) {
+  await rm(dirPath, {
+    recursive: true,
+    force: true,
+    maxRetries: 8,
+    retryDelay: 250,
+  })
 }
 
 async function renderFrameAt({ client, seconds, filePath, options }) {
@@ -648,12 +716,6 @@ async function captureFullFrameSequence({
   }
 }
 
-function insertSortedUnique(queue, value, minGapSeconds) {
-  if (queue.some((time) => Math.abs(time - value) < minGapSeconds)) return
-  queue.push(value)
-  queue.sort((left, right) => left - right)
-}
-
 async function captureCueKeyframes({
   client,
   frameDir,
@@ -661,64 +723,44 @@ async function captureCueKeyframes({
   duration,
   options,
 }) {
-  const timeline = buildCueCaptureTimeline({
+  const plan = buildCueFramePlan({
     cues,
     durationSeconds: duration,
-    preCueMs: options.preCueMs,
-    postCueMs: options.postCueMs,
-    minGapMs: options.minGapMs,
+    fps: options.fps,
+    burstPreEndMs: options.cueBurstPreEndMs,
+    burstMaxMs: options.cueBurstMaxMs,
   })
-  const queue = [...timeline.captureTimes]
-  const capturedTimes = []
   const frameLatencies = []
-  const minGapSeconds = options.minGapMs / 1000
-  let previousScrollTop = null
   let lastCrop = null
 
-  while (queue.length) {
-    const seconds = queue.shift()
-    if (seconds === undefined) break
-    if (capturedTimes.some((time) => Math.abs(time - seconds) < minGapSeconds)) {
-      continue
-    }
-
+  for (let index = 0; index < plan.entries.length; index += 1) {
     const frameStartedAt = performance.now()
-    const frameIndex = capturedTimes.length
+    const entry = plan.entries[index]
     const result = await renderFrameAt({
       client,
-      seconds,
-      filePath: path.join(frameDir, `frame-${String(frameIndex).padStart(6, '0')}.png`),
+      seconds: entry.seconds,
+      filePath: path.join(frameDir, `frame-${String(index).padStart(6, '0')}.png`),
       options,
     })
-    capturedTimes.push(seconds)
     lastCrop = result.crop
     frameLatencies.push(Number((performance.now() - frameStartedAt).toFixed(2)))
-
-    const scrollTop = Number(result.state?.scrollTop ?? 0)
-    if (previousScrollTop !== null && Math.abs(scrollTop - previousScrollTop) > 1) {
-      for (
-        let offsetMs = options.scrollSampleMs;
-        offsetMs <= options.scrollBurstMs;
-        offsetMs += options.scrollSampleMs
-      ) {
-        const burstTime = Number(Math.min(duration, seconds + offsetMs / 1000).toFixed(3))
-        insertSortedUnique(queue, burstTime, minGapSeconds)
-      }
-    }
-    previousScrollTop = scrollTop
   }
 
-  const entries = createConcatEntries({
-    captureTimes: capturedTimes,
+  const frameErrors = await validateFrameSequence(frameDir, plan.entries.length)
+  if (frameErrors.length) throw new Error(frameErrors.join('; '))
+
+  const concatEntries = createCueConcatEntries({
+    plan,
+    fps: options.fps,
     frameName: (index) => path.join(frameDir, `frame-${String(index).padStart(6, '0')}.png`),
   })
   const concatPath = path.join(frameDir, 'frames.concat.txt')
-  await writeFile(concatPath, renderConcatFile(entries))
+  await writeFile(concatPath, renderCueConcatFile(concatEntries))
 
   return {
     ffmpegInput: { kind: 'concat', concatPath },
-    frameCount: Math.ceil(duration * options.fps),
-    capturedFrameCount: capturedTimes.length,
+    frameCount: plan.frameCount,
+    capturedFrameCount: plan.entries.length,
     frameLatencies,
     crop: lastCrop,
     outputWidth: lastCrop?.width ?? options.width,
@@ -746,8 +788,11 @@ async function recordOne(recording, options) {
       cueHash: sha256Json(cues),
       appBuildHash: await appBuildHash(),
     }
-    const fileName = outputFileName({ recording, quality, generatedFrom })
-    const outputPath = path.join(options.outputRoot, fileName)
+    const output = await nextAvailableOutput({
+      outputRoot: options.outputRoot,
+      fileName: outputFileName({ recording, quality, generatedFrom }),
+    })
+    const { fileName, outputPath } = output
     const launched = await startChrome(options, userDataDir)
     chrome = launched.chrome
     client = await createPage(launched.browserWsUrl)
@@ -769,14 +814,14 @@ async function recordOne(recording, options) {
       throw new Error(`invalid audio duration: ${state.duration}`)
     }
 
-    await evaluate(client, `window.tikkunRecorder.renderAt(${session.cues[0].timeStart})`)
+    await evaluate(client, `window.tikkunRecorder.settleAt(${session.cues[0].timeStart})`)
     const sample = await activeWordSample(client)
     if (!sample?.text || sample.width <= 0 || sample.height <= 0) {
       throw new Error('active Hebrew word sample was not visible')
     }
 
     const capture =
-      options.renderMode === 'full-frames'
+      options.renderMode === 'deterministic-frames'
         ? await captureFullFrameSequence({ client, frameDir, duration, options })
         : await captureCueKeyframes({ client, frameDir, cues: session.cues, duration, options })
 
@@ -861,10 +906,10 @@ async function recordOne(recording, options) {
     }
   } finally {
     client?.close()
-    chrome?.kill('SIGTERM')
+    await stopChrome(chrome)
     if (!options.keepFrames) {
-      await rm(frameDir, { recursive: true, force: true })
-      await rm(userDataDir, { recursive: true, force: true })
+      await removeWorkDir(frameDir)
+      await removeWorkDir(userDataDir)
     }
   }
 }
@@ -970,13 +1015,13 @@ async function calibrate(options) {
 }
 
 async function cleanup(options) {
-  await rm(options.workRoot, { recursive: true, force: true })
+  await removeWorkDir(options.workRoot)
   if (options.includeOutput) {
     const entries = await readdir(options.outputRoot).catch(() => [])
     await Promise.all(
       entries
         .filter((entry) => entry.endsWith('.mp4'))
-        .map((entry) => rm(path.join(options.outputRoot, entry), { force: true }))
+        .map((entry) => removeWorkDir(path.join(options.outputRoot, entry)))
     )
   }
 }
