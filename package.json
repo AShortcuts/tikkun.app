@@ -23,6 +23,7 @@
     "video:record": "node --experimental-transform-types scripts/record-aliyah-videos.mjs",
     "video:calibrate": "node --experimental-transform-types scripts/record-aliyah-videos.mjs calibrate",
     "video:cleanup": "node --experimental-transform-types scripts/record-aliyah-videos.mjs cleanup",
+    "video:shut-down": "pkill -f record-aliyah-videos || true; pkill -f \"Brave Browser\" || true; pkill -f vite || true; npm run video:cleanup",
     "test": "ava",
     "vitest": "vitest",
     "test:watch": "npm test -- --watch",

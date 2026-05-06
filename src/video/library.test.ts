@@ -32,14 +32,14 @@ const metadata = (
   parshaSlug: 'bereshit',
   aliyah: 1,
   title: 'Bereshit Aliyah 1',
-  fileName: 'bereshit-1_yd_1080p60_a1b2c3d4.mp4',
+  fileName: 'bereshit-1_yd_1080p30_a1b2c3d4.mp4',
   width: 1920,
   height: 1080,
-  fps: 60,
+  fps: 30,
   durationSeconds: 10,
-  frameCount: 600,
+  frameCount: 300,
   bytes: 10_000_000,
-  quality: '1080p60',
+  quality: '1080p30',
   generatedAt: '2026-05-03T12:00:00.000Z',
   generatedFrom: {
     audioHash: 'audio-hash',
@@ -116,7 +116,7 @@ test('video links merge only validated metadata with registered Koofr links', (t
     audioId: 'bereshit-1',
     videoSrc: 'https://koofr.eu/links/video',
     downloadSrc: 'https://koofr.eu/links/download',
-    fps: 60,
+    fps: 30,
   })
 })
 

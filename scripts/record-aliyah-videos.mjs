@@ -20,7 +20,7 @@ const defaults = {
   width: 1920,
   height: 1080,
   deviceScaleFactor: 2,
-  fps: 60,
+  fps: 30,
   crf: 18,
   preset: 'slow',
   outputRoot: process.env.TIKKUN_VIDEO_OUTPUT_ROOT || defaultOutputRoot,
@@ -83,8 +83,8 @@ function parseArgs(argv) {
   if (!Number.isInteger(options.concurrency) || options.concurrency < 1) {
     throw new Error('--concurrency must be a positive integer')
   }
-  if (!Number.isInteger(options.fps) || options.fps < 60) {
-    throw new Error('--fps must be an integer of at least 60')
+  if (!Number.isInteger(options.fps) || options.fps < 24) {
+    throw new Error('--fps must be an integer of at least 24')
   }
 
   return options

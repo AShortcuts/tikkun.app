@@ -20,7 +20,7 @@ export interface VideoRenderMetadata {
   fileName: string
   width: number
   height: number
-  fps: 60
+  fps: number
   durationSeconds: number
   frameCount: number
   bytes?: number
@@ -48,7 +48,7 @@ export interface AliyahVideo {
   downloadSrc: string
   width: number
   height: number
-  fps: 60
+  fps: number
   durationSeconds: number
   frameCount: number
   bytes?: number
