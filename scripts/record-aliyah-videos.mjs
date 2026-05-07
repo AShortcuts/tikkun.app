@@ -699,12 +699,14 @@ async function renderFrameAt({
   settleMs = 0,
   highlightAnimationMs,
   settleBeforeAnimation = false,
+  scrollTransition = false,
+  transitionWaitMs = 0,
 }) {
   const state =
     highlightAnimationMs !== undefined
       ? await evaluate(
           client,
-          `window.tikkunRecorder.renderHighlightAnimationAt(${seconds}, ${highlightAnimationMs}, ${settleBeforeAnimation})`
+          `window.tikkunRecorder.renderHighlightAnimationAt(${seconds}, ${highlightAnimationMs}, ${settleBeforeAnimation}, ${scrollTransition}, ${transitionWaitMs})`
         )
       : settleMs > 0
         ? await evaluate(client, `window.tikkunRecorder.settleAt(${seconds})`)
@@ -781,6 +783,8 @@ async function captureCueKeyframes({
       settleMs: entry.settleMs ?? 0,
       highlightAnimationMs: entry.highlightAnimationMs,
       settleBeforeAnimation: entry.settleBeforeAnimation ?? false,
+      scrollTransition: entry.scrollTransition ?? false,
+      transitionWaitMs: entry.transitionWaitMs ?? 0,
     })
     lastCrop = result.crop
     frameLatencies.push(Number((performance.now() - frameStartedAt).toFixed(2)))

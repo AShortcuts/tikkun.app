@@ -6,6 +6,8 @@ export interface CueFramePlanEntry {
   settleMs?: number
   highlightAnimationMs?: number
   settleBeforeAnimation?: boolean
+  scrollTransition?: boolean
+  transitionWaitMs?: number
 }
 
 export interface CueFramePlan {
@@ -28,6 +30,10 @@ const frameAtOrAfter = (seconds: number, fps: number) =>
 const frameAtOrBefore = (seconds: number, fps: number) =>
   Math.floor(seconds * fps + 1e-6)
 const cueStartSettleMs = 100
+const lineScrollTransitionMs = 240
+
+const isSameRenderedLine = (left: WordCue, right: WordCue) =>
+  left.pageNumber === right.pageNumber && left.lineIndex === right.lineIndex
 
 export function buildCueFramePlan({
   cues,
@@ -49,6 +55,8 @@ export function buildCueFramePlan({
   const frameSettleMs = new Map<number, number>()
   const frameHighlightAnimationMs = new Map<number, number>()
   const frameSettleBeforeAnimation = new Set<number>()
+  const scrollTransitionFrames = new Set<number>()
+  const frameTransitionWaitMs = new Map<number, number>()
   const addFrame = (
     frameIndex: number,
     {
@@ -56,11 +64,15 @@ export function buildCueFramePlan({
       settleMs,
       highlightAnimationMs,
       settleBeforeAnimation = false,
+      scrollTransition = false,
+      transitionWaitMs,
     }: {
       seconds?: number
       settleMs?: number
       highlightAnimationMs?: number
       settleBeforeAnimation?: boolean
+      scrollTransition?: boolean
+      transitionWaitMs?: number
     } = {}
   ) => {
     frameIndexes.add(frameIndex)
@@ -79,22 +91,48 @@ export function buildCueFramePlan({
     if (settleBeforeAnimation) {
       frameSettleBeforeAnimation.add(frameIndex)
     }
+    if (scrollTransition) {
+      scrollTransitionFrames.add(frameIndex)
+    }
+    if (transitionWaitMs !== undefined && !frameTransitionWaitMs.has(frameIndex)) {
+      frameTransitionWaitMs.set(frameIndex, Number(transitionWaitMs.toFixed(3)))
+    }
+  }
+  const cueFrames: number[] = []
+  let previousCueFrame = -1
+  for (const cue of cues) {
+    const cueFrame = clamp(
+      Math.max(frameAtOrAfter(cue.timeStart, fps), previousCueFrame + 1),
+      0,
+      maxFrame
+    )
+    cueFrames.push(cueFrame)
+    previousCueFrame = cueFrame
   }
 
   for (let cueIndex = 0; cueIndex < cues.length; cueIndex += 1) {
     const cue = cues[cueIndex]
+    const previousCue = cues[cueIndex - 1]
     const nextCue = cues[cueIndex + 1]
-    const cueFrame = clamp(Math.round(cue.timeStart * fps), 0, maxFrame)
+    const cueFrame = cueFrames[cueIndex]
     const nextCueStart = nextCue?.timeStart ?? durationSeconds
-    const nextCueFrame = nextCue
-      ? clamp(Math.round(nextCue.timeStart * fps), 0, maxFrame)
-      : maxFrame + 1
+    const cueEnd = Number.isFinite(cue.timeEnd) ? cue.timeEnd : nextCue?.timeStart
+    const startsNewLine = Boolean(previousCue && !isSameRenderedLine(previousCue, cue))
+    const targetTransitionEnd =
+      cue.timeStart + (startsNewLine ? lineScrollTransitionMs : cueStartSettleMs) / 1000
+    const burstProtectedTransitionEnd = Number.isFinite(cueEnd)
+      ? Math.max(cue.timeStart + cueStartSettleMs / 1000, cueEnd - burstPreEndMs / 1000)
+      : targetTransitionEnd
+    const nextCueFrame = cueFrames[cueIndex + 1] ?? maxFrame + 1
     const lastCueStartFrame = Math.max(
       cueFrame,
       Math.min(nextCueFrame - 1, maxFrame)
     )
     const settledFrame = clamp(
-      frameAtOrAfter(cue.timeStart + cueStartSettleMs / 1000, fps),
+      frameAtOrAfter(
+        Math.min(targetTransitionEnd, burstProtectedTransitionEnd, nextCueStart),
+        fps
+      ),
       cueFrame,
       lastCueStartFrame
     )
@@ -104,10 +142,13 @@ export function buildCueFramePlan({
       addFrame(cueFrame, { seconds: cueStartSeconds, settleMs: cueStartSettleMs })
     } else {
       for (let frameIndex = cueFrame; frameIndex < settledFrame; frameIndex += 1) {
+        const elapsedMs = (frameIndex - cueFrame + 1) * (1000 / fps)
         addFrame(frameIndex, {
           seconds: cueStartSeconds,
-          highlightAnimationMs: (frameIndex - cueFrame) * (1000 / fps),
-          settleBeforeAnimation: frameIndex === cueFrame,
+          highlightAnimationMs: Math.min(elapsedMs, cueStartSettleMs),
+          settleBeforeAnimation: !startsNewLine && frameIndex === cueFrame,
+          scrollTransition: startsNewLine && frameIndex === cueFrame,
+          transitionWaitMs: startsNewLine ? 1000 / fps : undefined,
         })
       }
       addFrame(settledFrame, {
@@ -116,7 +157,6 @@ export function buildCueFramePlan({
       })
     }
 
-    const cueEnd = Number.isFinite(cue.timeEnd) ? cue.timeEnd : nextCue?.timeStart
     if (!Number.isFinite(cueEnd)) continue
 
     const burstStartSeconds = Math.max(cue.timeStart, cueEnd - burstPreEndMs / 1000)
@@ -131,7 +171,7 @@ export function buildCueFramePlan({
     )
     const burstEndFrame = Math.min(
       clamp(frameAtOrBefore(burstEndSeconds, fps), 0, maxFrame),
-      nextCue ? clamp(Math.round(nextCue.timeStart * fps), 0, maxFrame) - 1 : maxFrame
+      nextCue ? nextCueFrame - 1 : maxFrame
     )
 
     for (let frameIndex = burstStartFrame; frameIndex <= burstEndFrame; frameIndex += 1) {
@@ -171,6 +211,13 @@ export function buildCueFramePlan({
       }
       if (frameSettleBeforeAnimation.has(frameIndex)) {
         entry.settleBeforeAnimation = true
+      }
+      if (scrollTransitionFrames.has(frameIndex)) {
+        entry.scrollTransition = true
+      }
+      const transitionWaitMs = frameTransitionWaitMs.get(frameIndex)
+      if (transitionWaitMs !== undefined) {
+        entry.transitionWaitMs = transitionWaitMs
       }
       return entry
     })

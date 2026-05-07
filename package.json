@@ -28,7 +28,7 @@
     "vitest": "vitest",
     "test:watch": "npm test -- --watch",
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/generate-service-worker.mjs",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "eslint src scripts/*.mjs vite.config.ts",

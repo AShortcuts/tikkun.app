@@ -114,7 +114,9 @@ declare global {
       renderHighlightAnimationAt: (
         seconds: number,
         elapsedMs: number,
-        settleBeforeAnimation: boolean
+        settleBeforeAnimation: boolean,
+        scrollTransition: boolean,
+        transitionWaitMs: number
       ) => Promise<{
         audioId: string
         currentTime: number
@@ -313,6 +315,7 @@ const showParshaPicker = () => {
 
   jumper.onMount()
   syncReaderProgressVisibility()
+  syncToolbarCurrentAliyahButton(null, audioControllerGlobal ?? undefined)
 }
 
 const hideParshaPicker = () => {
@@ -331,6 +334,7 @@ const hideParshaPicker = () => {
   }
 
   syncReaderProgressVisibility()
+  refreshReaderChrome(audioControllerGlobal ?? undefined)
 }
 
 const isShowingParshaPicker = () =>
@@ -645,7 +649,13 @@ function syncToolbarCurrentAliyahButton(
         })
       : null
 
-  const available = Boolean(current?.run && current.aliyahIndex && recording)
+  const isTableOfContentsVisible = isShowingParshaPicker()
+  const available = Boolean(
+    current?.run &&
+      current.aliyahIndex &&
+      recording &&
+      !isTableOfContentsVisible
+  )
   const isCurrentSession = Boolean(
     available && audioController?.session?.recording.id === recording?.id
   )
@@ -654,7 +664,7 @@ function syncToolbarCurrentAliyahButton(
   )
 
   button.classList.toggle('u-hidden', !available)
-  label.classList.toggle('u-hidden', !current)
+  label.classList.toggle('u-hidden', !current || isTableOfContentsVisible)
   label.textContent = current?.label ?? '—'
   button.disabled = !available
   button.dataset.runId = current?.run?.id ?? ''
@@ -2677,7 +2687,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       renderHighlightAnimationAt: async (
         seconds: number,
         elapsedMs: number,
-        settleBeforeAnimation: boolean
+        settleBeforeAnimation: boolean,
+        scrollTransition: boolean,
+        transitionWaitMs: number
       ) => {
         const session = audioController.session
         if (!session) return null
@@ -2694,15 +2706,24 @@ document.addEventListener('DOMContentLoaded', async () => {
           '--recording-highlight-animation-play-state',
           'paused'
         )
-        audioController.seek(seconds)
-        const cueIndex = highlightController.getCueIndex(session.cues, seconds)
-        if (cueIndex >= 0) {
-          highlightController.clear()
-          await highlightController.activateCue(session.cues[cueIndex], { scroll: false })
-        } else {
-          await syncCurrentSessionHighlight(audioController, highlightController)
+        if (scrollTransition || settleBeforeAnimation) {
+          audioController.seek(seconds)
+          const cueIndex = highlightController.getCueIndex(session.cues, seconds)
+          if (cueIndex >= 0) {
+            highlightController.clear()
+            await highlightController.activateCue(session.cues[cueIndex], {
+              scroll: scrollTransition,
+            })
+          } else {
+            await syncCurrentSessionHighlight(audioController, highlightController)
+          }
         }
         await waitForAnimationFrame()
+        if (transitionWaitMs > 0) {
+          await new Promise<void>((resolve) =>
+            window.setTimeout(resolve, transitionWaitMs)
+          )
+        }
 
         return {
           audioId: session.recording.id,

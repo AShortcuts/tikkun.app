@@ -39,7 +39,7 @@ test('cue frame plan captures one cue frame and a burst before cue end', (t) => 
   )
   t.deepEqual(
     plan.entries.map((entry) => entry.highlightAnimationMs ?? null),
-    [null, 0, null, null, null, null, null, 0, null, null]
+    [null, 100, null, null, null, null, null, 100, null, null]
   )
 })
 
@@ -79,21 +79,120 @@ test('cue start frames capture the highlight animation before the held frame', (
       {
         frameIndex: 15,
         seconds: 0.5,
-        highlightAnimationMs: 0,
+        highlightAnimationMs: 33.333,
         settleBeforeAnimation: true,
       },
       {
         frameIndex: 16,
         seconds: 0.5,
-        highlightAnimationMs: 33.333,
+        highlightAnimationMs: 66.667,
         settleBeforeAnimation: false,
       },
       {
         frameIndex: 17,
         seconds: 0.5,
-        highlightAnimationMs: 66.667,
+        highlightAnimationMs: 100,
         settleBeforeAnimation: false,
       },
+    ]
+  )
+})
+
+test('line changes capture a scroll transition before the held frame', (t) => {
+  const plan = buildCueFramePlan({
+    cues: [
+      { ...cue(0.5, 0.8), lineIndex: 0 },
+      { ...cue(0.9, 1.2), lineIndex: 1 },
+    ],
+    durationSeconds: 1.5,
+    fps: 30,
+    burstPreEndMs: 100,
+    burstMaxMs: 100,
+  })
+
+  const transition = plan.entries.filter((entry) => entry.seconds === 0.9)
+  t.deepEqual(
+    transition.map((entry) => ({
+      frameIndex: entry.frameIndex,
+      scrollTransition: entry.scrollTransition ?? false,
+      settleBeforeAnimation: entry.settleBeforeAnimation ?? false,
+      transitionWaitMs: entry.transitionWaitMs,
+      settleMs: entry.settleMs ?? 0,
+    })),
+    [
+      {
+        frameIndex: 27,
+        scrollTransition: true,
+        settleBeforeAnimation: false,
+        transitionWaitMs: 33.333,
+        settleMs: 0,
+      },
+      {
+        frameIndex: 28,
+        scrollTransition: false,
+        settleBeforeAnimation: false,
+        transitionWaitMs: 33.333,
+        settleMs: 0,
+      },
+      {
+        frameIndex: 29,
+        scrollTransition: false,
+        settleBeforeAnimation: false,
+        transitionWaitMs: 33.333,
+        settleMs: 0,
+      },
+      {
+        frameIndex: 30,
+        scrollTransition: false,
+        settleBeforeAnimation: false,
+        transitionWaitMs: 33.333,
+        settleMs: 0,
+      },
+      {
+        frameIndex: 31,
+        scrollTransition: false,
+        settleBeforeAnimation: false,
+        transitionWaitMs: 33.333,
+        settleMs: 0,
+      },
+      {
+        frameIndex: 32,
+        scrollTransition: false,
+        settleBeforeAnimation: false,
+        transitionWaitMs: 33.333,
+        settleMs: 0,
+      },
+      {
+        frameIndex: 33,
+        scrollTransition: false,
+        settleBeforeAnimation: false,
+        transitionWaitMs: undefined,
+        settleMs: 100,
+      },
+    ]
+  )
+})
+
+test('cue starts never collapse onto the same output frame', (t) => {
+  const plan = buildCueFramePlan({
+    cues: [cue(0.5, 0.54), cue(0.516, 0.58), cue(0.548, 0.62)],
+    durationSeconds: 1,
+    fps: 30,
+    burstPreEndMs: 100,
+    burstMaxMs: 100,
+  })
+
+  t.deepEqual(
+    [0.5, 0.516, 0.548].map((seconds) => {
+      const entry = plan.entries.find(
+        (candidate) => candidate.seconds === seconds && candidate.frameIndex > 0
+      )
+      return [entry?.frameIndex, seconds]
+    }),
+    [
+      [15, 0.5],
+      [16, 0.516],
+      [17, 0.548],
     ]
   )
 })

@@ -1,10 +1,12 @@
 .tikkun-page {
   --verse-column-width: 4ch;
+  --verse-gutter-text-gap: 1ch;
   --aliyah-column-width: 8.5ch;
   --aliyah-gutter-gap: 0.85ch;
   --aliyah-indicator-max-width: var(--aliyah-column-width);
   --line-side-balance-width: calc(
-    var(--verse-column-width) + var(--aliyah-column-width)
+    var(--verse-column-width) + var(--verse-gutter-text-gap) +
+      var(--aliyah-column-width)
   );
 }
 
@@ -103,7 +105,10 @@
 .line-gutter.mod-verses {
   grid-column: 3;
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
+  box-sizing: border-box;
+  min-width: 0;
+  padding-left: var(--verse-gutter-text-gap);
 }
 
 .line-gutter.mod-aliyot {
@@ -113,6 +118,33 @@
   align-items: flex-start;
   gap: 0.45rem;
   padding-left: var(--aliyah-gutter-gap);
+}
+
+@media screen and (max-width: 430px) {
+  .tikkun-page {
+    --verse-gutter-text-gap: 0ch;
+  }
+
+  .line {
+    grid-template-columns:
+      0
+      minmax(0, 1fr)
+      0;
+  }
+
+  .line-gutter.mod-verses {
+    grid-column: 3;
+    justify-content: flex-start;
+    overflow: visible;
+  }
+
+  .location-indicator.mod-verses {
+    transform: translateX(0.45rem);
+  }
+
+  .line-gutter.mod-aliyot {
+    grid-column: 1;
+  }
 }
 
 .column {
@@ -225,6 +257,8 @@
 .location-indicator.mod-verses {
   position: static;
   color: var(--verses-color);
+  text-align: right;
+  white-space: nowrap;
 }
 
 .location-indicator.mod-aliyot {
@@ -340,17 +374,5 @@
   .tikkun-page {
     --aliyah-column-width: 0ch;
     --aliyah-gutter-gap: 0ch;
-  }
-}
-
-@media screen and (max-width: 430px) {
-
-  .line-gutter.mod-verses,
-  .location-indicator.mod-verses {
-    display: none;
-  }
-
-  .tikkun-page {
-    --verse-column-width: 0ch;
   }
 }
