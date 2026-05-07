@@ -74,6 +74,8 @@ let lastAdminRenderedCueCount = 0
 let lastAdminFollowedCueIndex = -1
 let exportDownloadUrl: string | null = null
 let floatingPlayerExpanded = false
+let hasDismissedOfflinePrompt = false
+let pendingNetworkRecordingRetry: (() => Promise<void>) | null = null
 const floatingPlayerDesktopMediaQuery = window.matchMedia('(min-width: 701px)')
 const ADMIN_SESSION_UNLOCKED_KEY = 'tikkun-admin-unlocked'
 const ADMIN_SESSION_PANEL_OPEN_KEY = 'tikkun-admin-panel-open'
@@ -483,6 +485,82 @@ function getAudioButtonElements() {
   return [
     ...document.querySelectorAll<HTMLButtonElement>('[data-audio-button="true"]'),
   ]
+}
+
+function getOfflinePrompt() {
+  return document.querySelector<HTMLElement>('[data-target-id="app-offline-prompt"]')
+}
+
+function showOfflinePrompt({ force = false }: { force?: boolean } = {}) {
+  if (force) hasDismissedOfflinePrompt = false
+  if (hasDismissedOfflinePrompt) return
+  getOfflinePrompt()?.classList.remove('u-hidden')
+}
+
+function hideOfflinePrompt() {
+  getOfflinePrompt()?.classList.add('u-hidden')
+}
+
+function setPendingNetworkRecordingRetry(retry?: () => Promise<void>) {
+  pendingNetworkRecordingRetry = retry ?? null
+}
+
+function canPlayNetworkRecording(retry?: () => Promise<void>) {
+  if (navigator.onLine) return true
+  setPendingNetworkRecordingRetry(retry)
+  showOfflinePrompt({ force: true })
+  return false
+}
+
+async function playNetworkRecording(
+  audioController: AudioController,
+  retry?: () => Promise<void>
+) {
+  if (audioController.audio.paused && !canPlayNetworkRecording(retry)) return false
+  if (audioController.audio.error && audioController.session) audioController.audio.load()
+  await audioController.play()
+  return true
+}
+
+async function toggleNetworkRecordingPlayback(
+  audioController: AudioController,
+  retry?: () => Promise<void>
+) {
+  if (audioController.audio.paused && !canPlayNetworkRecording(retry)) return false
+  await audioController.togglePlayback()
+  return true
+}
+
+async function replayNetworkRecordingFromStart(
+  audioController: AudioController,
+  retry?: () => Promise<void>
+) {
+  if (!canPlayNetworkRecording(retry)) return false
+  await audioController.replayFromStart()
+  return true
+}
+
+function setupOfflineRecordingPrompt() {
+  document
+    .querySelector<HTMLButtonElement>('[data-target-id="app-offline-dismiss"]')
+    ?.addEventListener('click', () => {
+      hasDismissedOfflinePrompt = true
+      hideOfflinePrompt()
+    })
+
+  window.addEventListener('offline', () => {
+    hasDismissedOfflinePrompt = false
+    showOfflinePrompt()
+  })
+  window.addEventListener('online', () => {
+    hasDismissedOfflinePrompt = false
+    hideOfflinePrompt()
+    const retry = pendingNetworkRecordingRetry
+    pendingNetworkRecordingRetry = null
+    void retry?.()
+  })
+
+  if (!navigator.onLine) showOfflinePrompt()
 }
 
 function getAliyahMarkerElements() {
@@ -1059,8 +1137,18 @@ async function startPlaybackForButton(
       }
     }
 
-    await audioController.togglePlayback()
+    await toggleNetworkRecordingPlayback(audioController, () =>
+      startPlaybackForButton(button, audioController, highlightController)
+    )
     updateFloatingPlayer(audioController)
+    return
+  }
+
+  if (
+    !canPlayNetworkRecording(() =>
+      startPlaybackForButton(button, audioController, highlightController)
+    )
+  ) {
     return
   }
 
@@ -1075,7 +1163,9 @@ async function startPlaybackForButton(
   )
   if (!session) return
 
-  await audioController.play()
+  await playNetworkRecording(audioController, () =>
+    startPlaybackForButton(button, audioController, highlightController)
+  )
 }
 
 async function startPlaybackForToolbarCurrentAliyah(
@@ -1103,8 +1193,18 @@ async function startPlaybackForToolbarCurrentAliyah(
   if (!recording) return
 
   if (audioController.session?.recording.id === recording.id) {
-    await audioController.togglePlayback()
+    await toggleNetworkRecordingPlayback(audioController, () =>
+      startPlaybackForToolbarCurrentAliyah(button, audioController, highlightController)
+    )
     updateFloatingPlayer(audioController)
+    return
+  }
+
+  if (
+    !canPlayNetworkRecording(() =>
+      startPlaybackForToolbarCurrentAliyah(button, audioController, highlightController)
+    )
+  ) {
     return
   }
 
@@ -1119,7 +1219,9 @@ async function startPlaybackForToolbarCurrentAliyah(
   )
   if (!session) return
 
-  await audioController.play()
+  await playNetworkRecording(audioController, () =>
+    startPlaybackForToolbarCurrentAliyah(button, audioController, highlightController)
+  )
 }
 
 async function syncCurrentSessionHighlight(
@@ -1186,6 +1288,14 @@ async function replayAliyahFromStart(
 ) {
   const session = audioController.session
   if (!session) return
+  if (
+    restartAudio &&
+    !canPlayNetworkRecording(() =>
+      replayAliyahFromStart(audioController, highlightController, { restartAudio })
+    )
+  ) {
+    return
+  }
 
   if (session.cues.length) {
     cueNavigationIndex = 0
@@ -1197,7 +1307,9 @@ async function replayAliyahFromStart(
   }
 
   if (restartAudio) {
-    await audioController.replayFromStart()
+    await replayNetworkRecordingFromStart(audioController, () =>
+      replayAliyahFromStart(audioController, highlightController, { restartAudio })
+    )
   }
 }
 
@@ -1407,7 +1519,14 @@ async function selectAdminTokenIndex(
   })
 
   if (play && cue && audioController.audio.paused) {
-    await audioController.play()
+    await playNetworkRecording(audioController, () =>
+      selectAdminTokenIndex(index, highlightController, {
+        play,
+        preservePlayback,
+        seekToCue,
+        focusRow,
+      })
+    )
   }
 
   updateFloatingPlayer(audioController)
@@ -1764,7 +1883,9 @@ async function resetAdminRecorder(
 
   focusReaderSurface()
   saveAdminDraft(audioController)
-  await audioController.play()
+  await playNetworkRecording(audioController, () =>
+    resetAdminRecorder(audioController, highlightController)
+  )
   updateFloatingPlayer(audioController)
   syncAdminPanelState(audioControllerGlobal)
 }
@@ -2248,6 +2369,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setControlIcon(document.querySelector('[data-target-id="floating-video-download"]'), 'download')
   setControlIcon(document.querySelector('[data-target-id="settings-toggle"]'), 'settings2')
   updateFloatingPlayer(audioController)
+  setupOfflineRecordingPrompt()
 
   viewportTracker.on('viewport-updated', (range) => {
     if (!display?.viewModel) return
@@ -2331,9 +2453,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let activeElement: HTMLElement | null = null
     if (cue) {
+      if (
+        audioController.audio.paused &&
+        !canPlayNetworkRecording(async () => {
+          if (!document.body.contains(word)) return
+          word.click()
+        })
+      ) {
+        return
+      }
       cueNavigationIndex = audioController.session.cues.indexOf(cue)
       audioController.seek(cue.timeStart)
-      await audioController.play()
+      await playNetworkRecording(audioController, async () => {
+        if (!document.body.contains(word)) return
+        word.click()
+      })
       activeElement = await highlightController.activateCue(cue, {
         scroll: readerPreferences.autoScrollWithPlayback,
       })
@@ -2392,17 +2526,29 @@ document.addEventListener('DOMContentLoaded', async () => {
       updateFloatingPlayerMeta(audioController)
     })
   }
+  audioElement.addEventListener('error', () => {
+    if (navigator.onLine || !audioController.session) return
+    showOfflinePrompt({ force: true })
+    setPendingNetworkRecordingRetry(async () => {
+      audioElement.load()
+      await playNetworkRecording(audioController)
+    })
+  })
 
   document
     .querySelector('[data-target-id="floating-play"]')!
     .addEventListener('click', async () => {
-      await audioController.togglePlayback()
+      await toggleNetworkRecordingPlayback(audioController, async () => {
+        await playNetworkRecording(audioController)
+      })
       focusReaderSurface()
     })
   document
     .querySelector('[data-target-id="floating-mobile-toggle"]')!
     .addEventListener('click', async () => {
-      await audioController.togglePlayback()
+      await toggleNetworkRecordingPlayback(audioController, async () => {
+        await playNetworkRecording(audioController)
+      })
       focusReaderSurface()
     })
   document
@@ -2639,7 +2785,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (event.code === 'Space') {
       event.preventDefault()
-      void audioController.togglePlayback()
+      void toggleNetworkRecordingPlayback(audioController, async () => {
+        await playNetworkRecording(audioController)
+      })
       return
     }
 
