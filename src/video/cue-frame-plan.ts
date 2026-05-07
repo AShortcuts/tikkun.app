@@ -3,6 +3,9 @@ import type { WordCue } from '../audio/types.ts'
 export interface CueFramePlanEntry {
   frameIndex: number
   seconds: number
+  settleMs?: number
+  highlightAnimationMs?: number
+  settleBeforeAnimation?: boolean
 }
 
 export interface CueFramePlan {
@@ -24,6 +27,7 @@ const frameAtOrAfter = (seconds: number, fps: number) =>
   Math.ceil(seconds * fps - 1e-6)
 const frameAtOrBefore = (seconds: number, fps: number) =>
   Math.floor(seconds * fps + 1e-6)
+const cueStartSettleMs = 100
 
 export function buildCueFramePlan({
   cues,
@@ -42,10 +46,38 @@ export function buildCueFramePlan({
   const maxFrame = frameCount - 1
   const frameIndexes = new Set<number>([maxFrame])
   const frameSeconds = new Map<number, number>()
-  const addFrame = (frameIndex: number, seconds?: number) => {
+  const frameSettleMs = new Map<number, number>()
+  const frameHighlightAnimationMs = new Map<number, number>()
+  const frameSettleBeforeAnimation = new Set<number>()
+  const addFrame = (
+    frameIndex: number,
+    {
+      seconds,
+      settleMs,
+      highlightAnimationMs,
+      settleBeforeAnimation = false,
+    }: {
+      seconds?: number
+      settleMs?: number
+      highlightAnimationMs?: number
+      settleBeforeAnimation?: boolean
+    } = {}
+  ) => {
     frameIndexes.add(frameIndex)
     if (seconds !== undefined && !frameSeconds.has(frameIndex)) {
       frameSeconds.set(frameIndex, Number(seconds.toFixed(6)))
+    }
+    if (settleMs !== undefined && !frameSettleMs.has(frameIndex)) {
+      frameSettleMs.set(frameIndex, settleMs)
+    }
+    if (
+      highlightAnimationMs !== undefined &&
+      !frameHighlightAnimationMs.has(frameIndex)
+    ) {
+      frameHighlightAnimationMs.set(frameIndex, Number(highlightAnimationMs.toFixed(3)))
+    }
+    if (settleBeforeAnimation) {
+      frameSettleBeforeAnimation.add(frameIndex)
     }
   }
 
@@ -53,12 +85,40 @@ export function buildCueFramePlan({
     const cue = cues[cueIndex]
     const nextCue = cues[cueIndex + 1]
     const cueFrame = clamp(Math.round(cue.timeStart * fps), 0, maxFrame)
-    addFrame(cueFrame, cue.timeStart)
+    const nextCueStart = nextCue?.timeStart ?? durationSeconds
+    const nextCueFrame = nextCue
+      ? clamp(Math.round(nextCue.timeStart * fps), 0, maxFrame)
+      : maxFrame + 1
+    const lastCueStartFrame = Math.max(
+      cueFrame,
+      Math.min(nextCueFrame - 1, maxFrame)
+    )
+    const settledFrame = clamp(
+      frameAtOrAfter(cue.timeStart + cueStartSettleMs / 1000, fps),
+      cueFrame,
+      lastCueStartFrame
+    )
+    const cueStartSeconds = Math.min(cue.timeStart, nextCueStart, durationSeconds)
+
+    if (settledFrame === cueFrame) {
+      addFrame(cueFrame, { seconds: cueStartSeconds, settleMs: cueStartSettleMs })
+    } else {
+      for (let frameIndex = cueFrame; frameIndex < settledFrame; frameIndex += 1) {
+        addFrame(frameIndex, {
+          seconds: cueStartSeconds,
+          highlightAnimationMs: (frameIndex - cueFrame) * (1000 / fps),
+          settleBeforeAnimation: frameIndex === cueFrame,
+        })
+      }
+      addFrame(settledFrame, {
+        seconds: cueStartSeconds,
+        settleMs: cueStartSettleMs,
+      })
+    }
 
     const cueEnd = Number.isFinite(cue.timeEnd) ? cue.timeEnd : nextCue?.timeStart
     if (!Number.isFinite(cueEnd)) continue
 
-    const nextCueStart = nextCue?.timeStart ?? durationSeconds
     const burstStartSeconds = Math.max(cue.timeStart, cueEnd - burstPreEndMs / 1000)
     const burstEndSeconds = Math.min(
       nextCueStart,
@@ -82,16 +142,38 @@ export function buildCueFramePlan({
   if (!frameIndexes.has(0)) {
     const firstCue = cues[0]
     if (firstCue) {
-      addFrame(0, firstCue.timeStart)
+      addFrame(
+        0,
+        {
+          seconds: Math.min(
+            firstCue.timeStart,
+            cues[1]?.timeStart ?? durationSeconds,
+            durationSeconds
+          ),
+          settleMs: cueStartSettleMs,
+        }
+      )
     }
   }
 
   const entries = [...frameIndexes]
     .sort((left, right) => left - right)
-    .map((frameIndex) => ({
-      frameIndex,
-      seconds: frameSeconds.get(frameIndex) ?? secondsForFrame(frameIndex, fps),
-    }))
+    .map((frameIndex) => {
+      const entry: CueFramePlanEntry = {
+        frameIndex,
+        seconds: frameSeconds.get(frameIndex) ?? secondsForFrame(frameIndex, fps),
+      }
+      const settleMs = frameSettleMs.get(frameIndex)
+      if (settleMs !== undefined) entry.settleMs = settleMs
+      const highlightAnimationMs = frameHighlightAnimationMs.get(frameIndex)
+      if (highlightAnimationMs !== undefined) {
+        entry.highlightAnimationMs = highlightAnimationMs
+      }
+      if (frameSettleBeforeAnimation.has(frameIndex)) {
+        entry.settleBeforeAnimation = true
+      }
+      return entry
+    })
 
   return { frameCount, entries }
 }

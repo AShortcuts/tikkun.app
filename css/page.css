@@ -170,6 +170,8 @@
   background: var(--reader-highlight-fill-surface);
   pointer-events: none;
   animation: active-word-highlight-in 0.1s ease;
+  animation-delay: var(--recording-highlight-animation-delay, 0s);
+  animation-play-state: var(--recording-highlight-animation-play-state, running);
   transition:
     inset 0.1s ease,
     transform 0.1s ease,

@@ -111,6 +111,17 @@ declare global {
         duration: number
         activeTokenKey: string | null
       } | null>
+      renderHighlightAnimationAt: (
+        seconds: number,
+        elapsedMs: number,
+        settleBeforeAnimation: boolean
+      ) => Promise<{
+        audioId: string
+        currentTime: number
+        duration: number
+        activeTokenKey: string | null
+        scrollTop: number
+      } | null>
       settleAt: (seconds: number) => Promise<{
         audioId: string
         currentTime: number
@@ -2646,6 +2657,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const session = audioController.session
         if (!session) return null
 
+        document.documentElement.style.removeProperty(
+          '--recording-highlight-animation-delay'
+        )
+        document.documentElement.style.removeProperty(
+          '--recording-highlight-animation-play-state'
+        )
         audioController.seek(seconds)
         await syncCurrentSessionHighlight(audioController, highlightController)
         await waitForAnimationFrame()
@@ -2655,6 +2672,44 @@ document.addEventListener('DOMContentLoaded', async () => {
           currentTime: audioController.audio.currentTime,
           duration: audioController.audio.duration,
           activeTokenKey: highlightController.getActiveTokenKey(),
+        }
+      },
+      renderHighlightAnimationAt: async (
+        seconds: number,
+        elapsedMs: number,
+        settleBeforeAnimation: boolean
+      ) => {
+        const session = audioController.session
+        if (!session) return null
+
+        if (settleBeforeAnimation) {
+          await window.tikkunRecorder?.settleAt(seconds)
+        }
+
+        document.documentElement.style.setProperty(
+          '--recording-highlight-animation-delay',
+          `${-Math.max(0, elapsedMs)}ms`
+        )
+        document.documentElement.style.setProperty(
+          '--recording-highlight-animation-play-state',
+          'paused'
+        )
+        audioController.seek(seconds)
+        const cueIndex = highlightController.getCueIndex(session.cues, seconds)
+        if (cueIndex >= 0) {
+          highlightController.clear()
+          await highlightController.activateCue(session.cues[cueIndex], { scroll: false })
+        } else {
+          await syncCurrentSessionHighlight(audioController, highlightController)
+        }
+        await waitForAnimationFrame()
+
+        return {
+          audioId: session.recording.id,
+          currentTime: audioController.audio.currentTime,
+          duration: audioController.audio.duration,
+          activeTokenKey: highlightController.getActiveTokenKey(),
+          scrollTop: getBook().scrollTop,
         }
       },
       settleAt: async (seconds: number) => {

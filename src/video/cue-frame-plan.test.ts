@@ -27,11 +27,74 @@ test('cue frame plan captures one cue frame and a burst before cue end', (t) => 
   t.is(plan.frameCount, 20)
   t.deepEqual(
     plan.entries.map((entry) => entry.frameIndex),
-    [0, 5, 10, 11, 12, 13, 17, 18, 19]
+    [0, 5, 6, 10, 11, 12, 13, 17, 18, 19]
   )
   t.deepEqual(
     plan.entries.map((entry) => entry.seconds),
-    [0.5, 0.5, 1, 1.1, 1.2, 1.3, 1.7, 1.8, 1.9]
+    [0.5, 0.5, 0.5, 1, 1.1, 1.2, 1.3, 1.7, 1.7, 1.9]
+  )
+  t.deepEqual(
+    plan.entries.map((entry) => entry.settleMs ?? 0),
+    [100, 0, 100, 0, 0, 0, 0, 0, 100, 0]
+  )
+  t.deepEqual(
+    plan.entries.map((entry) => entry.highlightAnimationMs ?? null),
+    [null, 0, null, null, null, null, null, 0, null, null]
+  )
+})
+
+test('cue start held frames settle before capture without moving the output frame', (t) => {
+  const plan = buildCueFramePlan({
+    cues: [cue(0.5, 0.8)],
+    durationSeconds: 1,
+    fps: 30,
+    burstPreEndMs: 100,
+    burstMaxMs: 100,
+  })
+
+  const cueStart = plan.entries.find((entry) => entry.frameIndex === 18)
+  t.deepEqual(cueStart, { frameIndex: 18, seconds: 0.5, settleMs: 100 })
+})
+
+test('cue start frames capture the highlight animation before the held frame', (t) => {
+  const plan = buildCueFramePlan({
+    cues: [cue(0.5, 0.8)],
+    durationSeconds: 1,
+    fps: 30,
+    burstPreEndMs: 100,
+    burstMaxMs: 100,
+  })
+
+  const animationFrames = plan.entries.filter(
+    (entry) => entry.highlightAnimationMs !== undefined
+  )
+  t.deepEqual(
+    animationFrames.map((entry) => ({
+      frameIndex: entry.frameIndex,
+      seconds: entry.seconds,
+      highlightAnimationMs: entry.highlightAnimationMs,
+      settleBeforeAnimation: entry.settleBeforeAnimation ?? false,
+    })),
+    [
+      {
+        frameIndex: 15,
+        seconds: 0.5,
+        highlightAnimationMs: 0,
+        settleBeforeAnimation: true,
+      },
+      {
+        frameIndex: 16,
+        seconds: 0.5,
+        highlightAnimationMs: 33.333,
+        settleBeforeAnimation: false,
+      },
+      {
+        frameIndex: 17,
+        seconds: 0.5,
+        highlightAnimationMs: 66.667,
+        settleBeforeAnimation: false,
+      },
+    ]
   )
 })
 
@@ -66,10 +129,11 @@ test('concat entries hold each captured frame until the next planned output fram
 
   t.deepEqual(entries, [
     { file: 'frame-0.png', durationSeconds: 0.5 },
-    { file: 'frame-1.png', durationSeconds: 0.2 },
+    { file: 'frame-1.png', durationSeconds: 0.1 },
     { file: 'frame-2.png', durationSeconds: 0.1 },
     { file: 'frame-3.png', durationSeconds: 0.1 },
     { file: 'frame-4.png', durationSeconds: 0.1 },
+    { file: 'frame-5.png', durationSeconds: 0.1 },
   ])
   t.true(
     Math.abs(entries.reduce((total, entry) => total + entry.durationSeconds, 0) - 1) <
@@ -89,8 +153,8 @@ test('cue frame plan caps bursts before the next cue begins', (t) => {
   t.deepEqual(
     plan.entries.map((entry) => entry.frameIndex),
     [
-      0, 30, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 63, 64, 65, 66, 67, 68,
-      69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 89,
+      0, 30, 31, 32, 33, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62,
+      63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 89,
     ]
   )
 })

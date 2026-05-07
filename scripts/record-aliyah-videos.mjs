@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFile, spawn } from 'node:child_process'
@@ -27,7 +28,7 @@ const defaults = {
   deviceScaleFactor: 4,
   fps: 30,
   crf: 18,
-  preset: 'slow',
+  preset: 'veryfast',
   outputRoot: process.env.TIKKUN_VIDEO_OUTPUT_ROOT || defaultOutputRoot,
   workRoot: process.env.TIKKUN_VIDEO_WORK_ROOT || defaultWorkRoot,
   baseUrl: 'http://127.0.0.1:4177',
@@ -105,6 +106,9 @@ function parseArgs(argv) {
   }
   if (!Number.isInteger(options.fps) || options.fps < 24) {
     throw new Error('--fps must be an integer of at least 24')
+  }
+  if (!Number.isFinite(options.deviceScaleFactor) || options.deviceScaleFactor <= 0) {
+    throw new Error('--scale must be a positive number')
   }
   if (!['cue-keyframes', 'deterministic-frames'].includes(options.renderMode)) {
     throw new Error('--render-mode must be cue-keyframes or deterministic-frames')
@@ -224,11 +228,12 @@ function chromeExecutable() {
   const candidates = [
     process.env.TIKKUN_CHROME,
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
     '/Applications/Chromium.app/Contents/MacOS/Chromium',
     '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
   ].filter(Boolean)
 
-  return candidates[0]
+  return candidates.find((candidate) => existsSync(candidate))
 }
 
 async function startVite(options) {
@@ -545,6 +550,16 @@ function parseFrameRate(value) {
   return denominator ? numerator / denominator : numerator
 }
 
+function capturedPixelDimensions(crop, options) {
+  const logicalWidth = crop?.width ?? options.width
+  const logicalHeight = crop?.height ?? options.height
+  const scale = options.captureScale ?? options.deviceScaleFactor
+  return {
+    outputWidth: Math.round(logicalWidth * scale),
+    outputHeight: Math.round(logicalHeight * scale),
+  }
+}
+
 async function validateOutput({
   outputPath,
   expectedDuration,
@@ -565,8 +580,12 @@ async function validateOutput({
 
   if (!videoStream) errors.push('missing video stream')
   if (!audioStream) errors.push('missing audio stream')
-  if (videoStream && Number(videoStream.width) !== expectedWidth) errors.push('width mismatch')
-  if (videoStream && Number(videoStream.height) !== expectedHeight) errors.push('height mismatch')
+  if (videoStream && Number(videoStream.width) !== expectedWidth) {
+    errors.push(`width mismatch: ${videoStream.width} !== ${expectedWidth}`)
+  }
+  if (videoStream && Number(videoStream.height) !== expectedHeight) {
+    errors.push(`height mismatch: ${videoStream.height} !== ${expectedHeight}`)
+  }
   if (Math.abs(actualFps - options.fps) > 0.01) errors.push(`fps mismatch: ${actualFps}`)
   if (Number.isFinite(actualFrames) && Math.abs(actualFrames - expectedFrameCount) > 1) {
     errors.push(`frame count mismatch: ${actualFrames} !== ${expectedFrameCount}`)
@@ -670,8 +689,27 @@ async function removeWorkDir(dirPath) {
   })
 }
 
-async function renderFrameAt({ client, seconds, filePath, options }) {
-  const state = await evaluate(client, `window.tikkunRecorder.renderAt(${seconds})`)
+const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
+
+async function renderFrameAt({
+  client,
+  seconds,
+  filePath,
+  options,
+  settleMs = 0,
+  highlightAnimationMs,
+  settleBeforeAnimation = false,
+}) {
+  const state =
+    highlightAnimationMs !== undefined
+      ? await evaluate(
+          client,
+          `window.tikkunRecorder.renderHighlightAnimationAt(${seconds}, ${highlightAnimationMs}, ${settleBeforeAnimation})`
+        )
+      : settleMs > 0
+        ? await evaluate(client, `window.tikkunRecorder.settleAt(${seconds})`)
+        : await evaluate(client, `window.tikkunRecorder.renderAt(${seconds})`)
+  if (settleMs > 0) await wait(settleMs)
   const crop = options.crop
     ? await evaluate(client, `window.tikkunRecorder.captureRect(${options.cropMargin})`)
     : null
@@ -711,8 +749,7 @@ async function captureFullFrameSequence({
     capturedFrameCount: frameCount,
     frameLatencies,
     crop: lastCrop,
-    outputWidth: lastCrop?.width ?? options.width,
-    outputHeight: lastCrop?.height ?? options.height,
+    ...capturedPixelDimensions(lastCrop, options),
   }
 }
 
@@ -741,6 +778,9 @@ async function captureCueKeyframes({
       seconds: entry.seconds,
       filePath: path.join(frameDir, `frame-${String(index).padStart(6, '0')}.png`),
       options,
+      settleMs: entry.settleMs ?? 0,
+      highlightAnimationMs: entry.highlightAnimationMs,
+      settleBeforeAnimation: entry.settleBeforeAnimation ?? false,
     })
     lastCrop = result.crop
     frameLatencies.push(Number((performance.now() - frameStartedAt).toFixed(2)))
@@ -763,8 +803,7 @@ async function captureCueKeyframes({
     capturedFrameCount: plan.entries.length,
     frameLatencies,
     crop: lastCrop,
-    outputWidth: lastCrop?.width ?? options.width,
-    outputHeight: lastCrop?.height ?? options.height,
+    ...capturedPixelDimensions(lastCrop, options),
   }
 }
 
@@ -799,6 +838,10 @@ async function recordOne(recording, options) {
 
     const url = `${options.baseUrl}/?recording=1&audioId=${encodeURIComponent(recording.id)}#/parsha/${recording.parshaSlug}`
     await navigate(client, url, options)
+    const captureOptions = {
+      ...options,
+      captureScale: await evaluate(client, 'window.devicePixelRatio'),
+    }
     const session = await evaluate(
       client,
       `window.tikkunRecorder.loadAudio(${JSON.stringify(recording.id)})`
@@ -822,8 +865,14 @@ async function recordOne(recording, options) {
 
     const capture =
       options.renderMode === 'deterministic-frames'
-        ? await captureFullFrameSequence({ client, frameDir, duration, options })
-        : await captureCueKeyframes({ client, frameDir, cues: session.cues, duration, options })
+        ? await captureFullFrameSequence({ client, frameDir, duration, options: captureOptions })
+        : await captureCueKeyframes({
+            client,
+            frameDir,
+            cues: session.cues,
+            duration,
+            options: captureOptions,
+          })
 
     const ffmpegLog =
       capture.ffmpegInput.kind === 'concat'
@@ -974,7 +1023,16 @@ async function recordBatch(options) {
     await appendReports(results)
     const failed = results.filter((result) => !result.ok)
     if (failed.length) {
-      throw new Error(`${failed.length}/${results.length} video job(s) failed`)
+      const summary = failed
+        .map((result) => {
+          const details =
+            result.report.error ??
+            result.report.validation?.errors?.join(', ') ??
+            'unknown failure'
+          return `${result.report.audioId}: ${details}`
+        })
+        .join('; ')
+      throw new Error(`${failed.length}/${results.length} video job(s) failed: ${summary}`)
     }
   } finally {
     vite?.kill('SIGTERM')
