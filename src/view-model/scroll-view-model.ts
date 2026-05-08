@@ -105,7 +105,8 @@ export abstract class ScrollViewModel {
     readonly generator: LeiningGenerator,
     /** The "view" (set of runs and contained עליות) that the user can scroll through. */
     readonly relevantRuns: LeiningRun[],
-    initialRef: RefWithScroll
+    initialRef: RefWithScroll,
+    private readonly displayTitleByRunId: Record<string, string> = {}
   ) {
     this.resolver = loadScroll(initialRef.scroll)
     const startingInfo = this.loadAndConsumeScroll(initialRef)
@@ -113,6 +114,10 @@ export abstract class ScrollViewModel {
       ({ currentIndex }) => currentIndex
     )
     this.startingLocation = startingInfo.then(({ location }) => location)
+  }
+
+  displayTitleForRun(run: LeiningRun) {
+    return this.displayTitleByRunId[run.id] ?? run.leining.date.title.he
   }
   private async loadAndConsumeScroll(initialRef: RefWithScroll) {
     const scrollResolver = await this.resolver
@@ -139,18 +144,22 @@ export abstract class ScrollViewModel {
   static forId(
     generator: LeiningGenerator,
     runId: string,
-    initialRef?: RefWithScroll
+    initialRef?: RefWithScroll,
+    options: { displayTitle?: string } = {}
   ): ScrollViewModel | null {
     const run = generator.parseId(runId)
     if (!run) return null
+    const displayTitleByRunId = options.displayTitle
+      ? { [run.id]: options.displayTitle }
+      : {}
     // Always render the full מגילה.
     if (run.type === LeiningRunType.Megillah)
-      return new FullScrollViewModel(generator, run, initialRef)
+      return new FullScrollViewModel(generator, run, initialRef, displayTitleByRunId)
     // For the פרשה itself, render all of חומש.
     if (run.leining.isParsha && run.type === LeiningRunType.Main)
-      return new FullScrollViewModel(generator, run, initialRef)
+      return new FullScrollViewModel(generator, run, initialRef, displayTitleByRunId)
     // For any part of יום טוב, special מפטיר, or הפתרה, only render relevant parts.
-    return new HolidayViewModel(generator, run, initialRef)
+    return new HolidayViewModel(generator, run, initialRef, displayTitleByRunId)
   }
 
   /** Creates the appropriate `ScrollViewModel` subclass for the first leining on or after a date. */
@@ -240,7 +249,7 @@ export abstract class ScrollViewModel {
 
     let run: LeiningRun | undefined
     let aliyot: LeiningAliyah[] = []
-    const labeller = new AliyahLabeller()
+    const labeller = new AliyahLabeller((run) => this.displayTitleForRun(run))
     const lines: RenderedLineInfo[] = pageLines.map((rawLine) => {
       const verses = rawLine.verses.map(toRef)
 
@@ -287,12 +296,14 @@ class FullScrollViewModel extends ScrollViewModel {
   constructor(
     generator: LeiningGenerator,
     run: LeiningRun,
-    initialRef: RefWithScroll = run.aliyot[0].start
+    initialRef: RefWithScroll = run.aliyot[0].start,
+    displayTitleByRunId: Record<string, string> = {}
   ) {
     super(
       generator,
       FullScrollViewModel.calculateRuns(generator, run),
-      initialRef
+      initialRef,
+      displayTitleByRunId
     )
     this.pageCount = this.resolver.then((r) => r.getPageCount())
   }
@@ -350,13 +361,15 @@ class HolidayViewModel extends ScrollViewModel {
   constructor(
     generator: LeiningGenerator,
     run: LeiningRun,
-    initialRef: RefWithScroll = run.aliyot[0].start
+    initialRef: RefWithScroll = run.aliyot[0].start,
+    displayTitleByRunId: Record<string, string> = {}
   ) {
     // TODO(decide): Should this include the whole LeiningDate?
     super(
       generator,
       run.leining.runs.filter((r) => r.scroll === run.scroll),
-      initialRef
+      initialRef,
+      displayTitleByRunId
     )
     this.pages = this.fetchPages()
   }

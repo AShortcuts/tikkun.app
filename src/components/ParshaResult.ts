@@ -1,4 +1,4 @@
-import { LeiningInstance } from '../calendar-model/model-types.ts'
+import type { LeiningInstance } from '../calendar-model/model-types.ts'
 import utils from './utils.ts'
 import renderLeiningTitle from './render-leining-title.ts'
 

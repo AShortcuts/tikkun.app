@@ -39,6 +39,7 @@ import { AudioController, ActiveAudioSession } from './reading/audio-controller.
 import { HighlightController, cueKey } from './reading/highlight-controller.ts'
 import { collectTokenKeysForAliyahRange } from './reading/aliyah-token-sequence.ts'
 import type { AudioRecording, CueExportPayload, WordCue } from './audio/types.ts'
+import type { LeiningAliyah } from './calendar-model/model-types.ts'
 import { verifyAdminPassword } from './admin/access.ts'
 import {
   getAdminDraftStorageKey,
@@ -62,6 +63,7 @@ const generator = new LeiningGenerator({
   israel: false,
 })
 const recordingMode = getRecordingModeConfig()
+type PlaybackAliyahIndex = Exclude<LeiningAliyah['index'], undefined>
 
 let display: ScrollDisplay
 let readerPreferences: ReaderPreferences = getDefaultReaderPreferences()
@@ -569,6 +571,28 @@ function getAliyahMarkerElements() {
   ]
 }
 
+function parsePlaybackAliyahIndex(
+  value: string | undefined
+): PlaybackAliyahIndex | null {
+  if (value === 'Maftir') return 'Maftir'
+  const index = Number(value)
+  return Number.isInteger(index) && index >= 1 ? index : null
+}
+
+function recordingAliyahIndexForPlayback(
+  aliyahIndex: PlaybackAliyahIndex
+): number {
+  return aliyahIndex === 'Maftir' ? 7 : aliyahIndex
+}
+
+function aliyahMarkerSelector(runId: string, aliyahIndex: PlaybackAliyahIndex) {
+  return `[data-aliyah-marker="true"][data-run-id="${runId}"][data-aliyah-index="${aliyahIndex}"]`
+}
+
+function isSameRunMaftirMarker(marker: HTMLElement | null, runId: string) {
+  return marker?.dataset.runId === runId && marker.dataset.aliyahIndex === 'Maftir'
+}
+
 function setControlIcon(element: HTMLElement | null, icon: IconName) {
   if (!element) return
   element.innerHTML = iconMarkup(icon)
@@ -596,7 +620,7 @@ function getAliyahProgressAnchors() {
       const rect = line.getBoundingClientRect()
       const label = line.querySelector('.aliyah-label-text')?.textContent?.trim() ?? '—'
       const aliyahStarts = (line.dataset.aliyahStarts ?? '').split(',')
-      const aliyahIndex = Number(aliyahStarts[0]) || 0
+      const aliyahIndex = parsePlaybackAliyahIndex(aliyahStarts[0])
       const lineInfo = getLineInfoFromElement(line)
       const progressLabel = aliyahStarts.includes('1') ? 'ראשון' : label
       return {
@@ -658,7 +682,7 @@ function getLineInfoFromElement(element: Element) {
 
 function getSessionButtonState(button: HTMLButtonElement) {
   const lineInfo = getLineInfoFromElement(button)
-  const aliyahIndex = Number(button.dataset.aliyahIndex)
+  const aliyahIndex = parsePlaybackAliyahIndex(button.dataset.aliyahIndex)
   if (!lineInfo?.run || !aliyahIndex) return null
 
   const recording = findRecordingForRun({
@@ -760,11 +784,10 @@ async function collectAliyahTokenKeys({
   aliyahIndex,
 }: {
   runId: string
-  aliyahIndex: number
+  aliyahIndex: PlaybackAliyahIndex
 }) {
-  let marker = document.querySelector<HTMLElement>(
-    `[data-aliyah-marker="true"][data-run-id="${runId}"][data-aliyah-index="${aliyahIndex}"]`
-  )
+  const markerSelector = aliyahMarkerSelector(runId, aliyahIndex)
+  let marker = document.querySelector<HTMLElement>(markerSelector)
   while (!marker) {
     const renderedPages = display.getRenderedPageNumbers()
     const lastPage = renderedPages[renderedPages.length - 1]
@@ -773,9 +796,7 @@ async function collectAliyahTokenKeys({
     const loaded = await display.ensurePageRendered(lastPage + 1)
     if (!loaded) return []
 
-    marker = document.querySelector<HTMLElement>(
-      `[data-aliyah-marker="true"][data-run-id="${runId}"][data-aliyah-index="${aliyahIndex}"]`
-    )
+    marker = document.querySelector<HTMLElement>(markerSelector)
   }
 
   let markers = getAliyahMarkerElements()
@@ -788,12 +809,14 @@ async function collectAliyahTokenKeys({
     const loaded = await display.ensurePageRendered(lastPage + 1)
     if (!loaded) break
     markers = getAliyahMarkerElements()
-    marker = document.querySelector<HTMLElement>(
-      `[data-aliyah-marker="true"][data-run-id="${runId}"][data-aliyah-index="${aliyahIndex}"]`
-    )
+    marker = document.querySelector<HTMLElement>(markerSelector)
     if (!marker) break
     markerIndex = markers.indexOf(marker)
     nextMarker = markers[markerIndex + 1] ?? null
+  }
+
+  if (aliyahIndex === 7 && isSameRunMaftirMarker(nextMarker, runId)) {
+    nextMarker = markers[markerIndex + 2] ?? null
   }
 
   const startLine = marker.closest<HTMLElement>('[data-class="line"]')
@@ -807,6 +830,34 @@ async function collectAliyahTokenKeys({
   })
 }
 
+async function seekAudioSessionToTokenKey(
+  audioController: AudioController,
+  highlightController: HighlightController,
+  tokenKey: string | undefined
+) {
+  const session = audioController.session
+  if (!session) return
+
+  const cueIndex = tokenKey
+    ? session.cues.findIndex((candidate) => cueKey(candidate) === tokenKey)
+    : session.cues.length ? 0 : -1
+  const cue = cueIndex >= 0 ? session.cues[cueIndex] : undefined
+
+  if (cue) {
+    audioController.seek(cue.timeStart)
+    cueNavigationIndex = cueIndex
+    await highlightController.activateCue(cue, { scroll: true })
+    return
+  }
+
+  const fallbackTokenKey = tokenKey ?? session.tokenKeys[0]
+  if (fallbackTokenKey) {
+    await highlightController.activateTokenKey(fallbackTokenKey, {
+      scroll: true,
+    })
+  }
+}
+
 async function loadAudioSessionForRecording(
   {
     recording,
@@ -815,26 +866,37 @@ async function loadAudioSessionForRecording(
   }: {
     recording: AudioRecording
     runId: string
-    aliyahIndex: number
+    aliyahIndex: PlaybackAliyahIndex
   },
   audioController: AudioController,
   highlightController: HighlightController
 ) {
-  if (audioController.session?.recording.id === recording.id) {
-    return audioController.session
-  }
-
+  const recordingAliyahIndex = recordingAliyahIndexForPlayback(aliyahIndex)
+  const isMaftirPlaybackRequest = aliyahIndex === 'Maftir'
   const tokenKeys = await collectAliyahTokenKeys({
     runId,
-    aliyahIndex,
+    aliyahIndex: recordingAliyahIndex,
   })
   if (!tokenKeys.length) return null
+
+  if (audioController.session?.recording.id === recording.id) {
+    if (isMaftirPlaybackRequest) {
+      const requestedTokenKeys = await collectAliyahTokenKeys({ runId, aliyahIndex })
+      highlightController.setSequence(tokenKeys)
+      await seekAudioSessionToTokenKey(
+        audioController,
+        highlightController,
+        requestedTokenKeys[0] ?? tokenKeys[0]
+      )
+    }
+    return audioController.session
+  }
 
   const session: ActiveAudioSession = {
     recording,
     cues: cloneCues(getCuesForRecording(recording)),
     runId,
-    aliyahIndex,
+    aliyahIndex: recordingAliyahIndex,
     tokenKeys,
   }
 
@@ -852,7 +914,14 @@ async function loadAudioSessionForRecording(
   cueNavigationIndex = session.cues.length ? 0 : null
   syncAdminPanelState(audioController)
 
-  if (session.cues.length) {
+  if (isMaftirPlaybackRequest) {
+    const requestedTokenKeys = await collectAliyahTokenKeys({ runId, aliyahIndex })
+    await seekAudioSessionToTokenKey(
+      audioController,
+      highlightController,
+      requestedTokenKeys[0] ?? tokenKeys[0]
+    )
+  } else if (session.cues.length) {
     audioController.seek(session.cues[0].timeStart)
     await highlightController.activateCue(session.cues[0], {
       scroll: true,
@@ -1111,6 +1180,25 @@ async function startPlaybackForButton(
   if (!state?.recording || !state.lineInfo.run) return
 
   if (audioController.session?.recording.id === state.recording.id) {
+    if (state.aliyahIndex === 'Maftir') {
+      const session = await loadAudioSessionForRecording(
+        {
+          recording: state.recording,
+          runId: state.lineInfo.run.id,
+          aliyahIndex: state.aliyahIndex,
+        },
+        audioController,
+        highlightController
+      )
+      if (!session) return
+
+      await playNetworkRecording(audioController, () =>
+        startPlaybackForButton(button, audioController, highlightController)
+      )
+      updateFloatingPlayer(audioController)
+      return
+    }
+
     if (audioController.audio.paused) {
       const session = audioController.session
       const activeTokenKey = highlightController.getActiveTokenKey()
@@ -1174,11 +1262,11 @@ async function startPlaybackForToolbarCurrentAliyah(
   highlightController: HighlightController
 ) {
   const runId = button.dataset.runId
-  const aliyahIndex = Number(button.dataset.aliyahIndex)
+  const aliyahIndex = parsePlaybackAliyahIndex(button.dataset.aliyahIndex)
   if (!runId || !aliyahIndex) return
 
   const marker = document.querySelector<HTMLElement>(
-    `[data-aliyah-marker="true"][data-run-id="${runId}"][data-aliyah-index="${aliyahIndex}"]`
+    aliyahMarkerSelector(runId, aliyahIndex)
   )
   if (!marker) return
 
@@ -1193,6 +1281,25 @@ async function startPlaybackForToolbarCurrentAliyah(
   if (!recording) return
 
   if (audioController.session?.recording.id === recording.id) {
+    if (aliyahIndex === 'Maftir') {
+      const session = await loadAudioSessionForRecording(
+        {
+          recording,
+          runId,
+          aliyahIndex,
+        },
+        audioController,
+        highlightController
+      )
+      if (!session) return
+
+      await playNetworkRecording(audioController, () =>
+        startPlaybackForToolbarCurrentAliyah(button, audioController, highlightController)
+      )
+      updateFloatingPlayer(audioController)
+      return
+    }
+
     await toggleNetworkRecordingPlayback(audioController, () =>
       startPlaybackForToolbarCurrentAliyah(button, audioController, highlightController)
     )
@@ -1998,9 +2105,17 @@ function recordNextCue(
 function stepAdminBack(highlightController: HighlightController) {
   const session = audioControllerGlobal?.session
   if (!session?.tokenKeys.length) return
+  const selectedCueIndex = getEditableAdminCueIndex(highlightController)
   const targetIndex =
-    adminState.tokenPointer <= 0 ? 0 : Math.max(0, adminState.tokenPointer - 1)
-  void selectAdminTokenIndex(targetIndex, highlightController)
+    selectedCueIndex > 0
+      ? selectedCueIndex - 1
+      : adminState.tokenPointer <= 0
+        ? 0
+        : Math.max(0, adminState.tokenPointer - 1)
+  void selectAdminTokenIndex(targetIndex, highlightController, {
+    play: true,
+    preservePlayback: true,
+  })
 }
 
 function undoLastAdminCue(highlightController: HighlightController) {
@@ -2375,7 +2490,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!display?.viewModel) return
     topBarModel.setLine(display.viewModel, range)
     const run = topBarModel.info.currentRun
-    titleEl.textContent = formatTopBarTitle(run?.leining.date.title.he)
+    titleEl.textContent = formatTopBarTitle(
+      run ? display.viewModel.displayTitleForRun(run) : undefined
+    )
     updateReaderProgress()
   })
 

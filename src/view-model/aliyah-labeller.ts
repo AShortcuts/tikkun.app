@@ -7,6 +7,11 @@ import type {
 import { findLastIndex } from '../calendar-model/utils.ts'
 
 export class AliyahLabeller {
+  constructor(
+    private readonly titleForRun: (run: LeiningRun) => string = (run) =>
+      run.leining.date.title.he
+  ) {}
+
   /**
    * The index (if any) for the end of an עלייה from the previous פסוק.
    * This is stored to be applied to the following פסוק, if it does not
@@ -44,14 +49,21 @@ export class AliyahLabeller {
       const starts =
         run?.aliyot.filter((a) => a.index && refEquals(a.start, v)) ?? []
       labels.push(
-        ...starts.map((a) => aliyahName(a.index, run!)).filter((x) => x)
+        ...starts
+          .map((a) =>
+            aliyahName(a.index, run!, { title: this.titleForRun(run!) })
+          )
+          .filter((x) => x)
       )
 
       if (this.previousEndIndex >= 0) {
         const previousEndLabel = `סוף ${aliyahName(
           this.previousRun!.aliyot[this.previousEndIndex].index,
           this.previousRun!,
-          { isEnd: true }
+          {
+            isEnd: true,
+            title: this.titleForRun(this.previousRun!),
+          }
         )}`
 
         // If there is no label here, and the previous פסוק ended an עלייה,
@@ -90,14 +102,17 @@ const aliyahStrings = [
 export function aliyahName(
   index: LeiningAliyah['index'],
   run: LeiningRun,
-  { isEnd }: { isEnd?: boolean } = {}
+  {
+    isEnd,
+    title = run.leining.date.title.he,
+  }: { isEnd?: boolean; title?: string } = {}
 ) {
   if (!index) return ''
   if (index === 'Maftir') return 'מפטיר'
   if (index < 1 || index > aliyahStrings.length) return ''
 
-  if (!isEnd && index === 1) return run.leining.date.title.he.replace(/^פרשת /, '')
-  if (run.leining.date.title.he === 'שמחת תורה') {
+  if (!isEnd && index === 1) return title.replace(/^פרשת /, '')
+  if (title === 'שמחת תורה') {
     if (index === 6) return `חתן תורה`
     if (index === 7) return `חתן בראשית`
   }

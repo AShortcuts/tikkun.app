@@ -1,8 +1,8 @@
 import { Locale } from '@hebcal/hdate'
 import {
-  LeiningInstance,
   LeiningInstanceId,
 } from '../calendar-model/model-types.ts'
+import type { LeiningInstance } from '../calendar-model/model-types.ts'
 import { toTitleCase } from '../calendar-model/hebcal-conversions.ts'
 
 function stripHebrewDayPrefix(title: string) {

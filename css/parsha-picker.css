@@ -262,6 +262,77 @@
   background-color: var(--heavy-accent-color);
 }
 
+.aliyah-selection-popup {
+  position: fixed;
+  z-index: 20;
+  min-width: 13rem;
+  max-width: min(18rem, calc(100vw - 1.5rem));
+  padding: 0.35rem;
+  border: 1px solid var(--medium-accent-color);
+  border-radius: var(--button-border-radius);
+  background-color: var(--paper-color);
+  box-shadow: 0 0.75rem 2rem oklch(0% 0 0 / 0.18);
+  direction: ltr;
+  animation: aliyah-popup-in 0.14s ease-out;
+}
+
+.aliyah-selection-heading {
+  padding: 0.45rem 0.85rem 0.35rem;
+  color: var(--light-text-color);
+  font-size: 0.82rem;
+  line-height: 1.2;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.aliyah-selection-option {
+  display: block;
+  padding: 0.65rem 0.85rem;
+  border: none;
+  border-radius: calc(var(--button-border-radius) * 0.7);
+  background-color: transparent;
+  color: var(--text-color);
+  font: inherit;
+  font-size: 0.98rem;
+  line-height: 1.2;
+  text-align: left;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.aliyah-selection-option.mod-group {
+  width: 100%;
+  cursor: pointer;
+}
+
+.aliyah-selection-option.mod-group::after {
+  content: "›";
+  float: right;
+  color: var(--light-text-color);
+}
+
+.aliyah-selection-option:hover,
+.aliyah-selection-option:focus {
+  background-color: var(--light-accent-color);
+  outline: none;
+}
+
+.aliyah-selection-option:active {
+  background-color: var(--medium-accent-color);
+}
+
+@keyframes aliyah-popup-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.25rem) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .section.mod-alternate {
   background-color: var(--light-accent-color);
 }

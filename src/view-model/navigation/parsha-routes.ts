@@ -7,6 +7,7 @@ import {
   type LeiningInstance,
   type LeiningRun,
 } from '../../calendar-model/model-types.ts'
+import type { RefWithScroll } from '../../ref.ts'
 import { fromISODateString, toISODateString } from '../../calendar-model/utils.ts'
 import slugify from '../../slugify.ts'
 
@@ -26,7 +27,14 @@ type MegillahRoute = {
   aliases: string[]
 }
 
-type ParshaRouteSpec = WeeklyParshaRoute | MegillahRoute
+type VezosHaberachaRoute = {
+  kind: 'vezos-haberacha'
+  canonicalSlug: 'vezos-haberacha'
+  aliases: string[]
+  displayTitle: 'וזאת הברכה'
+}
+
+type ParshaRouteSpec = WeeklyParshaRoute | MegillahRoute | VezosHaberachaRoute
 
 const weeklyParshaRoutes: WeeklyParshaRoute[] = [
   { kind: 'weekly', canonicalSlug: 'beresheet', titleSlugs: ['bereshit'], aliases: ['bereshit'] },
@@ -96,6 +104,23 @@ const parshaRouteSpecs: ParshaRouteSpec[] = [
     canonicalSlug: 'megillah-esther',
     aliases: ['esther', 'megillat-esther', 'ester', 'megillah-ester'],
   },
+  // Hebcal emits וזאת הברכה as the Simchat Torah holiday leining, but the TOC
+  // treats it as its own parsha. Keep a separate slug and display title so
+  // direct Simchat Torah navigation remains holiday-labeled while this parsha
+  // route labels the reader as וזאת הברכה.
+  {
+    kind: 'vezos-haberacha',
+    canonicalSlug: 'vezos-haberacha',
+    aliases: [
+      'vezos-haberacha',
+      'vezot-haberacha',
+      'vezos-habracha',
+      'vezot-habracha',
+      'vzot-haberacha',
+      'vzot-habracha',
+    ],
+    displayTitle: 'וזאת הברכה',
+  },
 ]
 
 const routeSpecByCanonicalSlug = new Map(
@@ -155,21 +180,50 @@ function estherRun(leiningDate: LeiningDate) {
   return match?.runs.find((run) => run.type === LeiningRunType.Megillah) ?? null
 }
 
+function vezosHaberachaRun(leiningDate: LeiningDate) {
+  if (leiningDate.title.he !== 'שמחת תורה') return null
+
+  const match = leiningDate.leinings.find(
+    (leining) => leining.id === LeiningInstanceId.Shacharis
+  )
+
+  return (
+    match?.runs.find(
+      (run) =>
+        run.type === LeiningRunType.Main &&
+        run.aliyot[0]?.start.b === 5 &&
+        run.aliyot[0]?.start.c === 33
+    ) ?? null
+  )
+}
+
 export function canonicalizeParshaSlug(slug: string): string | null {
   return aliasToCanonicalSlug.get(normalizeParshaSlug(slug)) ?? null
 }
 
-export function generateParshaUrl(slug: string) {
-  return `#/parsha/${slug}`
+export function generateParshaUrl(slug: string, initialRef?: RefWithScroll) {
+  if (!initialRef) return `#/parsha/${slug}`
+
+  return `#/parsha/${slug}/${initialRef.b}-${initialRef.c}-${initialRef.v}`
 }
 
-export function semanticParshaUrlForLeining(leining: LeiningInstance): string | null {
+export function semanticParshaUrlForLeining(
+  leining: LeiningInstance,
+  initialRef?: RefWithScroll
+): string | null {
   if (
     leining.id === LeiningInstanceId.Megillah &&
     leining.runs.some((run) => run.type === LeiningRunType.Megillah) &&
     titleSlug(leining.date.title.en) === PURIM_TITLE_SLUG
   ) {
-    return generateParshaUrl('megillah-esther')
+    return generateParshaUrl('megillah-esther', initialRef)
+  }
+
+  if (
+    leining.id === LeiningInstanceId.Shacharis &&
+    leining.runs.some((run) => run.aliyot[0]?.start.b === 5 && run.aliyot[0]?.start.c === 33)
+  ) {
+    return generateParshaUrl('vezos-haberacha', initialRef)
   }
 
   if (!leining.isParsha || leining.id !== LeiningInstanceId.Shacharis) return null
@@ -179,14 +233,14 @@ export function semanticParshaUrlForLeining(leining: LeiningInstance): string | 
     (spec) => spec.kind === 'weekly' && spec.titleSlugs.includes(slug)
   )
 
-  return routeSpec ? generateParshaUrl(routeSpec.canonicalSlug) : null
+  return routeSpec ? generateParshaUrl(routeSpec.canonicalSlug, initialRef) : null
 }
 
 export function resolveParshaRun(
   generator: LeiningGenerator,
   slug: string,
   now: Date = new Date()
-): { canonicalSlug: string; run: LeiningRun } | null {
+): { canonicalSlug: string; run: LeiningRun; displayTitle?: string } | null {
   const canonicalSlug = canonicalizeParshaSlug(slug)
   if (!canonicalSlug) return null
 
@@ -194,12 +248,19 @@ export function resolveParshaRun(
   if (!spec) return null
 
   for (const leiningDate of futureLeiningDates(generator, now)) {
-    const run =
-      spec.kind === 'weekly'
-        ? mainParshaRun(leiningDate, spec.titleSlugs)
-        : estherRun(leiningDate)
+    const run = (() => {
+      if (spec.kind === 'weekly') return mainParshaRun(leiningDate, spec.titleSlugs)
+      if (spec.kind === 'megillah') return estherRun(leiningDate)
+      return vezosHaberachaRun(leiningDate)
+    })()
 
-    if (run) return { canonicalSlug, run }
+    if (run) {
+      return {
+        canonicalSlug,
+        run,
+        displayTitle: spec.kind === 'vezos-haberacha' ? spec.displayTitle : undefined,
+      }
+    }
   }
 
   return null

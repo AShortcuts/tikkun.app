@@ -106,6 +106,34 @@ test('Parsha slug resolves exact solo Vayelech only', async (t) => {
   )
 })
 
+test('Parsha slug can start at a specific ref', async (t) => {
+  const route = toReaderRoute(
+    parseUrl(generator, '/parsha/behar/3-25-1', { now: new Date('2026-01-01') })
+  )
+
+  t.truthy(route)
+  t.is(route?.canonicalHash, '#/parsha/behar/3-25-1')
+  t.is(
+    await renderStartingLineForRoute(route),
+    await renderStartingLineForRoute(
+      toReaderRoute(parseUrl(generator, '/run/2027-05-22:shacharis,main/3-25-1'))
+    )
+  )
+})
+
+test('Vezos Haberacha has its own parsha route and display title', async (t) => {
+  const route = toReaderRoute(
+    parseUrl(generator, '/parsha/vezos-haberacha/5-33-1', {
+      now: new Date('2026-01-01'),
+    })
+  )
+
+  t.truthy(route)
+  t.is(route?.canonicalHash, '#/parsha/vezos-haberacha/5-33-1')
+  t.is(route?.model.displayTitleForRun(route.model.relevantRuns[0]), 'וזאת הברכה')
+  t.regex(await renderStartingLineForRoute(route), /^וזאת הברכה:/)
+})
+
 test('Parsha slug resolves exact solo Nitzavim only', async (t) => {
   const route = toReaderRoute(
     parseUrl(generator, '/parsha/nitzavim', { now: new Date('2026-01-01') })
@@ -201,6 +229,25 @@ test('Generated URLs round-trip', async (t) => {
     await renderStartingLine(
       toModel(parseUrl(generator, '/run/2025-09-20:shacharis,main'))
     )
+  )
+})
+
+test('Generated run URL can start at a specific ref', async (t) => {
+  t.is(
+    await renderStartingLine(
+      toModel(
+        parseUrl(
+          generator,
+          generateUrl(generator.parseId('2025-05-03:shacharis,main')!, {
+            scroll: 'torah',
+            b: 3,
+            c: 14,
+            v: 1,
+          }).replace(/^#/, '')
+        )
+      )
+    ),
+    await renderStartingLine(toModel(parseUrl(generator, '/run/2025-05-03:shacharis,main/3-14-1')))
   )
 })
 
