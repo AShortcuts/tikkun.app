@@ -25,7 +25,7 @@ let cuePayloadsByAudioId = null
 const defaults = {
   width: 1920,
   height: 1080,
-  deviceScaleFactor: 4,
+  deviceScaleFactor: 3,
   fps: 30,
   crf: 18,
   preset: 'veryfast',
@@ -33,7 +33,8 @@ const defaults = {
   workRoot: process.env.TIKKUN_VIDEO_WORK_ROOT || defaultWorkRoot,
   baseUrl: 'http://127.0.0.1:4177',
   concurrency: 1,
-  renderMode: 'cue-keyframes',
+  // Default to deterministic frames until cue-keyframe rendering is tuned.
+  renderMode: 'deterministic-frames',
   cueBurstPreEndMs: 120,
   cueBurstMaxMs: 500,
   crop: true,
