@@ -16,7 +16,7 @@
   <link rel="mask-icon" href="/assets/images/safari-pinned-tab.svg" color="#000000" />
   <link rel="stylesheet" href="/css/master.css" />
   <script>
-    ;(() => {
+    ; (() => {
       const storageKey = 'tikkun.reader-preferences.v3'
       const defaultTheme = 'automatic'
       const validThemes = new Set(['automatic', 'light', 'sepia', 'dark'])
@@ -61,6 +61,7 @@
     }
 
     @media (prefers-color-scheme: dark) {
+
       html[data-reader-theme='automatic'],
       html[data-reader-theme='automatic'] body {
         background: oklch(25% 0 0);
@@ -91,21 +92,25 @@
         <div class="toolbar-wrapper mod-right">
           <div class="toolbar-item">
             <span class="toolbar-current-aliyah-label u-hidden" data-target-id="toolbar-current-aliyah-label">—</span>
-            <button class="aliyah-audio-button toolbar-current-aliyah-audio u-hidden" data-target-id="toolbar-current-aliyah-audio" type="button" aria-label="Play current aliyah" title="Play current aliyah"></button>
-            <button class="toolbar-button" data-target-id="settings-toggle" type="button" title="Reader settings" aria-label="Reader settings"></button>
+            <button class="aliyah-audio-button toolbar-current-aliyah-audio u-hidden"
+              data-target-id="toolbar-current-aliyah-audio" type="button" aria-label="Play current aliyah"
+              title="Play current aliyah"></button>
+            <button class="toolbar-button" data-target-id="settings-toggle" type="button" title="Reader settings"
+              aria-label="Reader settings"></button>
           </div>
         </div>
       </div>
-      
+
     </header>
     <div class="reader-progress-mobile" data-target-id="reader-progress-mobile" aria-hidden="true">
-        <div class="reader-progress-mobile-fill" data-target-id="reader-progress-mobile-fill"></div>
-      </div>
+      <div class="reader-progress-mobile-fill" data-target-id="reader-progress-mobile-fill"></div>
+    </div>
     <div id="js-app" class="app-body">
       <section class="reader-shell" data-target-id="reader-shell">
         <div class="reader-side mod-left">
           <div class="floating-player u-hidden" data-target-id="floating-player">
-            <button class="floating-player-mobile-dash" data-target-id="floating-mobile-toggle" type="button" title="Play or pause" aria-label="Play or pause"></button>
+            <button class="floating-player-mobile-dash" data-target-id="floating-mobile-toggle" type="button"
+              title="Play or pause" aria-label="Play or pause"></button>
             <div class="floating-player-details" data-target-id="floating-player-details">
               <div class="floating-player-meta" data-target-id="floating-player-meta">
                 <span class="floating-player-meta-item">
@@ -130,7 +135,8 @@
                 <div class="floating-player-progress-item">
                   <div class="floating-player-progress-head">
                     <span class="floating-player-progress-label">Audio Progress</span>
-                    <span class="floating-player-progress-value" data-target-id="floating-meta-duration">0:00/0:00</span>
+                    <span class="floating-player-progress-value"
+                      data-target-id="floating-meta-duration">0:00/0:00</span>
                   </div>
                   <div class="floating-player-progress-track">
                     <div class="floating-player-progress-fill mod-audio"></div>
@@ -139,12 +145,41 @@
               </div>
             </div>
             <div class="floating-player-controls">
-              <button class="floating-player-button" data-target-id="floating-replay" type="button" title="Replay current Word" aria-label="Replay current Word"></button>
-              <button class="floating-player-button" data-target-id="floating-next" type="button" title="Next Word" aria-label="Next Word"></button>
-              <button class="floating-player-button" data-target-id="floating-play" type="button" title="Play or pause" aria-label="Play or pause"></button>
-              <button class="floating-player-button" data-target-id="floating-prev" type="button" title="Previous Word" aria-label="Previous Word"></button>
-              <a class="floating-player-button mod-download" data-target-id="floating-download" href="#" download title="Download current recording" aria-label="Download current recording"></a>
-              <a class="floating-player-button mod-download u-hidden" data-target-id="floating-video-download" href="#" download title="Download aliyah video" aria-label="Download aliyah video"></a>
+              <button class="floating-player-button" data-target-id="floating-replay" type="button"
+                title="Replay current Word" aria-label="Replay current Word"></button>
+              <button class="floating-player-button" data-target-id="floating-next" type="button" title="Next Word"
+                aria-label="Next Word"></button>
+              <button class="floating-player-button" data-target-id="floating-play" type="button" title="Play or pause"
+                aria-label="Play or pause"></button>
+              <button class="floating-player-button" data-target-id="floating-prev" type="button" title="Previous Word"
+                aria-label="Previous Word"></button>
+              <!-- <a class="floating-player-button mod-download" data-target-id="floating-download" href="#" download title="Download current recording" aria-label="Download current recording"></a> -->
+              <div class="floating-speed-control">
+                <button class="floating-player-button mod-speed" data-target-id="floating-speed-toggle" type="button"
+                  title="Playback speed" aria-label="Playback speed" aria-expanded="false">1x</button>
+                <div class="floating-speed-popover u-hidden" data-target-id="floating-speed-popover">
+                  <input class="floating-speed-slider" data-target-id="floating-speed-slider" type="range" min="0.5"
+                  max="3" step="0.05" list="floating-speed-marks" aria-label="Playback speed" />
+                  <datalist id="floating-speed-marks">
+                    <option value="0.5" label="0.5x"></option>
+                    <option value="1" label="1x"></option>
+                    <option value="1.5" label="1.5x"></option>
+                    <option value="2" label="2x"></option>
+                    <option value="3" label="3x"></option>
+                  </datalist>
+                  <div class="floating-speed-ticks" aria-hidden="true">
+                    <span style="--speed-tick-position: 0%">0.5x</span>
+                    <span style="--speed-tick-position: 20%">1x</span>
+                    <span style="--speed-tick-position: 40%">1.5x</span>
+                    <span style="--speed-tick-position: 60%">2x</span>
+                    <span style="--speed-tick-position: 100%">3x</span>
+                  </div>
+                </div>
+              </div>
+              <a class="floating-player-button mod-download u-hidden" data-target-id="floating-download" href="#"
+                download title="Download current recording" aria-label="Download current recording"></a>
+              <a class="floating-player-button mod-download u-hidden" data-target-id="floating-video-download" href="#"
+                download title="Download aliyah video" aria-label="Download aliyah video"></a>
             </div>
           </div>
         </div>
@@ -182,8 +217,16 @@
       <div class="settings-pane-header">
         <h2>Reader Settings</h2>
         <div class="settings-pane-header-actions">
-          <button class="toolbar-button mod-icon-label" type="button" data-target-id="settings-reset-highlight" aria-label="Reset highlight settings" title="Reset highlight settings"></button>
-          <button class="toolbar-button mod-icon-label" type="button" data-target-id="settings-close" aria-label="Close reader settings" title="Close reader settings"><svg class="ui-icon lucide lucide-x-icon lucide-x" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg></button>
+          <button class="toolbar-button mod-icon-label" type="button" data-target-id="settings-reset-highlight"
+            aria-label="Reset highlight settings" title="Reset highlight settings"></button>
+          <button class="toolbar-button mod-icon-label" type="button" data-target-id="settings-close"
+            aria-label="Close reader settings" title="Close reader settings"><svg
+              class="ui-icon lucide lucide-x-icon lucide-x" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
+            </svg></button>
         </div>
       </div>
       <form class="settings-form stack medium" data-target-id="settings-form">
@@ -203,7 +246,8 @@
         <label class="settings-field mod-inline-compact">
           <span>Playback rate</span>
           <div class="settings-number-input">
-            <input data-target-id="settings-playback-rate" type="number" min="0.5" max="2" step="0.05" inputmode="decimal" />
+            <input data-target-id="settings-playback-rate" type="number" min="0.5" max="3" step="0.05"
+              inputmode="decimal" />
             <span>x</span>
           </div>
         </label>
@@ -215,7 +259,8 @@
           <span>Highlight opacity</span>
           <div class="settings-range-input">
             <input data-target-id="settings-highlight-opacity" type="range" min="0.05" max="0.45" step="0.01" />
-            <input data-target-id="settings-highlight-opacity-value" type="number" min="0.05" max="0.45" step="0.01" inputmode="decimal" />
+            <input data-target-id="settings-highlight-opacity-value" type="number" min="0.05" max="0.45" step="0.01"
+              inputmode="decimal" />
           </div>
         </label>
         <label class="settings-field mod-inline-compact">
@@ -226,14 +271,16 @@
           <span>Outline width</span>
           <div class="settings-range-input">
             <input data-target-id="settings-outline-width" type="range" min="1" max="6" step="1" />
-            <input data-target-id="settings-outline-width-value" type="number" min="1" max="6" step="1" inputmode="decimal" />
+            <input data-target-id="settings-outline-width-value" type="number" min="1" max="6" step="1"
+              inputmode="decimal" />
           </div>
         </label>
         <label class="settings-field">
           <span>Spacing around word</span>
           <div class="settings-range-input">
             <input data-target-id="settings-outline-offset" type="range" min="0" max="10" step="0.5" />
-            <input data-target-id="settings-outline-offset-value" type="number" min="0" max="10" step="0.5" inputmode="decimal" />
+            <input data-target-id="settings-outline-offset-value" type="number" min="0" max="10" step="0.5"
+              inputmode="decimal" />
           </div>
         </label>
         <label class="settings-field">
@@ -295,88 +342,90 @@
     </div>
     <div class="app-offline-prompt u-hidden" data-target-id="app-offline-prompt" role="status" aria-live="polite">
       <span>No Internet Access. Recordings can't be played.</span>
-      <button class="app-update-dismiss" data-target-id="app-offline-dismiss" type="button" aria-label="Dismiss no internet prompt">OK</button>
+      <button class="app-update-dismiss" data-target-id="app-offline-dismiss" type="button"
+        aria-label="Dismiss no internet prompt">OK</button>
     </div>
     <div class="app-update-prompt u-hidden" data-target-id="app-update-prompt" role="status" aria-live="polite">
       <span>Update available</span>
       <button class="app-update-button" data-target-id="app-update-apply" type="button">Reload</button>
-      <button class="app-update-dismiss" data-target-id="app-update-dismiss" type="button" aria-label="Dismiss update prompt">Later</button>
+      <button class="app-update-dismiss" data-target-id="app-update-dismiss" type="button"
+        aria-label="Dismiss update prompt">Later</button>
     </div>
   </div>
   <script type="module" src="/src/index.ts"></script>
   <script>
-    ;(() => {
-      if (!('serviceWorker' in navigator)) return
+      ; (() => {
+        if (!('serviceWorker' in navigator)) return
 
-      const updatePrompt = document.querySelector('[data-target-id="app-update-prompt"]')
-      const applyUpdate = document.querySelector('[data-target-id="app-update-apply"]')
-      const dismissUpdate = document.querySelector('[data-target-id="app-update-dismiss"]')
-      let waitingWorker = null
-      let hasDismissedUpdate = false
-      let isReloadingForUpdate = false
-      let lastUpdateCheck = 0
+        const updatePrompt = document.querySelector('[data-target-id="app-update-prompt"]')
+        const applyUpdate = document.querySelector('[data-target-id="app-update-apply"]')
+        const dismissUpdate = document.querySelector('[data-target-id="app-update-dismiss"]')
+        let waitingWorker = null
+        let hasDismissedUpdate = false
+        let isReloadingForUpdate = false
+        let lastUpdateCheck = 0
 
-      const showUpdatePrompt = (worker) => {
-        waitingWorker = worker
-        if (hasDismissedUpdate || !updatePrompt) return
-        updatePrompt.classList.remove('u-hidden')
-      }
+        const showUpdatePrompt = (worker) => {
+          waitingWorker = worker
+          if (hasDismissedUpdate || !updatePrompt) return
+          updatePrompt.classList.remove('u-hidden')
+        }
 
-      const watchInstallingWorker = (worker) => {
-        if (!worker) return
-        worker.addEventListener('statechange', () => {
-          if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-            showUpdatePrompt(worker)
+        const watchInstallingWorker = (worker) => {
+          if (!worker) return
+          worker.addEventListener('statechange', () => {
+            if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+              showUpdatePrompt(worker)
+            }
+          })
+        }
+
+        applyUpdate?.addEventListener('click', () => {
+          if (!waitingWorker) return
+          isReloadingForUpdate = true
+          waitingWorker.postMessage({ type: 'SKIP_WAITING' })
+        })
+
+        dismissUpdate?.addEventListener('click', () => {
+          hasDismissedUpdate = true
+          updatePrompt?.classList.add('u-hidden')
+        })
+
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (isReloadingForUpdate) window.location.reload()
+        })
+
+        window.addEventListener('load', async () => {
+          try {
+            const response = await fetch('/service-worker.js', {
+              cache: 'no-store',
+              method: 'HEAD',
+            })
+            if (!response.ok) return
+
+            const registration = await navigator.serviceWorker.register('/service-worker.js')
+            if (registration.waiting) showUpdatePrompt(registration.waiting)
+            watchInstallingWorker(registration.installing)
+            registration.addEventListener('updatefound', () =>
+              watchInstallingWorker(registration.installing)
+            )
+
+            if (navigator.serviceWorker.controller) {
+              lastUpdateCheck = Date.now()
+              await registration.update()
+            }
+
+            document.addEventListener('visibilitychange', () => {
+              if (document.visibilityState !== 'visible') return
+              if (Date.now() - lastUpdateCheck < 60 * 60 * 1000) return
+              lastUpdateCheck = Date.now()
+              void registration.update()
+            })
+          } catch {
+            // Development servers do not generate the production service worker.
           }
         })
-      }
-
-      applyUpdate?.addEventListener('click', () => {
-        if (!waitingWorker) return
-        isReloadingForUpdate = true
-        waitingWorker.postMessage({ type: 'SKIP_WAITING' })
-      })
-
-      dismissUpdate?.addEventListener('click', () => {
-        hasDismissedUpdate = true
-        updatePrompt?.classList.add('u-hidden')
-      })
-
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (isReloadingForUpdate) window.location.reload()
-      })
-
-      window.addEventListener('load', async () => {
-        try {
-          const response = await fetch('/service-worker.js', {
-            cache: 'no-store',
-            method: 'HEAD',
-          })
-          if (!response.ok) return
-
-          const registration = await navigator.serviceWorker.register('/service-worker.js')
-          if (registration.waiting) showUpdatePrompt(registration.waiting)
-          watchInstallingWorker(registration.installing)
-          registration.addEventListener('updatefound', () =>
-            watchInstallingWorker(registration.installing)
-          )
-
-          if (navigator.serviceWorker.controller) {
-            lastUpdateCheck = Date.now()
-            await registration.update()
-          }
-
-          document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState !== 'visible') return
-            if (Date.now() - lastUpdateCheck < 60 * 60 * 1000) return
-            lastUpdateCheck = Date.now()
-            void registration.update()
-          })
-        } catch {
-          // Development servers do not generate the production service worker.
-        }
-      })
-    })()
+      })()
   </script>
 </body>
 

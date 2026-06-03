@@ -79,6 +79,10 @@ let floatingPlayerExpanded = false
 let hasDismissedOfflinePrompt = false
 let pendingNetworkRecordingRetry: (() => Promise<void>) | null = null
 const floatingPlayerDesktopMediaQuery = window.matchMedia('(min-width: 701px)')
+const PLAYBACK_RATE_MIN = 0.5
+const PLAYBACK_RATE_MAX = 3
+const PLAYBACK_RATE_MAGNET_THRESHOLD = 0.09
+const PLAYBACK_RATE_MARKS = [0.5, 1, 1.5, 2, 3] as const
 const ADMIN_SESSION_UNLOCKED_KEY = 'tikkun-admin-unlocked'
 const ADMIN_SESSION_PANEL_OPEN_KEY = 'tikkun-admin-panel-open'
 const adminDraftTimeFormat = Intl.DateTimeFormat(undefined, {
@@ -487,6 +491,64 @@ function getAudioButtonElements() {
   return [
     ...document.querySelectorAll<HTMLButtonElement>('[data-audio-button="true"]'),
   ]
+}
+
+function clampPlaybackRate(rate: number) {
+  if (!Number.isFinite(rate)) return readerPreferences.playbackRate
+  return Math.max(PLAYBACK_RATE_MIN, Math.min(PLAYBACK_RATE_MAX, rate))
+}
+
+function snapPlaybackRateToMark(rate: number, threshold = PLAYBACK_RATE_MAGNET_THRESHOLD) {
+  const clampedRate = clampPlaybackRate(rate)
+  const nearestMark = PLAYBACK_RATE_MARKS.reduce((nearest, mark) =>
+    Math.abs(mark - clampedRate) < Math.abs(nearest - clampedRate) ? mark : nearest
+  )
+
+  return Math.abs(nearestMark - clampedRate) <= threshold ? nearestMark : clampedRate
+}
+
+function formatPlaybackRate(rate: number) {
+  const rounded = Math.round(clampPlaybackRate(rate) * 100) / 100
+  return `${rounded.toFixed(2).replace(/\.?0+$/, '')}x`
+}
+
+function syncSettingsPlaybackRateInput() {
+  const playbackRate = document.querySelector<HTMLInputElement>(
+    '[data-target-id="settings-playback-rate"]'
+  )
+  if (playbackRate) {
+    playbackRate.value = `${Number(clampPlaybackRate(readerPreferences.playbackRate).toFixed(2))}`
+  }
+}
+
+function syncFloatingPlaybackRateControl(audioController?: AudioController) {
+  const rate = clampPlaybackRate(readerPreferences.playbackRate)
+  const button = document.querySelector<HTMLButtonElement>(
+    '[data-target-id="floating-speed-toggle"]'
+  )
+  const slider = document.querySelector<HTMLInputElement>(
+    '[data-target-id="floating-speed-slider"]'
+  )
+
+  if (button) button.textContent = formatPlaybackRate(rate)
+  if (slider) slider.value = `${rate}`
+  if (audioController) audioController.audio.playbackRate = rate
+}
+
+function applyPlaybackRatePreference(
+  audioController: AudioController,
+  requestedRate: number,
+  { snap = false }: { snap?: boolean } = {}
+) {
+  const playbackRate = snap
+    ? snapPlaybackRateToMark(requestedRate)
+    : clampPlaybackRate(requestedRate)
+  readerPreferences = mergeReaderPreferences(readerPreferences, { playbackRate })
+  saveReaderPreferences(readerPreferences)
+  applyReaderPreferences(readerPreferences)
+  audioController.audio.playbackRate = playbackRate
+  syncSettingsPlaybackRateInput()
+  syncFloatingPlaybackRateControl(audioController)
 }
 
 function getOfflinePrompt() {
@@ -1066,6 +1128,7 @@ function updateFloatingPlayer(audioController: AudioController) {
     videoDownloadLink.removeAttribute('download')
   }
 
+  syncFloatingPlaybackRateControl(audioController)
   updateFloatingPlayerAudioProgress(audioController)
   updateFloatingPlayerMeta(audioController)
   const anchors = getAliyahProgressAnchors()
@@ -2274,7 +2337,7 @@ function setupSettingsPane(audioController: AudioController) {
 
   const syncForm = () => {
     narratorSelect.value = readerPreferences.narratorId
-    playbackRate.value = `${Number(readerPreferences.playbackRate.toFixed(2))}`
+    syncSettingsPlaybackRateInput()
     highlightFill.value = readerPreferences.highlightFill
     highlightOpacity.value = `${readerPreferences.highlightOpacity}`
     highlightOpacityValue.value = `${readerPreferences.highlightOpacity}`
@@ -2294,7 +2357,7 @@ function setupSettingsPane(audioController: AudioController) {
       button.classList.toggle('is-active', isActive)
       button.setAttribute('aria-pressed', `${isActive}`)
     }
-    audioController.audio.playbackRate = readerPreferences.playbackRate
+    syncFloatingPlaybackRateControl(audioController)
   }
 
   const applyUpdates = (updates: Partial<ReaderPreferences>) => {
@@ -2310,7 +2373,8 @@ function setupSettingsPane(audioController: AudioController) {
   const applyPlaybackRate = () => {
     const nextRate = Number.parseFloat(playbackRate.value)
     if (!Number.isFinite(nextRate)) return
-    applyUpdates({ playbackRate: nextRate })
+    applyPlaybackRatePreference(audioController, nextRate)
+    refreshReaderChrome(audioController)
   }
 
   const bindRangeValuePair = ({
@@ -2468,6 +2532,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const audioController = new AudioController(audioElement)
   audioControllerGlobal = audioController
+  readerPreferences = mergeReaderPreferences(readerPreferences, {
+    playbackRate: clampPlaybackRate(readerPreferences.playbackRate),
+  })
+  audioController.audio.playbackRate = readerPreferences.playbackRate
   const highlightController = new HighlightController(book)
   highlightControllerGlobal = highlightController
   mountAdminEditorUi()
@@ -2686,6 +2754,37 @@ document.addEventListener('DOMContentLoaded', async () => {
       await replayAliyahFromStart(audioController, highlightController)
       focusReaderSurface()
     })
+  const speedToggle = document.querySelector<HTMLButtonElement>(
+    '[data-target-id="floating-speed-toggle"]'
+  )!
+  const speedPopover = document.querySelector<HTMLElement>(
+    '[data-target-id="floating-speed-popover"]'
+  )!
+  const speedSlider = document.querySelector<HTMLInputElement>(
+    '[data-target-id="floating-speed-slider"]'
+  )!
+  speedToggle.addEventListener('click', () => {
+    const isOpening = speedPopover.classList.contains('u-hidden')
+    speedPopover.classList.toggle('u-hidden', !isOpening)
+    speedToggle.setAttribute('aria-expanded', `${isOpening}`)
+    syncFloatingPlaybackRateControl(audioController)
+    if (isOpening) speedSlider.focus({ preventScroll: true })
+  })
+  for (const eventName of ['click', 'mousedown', 'pointerdown', 'touchstart'] as const) {
+    speedPopover.addEventListener(eventName, (event) => event.stopPropagation())
+  }
+  speedSlider.addEventListener('input', () => {
+    applyPlaybackRatePreference(audioController, Number.parseFloat(speedSlider.value), {
+      snap: true,
+    })
+  })
+  speedSlider.addEventListener('change', () => {
+    const playbackRate = snapPlaybackRateToMark(
+      Number.parseFloat(speedSlider.value),
+      Number.POSITIVE_INFINITY
+    )
+    applyPlaybackRatePreference(audioController, playbackRate)
+  })
   document
     .querySelector('[data-target-id="toolbar-current-aliyah-audio"]')!
     .addEventListener('click', async () => {
@@ -2703,6 +2802,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     .addEventListener('click', (event) => {
       const target = event.target as HTMLElement
       if (target.closest('.floating-player-button')) return
+      if (target.closest('[data-target-id="floating-speed-popover"]')) return
       if (!audioController.session) return
       if (!floatingPlayerDesktopMediaQuery.matches) return
 
@@ -2751,6 +2851,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       document
         .querySelector<HTMLElement>('[data-target-id="settings-pane"]')!
         .classList.add('u-hidden')
+      document
+        .querySelector<HTMLElement>('[data-target-id="floating-speed-popover"]')
+        ?.classList.add('u-hidden')
+      document
+        .querySelector<HTMLButtonElement>('[data-target-id="floating-speed-toggle"]')
+        ?.setAttribute('aria-expanded', 'false')
       hideExportModal()
     })
   )
