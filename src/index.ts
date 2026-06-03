@@ -551,6 +551,13 @@ function applyPlaybackRatePreference(
   syncFloatingPlaybackRateControl(audioController)
 }
 
+function playbackRateFromSliderPointer(slider: HTMLInputElement, clientX: number) {
+  const rect = slider.getBoundingClientRect()
+  const ratio = (clientX - rect.left) / Math.max(rect.width, 1)
+  return PLAYBACK_RATE_MIN + Math.max(0, Math.min(1, ratio)) *
+    (PLAYBACK_RATE_MAX - PLAYBACK_RATE_MIN)
+}
+
 function getOfflinePrompt() {
   return document.querySelector<HTMLElement>('[data-target-id="app-offline-prompt"]')
 }
@@ -2457,12 +2464,22 @@ function setupSettingsPane(audioController: AudioController) {
     applyUpdates(getDefaultHighlightPreferences())
   )
 
-  document
-    .querySelector('[data-target-id="settings-toggle"]')!
-    .addEventListener('click', () => pane.classList.toggle('u-hidden'))
+  const settingsToggle = document.querySelector<HTMLElement>(
+    '[data-target-id="settings-toggle"]'
+  )!
+  const closeSettingsPane = () => pane.classList.add('u-hidden')
+
+  settingsToggle.addEventListener('click', () => pane.classList.toggle('u-hidden'))
   document
     .querySelector('[data-target-id="settings-close"]')!
-    .addEventListener('click', () => pane.classList.add('u-hidden'))
+    .addEventListener('click', closeSettingsPane)
+  document.addEventListener('pointerdown', (event) => {
+    const target = event.target as HTMLElement
+    if (pane.classList.contains('u-hidden')) return
+    if (target.closest('[data-target-id="settings-pane"]')) return
+    if (target.closest('[data-target-id="settings-toggle"]')) return
+    closeSettingsPane()
+  })
 }
 
 function renderRoute(route: AppRoute, audioController: AudioController) {
@@ -2763,6 +2780,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const speedSlider = document.querySelector<HTMLInputElement>(
     '[data-target-id="floating-speed-slider"]'
   )!
+  const closeSpeedPopover = () => {
+    speedPopover.classList.add('u-hidden')
+    speedToggle.setAttribute('aria-expanded', 'false')
+  }
   speedToggle.addEventListener('click', () => {
     const isOpening = speedPopover.classList.contains('u-hidden')
     speedPopover.classList.toggle('u-hidden', !isOpening)
@@ -2773,10 +2794,49 @@ document.addEventListener('DOMContentLoaded', async () => {
   for (const eventName of ['click', 'mousedown', 'pointerdown', 'touchstart'] as const) {
     speedPopover.addEventListener(eventName, (event) => event.stopPropagation())
   }
+  document.addEventListener('pointerdown', (event) => {
+    const target = event.target as HTMLElement
+    if (target.closest('.floating-speed-control')) return
+    closeSpeedPopover()
+  })
   speedSlider.addEventListener('input', () => {
     applyPlaybackRatePreference(audioController, Number.parseFloat(speedSlider.value), {
       snap: true,
     })
+  })
+  speedSlider.addEventListener('pointerdown', (event) => {
+    event.preventDefault()
+    speedSlider.setPointerCapture(event.pointerId)
+    applyPlaybackRatePreference(
+      audioController,
+      playbackRateFromSliderPointer(speedSlider, event.clientX),
+      { snap: true }
+    )
+  })
+  speedSlider.addEventListener('pointermove', (event) => {
+    if (!speedSlider.hasPointerCapture(event.pointerId)) return
+    applyPlaybackRatePreference(
+      audioController,
+      playbackRateFromSliderPointer(speedSlider, event.clientX),
+      { snap: true }
+    )
+  })
+  speedSlider.addEventListener('pointerup', (event) => {
+    if (speedSlider.hasPointerCapture(event.pointerId)) {
+      speedSlider.releasePointerCapture(event.pointerId)
+    }
+    applyPlaybackRatePreference(
+      audioController,
+      snapPlaybackRateToMark(
+        playbackRateFromSliderPointer(speedSlider, event.clientX),
+        Number.POSITIVE_INFINITY
+      )
+    )
+  })
+  speedSlider.addEventListener('pointercancel', (event) => {
+    if (speedSlider.hasPointerCapture(event.pointerId)) {
+      speedSlider.releasePointerCapture(event.pointerId)
+    }
   })
   speedSlider.addEventListener('change', () => {
     const playbackRate = snapPlaybackRateToMark(
