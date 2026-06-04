@@ -8,7 +8,7 @@
   "cueCount": 187,
   "tokenizationVersion": "v2",
   "audioVersion": "Source file: בראשית ז׳.m4a",
-  "savedAt": "2026-05-08T03:45:37.246Z",
+  "savedAt": "2026-06-04T23:20:56.571Z",
   "cues": [
     {
       "cueNumber": 1,
@@ -1236,7 +1236,7 @@
     },
     {
       "cueNumber": 154,
-      "timeStart": 197.04,
+      "timeStart": 196.947,
       "pageNumber": 6,
       "lineIndex": 26,
       "fragmentIndex": 0,
@@ -1244,7 +1244,7 @@
     },
     {
       "cueNumber": 155,
-      "timeStart": 197.549,
+      "timeStart": 197.541,
       "pageNumber": 6,
       "lineIndex": 26,
       "fragmentIndex": 0,
@@ -1252,7 +1252,7 @@
     },
     {
       "cueNumber": 156,
-      "timeStart": 199.073,
+      "timeStart": 198.974,
       "pageNumber": 6,
       "lineIndex": 26,
       "fragmentIndex": 0,
@@ -1260,7 +1260,7 @@
     },
     {
       "cueNumber": 157,
-      "timeStart": 199.49,
+      "timeStart": 199.345,
       "pageNumber": 6,
       "lineIndex": 26,
       "fragmentIndex": 0,
@@ -1268,7 +1268,7 @@
     },
     {
       "cueNumber": 158,
-      "timeStart": 200.716,
+      "timeStart": 200.496,
       "pageNumber": 6,
       "lineIndex": 26,
       "fragmentIndex": 0,
@@ -1276,7 +1276,7 @@
     },
     {
       "cueNumber": 159,
-      "timeStart": 203.007,
+      "timeStart": 203.031,
       "pageNumber": 6,
       "lineIndex": 26,
       "fragmentIndex": 0,
@@ -1284,7 +1284,7 @@
     },
     {
       "cueNumber": 160,
-      "timeStart": 203.724,
+      "timeStart": 203.746,
       "pageNumber": 6,
       "lineIndex": 26,
       "fragmentIndex": 0,
@@ -1292,7 +1292,7 @@
     },
     {
       "cueNumber": 161,
-      "timeStart": 205.545,
+      "timeStart": 205.393,
       "pageNumber": 6,
       "lineIndex": 26,
       "fragmentIndex": 0,
@@ -1300,7 +1300,7 @@
     },
     {
       "cueNumber": 162,
-      "timeStart": 205.973,
+      "timeStart": 206.147,
       "pageNumber": 6,
       "lineIndex": 27,
       "fragmentIndex": 0,
@@ -1308,7 +1308,7 @@
     },
     {
       "cueNumber": 163,
-      "timeStart": 207.437,
+      "timeStart": 207.482,
       "pageNumber": 6,
       "lineIndex": 27,
       "fragmentIndex": 0,
@@ -1316,7 +1316,7 @@
     },
     {
       "cueNumber": 164,
-      "timeStart": 208.64,
+      "timeStart": 208.509,
       "pageNumber": 6,
       "lineIndex": 27,
       "fragmentIndex": 0,
@@ -1324,7 +1324,7 @@
     },
     {
       "cueNumber": 165,
-      "timeStart": 210.885,
+      "timeStart": 210.767,
       "pageNumber": 6,
       "lineIndex": 27,
       "fragmentIndex": 0,
@@ -1332,7 +1332,7 @@
     },
     {
       "cueNumber": 166,
-      "timeStart": 213.537,
+      "timeStart": 213.527,
       "pageNumber": 6,
       "lineIndex": 27,
       "fragmentIndex": 0,
@@ -1340,7 +1340,7 @@
     },
     {
       "cueNumber": 167,
-      "timeStart": 214.014,
+      "timeStart": 214.044,
       "pageNumber": 6,
       "lineIndex": 27,
       "fragmentIndex": 0,
@@ -1348,7 +1348,7 @@
     },
     {
       "cueNumber": 168,
-      "timeStart": 216.949,
+      "timeStart": 216.98,
       "pageNumber": 6,
       "lineIndex": 27,
       "fragmentIndex": 0,
@@ -1356,7 +1356,7 @@
     },
     {
       "cueNumber": 169,
-      "timeStart": 217.657,
+      "timeStart": 217.593,
       "pageNumber": 6,
       "lineIndex": 28,
       "fragmentIndex": 0,
@@ -1364,7 +1364,7 @@
     },
     {
       "cueNumber": 170,
-      "timeStart": 218.462,
+      "timeStart": 218.347,
       "pageNumber": 6,
       "lineIndex": 28,
       "fragmentIndex": 0,
@@ -1372,7 +1372,7 @@
     },
     {
       "cueNumber": 171,
-      "timeStart": 219.876,
+      "timeStart": 220.019,
       "pageNumber": 6,
       "lineIndex": 28,
       "fragmentIndex": 0,
@@ -1380,7 +1380,7 @@
     },
     {
       "cueNumber": 172,
-      "timeStart": 220.42,
+      "timeStart": 220.353,
       "pageNumber": 6,
       "lineIndex": 28,
       "fragmentIndex": 0,
@@ -1388,7 +1388,7 @@
     },
     {
       "cueNumber": 173,
-      "timeStart": 220.896,
+      "timeStart": 220.729,
       "pageNumber": 6,
       "lineIndex": 28,
       "fragmentIndex": 0,
@@ -1396,7 +1396,7 @@
     },
     {
       "cueNumber": 174,
-      "timeStart": 222.604,
+      "timeStart": 222.618,
       "pageNumber": 6,
       "lineIndex": 28,
       "fragmentIndex": 0,
@@ -1404,7 +1404,7 @@
     },
     {
       "cueNumber": 175,
-      "timeStart": 223.252,
+      "timeStart": 223.219,
       "pageNumber": 6,
       "lineIndex": 29,
       "fragmentIndex": 0,
@@ -1412,7 +1412,7 @@
     },
     {
       "cueNumber": 176,
-      "timeStart": 225.193,
+      "timeStart": 225.393,
       "pageNumber": 6,
       "lineIndex": 29,
       "fragmentIndex": 0,
@@ -1420,7 +1420,7 @@
     },
     {
       "cueNumber": 177,
-      "timeStart": 227.247,
+      "timeStart": 227.282,
       "pageNumber": 6,
       "lineIndex": 29,
       "fragmentIndex": 0,
@@ -1428,7 +1428,7 @@
     },
     {
       "cueNumber": 178,
-      "timeStart": 227.954,
+      "timeStart": 227.802,
       "pageNumber": 6,
       "lineIndex": 29,
       "fragmentIndex": 0,
@@ -1436,7 +1436,7 @@
     },
     {
       "cueNumber": 179,
-      "timeStart": 229.073,
+      "timeStart": 229.113,
       "pageNumber": 6,
       "lineIndex": 29,
       "fragmentIndex": 0,
@@ -1444,7 +1444,7 @@
     },
     {
       "cueNumber": 180,
-      "timeStart": 229.319,
+      "timeStart": 229.419,
       "pageNumber": 6,
       "lineIndex": 29,
       "fragmentIndex": 0,
@@ -1452,7 +1452,7 @@
     },
     {
       "cueNumber": 181,
-      "timeStart": 231.773,
+      "timeStart": 231.838,
       "pageNumber": 6,
       "lineIndex": 29,
       "fragmentIndex": 0,
@@ -1460,7 +1460,7 @@
     },
     {
       "cueNumber": 182,
-      "timeStart": 232.203,
+      "timeStart": 232.182,
       "pageNumber": 6,
       "lineIndex": 30,
       "fragmentIndex": 0,
@@ -1468,7 +1468,7 @@
     },
     {
       "cueNumber": 183,
-      "timeStart": 234.499,
+      "timeStart": 234.401,
       "pageNumber": 6,
       "lineIndex": 30,
       "fragmentIndex": 0,
@@ -1476,7 +1476,7 @@
     },
     {
       "cueNumber": 184,
-      "timeStart": 239.307,
+      "timeStart": 239.422,
       "pageNumber": 6,
       "lineIndex": 30,
       "fragmentIndex": 0,
@@ -1484,7 +1484,7 @@
     },
     {
       "cueNumber": 185,
-      "timeStart": 239.937,
+      "timeStart": 239.984,
       "pageNumber": 6,
       "lineIndex": 30,
       "fragmentIndex": 0,
@@ -1492,7 +1492,7 @@
     },
     {
       "cueNumber": 186,
-      "timeStart": 244.412,
+      "timeStart": 244.366,
       "pageNumber": 6,
       "lineIndex": 30,
       "fragmentIndex": 0,
@@ -1500,7 +1500,7 @@
     },
     {
       "cueNumber": 187,
-      "timeStart": 244.98,
+      "timeStart": 244.904,
       "pageNumber": 6,
       "lineIndex": 30,
       "fragmentIndex": 0,

@@ -68,6 +68,7 @@ type PlaybackAliyahIndex = Exclude<LeiningAliyah['index'], undefined>
 let display: ScrollDisplay
 let readerPreferences: ReaderPreferences = getDefaultReaderPreferences()
 let lastReaderHash = '#/next'
+let currentReaderHash: string | null = null
 let progressFrame = 0
 let deferredProgressFrame = 0
 let progressAnchorLoadPromise: Promise<void> | null = null
@@ -297,6 +298,15 @@ function setAdminPanelVisible(
   syncAdminPanelState(audioController)
 }
 
+function closeAdminMode(audioController?: AudioController | null) {
+  adminState.recording = false
+  adminState.unlocked = false
+  const controller = audioController ?? audioControllerGlobal
+  controller?.pause()
+  if (controller) updateFloatingPlayer(controller)
+  setAdminPanelVisible(false, controller)
+}
+
 const syncReaderProgressVisibility = () => {
   const visible =
     parseCurrentRoute()?.view === 'reader' && !isShowingParshaPicker()
@@ -306,6 +316,31 @@ const syncReaderProgressVisibility = () => {
     '[data-target-id="reader-progress-mobile"]',
     '.reader-corner-controls',
   ].forEach((selector) => setVisibility({ selector, visible }))
+}
+
+const syncReaderSideNavigationVisibility = () => {
+  const visible =
+    parseCurrentRoute()?.view === 'reader' && !isShowingParshaPicker()
+
+  setVisibility({ selector: '.reader-side', visible })
+}
+
+function resetReaderSideNavigationState(audioController?: AudioController) {
+  setFloatingPlayerExpanded(false)
+  document
+    .querySelector<HTMLElement>('[data-target-id="floating-speed-popover"]')
+    ?.classList.add('u-hidden')
+  document
+    .querySelector<HTMLButtonElement>('[data-target-id="floating-speed-toggle"]')
+    ?.setAttribute('aria-expanded', 'false')
+
+  if (!audioController) return
+  audioController.clearSession()
+  highlightControllerGlobal?.clear()
+  updateFloatingPlayer(audioController)
+  refreshInlineAudioButtons(audioController)
+  syncToolbarCurrentAliyahButton(null, audioController)
+  syncAdminPanelState(audioController)
 }
 
 const showParshaPicker = () => {
@@ -323,6 +358,7 @@ const showParshaPicker = () => {
 
   jumper.onMount()
   syncReaderProgressVisibility()
+  syncReaderSideNavigationVisibility()
   syncToolbarCurrentAliyahButton(null, audioControllerGlobal ?? undefined)
 }
 
@@ -342,6 +378,7 @@ const hideParshaPicker = () => {
   }
 
   syncReaderProgressVisibility()
+  syncReaderSideNavigationVisibility()
   refreshReaderChrome(audioControllerGlobal ?? undefined)
 }
 
@@ -349,7 +386,14 @@ const isShowingParshaPicker = () =>
   Boolean(document.querySelector('.parsha-picker'))
 
 const toggleParshaPicker = () => {
-  if (parseCurrentRoute()?.view !== 'reader') {
+  const route = parseCurrentRoute()
+  const readerShell = document.querySelector<HTMLElement>(
+    '[data-target-id="reader-shell"]'
+  )
+  const isRenderedReaderView =
+    Boolean(display) && !readerShell?.classList.contains('u-hidden')
+
+  if (route?.view !== 'reader' && !isRenderedReaderView) {
     location.hash = lastReaderHash
     return
   }
@@ -544,7 +588,6 @@ function applyPlaybackRatePreference(
     ? snapPlaybackRateToMark(requestedRate)
     : clampPlaybackRate(requestedRate)
   readerPreferences = mergeReaderPreferences(readerPreferences, { playbackRate })
-  saveReaderPreferences(readerPreferences)
   applyReaderPreferences(readerPreferences)
   audioController.audio.playbackRate = playbackRate
   syncSettingsPlaybackRateInput()
@@ -590,15 +633,6 @@ async function playNetworkRecording(
   if (audioController.audio.paused && !canPlayNetworkRecording(retry)) return false
   if (audioController.audio.error && audioController.session) audioController.audio.load()
   await audioController.play()
-  return true
-}
-
-async function toggleNetworkRecordingPlayback(
-  audioController: AudioController,
-  retry?: () => Promise<void>
-) {
-  if (audioController.audio.paused && !canPlayNetworkRecording(retry)) return false
-  await audioController.togglePlayback()
   return true
 }
 
@@ -660,6 +694,15 @@ function aliyahMarkerSelector(runId: string, aliyahIndex: PlaybackAliyahIndex) {
 
 function isSameRunMaftirMarker(marker: HTMLElement | null, runId: string) {
   return marker?.dataset.runId === runId && marker.dataset.aliyahIndex === 'Maftir'
+}
+
+const aliyahTokenKeysCache = new Map<string, string[]>()
+
+function getAliyahTokenKeysCacheKey(
+  runId: string,
+  aliyahIndex: PlaybackAliyahIndex
+) {
+  return `${runId}:${aliyahIndex}`
 }
 
 function setControlIcon(element: HTMLElement | null, icon: IconName) {
@@ -855,6 +898,10 @@ async function collectAliyahTokenKeys({
   runId: string
   aliyahIndex: PlaybackAliyahIndex
 }) {
+  const cacheKey = getAliyahTokenKeysCacheKey(runId, aliyahIndex)
+  const cachedTokenKeys = aliyahTokenKeysCache.get(cacheKey)
+  if (cachedTokenKeys) return [...cachedTokenKeys]
+
   const markerSelector = aliyahMarkerSelector(runId, aliyahIndex)
   let marker = document.querySelector<HTMLElement>(markerSelector)
   while (!marker) {
@@ -892,11 +939,13 @@ async function collectAliyahTokenKeys({
   const endLine = nextMarker?.closest<HTMLElement>('[data-class="line"]') ?? null
   if (!startLine) return []
 
-  return collectTokenKeysForAliyahRange({
+  const tokenKeys = collectTokenKeysForAliyahRange({
     book: getBook(),
     startLine,
     endLine,
   })
+  if (tokenKeys.length) aliyahTokenKeysCache.set(cacheKey, tokenKeys)
+  return [...tokenKeys]
 }
 
 async function seekAudioSessionToTokenKey(
@@ -925,6 +974,26 @@ async function seekAudioSessionToTokenKey(
       scroll: true,
     })
   }
+}
+
+function isCurrentPlaybackWithinTokenKeys(
+  audioController: AudioController,
+  highlightController: HighlightController,
+  tokenKeys: string[]
+) {
+  const activeTokenKey = highlightController.getActiveTokenKey()
+  if (activeTokenKey && tokenKeys.includes(activeTokenKey)) return true
+
+  const session = audioController.session
+  if (!session?.cues.length) return false
+
+  const cueIndex = highlightController.getCueIndex(
+    session.cues,
+    audioController.audio.currentTime
+  )
+  if (cueIndex < 0) return false
+
+  return tokenKeys.includes(cueKey(session.cues[cueIndex]))
 }
 
 async function loadAudioSessionForRecording(
@@ -1088,6 +1157,9 @@ function updateFloatingPlayer(audioController: AudioController) {
   const replayButton = document.querySelector<HTMLButtonElement>(
     '[data-target-id="floating-replay"]'
   )!
+  const expandButton = document.querySelector<HTMLButtonElement>(
+    '[data-target-id="floating-expand-toggle"]'
+  )!
   const downloadLink = document.querySelector<HTMLAnchorElement>(
     '[data-target-id="floating-download"]'
   )!
@@ -1106,7 +1178,7 @@ function updateFloatingPlayer(audioController: AudioController) {
   cornerControls?.classList.toggle('mod-raised', Boolean(activeSession))
   const isPaused = audioController.audio.paused
   setControlIcon(playButton, isPaused ? 'play' : 'pause')
-  for (const button of [prevButton, playButton, nextButton, replayButton]) {
+  for (const button of [prevButton, playButton, nextButton, replayButton, expandButton]) {
     button.disabled = !activeSession
   }
   mobileDash.disabled = !activeSession
@@ -1158,38 +1230,75 @@ function setFloatingPlayerExpanded(expanded: boolean) {
 
   player.classList.toggle('is-expanded', nextExpanded)
   player.classList.toggle('mod-expandable', canExpand)
-  player.title = !canExpand
-    ? ''
-    : nextExpanded
-      ? 'Click to collapse player progress'
-      : 'Click to show player progress'
+  player.removeAttribute('title')
+
+  const expandButton = document.querySelector<HTMLButtonElement>(
+    '[data-target-id="floating-expand-toggle"]'
+  )
+  if (!expandButton) return
+
+  const label = nextExpanded ? 'Hide player progress' : 'Show player progress'
+  setControlIcon(expandButton, nextExpanded ? 'collapse' : 'expand')
+  expandButton.title = label
+  expandButton.setAttribute('aria-label', label)
+  expandButton.setAttribute('aria-expanded', `${nextExpanded}`)
+}
+
+function getProgressTargets() {
+  const player = document.querySelector<HTMLElement>('[data-target-id="floating-player"]')
+  const adminProgress = document.querySelector<HTMLElement>(
+    '[data-target-id="admin-progress"]'
+  )
+  return [player, adminProgress]
 }
 
 function updateFloatingPlayerAudioProgress(audioController: AudioController) {
-  const player = document.querySelector<HTMLElement>('[data-target-id="floating-player"]')
-  if (!player) return
-
   const { currentTime, duration } = audioController.audio
   const progress =
     audioController.session && Number.isFinite(duration) && duration > 0
       ? Math.max(0, Math.min(1, currentTime / duration))
       : 0
 
-  player.style.setProperty('--audio-progress-ratio', `${progress}`)
+  for (const target of getProgressTargets()) {
+    target?.style.setProperty('--audio-progress-ratio', `${progress}`)
+  }
 
+  updateFloatingPlayerCueProgress(audioController)
+}
+
+function updateFloatingPlayerCueProgress(
+  audioController: AudioController,
+  cueIndex = audioController.session
+    ? getCurrentCueIndex(audioController.session, audioController.audio.currentTime)
+    : -1
+) {
+  const session = audioController.session
   const cueProgress =
-    audioController.session?.cues.length
+    session?.cues.length
       ? Math.max(
           0,
           Math.min(
             1,
-            Math.max(getCurrentCueIndex(audioController.session, currentTime) + 1, 1) /
-              audioController.session.cues.length
+            Math.max(cueIndex + 1, 1) / session.cues.length
           )
         )
       : 0
 
-  player.style.setProperty('--cue-progress-ratio', `${cueProgress}`)
+  for (const target of getProgressTargets()) {
+    target?.style.setProperty('--cue-progress-ratio', `${cueProgress}`)
+  }
+
+  const cueLabel = session?.cues.length
+    ? `${Math.max(cueIndex + 1, 1)} / ${session.cues.length}`
+    : '0 / 0'
+  const floatingCues = document.querySelector<HTMLElement>(
+    '[data-target-id="floating-meta-cues"]'
+  )
+  const adminCues = document.querySelector<HTMLElement>(
+    '[data-target-id="admin-meta-cues"]'
+  )
+  if (floatingCues) floatingCues.textContent = cueLabel
+  if (adminCues) adminCues.textContent = cueLabel
 }
 
 function formatDuration(seconds: number) {
@@ -1218,27 +1327,56 @@ function updateFloatingPlayerMeta(audioController: AudioController) {
   const aliyah = document.querySelector<HTMLElement>('[data-target-id="floating-meta-aliyah"]')
   const cues = document.querySelector<HTMLElement>('[data-target-id="floating-meta-cues"]')
   const duration = document.querySelector<HTMLElement>('[data-target-id="floating-meta-duration"]')
+  const adminCues = document.querySelector<HTMLElement>('[data-target-id="admin-meta-cues"]')
+  const adminDuration = document.querySelector<HTMLElement>(
+    '[data-target-id="admin-meta-duration"]'
+  )
   const session = audioController.session
 
-  if (!parsha || !aliyah || !cues || !duration) return
-
   if (!session) {
-    parsha.textContent = '—'
-    aliyah.textContent = '—'
-    cues.textContent = '0 / 0'
-    duration.textContent = '0:00 / 0:00'
+    if (parsha) parsha.textContent = '—'
+    if (aliyah) aliyah.textContent = '—'
+    if (cues) cues.textContent = '0 / 0'
+    if (duration) duration.textContent = '0:00 / 0:00'
+    if (adminCues) adminCues.textContent = '0 / 0'
+    if (adminDuration) adminDuration.textContent = '0:00 / 0:00'
     return
   }
 
   const cueIndex = getCurrentCueIndex(session, audioController.audio.currentTime)
   const currentCue = session.cues.length ? Math.max(cueIndex + 1, 1) : 0
-
-  parsha.textContent = session.recording.parshaName
-  aliyah.textContent = hebrewNumeral(session.recording.aliyah)
-  cues.textContent = `${currentCue} / ${session.cues.length}`
-  duration.textContent = `${formatDuration(audioController.audio.currentTime)} / ${formatDuration(
+  const cueLabel = `${currentCue} / ${session.cues.length}`
+  const durationLabel = `${formatDuration(audioController.audio.currentTime)} / ${formatDuration(
     audioController.audio.duration
   )}`
+
+  if (parsha) parsha.textContent = session.recording.parshaName
+  if (aliyah) aliyah.textContent = hebrewNumeral(session.recording.aliyah)
+  if (cues) cues.textContent = cueLabel
+  if (duration) duration.textContent = durationLabel
+  if (adminCues) adminCues.textContent = cueLabel
+  if (adminDuration) adminDuration.textContent = durationLabel
+}
+
+function pauseCurrentRecording(audioController: AudioController) {
+  audioController.pause()
+  updateFloatingPlayer(audioController)
+  refreshInlineAudioButtons(audioController)
+  syncAdminPanelState(audioController)
+}
+
+async function toggleCurrentRecordingPlayback(
+  audioController: AudioController,
+  retry?: () => Promise<void>
+) {
+  if (!audioController.audio.paused) {
+    pauseCurrentRecording(audioController)
+    return true
+  }
+
+  const played = await playNetworkRecording(audioController, retry)
+  if (played) updateFloatingPlayer(audioController)
+  return played
 }
 
 async function startPlaybackForButton(
@@ -1251,6 +1389,23 @@ async function startPlaybackForButton(
 
   if (audioController.session?.recording.id === state.recording.id) {
     if (state.aliyahIndex === 'Maftir') {
+      if (!audioController.audio.paused) {
+        pauseCurrentRecording(audioController)
+        return
+      }
+
+      const maftirTokenKeys = await collectAliyahTokenKeys({
+        runId: state.lineInfo.run.id,
+        aliyahIndex: state.aliyahIndex,
+      })
+
+      if (isCurrentPlaybackWithinTokenKeys(audioController, highlightController, maftirTokenKeys)) {
+        await toggleCurrentRecordingPlayback(audioController, () =>
+          startPlaybackForButton(button, audioController, highlightController)
+        )
+        return
+      }
+
       const session = await loadAudioSessionForRecording(
         {
           recording: state.recording,
@@ -1295,10 +1450,9 @@ async function startPlaybackForButton(
       }
     }
 
-    await toggleNetworkRecordingPlayback(audioController, () =>
+    await toggleCurrentRecordingPlayback(audioController, () =>
       startPlaybackForButton(button, audioController, highlightController)
     )
-    updateFloatingPlayer(audioController)
     return
   }
 
@@ -1352,6 +1506,26 @@ async function startPlaybackForToolbarCurrentAliyah(
 
   if (audioController.session?.recording.id === recording.id) {
     if (aliyahIndex === 'Maftir') {
+      if (!audioController.audio.paused) {
+        pauseCurrentRecording(audioController)
+        return
+      }
+
+      const maftirTokenKeys = await collectAliyahTokenKeys({ runId, aliyahIndex })
+
+      if (
+        isCurrentPlaybackWithinTokenKeys(
+          audioController,
+          highlightController,
+          maftirTokenKeys
+        )
+      ) {
+        await toggleCurrentRecordingPlayback(audioController, () =>
+          startPlaybackForToolbarCurrentAliyah(button, audioController, highlightController)
+        )
+        return
+      }
+
       const session = await loadAudioSessionForRecording(
         {
           recording,
@@ -1370,10 +1544,9 @@ async function startPlaybackForToolbarCurrentAliyah(
       return
     }
 
-    await toggleNetworkRecordingPlayback(audioController, () =>
+    await toggleCurrentRecordingPlayback(audioController, () =>
       startPlaybackForToolbarCurrentAliyah(button, audioController, highlightController)
     )
-    updateFloatingPlayer(audioController)
     return
   }
 
@@ -1599,12 +1772,32 @@ function mountAdminEditorUi() {
         <button type="button" class="toolbar-button" data-target-id="admin-trim-here">Trim From Here</button>
       </div>
       <div class="admin-panel-actions mod-secondary mod-timing">
-        <button type="button" class="toolbar-button" data-admin-nudge="-0.25">-250ms</button>
-        <button type="button" class="toolbar-button" data-admin-nudge="-0.05">-50ms</button>
-        <button type="button" class="toolbar-button" data-admin-nudge="0.05">+50ms</button>
-        <button type="button" class="toolbar-button" data-admin-nudge="0.25">+250ms</button>
+        <button type="button" class="toolbar-button" data-admin-nudge="-0.25" title="Move selected cue back 250ms" aria-label="Move selected cue back 250ms">-250</button>
+        <button type="button" class="toolbar-button" data-admin-nudge="-0.05" title="Move selected cue back 50ms" aria-label="Move selected cue back 50ms">-50</button>
+        <button type="button" class="toolbar-button" data-admin-nudge="0.05" title="Move selected cue forward 50ms" aria-label="Move selected cue forward 50ms">+50</button>
+        <button type="button" class="toolbar-button" data-admin-nudge="0.25" title="Move selected cue forward 250ms" aria-label="Move selected cue forward 250ms">+250</button>
       </div>
       <div class="admin-cue-list" data-target-id="admin-cue-list"></div>
+      <div class="admin-progress-list" data-target-id="admin-progress">
+        <div class="floating-player-progress-item">
+          <div class="floating-player-progress-head">
+            <span class="floating-player-progress-label">Word Progress</span>
+            <span class="floating-player-progress-value" data-target-id="admin-meta-cues">0 / 0</span>
+          </div>
+          <div class="floating-player-progress-track">
+            <div class="floating-player-progress-fill mod-cues"></div>
+          </div>
+        </div>
+        <div class="floating-player-progress-item">
+          <div class="floating-player-progress-head">
+            <span class="floating-player-progress-label">Audio Progress</span>
+            <span class="floating-player-progress-value" data-target-id="admin-meta-duration">0:00 / 0:00</span>
+          </div>
+          <div class="floating-player-progress-track">
+            <div class="floating-player-progress-fill mod-audio"></div>
+          </div>
+        </div>
+      </div>
     `
   )
 }
@@ -1772,8 +1965,19 @@ function syncAdminCueListViewport(list: HTMLElement, followCueIndex: number) {
       rows.length !== lastAdminRenderedCueCount)
 
   if (shouldFollow) {
-    rows[followCueIndex]?.scrollIntoView({
-      block: 'nearest',
+    const row = rows[followCueIndex]
+    const rowRect = row?.getBoundingClientRect()
+    const listRect = list.getBoundingClientRect()
+    if (rowRect && rowRect.top < listRect.top) {
+      list.scrollTop -= listRect.top - rowRect.top
+    } else if (rowRect && rowRect.bottom > listRect.bottom) {
+      list.scrollTop += rowRect.bottom - listRect.bottom
+    }
+
+    requestAnimationFrame(() => {
+      const panel = getAdminPanel()
+      if (!panel || panel.classList.contains('u-hidden')) return
+      panel.scrollTop = panel.scrollHeight - panel.clientHeight
     })
     lastAdminFollowedCueIndex = followCueIndex
   }
@@ -1787,6 +1991,34 @@ function focusAdminCueRow(index: number) {
     `[data-target-id="admin-cue-list"] [data-admin-cue-index="${index}"]`
   )
   row?.focus({ preventScroll: true })
+}
+
+function syncAdminCueListCurrentIndex(index: number) {
+  const panel = getAdminPanel()
+  if (!panel || panel.classList.contains('u-hidden')) return
+
+  const list = document.querySelector<HTMLElement>('[data-target-id="admin-cue-list"]')
+  if (!list) return
+
+  const currentRows = Array.from(
+    list.querySelectorAll<HTMLElement>('.admin-cue-row.is-current')
+  )
+  const currentRow = list.querySelector<HTMLElement>(
+    `[data-admin-cue-index="${index}"]`
+  )
+  if (
+    currentRow?.classList.contains('is-current') &&
+    currentRows.length === 1 &&
+    lastAdminFollowedCueIndex === index
+  ) {
+    return
+  }
+
+  for (const row of currentRows) {
+    if (row !== currentRow) row.classList.remove('is-current')
+  }
+  currentRow?.classList.add('is-current')
+  syncAdminCueListViewport(list, index)
 }
 
 function renderAdminCueList(audioController?: AudioController | null) {
@@ -2496,6 +2728,7 @@ function renderRoute(route: AppRoute, audioController: AudioController) {
     if (route.view === 'cue-analytics') mountCueAnalyticsPage(aboutView)
     titleEl.textContent = 'תיקון קוראים'
     syncReaderProgressVisibility()
+    syncReaderSideNavigationVisibility()
     return
   }
 
@@ -2505,8 +2738,15 @@ function renderRoute(route: AppRoute, audioController: AudioController) {
   if (route.canonicalHash && location.hash !== route.canonicalHash) {
     history.replaceState(null, '', route.canonicalHash)
   }
-  lastReaderHash = (route.canonicalHash ?? location.hash) || lastReaderHash
+  const nextReaderHash = (route.canonicalHash ?? location.hash) || lastReaderHash
+  const readerRouteChanged =
+    currentReaderHash !== null && currentReaderHash !== nextReaderHash
+  if (readerRouteChanged) resetReaderSideNavigationState(audioController)
+  if (readerRouteChanged && isShowingParshaPicker()) hideParshaPicker()
+  currentReaderHash = nextReaderHash
+  lastReaderHash = nextReaderHash
   syncReaderProgressVisibility()
+  syncReaderSideNavigationVisibility()
   app.jumpTo(route.model)
 }
 
@@ -2565,6 +2805,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setControlIcon(document.querySelector('[data-target-id="floating-play"]'), 'play')
   setControlIcon(document.querySelector('[data-target-id="floating-next"]'), 'next')
   setControlIcon(document.querySelector('[data-target-id="floating-replay"]'), 'replay')
+  setControlIcon(document.querySelector('[data-target-id="floating-expand-toggle"]'), 'expand')
   setControlIcon(document.querySelector('[data-target-id="floating-download"]'), 'download')
   setControlIcon(document.querySelector('[data-target-id="floating-video-download"]'), 'download')
   setControlIcon(document.querySelector('[data-target-id="settings-toggle"]'), 'settings2')
@@ -2716,6 +2957,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     cueNavigationIndex = cueIndex
     const cue = session.cues[cueIndex]
+    syncAdminCueListCurrentIndex(cueIndex)
+    updateFloatingPlayerCueProgress(audioController, cueIndex)
     if (highlightController.getActiveTokenKey() === cueKey(cue)) return
 
     void highlightController.activateCue(cue, {
@@ -2740,7 +2983,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document
     .querySelector('[data-target-id="floating-play"]')!
     .addEventListener('click', async () => {
-      await toggleNetworkRecordingPlayback(audioController, async () => {
+      await toggleCurrentRecordingPlayback(audioController, async () => {
         await playNetworkRecording(audioController)
       })
       focusReaderSurface()
@@ -2748,7 +2991,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document
     .querySelector('[data-target-id="floating-mobile-toggle"]')!
     .addEventListener('click', async () => {
-      await toggleNetworkRecordingPlayback(audioController, async () => {
+      await toggleCurrentRecordingPlayback(audioController, async () => {
         await playNetworkRecording(audioController)
       })
       focusReaderSurface()
@@ -2791,11 +3034,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     syncFloatingPlaybackRateControl(audioController)
     if (isOpening) speedSlider.focus({ preventScroll: true })
   })
-  for (const eventName of ['click', 'mousedown', 'pointerdown', 'touchstart'] as const) {
-    speedPopover.addEventListener(eventName, (event) => event.stopPropagation())
-  }
   document.addEventListener('pointerdown', (event) => {
     const target = event.target as HTMLElement
+    if (speedPopover.classList.contains('u-hidden')) return
     if (target.closest('.floating-speed-control')) return
     closeSpeedPopover()
   })
@@ -2827,10 +3068,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     applyPlaybackRatePreference(
       audioController,
-      snapPlaybackRateToMark(
-        playbackRateFromSliderPointer(speedSlider, event.clientX),
-        Number.POSITIVE_INFINITY
-      )
+      playbackRateFromSliderPointer(speedSlider, event.clientX),
+      { snap: true }
     )
   })
   speedSlider.addEventListener('pointercancel', (event) => {
@@ -2839,11 +3078,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   })
   speedSlider.addEventListener('change', () => {
-    const playbackRate = snapPlaybackRateToMark(
-      Number.parseFloat(speedSlider.value),
-      Number.POSITIVE_INFINITY
-    )
-    applyPlaybackRatePreference(audioController, playbackRate)
+    applyPlaybackRatePreference(audioController, Number.parseFloat(speedSlider.value), {
+      snap: true,
+    })
   })
   document
     .querySelector('[data-target-id="toolbar-current-aliyah-audio"]')!
@@ -2858,11 +3095,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       focusReaderSurface()
     })
   document
-    .querySelector('[data-target-id="floating-player"]')!
-    .addEventListener('click', (event) => {
-      const target = event.target as HTMLElement
-      if (target.closest('.floating-player-button')) return
-      if (target.closest('[data-target-id="floating-speed-popover"]')) return
+    .querySelector('[data-target-id="floating-expand-toggle"]')!
+    .addEventListener('click', () => {
       if (!audioController.session) return
       if (!floatingPlayerDesktopMediaQuery.matches) return
 
@@ -2943,6 +3177,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   document
     .querySelector('[data-target-id="export-close"]')!
     .addEventListener('click', hideExportModal)
+
+  document
+    .querySelector('[data-target-id="admin-close"]')!
+    .addEventListener('click', () => closeAdminMode(audioController))
 
   document
     .querySelector('[data-target-id="admin-record"]')!
@@ -3068,7 +3306,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (event.code === 'Space') {
       event.preventDefault()
-      void toggleNetworkRecordingPlayback(audioController, async () => {
+      void toggleCurrentRecordingPlayback(audioController, async () => {
         await playNetworkRecording(audioController)
       })
       return

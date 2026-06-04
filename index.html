@@ -176,6 +176,8 @@
                   </div>
                 </div>
               </div>
+              <button class="floating-player-button mod-expand" data-target-id="floating-expand-toggle" type="button"
+                title="Show player progress" aria-label="Show player progress" aria-expanded="false"></button>
               <a class="floating-player-button mod-download u-hidden" data-target-id="floating-download" href="#"
                 download title="Download current recording" aria-label="Download current recording"></a>
               <a class="floating-player-button mod-download u-hidden" data-target-id="floating-video-download" href="#"
@@ -310,7 +312,18 @@
     <aside class="admin-panel u-hidden" data-target-id="admin-panel">
       <div class="admin-panel-header">
         <strong>Admin Timing Mode</strong>
-        <span data-target-id="admin-cue-count">0 Words</span>
+        <div class="admin-panel-header-actions">
+          <span data-target-id="admin-cue-count">0 Words</span>
+          <button class="admin-panel-close" type="button" data-target-id="admin-close"
+            aria-label="Close admin timing mode" title="Close admin timing mode">
+            <svg class="ui-icon lucide lucide-x-icon lucide-x" xmlns="http://www.w3.org/2000/svg" width="24"
+              height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
+            </svg>
+          </button>
+        </div>
       </div>
       <div class="admin-panel-status" data-target-id="admin-status">
         Select an aliyah and press play to start timing words.

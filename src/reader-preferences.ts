@@ -111,6 +111,7 @@ export function loadReaderPreferences(): ReaderPreferences {
     return {
       ...defaults,
       ...parsed,
+      playbackRate: defaults.playbackRate,
       themeMode: isThemeMode(parsed.themeMode)
         ? parsed.themeMode
         : defaults.themeMode,
@@ -121,7 +122,13 @@ export function loadReaderPreferences(): ReaderPreferences {
 }
 
 export function saveReaderPreferences(preferences: ReaderPreferences) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences))
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({
+      ...preferences,
+      playbackRate: defaultReaderPreferences.playbackRate,
+    })
+  )
 }
 
 export function mergeReaderPreferences(

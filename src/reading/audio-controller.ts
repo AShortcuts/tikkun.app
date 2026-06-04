@@ -77,6 +77,14 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
     return session
   }
 
+  clearSession() {
+    this.audio.pause()
+    this.activeSession = null
+    this.audio.removeAttribute('src')
+    this.audio.load()
+    this.emit('playback-updated', { playing: false })
+  }
+
   togglePlayback() {
     if (this.audio.paused) return this.audio.play()
     this.audio.pause()

@@ -4,6 +4,7 @@ import {
   applyReaderPreferences,
   defaultReaderPreferences,
   loadReaderPreferences,
+  saveReaderPreferences,
 } from './reader-preferences.ts'
 
 test.beforeEach(() => {
@@ -62,6 +63,29 @@ test('falls back to the default theme for an invalid saved theme mode', (t) => {
   const preferences = loadReaderPreferences()
 
   t.is(preferences.themeMode, defaultReaderPreferences.themeMode)
+})
+
+test('does not restore a saved playback rate', (t) => {
+  localStorage.setItem(
+    'tikkun.reader-preferences.v3',
+    JSON.stringify({ playbackRate: 1.75 })
+  )
+
+  const preferences = loadReaderPreferences()
+
+  t.is(preferences.playbackRate, defaultReaderPreferences.playbackRate)
+})
+
+test('does not persist a non-default playback rate', (t) => {
+  saveReaderPreferences({
+    ...defaultReaderPreferences,
+    playbackRate: 1.75,
+  })
+
+  const raw = localStorage.getItem('tikkun.reader-preferences.v3')
+  const stored = raw ? JSON.parse(raw) as Partial<typeof defaultReaderPreferences> : null
+
+  t.is(stored?.playbackRate, defaultReaderPreferences.playbackRate)
 })
 
 test('applies sepia to the root theme dataset', (t) => {

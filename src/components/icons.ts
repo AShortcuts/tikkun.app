@@ -6,6 +6,8 @@ export type IconName =
   | 'replay'
   | 'download'
   | 'settings2'
+  | 'expand'
+  | 'collapse'
 
 // Icons are from https://lucide.dev/icons v1.0.
 const iconPaths: Record<IconName, string> = {
@@ -38,6 +40,20 @@ const iconPaths: Record<IconName, string> = {
     <path d="M19 7h-9" />
     <circle cx="17" cy="17" r="3" />
     <circle cx="7" cy="7" r="3" />
+  `,
+  expand: `
+    <path d="M3 3h7" />
+    <path d="M3 3v7" />
+    <path d="M21 21h-7" />
+    <path d="M21 21v-7" />
+    <path d="m3 3 7 7" />
+    <path d="m21 21-7-7" />
+  `,
+  collapse: `
+    <path d="M10 3v7H3" />
+    <path d="M14 21v-7h7" />
+    <path d="m3 10 7-7" />
+    <path d="m21 14-7 7" />
   `,
 }
 
