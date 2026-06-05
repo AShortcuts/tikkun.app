@@ -137,11 +137,18 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section class="about-card stack small">
-        <div class="about-card-header">
-          <h2>Current audio catalog</h2>
-          <p>Recordings currently available for playback and download.</p>
-        </div>
+      <details class="about-card about-catalog-details stack small">
+        <summary class="about-catalog-summary">
+          <svg class="about-catalog-chevron lucide lucide-chevron-right-icon lucide-chevron-right" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+          <span class="about-card-header">
+            <span>
+              <span class="about-catalog-title">Current audio catalog</span>
+              <span class="about-catalog-copy">Recordings currently available for playback and download.</span>
+            </span>
+          </span>
+        </summary>
         <div class="about-table-wrap">
           <table class="about-table">
             <thead>
@@ -178,7 +185,7 @@ export default function AboutPage() {
             </tbody>
           </table>
         </div>
-      </section>
+      </details>
 
       <section class="about-card stack small">
         <div class="about-card-header">
