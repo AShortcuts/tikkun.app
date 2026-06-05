@@ -3,6 +3,7 @@ import test from 'ava'
 import {
   applyReaderPreferences,
   defaultReaderPreferences,
+  getDefaultHighlightPreferences,
   loadReaderPreferences,
   saveReaderPreferences,
 } from './reader-preferences.ts'
@@ -95,4 +96,19 @@ test('applies sepia to the root theme dataset', (t) => {
   })
 
   t.is(document.documentElement.dataset.readerTheme, 'sepia')
+})
+
+test('highlight reset defaults are not read from changed inline styles', (t) => {
+  applyReaderPreferences({
+    ...defaultReaderPreferences,
+    outlineOffset: 8,
+    radius: 16,
+    glow: 7,
+  })
+
+  const defaults = getDefaultHighlightPreferences()
+
+  t.is(defaults.outlineOffset, defaultReaderPreferences.outlineOffset)
+  t.is(defaults.radius, defaultReaderPreferences.radius)
+  t.is(defaults.glow, defaultReaderPreferences.glow)
 })

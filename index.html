@@ -231,82 +231,135 @@
             </svg></button>
         </div>
       </div>
-      <form class="settings-form stack medium" data-target-id="settings-form">
-        <label class="settings-field">
-          <span>Ba'al Koreh</span>
-          <select data-target-id="settings-narrator"></select>
-        </label>
-        <div class="settings-field">
-          <span>Theme</span>
-          <div class="settings-segmented-control" data-target-id="settings-theme-mode">
-            <button class="settings-segmented-option" type="button" data-theme-mode="automatic">Automatic</button>
-            <button class="settings-segmented-option" type="button" data-theme-mode="light">Light</button>
-            <button class="settings-segmented-option" type="button" data-theme-mode="sepia">Sepia</button>
-            <button class="settings-segmented-option" type="button" data-theme-mode="dark">Dark</button>
+      <form class="settings-form" data-target-id="settings-form">
+        <section class="settings-section">
+          <h3 class="settings-section-title">Reading</h3>
+          <label class="settings-field">
+            <span class="settings-field-copy">
+              <span class="settings-field-label">Ba'al Koreh</span>
+              <span class="settings-field-helper">Chooses whose recording the play buttons use.</span>
+            </span>
+            <select data-target-id="settings-narrator"></select>
+          </label>
+          <label class="settings-field mod-inline-compact">
+            <span class="settings-field-copy">
+              <span class="settings-field-label">Playback speed</span>
+              <span class="settings-field-helper">Makes the recording play slower or faster.</span>
+            </span>
+            <div class="settings-number-input">
+              <input data-target-id="settings-playback-rate" type="number" min="0.5" max="3" step="0.05"
+                inputmode="decimal" />
+              <span>x</span>
+            </div>
+          </label>
+        </section>
+
+        <section class="settings-section">
+          <h3 class="settings-section-title">Page Look</h3>
+          <div class="settings-field">
+            <span class="settings-field-copy">
+              <span class="settings-field-label">Theme</span>
+              <span class="settings-field-helper">Changes the page color behind the text.</span>
+            </span>
+            <div class="settings-segmented-control" data-target-id="settings-theme-mode">
+              <button class="settings-segmented-option" type="button" data-theme-mode="automatic">Automatic</button>
+              <button class="settings-segmented-option" type="button" data-theme-mode="light">Light</button>
+              <button class="settings-segmented-option" type="button" data-theme-mode="sepia">Sepia</button>
+              <button class="settings-segmented-option" type="button" data-theme-mode="dark">Dark</button>
+            </div>
           </div>
-        </div>
-        <label class="settings-field mod-inline-compact">
-          <span>Playback rate</span>
-          <div class="settings-number-input">
-            <input data-target-id="settings-playback-rate" type="number" min="0.5" max="3" step="0.05"
-              inputmode="decimal" />
-            <span>x</span>
-          </div>
-        </label>
-        <label class="settings-field mod-inline-compact">
-          <span>Highlight fill</span>
-          <input data-target-id="settings-highlight-fill" type="color" />
-        </label>
-        <label class="settings-field">
-          <span>Highlight opacity</span>
-          <div class="settings-range-input">
-            <input data-target-id="settings-highlight-opacity" type="range" min="0.05" max="0.45" step="0.01" />
-            <input data-target-id="settings-highlight-opacity-value" type="number" min="0.05" max="0.45" step="0.01"
-              inputmode="decimal" />
-          </div>
-        </label>
-        <label class="settings-field mod-inline-compact">
-          <span>Outline color</span>
-          <input data-target-id="settings-outline-color" type="color" />
-        </label>
-        <label class="settings-field">
-          <span>Outline width</span>
-          <div class="settings-range-input">
-            <input data-target-id="settings-outline-width" type="range" min="1" max="6" step="1" />
-            <input data-target-id="settings-outline-width-value" type="number" min="1" max="6" step="1"
-              inputmode="decimal" />
-          </div>
-        </label>
-        <label class="settings-field">
-          <span>Spacing around word</span>
-          <div class="settings-range-input">
-            <input data-target-id="settings-outline-offset" type="range" min="0" max="10" step="0.5" />
-            <input data-target-id="settings-outline-offset-value" type="number" min="0" max="10" step="0.5"
-              inputmode="decimal" />
-          </div>
-        </label>
-        <label class="settings-field">
-          <span>Corner radius</span>
-          <div class="settings-range-input">
-            <input data-target-id="settings-radius" type="range" min="0" max="16" step="1" />
-            <input data-target-id="settings-radius-value" type="number" min="0" max="16" step="1" inputmode="decimal" />
-          </div>
-        </label>
-        <label class="settings-field">
-          <span>Glow</span>
-          <div class="settings-range-input">
-            <input data-target-id="settings-glow" type="range" min="0" max="8" step="0.5" />
-            <input data-target-id="settings-glow-value" type="number" min="0" max="8" step="0.5" inputmode="decimal" />
-          </div>
-        </label>
-        <label class="settings-field mod-checkbox">
-          <input data-target-id="settings-auto-scroll" type="checkbox" />
-          <span>Auto-scroll with playback</span>
-        </label>
-        <label class="settings-field mod-checkbox">
-          <input data-target-id="settings-disable-shift-hide" type="checkbox" />
-          <span>Disable Shift key for nekudot hiding</span>
-        </label>
+        </section>
+
+        <section class="settings-section">
+          <h3 class="settings-section-title">Current Word</h3>
+          <label class="settings-field mod-inline-compact">
+            <span class="settings-field-copy">
+              <span class="settings-field-label">Fill color</span>
+              <span class="settings-field-helper">Changes the color washed behind the current word.</span>
+            </span>
+            <input data-target-id="settings-highlight-fill" type="color" />
+          </label>
+          <label class="settings-field">
+            <span class="settings-field-copy">
+              <span class="settings-field-label">Fill strength</span>
+              <span class="settings-field-helper">Makes the color behind the word lighter or stronger.</span>
+            </span>
+            <div class="settings-range-input">
+              <input data-target-id="settings-highlight-opacity" type="range" min="0.05" max="0.45" step="0.01" />
+              <input data-target-id="settings-highlight-opacity-value" type="number" min="0.05" max="0.45" step="0.01"
+                inputmode="decimal" />
+            </div>
+          </label>
+          <label class="settings-field mod-inline-compact">
+            <span class="settings-field-copy">
+              <span class="settings-field-label">Border color</span>
+              <span class="settings-field-helper">Changes the line color around the current word.</span>
+            </span>
+            <input data-target-id="settings-outline-color" type="color" />
+          </label>
+          <label class="settings-field">
+            <span class="settings-field-copy">
+              <span class="settings-field-label">Border thickness</span>
+              <span class="settings-field-helper">Makes the line around the word thinner or thicker.</span>
+            </span>
+            <div class="settings-range-input">
+              <input data-target-id="settings-outline-width" type="range" min="1" max="6" step="1" />
+              <input data-target-id="settings-outline-width-value" type="number" min="1" max="6" step="1"
+                inputmode="decimal" />
+            </div>
+          </label>
+          <label class="settings-field">
+            <span class="settings-field-copy">
+              <span class="settings-field-label">Breathing room</span>
+              <span class="settings-field-helper">Moves the border closer to or farther from the word.</span>
+            </span>
+            <div class="settings-range-input">
+              <input data-target-id="settings-outline-offset" type="range" min="0" max="10" step="0.5" />
+              <input data-target-id="settings-outline-offset-value" type="number" min="0" max="10" step="0.5"
+                inputmode="decimal" />
+            </div>
+          </label>
+          <label class="settings-field">
+            <span class="settings-field-copy">
+              <span class="settings-field-label">Corner shape</span>
+              <span class="settings-field-helper">Squares off or rounds the highlight corners.</span>
+            </span>
+            <div class="settings-range-input">
+              <input data-target-id="settings-radius" type="range" min="0" max="16" step="1" />
+              <input data-target-id="settings-radius-value" type="number" min="0" max="16" step="1"
+                inputmode="decimal" />
+            </div>
+          </label>
+          <label class="settings-field">
+            <span class="settings-field-copy">
+              <span class="settings-field-label">Halo</span>
+              <span class="settings-field-helper">Adds or removes the soft glow around the word.</span>
+            </span>
+            <div class="settings-range-input">
+              <input data-target-id="settings-glow" type="range" min="0" max="8" step="0.5" />
+              <input data-target-id="settings-glow-value" type="number" min="0" max="8" step="0.5"
+                inputmode="decimal" />
+            </div>
+          </label>
+        </section>
+
+        <section class="settings-section">
+          <h3 class="settings-section-title">Behavior</h3>
+          <label class="settings-field mod-checkbox">
+            <input data-target-id="settings-auto-scroll" type="checkbox" />
+            <span class="settings-field-copy">
+              <span class="settings-field-label">Auto-scroll with playback</span>
+              <span class="settings-field-helper">Keeps the current word in view while audio plays.</span>
+            </span>
+          </label>
+          <label class="settings-field mod-checkbox">
+            <input data-target-id="settings-disable-shift-hide" type="checkbox" />
+            <span class="settings-field-copy">
+              <span class="settings-field-label">Disable Shift key for Nekudot hiding</span>
+              <span class="settings-field-helper">Prevents Shift from hiding nekudot and ta'amim.</span>
+            </span>
+          </label>
+        </section>
       </form>
     </aside>
     <aside class="admin-panel u-hidden" data-target-id="admin-panel">

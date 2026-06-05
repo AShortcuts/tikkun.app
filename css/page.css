@@ -200,6 +200,7 @@
     var(--reader-highlight-outline-color);
   border-radius: var(--reader-highlight-border-radius);
   background: var(--reader-highlight-fill-surface);
+  box-shadow: 0 0 var(--reader-highlight-glow) var(--reader-highlight-fill-tint);
   pointer-events: none;
   animation: active-word-highlight-in 0.1s ease;
   animation-delay: var(--recording-highlight-animation-delay, 0s);
@@ -210,6 +211,7 @@
     border-color 0.1s linear,
     border-radius 0.1s ease,
     border-width 0.1s ease,
+    box-shadow 0.1s ease,
     background-color 0.1s ease;
 }
 

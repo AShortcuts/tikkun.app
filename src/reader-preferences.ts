@@ -83,15 +83,14 @@ export function getDefaultReaderPreferences(): ReaderPreferences {
 }
 
 export function getDefaultHighlightPreferences() {
-  const defaults = getDefaultReaderPreferences()
   return {
-    highlightFill: defaults.highlightFill,
-    highlightOpacity: defaults.highlightOpacity,
-    outlineColor: defaults.outlineColor,
-    outlineWidth: defaults.outlineWidth,
-    outlineOffset: defaults.outlineOffset,
-    radius: defaults.radius,
-    glow: defaults.glow,
+    highlightFill: defaultReaderPreferences.highlightFill,
+    highlightOpacity: defaultReaderPreferences.highlightOpacity,
+    outlineColor: defaultReaderPreferences.outlineColor,
+    outlineWidth: defaultReaderPreferences.outlineWidth,
+    outlineOffset: defaultReaderPreferences.outlineOffset,
+    radius: defaultReaderPreferences.radius,
+    glow: defaultReaderPreferences.glow,
   }
 }
 
