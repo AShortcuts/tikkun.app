@@ -66,6 +66,7 @@ const recordingMode = getRecordingModeConfig()
 type PlaybackAliyahIndex = Exclude<LeiningAliyah['index'], undefined>
 
 let display: ScrollDisplay
+let viewportTrackerGlobal: ViewportTracker | null = null
 let readerPreferences: ReaderPreferences = getDefaultReaderPreferences()
 let lastReaderHash = '#/next'
 let currentReaderHash: string | null = null
@@ -252,6 +253,7 @@ const app = {
       if (audioControllerGlobal && highlightControllerGlobal)
         syncCurrentSessionHighlight(audioControllerGlobal, highlightControllerGlobal)
     })
+    display.scrolled.then(() => viewportTrackerGlobal?.refresh())
   },
 }
 
@@ -2798,6 +2800,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   mountAdminEditorUi()
 
   const viewportTracker = new ViewportTracker(book)
+  viewportTrackerGlobal = viewportTracker
   const topBarModel = new TopBarTracker()
   const titleEl = getTitleEl()
 

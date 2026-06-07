@@ -34,6 +34,11 @@ let lastReportedRange: {
   center: string | null
   last: string | null
 }
+let lastReportedRunIds: {
+  first: string | null
+  center: string | null
+  last: string | null
+}
 
 let lineHeight: number
 
@@ -58,6 +63,11 @@ beforeEach(() => {
         first: renderLine(r.first),
         center: renderLine(r.center),
         last: renderLine(r.last),
+      }
+      lastReportedRunIds = {
+        first: r.first?.run?.id ?? null,
+        center: r.center?.run?.id ?? null,
+        last: r.last?.run?.id ?? null,
       }
     }))
   )
@@ -94,6 +104,19 @@ test('updates when scrolling down', async () => {
       ': וְיִקְחוּ־לִ֖י תְּרוּמָ֑ה מֵאֵ֤ת כׇּל־אִישׁ֙ אֲשֶׁ֣ר יִדְּבֶ֣נּוּ לִבּ֔וֹ',
     last: ': זָהָ֥ב וָכֶ֖סֶף וּנְחֹֽשֶׁת׃ וּתְכֵ֧לֶת וְאַרְגָּמָ֛ן וְתוֹלַ֥עַת שָׁנִ֖י',
   })
+})
+
+test('refreshes immediately after a programmatic jump while scroll events are throttled', async () => {
+  await resize(5)
+  await renderRun('2024-10-26:shacharis,main')
+  eventHandler.mockClear()
+
+  await renderRun('2025-03-01:shacharis,main')
+  expect(eventHandler).not.toBeCalled()
+
+  tracker!.refresh()
+
+  expect(lastReportedRunIds.center).toBe('2025-03-01:shacharis,main')
 })
 
 test('sends no event when scrolling by partial lines', async () => {
@@ -143,4 +166,3 @@ async function renderRun(runId: string) {
   await sd.scrolled
   return sd
 }
-

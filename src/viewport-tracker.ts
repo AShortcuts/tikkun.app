@@ -49,6 +49,10 @@ export class ViewportTracker extends EventEmitter<ViewportTrackerEvents> {
     )
   }
 
+  refresh() {
+    this.update()
+  }
+
   private update() {
     let updated = false
 
