@@ -38,6 +38,12 @@ import { normalizeFirstCueStart } from './audio/normalize-first-cue.ts'
 import { AudioController, ActiveAudioSession } from './reading/audio-controller.ts'
 import { HighlightController, cueKey } from './reading/highlight-controller.ts'
 import { collectTokenKeysForAliyahRange } from './reading/aliyah-token-sequence.ts'
+import {
+  createLastReadingHash,
+  LastReading,
+  loadEligibleLastReading,
+  saveLastReading,
+} from './reading/last-reading.ts'
 import type { AudioRecording, CueExportPayload, WordCue } from './audio/types.ts'
 import type { LeiningAliyah } from './calendar-model/model-types.ts'
 import { verifyAdminPassword } from './admin/access.ts'
@@ -80,6 +86,10 @@ let exportDownloadUrl: string | null = null
 let floatingPlayerExpanded = false
 let hasDismissedOfflinePrompt = false
 let pendingNetworkRecordingRetry: (() => Promise<void>) | null = null
+let lastReadingPromptDismissed = false
+let lastReadingPromptTarget: LastReading | null = null
+let shouldSaveLastReadingAfterRouteRender = false
+let hasUserScrolledReaderForLastReading = false
 const floatingPlayerDesktopMediaQuery = window.matchMedia('(min-width: 701px)')
 const PLAYBACK_RATE_MIN = 0.5
 const PLAYBACK_RATE_MAX = 3
@@ -247,13 +257,14 @@ const app = {
     )
     highlightControllerGlobal?.setDisplay(display)
 
-    display.rendered.then(() => {
+    const rendered = display.rendered.then(() => {
       hideParshaPicker()
       refreshReaderChrome()
       if (audioControllerGlobal && highlightControllerGlobal)
         syncCurrentSessionHighlight(audioControllerGlobal, highlightControllerGlobal)
     })
     display.scrolled.then(() => viewportTrackerGlobal?.refresh())
+    return rendered
   },
 }
 
@@ -327,6 +338,103 @@ const syncReaderSideNavigationVisibility = () => {
   setVisibility({ selector: '.reader-side', visible })
 }
 
+function getLastReadingPrompt() {
+  return document.querySelector<HTMLElement>(
+    '[data-target-id="last-reading-prompt"]'
+  )
+}
+
+function hideLastReadingPrompt() {
+  getLastReadingPrompt()?.classList.add('u-hidden')
+}
+
+function dismissLastReadingPrompt() {
+  lastReadingPromptDismissed = true
+  hideLastReadingPrompt()
+}
+
+function showLastReadingPrompt(lastReading: LastReading) {
+  if (lastReadingPromptDismissed || recordingMode.enabled) return
+  const prompt = getLastReadingPrompt()
+  const copy = document.querySelector<HTMLElement>(
+    '[data-target-id="last-reading-copy"]'
+  )
+  if (!prompt || !copy) return
+
+  const locationLabel = lastReading.aliyahLabel
+    ? `${lastReading.parshaName}, ${lastReading.aliyahLabel}`
+    : lastReading.parshaName
+  copy.textContent = `Resume ${locationLabel}?`
+  lastReadingPromptTarget = lastReading
+  prompt.classList.remove('u-hidden')
+}
+
+function setupLastReadingPrompt() {
+  document
+    .querySelector<HTMLButtonElement>('[data-target-id="last-reading-dismiss"]')
+    ?.addEventListener('click', dismissLastReadingPrompt)
+
+  document
+    .querySelector<HTMLButtonElement>('[data-target-id="last-reading-resume"]')
+    ?.addEventListener('click', () => {
+      const target = lastReadingPromptTarget
+      if (!target) return
+      dismissLastReadingPrompt()
+      shouldSaveLastReadingAfterRouteRender = true
+      if (location.hash === target.hash) {
+        window.dispatchEvent(new Event('hashchange'))
+        return
+      }
+      location.hash = target.hash
+    })
+}
+
+function requestLastReadingSaveAfterRouteRender() {
+  shouldSaveLastReadingAfterRouteRender = true
+  dismissLastReadingPrompt()
+}
+
+function lastReadingInputFromAnchor(
+  anchor: ReturnType<typeof getAliyahProgressAnchors>[number] | null
+) {
+  if (!display?.viewModel || !anchor?.run) return null
+  const aliyah = anchor.run.aliyot.find(
+    (candidate) => candidate.index === anchor.aliyahIndex
+  )
+  const hash = aliyah?.start
+    ? createLastReadingHash(anchor.run, aliyah.start)
+    : createLastReadingHash(anchor.run)
+  if (!hash || hash === '#/next') return null
+  return {
+    hash,
+    parshaName: display.viewModel.displayTitleForRun(anchor.run),
+    aliyahLabel: anchor.label === '—' ? undefined : anchor.label,
+  }
+}
+
+function saveLastReadingFromAnchor(
+  anchor: ReturnType<typeof getAliyahProgressAnchors>[number] | null
+) {
+  if (recordingMode.enabled || parseCurrentRoute()?.view !== 'reader') return
+  const input = lastReadingInputFromAnchor(anchor)
+  if (!input) return
+  saveLastReading(localStorage, input)
+}
+
+function saveCurrentLastReading() {
+  const anchors = getAliyahProgressAnchors()
+  if (!anchors.length) return
+
+  const book = getBook()
+  const viewportCenter = book.scrollTop + book.clientHeight / 2
+  let current = anchors[0] ?? null
+  for (const anchor of anchors) {
+    if (anchor.position <= viewportCenter) current = anchor
+    else break
+  }
+  saveLastReadingFromAnchor(current)
+}
+
 function resetReaderSideNavigationState(audioController?: AudioController) {
   setFloatingPlayerExpanded(false)
   document
@@ -355,6 +463,13 @@ const showParshaPicker = () => {
   ].forEach(({ selector, visible }) => setVisibility({ selector, visible }))
 
   const jumper = ParshaPicker(generator)
+  jumper.node.addEventListener('click', (event) => {
+    const target = event.target as HTMLElement
+    if (target.closest('a[href^="#/"]')) requestLastReadingSaveAfterRouteRender()
+  })
+  jumper.node.addEventListener('submit', () => {
+    requestLastReadingSaveAfterRouteRender()
+  })
 
   document.querySelector('[data-target-id="reader-shell"]')!.appendChild(jumper.node)
 
@@ -2724,6 +2839,7 @@ function renderRoute(route: AppRoute, audioController: AudioController) {
   if (route.view === 'about' || route.view === 'cue-analytics') {
     audioController.pause()
     setAdminPanelVisible(false, audioController)
+    hideLastReadingPrompt()
     readerShell.classList.add('u-hidden')
     aboutView.classList.remove('u-hidden')
     aboutView.innerHTML = route.view === 'about' ? AboutPage() : CueAnalyticsPage()
@@ -2749,7 +2865,11 @@ function renderRoute(route: AppRoute, audioController: AudioController) {
   lastReaderHash = nextReaderHash
   syncReaderProgressVisibility()
   syncReaderSideNavigationVisibility()
-  app.jumpTo(route.model)
+  const rendered = app.jumpTo(route.model)
+  if (shouldSaveLastReadingAfterRouteRender) {
+    shouldSaveLastReadingAfterRouteRender = false
+    void rendered.then(() => saveCurrentLastReading())
+  }
 }
 
 function navigateToHash(hash: string, audioController: AudioController) {
@@ -2772,6 +2892,7 @@ function toggleAboutRoute(audioController: AudioController) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  const openedHashless = !location.hash
   const book = getBook()
   const toggle = document.querySelector<HTMLInputElement>(
     '[data-target-id="annotations-toggle"]'
@@ -2798,6 +2919,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   const highlightController = new HighlightController(book)
   highlightControllerGlobal = highlightController
   mountAdminEditorUi()
+  setupLastReadingPrompt()
+  const launchLastReading =
+    openedHashless && !recordingMode.enabled
+      ? loadEligibleLastReading(localStorage)
+      : null
 
   const viewportTracker = new ViewportTracker(book)
   viewportTrackerGlobal = viewportTracker
@@ -2841,6 +2967,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     () => rememberLastScrolledPosition(),
     1000
   )
+  const saveLastReadingDebounced = debounce(() => saveCurrentLastReading(), 1000)
+
+  const markUserScrolledReaderForLastReading = () => {
+    hasUserScrolledReaderForLastReading = true
+    dismissLastReadingPrompt()
+  }
+
+  book.addEventListener('wheel', markUserScrolledReaderForLastReading, {
+    passive: true,
+  })
+  book.addEventListener('touchstart', markUserScrolledReaderForLastReading, {
+    passive: true,
+  })
+  book.addEventListener(
+    'keydown',
+    whenKey('ArrowDown', markUserScrolledReaderForLastReading)
+  )
+  book.addEventListener(
+    'keydown',
+    whenKey('ArrowUp', markUserScrolledReaderForLastReading)
+  )
+  book.addEventListener(
+    'keydown',
+    whenKey('PageDown', markUserScrolledReaderForLastReading)
+  )
+  book.addEventListener(
+    'keydown',
+    whenKey('PageUp', markUserScrolledReaderForLastReading)
+  )
 
   book.addEventListener('scroll', () => {
     if (!progressFrame) {
@@ -2850,6 +3005,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       })
     }
     rememberLastScrollPositionDebounced()
+    if (hasUserScrolledReaderForLastReading) saveLastReadingDebounced()
   })
 
   book.addEventListener('page-rendered', (event) => {
@@ -2866,6 +3022,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (playButton) {
       event.preventDefault()
       await startPlaybackForButton(playButton, audioController, highlightController)
+      saveLastReadingFromAnchor(getAliyahProgressAnchorForElement(playButton))
       focusReaderSurface()
       return
     }
@@ -2926,6 +3083,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       getAliyahProgressAnchorForElement(activeElement ?? word),
       audioController
     )
+    saveLastReadingFromAnchor(getAliyahProgressAnchorForElement(activeElement ?? word))
   })
 
   audioController.on('playback-updated', () => {
@@ -2989,6 +3147,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       await toggleCurrentRecordingPlayback(audioController, async () => {
         await playNetworkRecording(audioController)
       })
+      saveCurrentLastReading()
       focusReaderSurface()
     })
   document
@@ -2997,24 +3156,28 @@ document.addEventListener('DOMContentLoaded', async () => {
       await toggleCurrentRecordingPlayback(audioController, async () => {
         await playNetworkRecording(audioController)
       })
+      saveCurrentLastReading()
       focusReaderSurface()
     })
   document
     .querySelector('[data-target-id="floating-prev"]')!
     .addEventListener('click', () => {
       stepPlayback(-1, audioController, highlightController)
+      saveCurrentLastReading()
       focusReaderSurface()
     })
   document
     .querySelector('[data-target-id="floating-next"]')!
     .addEventListener('click', () => {
       stepPlayback(1, audioController, highlightController)
+      saveCurrentLastReading()
       focusReaderSurface()
     })
   document
     .querySelector('[data-target-id="floating-replay"]')!
     .addEventListener('click', async () => {
       await replayAliyahFromStart(audioController, highlightController)
+      saveCurrentLastReading()
       focusReaderSurface()
     })
   const speedToggle = document.querySelector<HTMLButtonElement>(
@@ -3550,4 +3713,5 @@ document.addEventListener('DOMContentLoaded', async () => {
       model: ScrollViewModel.forDate(generator, new Date()),
     }
   renderRoute(initialRoute, audioController)
+  if (launchLastReading) showLastReadingPrompt(launchLastReading)
 })
