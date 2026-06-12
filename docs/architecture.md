@@ -34,6 +34,7 @@ The app is treated as a PWA-capable static site rather than a native shell.
 - The generated service worker precaches non-media build output and uses cache-first behavior for same-origin assets.
 - Navigation requests use network-first behavior with cached fallback to `/index.html`.
 - Large media files are intentionally excluded from precache by path and extension to avoid oversized installs and unpredictable storage pressure.
+- Recording media should become available offline only through explicit user-requested offline downloads, not silent playback caching.
 
 If native app packaging is ever added, prefer treating Capacitor or another native wrapper as a packaging layer around the existing web build, not as a rewrite of the app architecture.
 
@@ -135,6 +136,5 @@ Avoid these patterns:
 
 ## Open Questions
 
-- Whether offline audio should remain browser-cache opportunistic or become an explicit per-parsha/per-aliyah download feature.
 - Whether a native wrapper such as Capacitor is worth adding later for app-store distribution or more reliable native media storage.
 - Whether admin cue editing should eventually move into a separate route/tool or remain embedded behind the current unlock flow.

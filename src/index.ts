@@ -264,10 +264,10 @@ const setVisibility = ({
   selector: string
   visible: boolean
 }) => {
-  const node = document.querySelector<HTMLElement>(selector)
-  if (!node) return
-  node.classList.toggle('u-hidden', !visible)
-  node.classList.toggle('mod-animated', !visible)
+  document.querySelectorAll<HTMLElement>(selector).forEach((node) => {
+    node.classList.toggle('u-hidden', !visible)
+    node.classList.toggle('mod-animated', !visible)
+  })
 }
 
 const getAdminPanel = () =>
@@ -3546,6 +3546,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const initialRoute =
     parseCurrentRoute() ?? {
       view: 'reader' as const,
+      canonicalHash: '#/next',
       model: ScrollViewModel.forDate(generator, new Date()),
     }
   renderRoute(initialRoute, audioController)
