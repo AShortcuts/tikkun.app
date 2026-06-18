@@ -1,4 +1,5 @@
 import { EventEmitter } from './event-emitter.ts'
+import { getReaderFocalPointClientY } from './reader-scroll.ts'
 import {
   RenderedLineInfo,
   RenderedPageInfo,
@@ -22,20 +23,17 @@ type ViewportTrackerEvents = {
 
 export class ViewportTracker extends EventEmitter<ViewportTrackerEvents> {
   private book: HTMLElement
+  private updateFrame = 0
   private readonly lineTrackers: {
     first: LineViewportTracker
     center: LineViewportTracker
     last: LineViewportTracker
   }
-  private readonly top: number
 
   constructor(book: HTMLElement) {
     super()
 
     this.book = book
-    this.top =
-      book.getBoundingClientRect().y +
-      parseFloat(getComputedStyle(book).paddingTop)
     this.lineTrackers = {
       first: new LineViewportTracker(ElementSearchDirection.Down, book),
       center: new LineViewportTracker(ElementSearchDirection.Down, book),
@@ -43,25 +41,41 @@ export class ViewportTracker extends EventEmitter<ViewportTrackerEvents> {
     }
     this.update()
 
-    book.addEventListener(
-      'scroll',
-      throttle(() => this.update(), 300)
-    )
+    book.addEventListener('scroll', () => this.scheduleUpdate())
   }
 
   refresh() {
+    if (this.updateFrame) {
+      cancelAnimationFrame(this.updateFrame)
+      this.updateFrame = 0
+    }
     this.update()
+  }
+
+  private scheduleUpdate() {
+    if (this.updateFrame) return
+
+    this.updateFrame = requestAnimationFrame(() => {
+      this.updateFrame = 0
+      if (!this.book.isConnected) return
+      this.update()
+    })
   }
 
   private update() {
     let updated = false
 
     // We cannot use ||  because we always need to update all trackers.
-    const height = document.documentElement.clientHeight
-    // TODO: Get actual height of new top bar.
-    if (this.lineTrackers.first.update(this.top)) updated = true
-    if (this.lineTrackers.center.update(height / 2)) updated = true
-    if (this.lineTrackers.last.update(height - 1)) updated = true
+    const bounds = this.book.getBoundingClientRect()
+    const paddingTop = parseFloat(getComputedStyle(this.book).paddingTop)
+    const viewportBottom = document.documentElement.clientHeight - 1
+    const clampToViewport = (y: number) => Math.max(0, Math.min(viewportBottom, y))
+    const firstLineY = clampToViewport(bounds.top + paddingTop)
+    const centerLineY = clampToViewport(getReaderFocalPointClientY(this.book))
+    const lastLineY = clampToViewport(bounds.bottom - 1)
+    if (this.lineTrackers.first.update(firstLineY)) updated = true
+    if (this.lineTrackers.center.update(centerLineY)) updated = true
+    if (this.lineTrackers.last.update(lastLineY)) updated = true
 
     if (updated) {
       this.emit('viewport-updated', {
@@ -190,24 +204,4 @@ function getLineInfo(el: Node) {
   if (!(el instanceof HTMLElement)) return null
   const pageNode = el.closest('.tikkun-page')
   return pageNode?.tikkunPage?.lines[Number(el.dataset.lineIndex)] ?? null
-}
-
-function throttle<TReturn, TArgs extends unknown[]>(
-  func: (...args: TArgs) => TReturn,
-  limit: number
-): (...args: TArgs) => TReturn {
-  let inThrottle: boolean
-  let lastResult: TReturn
-
-  return function (this: unknown, ...args): TReturn {
-    if (!inThrottle) {
-      inThrottle = true
-
-      setTimeout(() => (inThrottle = false), limit)
-
-      lastResult = func.apply(this, args)
-    }
-
-    return lastResult
-  }
 }

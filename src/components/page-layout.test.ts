@@ -24,7 +24,7 @@ test('centers line content with a structural balance rail instead of nudge offse
 
 test('keeps the desktop reader column centered in the app body', (t) => {
   t.true(readerEnhancementsCss.includes('--reader-side-rail-width: 80px'))
-  t.true(readerEnhancementsCss.includes('@media screen and (max-width: 1200px)'))
+  t.true(readerEnhancementsCss.includes('@media screen and (max-width: 1250px)'))
   t.regex(
     readerEnhancementsCss,
     /grid-template-columns:\s*var\(--reader-side-rail-width\)\s+minmax\(0,\s*1fr\)\s+var\(--reader-side-rail-width\);/
@@ -34,31 +34,32 @@ test('keeps the desktop reader column centered in the app body', (t) => {
 })
 
 test('uses the intended tikkun page responsive breakpoints', (t) => {
-  t.true(pageCss.includes('@media screen and (max-width: 1150px)'))
-  t.true(pageCss.includes('@media screen and (max-width: 1050px)'))
-  t.true(pageCss.includes('@media screen and (max-width: 850px)'))
-  t.false(pageCss.includes('@media screen and (max-width: 1100px)'))
-  t.false(pageCss.includes('@media screen and (max-width: 950px)'))
-  t.false(pageCss.includes('@media screen and (max-width: 800px)'))
+  t.true(pageCss.includes('@media screen and (max-width: 1180px)'))
+  t.true(pageCss.includes('@media screen and (max-width: 1120px)'))
+  t.true(pageCss.includes('@media screen and (max-width: 870px)'))
+  t.true(pageCss.includes('@media screen and (max-width: 385px)'))
+  t.false(pageCss.includes('@media screen and (max-width: 1150px)'))
+  t.false(pageCss.includes('@media screen and (max-width: 1050px)'))
+  t.false(pageCss.includes('@media screen and (max-width: 850px)'))
 })
 
 test('keeps verse numbers offscreen for the mobile pull gutter', (t) => {
-  const aliyotCollapseIndex = pageCss.indexOf('@media screen and (max-width: 530px)')
-  const versesCollapseIndex = pageCss.indexOf('@media screen and (max-width: 430px)')
+  const aliyotCollapseIndex = pageCss.indexOf('@media screen and (max-width: 550px)')
+  const versesCollapseIndex = pageCss.indexOf('@media screen and (max-width: 455px)')
 
   t.not(aliyotCollapseIndex, -1)
   t.not(versesCollapseIndex, -1)
   t.regex(
     pageCss,
-    /@media screen and \(max-width:\s*430px\)\s*{[\s\S]*?grid-template-columns:\s*0\s+minmax\(0,\s*1fr\)\s+0;[\s\S]*?\.line-gutter\.mod-verses\s*{[\s\S]*?grid-column:\s*3;[\s\S]*?overflow:\s*visible;[\s\S]*?\.location-indicator\.mod-verses\s*{[\s\S]*?transform:\s*translateX\(0\.45rem\);/
+    /@media screen and \(max-width:\s*455px\)\s*{[\s\S]*?grid-template-columns:\s*0\s+minmax\(0,\s*1fr\)\s+0;[\s\S]*?\.line-gutter\.mod-verses\s*{[\s\S]*?grid-column:\s*3;[\s\S]*?overflow:\s*visible;[\s\S]*?\.location-indicator\.mod-verses\s*{[\s\S]*?transform:\s*translateX\(0\.45rem\);/
   )
   t.false(
-    /@media screen and \(max-width:\s*430px\)\s*{[\s\S]*?\.line-gutter\.mod-verses,[\s\S]*?\.location-indicator\.mod-verses[\s\S]*?display:\s*none;/.test(
+    /@media screen and \(max-width:\s*455px\)\s*{[\s\S]*?\.line-gutter\.mod-verses,[\s\S]*?\.location-indicator\.mod-verses[\s\S]*?display:\s*none;/.test(
       pageCss
     )
   )
   t.false(
-    /@media screen and \(max-width:\s*430px\)\s*{[\s\S]*?\.tikkun-page table\s*{[\s\S]*?width:\s*100%;/.test(
+    /@media screen and \(max-width:\s*455px\)\s*{[\s\S]*?\.tikkun-page table\s*{[\s\S]*?width:\s*100%;/.test(
       pageCss
     )
   )
@@ -78,14 +79,14 @@ test('lets long verse labels overflow toward the side gutter', (t) => {
   t.false(pageCss.includes('max-width: calc(var(--verse-column-width) - 1ch)'))
   t.regex(
     pageCss,
-    /@media screen and \(max-width:\s*430px\)\s*{[\s\S]*?--verse-gutter-text-gap:\s*0ch;/
+    /@media screen and \(max-width:\s*455px\)\s*{[\s\S]*?--verse-gutter-text-gap:\s*0ch;/
   )
 })
 
 test('keeps aliyah audio buttons out of side-label flow', (t) => {
   const baseSideButtonIndex = pageCss.indexOf('.aliyah-badge .aliyah-audio-button')
   const constrainedSideButtonIndex = pageCss.indexOf(
-    '@media screen and (max-width: 850px)',
+    '@media screen and (max-width: 870px)',
     baseSideButtonIndex
   )
 
@@ -100,7 +101,7 @@ test('keeps aliyah audio buttons out of side-label flow', (t) => {
   )
   t.regex(
     pageCss,
-    /@media screen and \(max-width:\s*850px\)\s*{[\s\S]*?\.aliyah-badge \.aliyah-audio-button\s*{[\s\S]*?top:\s*calc\(100% \+ 0\.22rem\);[\s\S]*?transform:\s*none;/
+    /@media screen and \(max-width:\s*870px\)\s*{[\s\S]*?\.aliyah-badge \.aliyah-audio-button\s*{[\s\S]*?top:\s*calc\(100% \+ 0\.22rem\);[\s\S]*?transform:\s*none;/
   )
   t.false(/(?:^|\n)\.aliyah-audio-button\s*{[^}]*position:\s*absolute;/.test(pageCss))
   t.false(pageCss.includes('grid-row: 2'))

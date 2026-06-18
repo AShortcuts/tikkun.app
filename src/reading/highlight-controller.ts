@@ -1,5 +1,6 @@
 import type { WordCue } from '../audio/types.ts'
 import type { ScrollDisplay } from '../components/ScrollDisplay.ts'
+import { centerElementInScrollRoot } from '../reader-scroll.ts'
 
 const ACTIVE_CLASS = 'is-active-word'
 
@@ -168,32 +169,7 @@ export class HighlightController {
   }
 
   private scrollTokenIntoView(element: HTMLElement) {
-    const relativeTop = this.getElementTopWithinBook(element)
-    const targetTop =
-      relativeTop + element.offsetHeight / 2 - this.book.clientHeight / 2
-
-    this.book.scrollTo({
-      top: Math.max(0, targetTop),
-      behavior: 'smooth',
-    })
-  }
-
-  private getElementTopWithinBook(element: HTMLElement) {
-    let top = 0
-    let current: HTMLElement | null = element
-
-    while (current && current !== this.book) {
-      top += current.offsetTop
-      current = current.offsetParent as HTMLElement | null
-    }
-
-    if (current === this.book) {
-      return top
-    }
-
-    const bookRect = this.book.getBoundingClientRect()
-    const elementRect = element.getBoundingClientRect()
-    return this.book.scrollTop + (elementRect.top - bookRect.top)
+    centerElementInScrollRoot(this.book, element, { behavior: 'smooth' })
   }
 
   private indexTokenElements(root: ParentNode) {

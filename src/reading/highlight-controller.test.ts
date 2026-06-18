@@ -238,7 +238,7 @@ test('recenters even when the next highlighted token is already visible', async 
   t.is(book.scrollCalls.length, 2)
 })
 
-test('uses offset parent chain to center tokens inside the book', async (t) => {
+test('uses element geometry to center tokens inside the book', async (t) => {
   const scrollCalls: unknown[] = []
   const book = {
     addEventListener() {},
@@ -283,8 +283,8 @@ test('uses offset parent chain to center tokens inside the book', async (t) => {
     },
     getBoundingClientRect() {
       return {
-        top: 0,
-        bottom: 20,
+        top: 160,
+        bottom: 180,
         left: 0,
         right: 10,
         width: 10,

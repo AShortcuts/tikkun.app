@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tikkun highlight geometry demo</title>
+    <style>
+      @font-face {
+        font-family: 'ShlomosemiStam';
+        src: url('/assets/fonts/ShlomosemiStam.ttf');
+      }
+
+      :root {
+        --paper-color: oklch(98.5% 0 0);
+        --page-ink-color: oklch(0% 0 0 / 0.8);
+        --text-color: oklch(0% 0 0 / 0.72);
+        --light-text-color: oklch(0% 0 0 / 0.52);
+        --reader-highlight-fill: #ffd700;
+        --reader-highlight-fill-tint: rgba(255, 255, 0, 0.15);
+        --reader-highlight-fill-alpha-percent: 15%;
+        --reader-highlight-fill-alpha-inverse-percent: 85%;
+        --reader-highlight-outline-color: gold;
+        --reader-highlight-outline-width: 2px;
+        --reader-highlight-border-radius: 10px;
+        --reader-highlight-glow: 3.5px;
+        --reader-highlight-outline-offset: 3px;
+        --reader-highlight-expansion: calc(
+          var(--reader-highlight-outline-offset) +
+            var(--reader-highlight-outline-width)
+        );
+        --reader-highlight-outer-width: calc(
+          var(--reader-highlight-expansion) +
+            var(--reader-highlight-outline-width)
+        );
+        --reader-highlight-inner-radius: max(
+          0px,
+          calc(
+            var(--reader-highlight-border-radius) -
+              var(--reader-highlight-expansion)
+          )
+        );
+        color-scheme: light;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        --reader-highlight-fill-surface: color-mix(
+          in srgb,
+          var(--paper-color, white) var(--reader-highlight-fill-alpha-inverse-percent),
+          var(--reader-highlight-fill) var(--reader-highlight-fill-alpha-percent)
+        );
+        margin: 0;
+        background:
+          linear-gradient(90deg, oklch(0% 0 0 / 0.035) 1px, transparent 1px) 0 0 / 24px 24px,
+          linear-gradient(180deg, oklch(0% 0 0 / 0.03) 1px, transparent 1px) 0 0 / 24px 24px,
+          var(--paper-color);
+        color: var(--text-color);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+
+      main {
+        width: min(1120px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 32px 0 48px;
+      }
+
+      header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 24px;
+        align-items: end;
+        padding-bottom: 22px;
+        border-bottom: 1px solid oklch(0% 0 0 / 0.12);
+      }
+
+      h1 {
+        margin: 0;
+        color: var(--page-ink-color);
+        font-size: clamp(1.5rem, 3vw, 2.8rem);
+        line-height: 0.95;
+        letter-spacing: 0;
+      }
+
+      .note {
+        max-width: 58ch;
+        margin: 10px 0 0;
+        color: var(--light-text-color);
+        font-size: 0.98rem;
+        line-height: 1.45;
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        justify-content: flex-end;
+      }
+
+      button {
+        border: 1px solid oklch(0% 0 0 / 0.16);
+        border-radius: 8px;
+        background: oklch(100% 0 0 / 0.72);
+        color: var(--text-color);
+        cursor: pointer;
+        font: inherit;
+        padding: 8px 10px;
+      }
+
+      button[aria-pressed='true'] {
+        border-color: color-mix(in srgb, gold 62%, black);
+        background: color-mix(in srgb, gold 20%, white);
+        color: oklch(0% 0 0 / 0.82);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+        margin-top: 24px;
+      }
+
+      .method {
+        display: grid;
+        grid-template-rows: auto 1fr;
+        min-width: 0;
+        border-top: 3px solid oklch(0% 0 0 / 0.72);
+        padding-top: 12px;
+      }
+
+      .method h2 {
+        margin: 0;
+        color: var(--page-ink-color);
+        font-size: 1rem;
+        letter-spacing: 0;
+      }
+
+      .method p {
+        margin: 6px 0 0;
+        color: var(--light-text-color);
+        font-size: 0.86rem;
+        line-height: 1.35;
+      }
+
+      .sample-stack {
+        display: grid;
+        gap: 22px;
+        margin-top: 18px;
+      }
+
+      .sample {
+        min-height: 142px;
+        padding: 18px 16px;
+        border: 1px solid oklch(0% 0 0 / 0.1);
+        background: oklch(100% 0 0 / 0.52);
+        overflow: hidden;
+      }
+
+      .label {
+        margin-bottom: 14px;
+        color: var(--light-text-color);
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .line {
+        direction: rtl;
+        color: var(--page-ink-color);
+        font-family: ShlomosemiStam, serif;
+        font-size: clamp(3.2rem, 7vw, 5.3rem);
+        line-height: 1.05;
+        text-align: start;
+        white-space: normal;
+      }
+
+      .line.small {
+        font-size: clamp(2.5rem, 5vw, 3.8rem);
+      }
+
+      .line.production {
+        font-size: clamp(2.15rem, 4.9vw, 3.55rem);
+        line-height: 1.15;
+      }
+
+      .word {
+        display: inline;
+        position: relative;
+        border-radius: var(--reader-highlight-border-radius);
+      }
+
+      .active {
+        outline: none;
+      }
+
+      .method-before .active {
+        z-index: 0;
+        background: transparent;
+        box-shadow: none;
+      }
+
+      .method-before .active::before {
+        content: '';
+        position: absolute;
+        inset: calc(-1 * var(--reader-highlight-expansion));
+        z-index: -1;
+        border: var(--reader-highlight-outline-width) solid
+          var(--reader-highlight-outline-color);
+        border-radius: var(--reader-highlight-border-radius);
+        background: var(--reader-highlight-fill-surface);
+        box-shadow: 0 0 var(--reader-highlight-glow) var(--reader-highlight-fill-tint);
+        pointer-events: none;
+        animation: active-word-highlight-in 0.1s ease;
+      }
+
+      .method-direct .active {
+        background: var(--reader-highlight-fill-surface);
+        border-radius: var(--reader-highlight-inner-radius);
+        box-shadow:
+          0 0 0 var(--reader-highlight-expansion)
+          var(--reader-highlight-fill-surface),
+          0 0 0 var(--reader-highlight-outer-width)
+          var(--reader-highlight-outline-color),
+          0 0 var(--reader-highlight-glow)
+          var(--reader-highlight-outer-width)
+          var(--reader-highlight-fill-tint);
+        box-decoration-break: clone;
+        -webkit-box-decoration-break: clone;
+      }
+
+      .method-outline .active {
+        outline: var(--reader-highlight-outline-width) solid
+          var(--reader-highlight-outline-color);
+        outline-offset: var(--reader-highlight-outline-offset);
+        background: var(--reader-highlight-fill-surface);
+        border-radius: var(--reader-highlight-border-radius);
+        box-shadow: 0 0 var(--reader-highlight-glow) var(--reader-highlight-fill-tint);
+        box-decoration-break: clone;
+        -webkit-box-decoration-break: clone;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 24px;
+      }
+
+      .metric {
+        border-top: 1px solid oklch(0% 0 0 / 0.15);
+        padding-top: 10px;
+      }
+
+      .metric b {
+        display: block;
+        color: var(--page-ink-color);
+        font-size: 0.9rem;
+      }
+
+      .metric span {
+        display: block;
+        margin-top: 4px;
+        color: var(--light-text-color);
+        font-size: 0.82rem;
+        line-height: 1.35;
+      }
+
+      body.is-blinking .active {
+        animation: blink-word 0.75s steps(1, end) infinite;
+      }
+
+      @keyframes active-word-highlight-in {
+        from {
+          opacity: 0;
+          transform: scale(0.92);
+        }
+
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      @keyframes blink-word {
+        50% {
+          color: oklch(0% 0 0 / 0.28);
+        }
+      }
+
+      @media (max-width: 900px) {
+        header,
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        .toolbar {
+          justify-content: flex-start;
+        }
+
+        .metrics {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 520px) {
+        main {
+          width: min(100vw - 20px, 1120px);
+          padding-top: 18px;
+        }
+
+        .sample {
+          min-height: 118px;
+          padding: 14px 10px;
+        }
+
+        .metrics {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>Highlight geometry check</h1>
+          <p class="note">
+            Same text, same font, same highlight variables. Compare whether the
+            highlight surface covers the full token when a paseq is part of the
+            highlighted word. The Noach sample is the production line with
+            <span dir="rtl">צֹ֣הַר ׀</span>.
+          </p>
+        </div>
+        <div class="toolbar" aria-label="Demo controls">
+          <button id="blink-toggle" type="button" aria-pressed="false">
+            Blink active word
+          </button>
+          <button id="wide-toggle" type="button" aria-pressed="false">
+            Tight width
+          </button>
+        </div>
+      </header>
+
+      <section class="grid" aria-label="Highlight method comparison">
+        <article class="method method-before">
+          <h2>Current absolute ::before</h2>
+          <p>Separate positioned rectangle attached to an inline span.</p>
+          <div class="sample-stack">
+            <div class="sample">
+              <div class="label">Production: Noach, page 7</div>
+              <div class="line production">
+                <span class="word">וּשְׁלֹשִׁ֥ים</span>
+                <span class="word">אַמָּ֖ה</span>
+                <span class="word">קוֹמָתָֽהּ׃</span>
+                <span class="word active">צֹ֣הַר ׀</span>
+                <span class="word">תַּֽעֲשֶׂ֣ה</span>
+                <span class="word">לַתֵּבָ֗ה</span>
+                <span class="word">וְאֶל־</span>
+              </div>
+            </div>
+            <div class="sample">
+              <div class="label">Production: Vayetze, page 35</div>
+              <div class="line production">
+                <span class="word">עִמָּכֶ֖ם</span>
+                <span class="word">רָ֑ע</span>
+                <span class="word">וֵֽאלֹהֵ֨י</span>
+                <span class="word">אֲבִיכֶ֜ם</span>
+                <span class="word active">אֶ֣מֶשׁ ׀</span>
+                <span class="word">אָמַ֧ר</span>
+                <span class="word">אֵלַ֣י</span>
+                <span class="word">לֵאמֹ֗ר</span>
+              </div>
+            </div>
+            <div class="sample">
+              <div class="label">Synthetic short control</div>
+              <div class="line">
+                <span class="word">וַיֹּאמֶר</span>
+                <span class="word active">צֹהַר ׀</span>
+                <span class="word">תַּעֲשֶׂה</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="method method-direct">
+          <h2>Proposed background + box-shadow</h2>
+          <p>Paints on the inline text box itself, with no native outline.</p>
+          <div class="sample-stack">
+            <div class="sample">
+              <div class="label">Production: Noach, page 7</div>
+              <div class="line production">
+                <span class="word">וּשְׁלֹשִׁ֥ים</span>
+                <span class="word">אַמָּ֖ה</span>
+                <span class="word">קוֹמָתָֽהּ׃</span>
+                <span class="word active">צֹ֣הַר ׀</span>
+                <span class="word">תַּֽעֲשֶׂ֣ה</span>
+                <span class="word">לַתֵּבָ֗ה</span>
+                <span class="word">וְאֶל־</span>
+              </div>
+            </div>
+            <div class="sample">
+              <div class="label">Production: Vayetze, page 35</div>
+              <div class="line production">
+                <span class="word">עִמָּכֶ֖ם</span>
+                <span class="word">רָ֑ע</span>
+                <span class="word">וֵֽאלֹהֵ֨י</span>
+                <span class="word">אֲבִיכֶ֜ם</span>
+                <span class="word active">אֶ֣מֶשׁ ׀</span>
+                <span class="word">אָמַ֧ר</span>
+                <span class="word">אֵלַ֣י</span>
+                <span class="word">לֵאמֹ֗ר</span>
+              </div>
+            </div>
+            <div class="sample">
+              <div class="label">Synthetic short control</div>
+              <div class="line">
+                <span class="word">וַיֹּאמֶר</span>
+                <span class="word active">צֹהַר ׀</span>
+                <span class="word">תַּעֲשֶׂה</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="method method-outline">
+          <h2>Old native outline reference</h2>
+          <p>Included only to reproduce the older approach you moved away from.</p>
+          <div class="sample-stack">
+            <div class="sample">
+              <div class="label">Production: Noach, page 7</div>
+              <div class="line production">
+                <span class="word">וּשְׁלֹשִׁ֥ים</span>
+                <span class="word">אַמָּ֖ה</span>
+                <span class="word">קוֹמָתָֽהּ׃</span>
+                <span class="word active">צֹ֣הַר ׀</span>
+                <span class="word">תַּֽעֲשֶׂ֣ה</span>
+                <span class="word">לַתֵּבָ֗ה</span>
+                <span class="word">וְאֶל־</span>
+              </div>
+            </div>
+            <div class="sample">
+              <div class="label">Production: Vayetze, page 35</div>
+              <div class="line production">
+                <span class="word">עִמָּכֶ֖ם</span>
+                <span class="word">רָ֑ע</span>
+                <span class="word">וֵֽאלֹהֵ֨י</span>
+                <span class="word">אֲבִיכֶ֜ם</span>
+                <span class="word active">אֶ֣מֶשׁ ׀</span>
+                <span class="word">אָמַ֧ר</span>
+                <span class="word">אֵלַ֣י</span>
+                <span class="word">לֵאמֹ֗ר</span>
+              </div>
+            </div>
+            <div class="sample">
+              <div class="label">Synthetic short control</div>
+              <div class="line">
+                <span class="word">וַיֹּאמֶר</span>
+                <span class="word active">צֹהַר ׀</span>
+                <span class="word">תַּעֲשֶׂה</span>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="metrics" aria-label="What to verify">
+        <div class="metric">
+          <b>Coverage</b>
+          <span>The gold surface should include the visible paseq, not stop before it.</span>
+        </div>
+        <div class="metric">
+          <b>Stability</b>
+          <span>Use the blink toggle to check whether the highlight flashes or jumps.</span>
+        </div>
+        <div class="metric">
+          <b>Wrapping</b>
+          <span>Use tight width to force stress cases without changing production CSS.</span>
+        </div>
+        <div class="metric">
+          <b>Browser check</b>
+          <span>Compare Firefox and Safari especially; Chrome is usually less revealing here.</span>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const blinkToggle = document.querySelector('#blink-toggle')
+      const wideToggle = document.querySelector('#wide-toggle')
+      const samples = document.querySelectorAll('.sample')
+
+      blinkToggle.addEventListener('click', () => {
+        const isBlinking = document.body.classList.toggle('is-blinking')
+        blinkToggle.setAttribute('aria-pressed', String(isBlinking))
+      })
+
+      wideToggle.addEventListener('click', () => {
+        const isTight = wideToggle.getAttribute('aria-pressed') !== 'true'
+        wideToggle.setAttribute('aria-pressed', String(isTight))
+        for (const sample of samples) {
+          sample.style.maxWidth = isTight ? '260px' : ''
+        }
+      })
+    </script>
+  </body>
+</html>

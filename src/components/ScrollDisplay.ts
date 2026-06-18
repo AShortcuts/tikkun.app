@@ -6,6 +6,7 @@ import {
 } from '../view-model/scroll-view-model'
 import Page from './Page.ts'
 import utils from './utils.ts'
+import { centerElementInScrollRoot } from '../reader-scroll.ts'
 
 const { htmlToElement, purgeNode } = utils
 
@@ -57,12 +58,8 @@ export class ScrollDisplay {
   }
 
   private scrollTo({ element }: { element: HTMLElement }) {
-    // offsetTop is the <table>.  If we just rendered
-    // the previous page, we must add its top.
-    const relativeTop =
-      element.offsetTop + (element.offsetParent as HTMLElement).offsetTop
-    this.root.scrollTop =
-      relativeTop + element.offsetHeight / 2 - this.root.offsetHeight / 2
+    const target = getFirstVisibleWord(element) ?? element
+    centerElementInScrollRoot(this.root, target)
     // Raise an event so that the title updates.
     this.root.dispatchEvent(new Event('scroll'))
   }
@@ -139,4 +136,11 @@ function renderMessageNode(entry: RenderedMessageInfo) {
 
   node.appendChild(span)
   return node
+}
+
+function getFirstVisibleWord(line: HTMLElement) {
+  return [...line.querySelectorAll<HTMLElement>('.word')].find((word) => {
+    const rect = word.getBoundingClientRect()
+    return rect.width > 0 && rect.height > 0
+  }) ?? null
 }

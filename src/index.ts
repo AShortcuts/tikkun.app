@@ -4,7 +4,7 @@ import utils from './components/utils.ts'
 import { ScrollViewModel } from './view-model/scroll-view-model.ts'
 import { LeiningGenerator } from './calendar-model/generator.ts'
 import { ScrollDisplay } from './components/ScrollDisplay.ts'
-import { ViewportTracker } from './viewport-tracker.ts'
+import { ViewportTracker, type ViewportRange } from './viewport-tracker.ts'
 import { TopBarTracker } from './view-model/navigation/top-bar-model.ts'
 import {
   AppRoute,
@@ -18,6 +18,7 @@ import {
   applyReaderPreferences,
   getDefaultHighlightPreferences,
   getDefaultReaderPreferences,
+  isReaderFocalPointMode,
   isThemeMode,
   loadReaderPreferences,
   mergeReaderPreferences,
@@ -45,7 +46,8 @@ import {
   saveLastReading,
 } from './reading/last-reading.ts'
 import type { AudioRecording, CueExportPayload, WordCue } from './audio/types.ts'
-import type { LeiningAliyah } from './calendar-model/model-types.ts'
+import { getWordProgress } from './audio/progress.ts'
+import type { LeiningAliyah, LeiningRun } from './calendar-model/model-types.ts'
 import { verifyAdminPassword } from './admin/access.ts'
 import {
   getAdminDraftStorageKey,
@@ -60,6 +62,10 @@ import {
   getRecordingModeConfig,
   recordingModeAliyahLabel,
 } from './recording-mode.ts'
+import {
+  centerElementInScrollRoot,
+  getReaderFocalPointScrollTop,
+} from './reader-scroll.ts'
 
 const { whenKey } = utils
 
@@ -71,8 +77,17 @@ const generator = new LeiningGenerator({
 const recordingMode = getRecordingModeConfig()
 type PlaybackAliyahIndex = Exclude<LeiningAliyah['index'], undefined>
 
+type AliyahProgressAnchor = {
+  line: HTMLElement | null
+  label: string
+  run: LeiningRun | null
+  aliyahIndex: PlaybackAliyahIndex | null
+  position: number
+}
+
 let display: ScrollDisplay
 let viewportTrackerGlobal: ViewportTracker | null = null
+let latestViewportRange: ViewportRange | null = null
 let readerPreferences: ReaderPreferences = getDefaultReaderPreferences()
 let lastReaderHash = '#/next'
 let currentReaderHash: string | null = null
@@ -90,7 +105,7 @@ let lastReadingPromptDismissed = false
 let lastReadingPromptTarget: LastReading | null = null
 let shouldSaveLastReadingAfterRouteRender = false
 let hasUserScrolledReaderForLastReading = false
-const floatingPlayerDesktopMediaQuery = window.matchMedia('(min-width: 701px)')
+const floatingPlayerDesktopMediaQuery = window.matchMedia('(min-width: 716px)')
 const PLAYBACK_RATE_MIN = 0.5
 const PLAYBACK_RATE_MAX = 3
 const PLAYBACK_RATE_MAGNET_THRESHOLD = 0.09
@@ -101,6 +116,18 @@ const adminDraftTimeFormat = Intl.DateTimeFormat(undefined, {
   dateStyle: 'medium',
   timeStyle: 'short',
 })
+
+function applyHighlightRenderingDebugMode() {
+  const highlightMode = new URLSearchParams(location.search).get('highlight')
+  if (highlightMode === 'direct') {
+    document.documentElement.dataset.highlightRendering = 'direct'
+    return
+  }
+
+  delete document.documentElement.dataset.highlightRendering
+}
+
+applyHighlightRenderingDebugMode()
 
 const adminState: {
   unlocked: boolean
@@ -426,7 +453,7 @@ function saveCurrentLastReading() {
   if (!anchors.length) return
 
   const book = getBook()
-  const viewportCenter = book.scrollTop + book.clientHeight / 2
+  const viewportCenter = getReaderFocalPointScrollTop(book)
   let current = anchors[0] ?? null
   for (const anchor of anchors) {
     if (anchor.position <= viewportCenter) current = anchor
@@ -531,12 +558,6 @@ const toggleAnnotations = (getPreviousCheckedState: () => boolean) => {
   book.classList.toggle('mod-annotations-off', !toggle.checked)
 }
 
-const scrollState: { lastScrolledPosition: number; pageAtTop: HTMLElement | null } =
-  {
-    lastScrolledPosition: 0,
-    pageAtTop: null,
-  }
-
 const debounce = (callback: () => void, delay: number) => {
   let timeout: ReturnType<typeof setTimeout>
   return () => {
@@ -552,41 +573,6 @@ const setAppHeight = () => {
     '--app-height',
     `${window.innerHeight}px`
   )
-}
-
-function rememberLastScrolledPosition() {
-  const book = document.querySelector<HTMLElement>('[data-target-id="tikkun-book"]')
-  if (!book) return
-  const bookBoundingRect = book.getBoundingClientRect()
-
-  const topOfBookRelativeToViewport = {
-    x: bookBoundingRect.left + bookBoundingRect.width / 2,
-    y: bookBoundingRect.top,
-  }
-
-  const pageAtTop = [
-    ...(document.elementsFromPoint(
-      topOfBookRelativeToViewport.x,
-      topOfBookRelativeToViewport.y
-    ) as HTMLElement[]),
-  ].find((el) => el.className.includes('tikkun-page'))
-
-  if (!pageAtTop) return
-
-  scrollState.pageAtTop = pageAtTop
-  scrollState.lastScrolledPosition =
-    (book.scrollTop - pageAtTop.offsetTop) / pageAtTop.clientHeight
-}
-
-function resumeLastScrollPosition() {
-  if (!scrollState.pageAtTop) return
-  const book = document.querySelector<HTMLElement>('[data-target-id="tikkun-book"]')
-  if (!book) return
-  const pageRect = scrollState.pageAtTop.getBoundingClientRect()
-
-  book.scrollTop =
-    scrollState.pageAtTop.offsetTop +
-    scrollState.lastScrolledPosition * pageRect.height
 }
 
 function listenForRevealGesture(book: HTMLElement) {
@@ -840,7 +826,7 @@ function applyRecordingModePageLabels(root: ParentNode) {
   })
 }
 
-function getAliyahProgressAnchors() {
+function getAliyahProgressAnchors(): AliyahProgressAnchor[] {
   const book = getBook()
   const bookRect = book.getBoundingClientRect()
 
@@ -863,6 +849,42 @@ function getAliyahProgressAnchors() {
     .sort((a, b) => a.position - b.position)
 }
 
+function getPlaybackAliyahLabel(aliyahIndex: PlaybackAliyahIndex) {
+  if (aliyahIndex === 'Maftir') return 'מפטיר'
+  return ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'ששי', 'שביעי'][
+    aliyahIndex - 1
+  ]
+}
+
+function getCurrentAliyahFromViewportRange(
+  range: ViewportRange | null,
+  anchors: AliyahProgressAnchor[]
+): AliyahProgressAnchor | null {
+  const center = range?.center
+  const centerAliyah = center?.aliyot[0]
+  const centerRun = center?.run
+  if (!centerRun || !centerAliyah?.index) return null
+
+  const matchingAnchor = anchors.find(
+    (anchor) =>
+      anchor.run === centerRun && anchor.aliyahIndex === centerAliyah.index
+  )
+  if (matchingAnchor) {
+    return {
+      ...matchingAnchor,
+      label: getPlaybackAliyahLabel(centerAliyah.index),
+    }
+  }
+
+  return {
+    line: null,
+    label: getPlaybackAliyahLabel(centerAliyah.index),
+    run: centerRun,
+    aliyahIndex: centerAliyah.index,
+    position: getReaderFocalPointScrollTop(getBook()),
+  }
+}
+
 function getAliyahProgressAnchorForElement(element: HTMLElement) {
   const line = element.closest<HTMLElement>('[data-line-index]')
   if (!line) return null
@@ -880,6 +902,40 @@ function getAliyahProgressAnchorForElement(element: HTMLElement) {
   }
 
   return current
+}
+
+function getFirstVisibleWord(line: HTMLElement) {
+  return [...line.querySelectorAll<HTMLElement>('.word')].find((word) => {
+    const rect = word.getBoundingClientRect()
+    return rect.width > 0 && rect.height > 0
+  }) ?? null
+}
+
+function getReaderFocalPointScrollTarget(book: HTMLElement) {
+  const activeWord = book.querySelector<HTMLElement>('.word.is-active-word')
+  if (activeWord) return activeWord
+
+  const centerLine = latestViewportRange?.center
+  if (!centerLine) return null
+
+  const centerLineElement = [
+    ...book.querySelectorAll<HTMLElement>('[data-line-index]'),
+  ].find((line) => getLineInfoFromElement(line) === centerLine)
+  if (!centerLineElement) return null
+
+  return getFirstVisibleWord(centerLineElement) ?? centerLineElement
+}
+
+function recenterReaderFocalPoint(
+  target: HTMLElement | null,
+  options: ScrollToOptions = {}
+) {
+  const book = getBook()
+  if (target?.isConnected) {
+    centerElementInScrollRoot(book, target, options)
+  }
+  viewportTrackerGlobal?.refresh()
+  updateReaderProgress()
 }
 
 async function ensureNextProgressAnchorLoaded(currentIndex: number) {
@@ -1328,7 +1384,7 @@ function updateFloatingPlayer(audioController: AudioController) {
   updateFloatingPlayerAudioProgress(audioController)
   updateFloatingPlayerMeta(audioController)
   const anchors = getAliyahProgressAnchors()
-  const viewportCenter = getBook().scrollTop + getBook().clientHeight / 2
+  const viewportCenter = getReaderFocalPointScrollTop(getBook())
   let currentIndex = 0
   for (let i = 0; i < anchors.length; i++) {
     if (anchors[i].position <= viewportCenter) currentIndex = i
@@ -1390,32 +1446,24 @@ function updateFloatingPlayerCueProgress(
     : -1
 ) {
   const session = audioController.session
-  const cueProgress =
-    session?.cues.length
-      ? Math.max(
-          0,
-          Math.min(
-            1,
-            Math.max(cueIndex + 1, 1) / session.cues.length
-          )
-        )
-      : 0
+  const wordProgress = getWordProgress({
+    cueIndex,
+    cueCount: session?.cues.length ?? 0,
+    tokenCount: session?.tokenKeys.length ?? 0,
+  })
 
   for (const target of getProgressTargets()) {
-    target?.style.setProperty('--cue-progress-ratio', `${cueProgress}`)
+    target?.style.setProperty('--cue-progress-ratio', `${wordProgress.ratio}`)
   }
 
-  const cueLabel = session?.cues.length
-    ? `${Math.max(cueIndex + 1, 1)} / ${session.cues.length}`
-    : '0 / 0'
   const floatingCues = document.querySelector<HTMLElement>(
     '[data-target-id="floating-meta-cues"]'
   )
   const adminCues = document.querySelector<HTMLElement>(
     '[data-target-id="admin-meta-cues"]'
   )
-  if (floatingCues) floatingCues.textContent = cueLabel
-  if (adminCues) adminCues.textContent = cueLabel
+  if (floatingCues) floatingCues.textContent = wordProgress.label
+  if (adminCues) adminCues.textContent = wordProgress.label
 }
 
 function formatDuration(seconds: number) {
@@ -1461,17 +1509,20 @@ function updateFloatingPlayerMeta(audioController: AudioController) {
   }
 
   const cueIndex = getCurrentCueIndex(session, audioController.audio.currentTime)
-  const currentCue = session.cues.length ? Math.max(cueIndex + 1, 1) : 0
-  const cueLabel = `${currentCue} / ${session.cues.length}`
+  const wordProgress = getWordProgress({
+    cueIndex,
+    cueCount: session.cues.length,
+    tokenCount: session.tokenKeys.length,
+  })
   const durationLabel = `${formatDuration(audioController.audio.currentTime)} / ${formatDuration(
     audioController.audio.duration
   )}`
 
   if (parsha) parsha.textContent = session.recording.parshaName
   if (aliyah) aliyah.textContent = hebrewNumeral(session.recording.aliyah)
-  if (cues) cues.textContent = cueLabel
+  if (cues) cues.textContent = wordProgress.label
   if (duration) duration.textContent = durationLabel
-  if (adminCues) adminCues.textContent = cueLabel
+  if (adminCues) adminCues.textContent = wordProgress.label
   if (adminDuration) adminDuration.textContent = durationLabel
 }
 
@@ -1780,7 +1831,7 @@ async function replayAliyahFromStart(
   }
 }
 
-function updateReaderProgress() {
+function updateReaderProgress(range: ViewportRange | null = latestViewportRange) {
   const label = document.querySelector<HTMLElement>(
     '[data-target-id="reader-progress-label"]'
   )!
@@ -1805,7 +1856,7 @@ function updateReaderProgress() {
     return
   }
 
-  const viewportCenter = book.scrollTop + book.clientHeight / 2
+  const viewportCenter = getReaderFocalPointScrollTop(book)
 
   let currentIndex = 0
   for (let i = 0; i < anchors.length; i++) {
@@ -1814,13 +1865,24 @@ function updateReaderProgress() {
   }
 
   const current = anchors[currentIndex]
-  const next = anchors[currentIndex + 1]
-  label.textContent = current?.label ?? '—'
-  syncToolbarCurrentAliyahButton(current ?? null, audioControllerGlobal ?? undefined)
+  const currentForChrome = getCurrentAliyahFromViewportRange(range, anchors) ?? current
+  label.textContent = currentForChrome?.label ?? '—'
+  syncToolbarCurrentAliyahButton(
+    currentForChrome ?? null,
+    audioControllerGlobal ?? undefined
+  )
+  const matchingProgressIndex =
+    currentForChrome && currentForChrome.line
+      ? anchors.findIndex((anchor) => anchor.line === currentForChrome.line)
+      : currentIndex
+  const progressIndex =
+    matchingProgressIndex >= 0 ? matchingProgressIndex : currentIndex
+  const progressCurrent = anchors[progressIndex] ?? current
+  const next = anchors[progressIndex + 1]
 
-  if (!current || !next) {
-    if (current) {
-      void ensureNextProgressAnchorLoaded(currentIndex).then(() =>
+  if (!progressCurrent || !next) {
+    if (progressCurrent) {
+      void ensureNextProgressAnchorLoaded(progressIndex).then(() =>
         scheduleDeferredProgressRefresh()
       )
       return
@@ -1835,7 +1897,8 @@ function updateReaderProgress() {
     0,
     Math.min(
       1,
-      (viewportCenter - current.position) / (next.position - current.position)
+      (viewportCenter - progressCurrent.position) /
+        (next.position - progressCurrent.position)
     )
   )
   fill.style.height = `${Math.round(progress * 100)}%`
@@ -2678,6 +2741,9 @@ function setupSettingsPane(audioController: AudioController) {
   const themeModeButtons = [
     ...document.querySelectorAll<HTMLButtonElement>('[data-theme-mode]'),
   ]
+  const focalPointModeButtons = [
+    ...document.querySelectorAll<HTMLButtonElement>('[data-focal-point-mode]'),
+  ]
   const resetHighlightButton = document.querySelector<HTMLButtonElement>(
     '[data-target-id="settings-reset-highlight"]'
   )!
@@ -2713,14 +2779,28 @@ function setupSettingsPane(audioController: AudioController) {
       button.classList.toggle('is-active', isActive)
       button.setAttribute('aria-pressed', `${isActive}`)
     }
+    for (const button of focalPointModeButtons) {
+      const isActive =
+        button.dataset.focalPointMode === readerPreferences.focalPointMode
+      button.classList.toggle('is-active', isActive)
+      button.setAttribute('aria-pressed', `${isActive}`)
+    }
     syncFloatingPlaybackRateControl(audioController)
   }
 
   const applyUpdates = (updates: Partial<ReaderPreferences>) => {
+    const book = getBook()
+    const shouldSmoothRecenter =
+      updates.focalPointMode !== undefined &&
+      updates.focalPointMode !== readerPreferences.focalPointMode
+    const scrollTarget = shouldSmoothRecenter
+      ? getReaderFocalPointScrollTarget(book)
+      : null
     readerPreferences = mergeReaderPreferences(readerPreferences, updates)
     saveReaderPreferences(readerPreferences)
     applyReaderPreferences(readerPreferences)
     syncForm()
+    recenterReaderFocalPoint(scrollTarget, { behavior: 'smooth' })
     refreshReaderChrome(audioController)
   }
 
@@ -2809,6 +2889,13 @@ function setupSettingsPane(audioController: AudioController) {
       applyUpdates({ themeMode })
     })
   }
+  for (const button of focalPointModeButtons) {
+    button.addEventListener('click', () => {
+      const focalPointMode = button.dataset.focalPointMode
+      if (!isReaderFocalPointMode(focalPointMode)) return
+      applyUpdates({ focalPointMode })
+    })
+  }
   resetHighlightButton.addEventListener('click', () =>
     applyUpdates(getDefaultHighlightPreferences())
   )
@@ -2861,6 +2948,7 @@ function renderRoute(route: AppRoute, audioController: AudioController) {
     currentReaderHash !== null && currentReaderHash !== nextReaderHash
   if (readerRouteChanged) resetReaderSideNavigationState(audioController)
   if (readerRouteChanged && isShowingParshaPicker()) hideParshaPicker()
+  if (readerRouteChanged) latestViewportRange = null
   currentReaderHash = nextReaderHash
   lastReaderHash = nextReaderHash
   syncReaderProgressVisibility()
@@ -2943,12 +3031,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   viewportTracker.on('viewport-updated', (range) => {
     if (!display?.viewModel) return
+    latestViewportRange = range
     topBarModel.setLine(display.viewModel, range)
     const run = topBarModel.info.currentRun
     titleEl.textContent = formatTopBarTitle(
       run ? display.viewModel.displayTitleForRun(run) : undefined
     )
-    updateReaderProgress()
+    updateReaderProgress(range)
   })
 
   InfiniteScroller.new({
@@ -2963,10 +3052,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     },
   }).attach()
 
-  const rememberLastScrollPositionDebounced = debounce(
-    () => rememberLastScrolledPosition(),
-    1000
-  )
   const saveLastReadingDebounced = debounce(() => saveCurrentLastReading(), 1000)
 
   const markUserScrolledReaderForLastReading = () => {
@@ -3004,7 +3089,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateReaderProgress()
       })
     }
-    rememberLastScrollPositionDebounced()
     if (hasUserScrolledReaderForLastReading) saveLastReadingDebounced()
   })
 
@@ -3694,11 +3778,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   listenForRevealGesture(book)
   setAppHeight()
 
-  window.addEventListener('resize', () => {
+  let pendingResizeScrollTarget: HTMLElement | null = null
+  let resizeRecenterFrame = 0
+  const handleReaderViewportResize = () => {
+    pendingResizeScrollTarget ??= getReaderFocalPointScrollTarget(book)
     setAppHeight()
-    resumeLastScrollPosition()
-    updateReaderProgress()
-  })
+    if (resizeRecenterFrame) return
+
+    resizeRecenterFrame = requestAnimationFrame(() => {
+      resizeRecenterFrame = 0
+      const scrollTarget = pendingResizeScrollTarget
+      pendingResizeScrollTarget = null
+      recenterReaderFocalPoint(scrollTarget)
+    })
+  }
+
+  window.addEventListener('resize', handleReaderViewportResize)
+  window.visualViewport?.addEventListener('resize', handleReaderViewportResize)
 
   window.addEventListener('hashchange', () => {
     const route = parseCurrentRoute()

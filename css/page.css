@@ -22,31 +22,37 @@
   transition: transform var(--pull-transform);
 }
 
-@media screen and (max-width: 1150px) {
+@media screen and (max-width: 1180px) {
   .tikkun-page {
     --aliyah-column-width: 9.2ch;
     font-size: 1.65rem;
   }
 }
 
-@media screen and (max-width: 1050px) {
+@media screen and (max-width: 1120px) {
   .tikkun-page {
     --aliyah-column-width: 7.6ch;
     font-size: 1.4rem;
   }
 }
 
-@media screen and (max-width: 850px) {
+@media screen and (max-width: 870px) {
   .tikkun-page {
     --aliyah-column-width: 7ch;
     font-size: 1.15rem;
   }
 }
 
-@media screen and (max-width: 650px) {
+@media screen and (max-width: 670px) {
   .tikkun-page {
     --aliyah-column-width: 5.35ch;
     font-size: 1rem;
+  }
+}
+
+@media screen and (max-width: 385px) {
+  .tikkun-page {
+    font-size: 0.92rem;
   }
 }
 
@@ -120,7 +126,7 @@
   padding-left: var(--aliyah-gutter-gap);
 }
 
-@media screen and (max-width: 430px) {
+@media screen and (max-width: 455px) {
   .tikkun-page {
     --verse-gutter-text-gap: 0ch;
   }
@@ -213,6 +219,41 @@
     border-width 0.1s ease,
     box-shadow 0.1s ease,
     background-color 0.1s ease;
+}
+
+html[data-highlight-rendering='direct'] .word.is-active-word {
+  --reader-highlight-expansion: calc(
+    var(--reader-highlight-outline-offset) +
+      var(--reader-highlight-outline-width)
+  );
+  --reader-highlight-outer-width: calc(
+    var(--reader-highlight-expansion) +
+      var(--reader-highlight-outline-width)
+  );
+  --reader-highlight-inner-radius: max(
+    0px,
+    calc(
+      var(--reader-highlight-border-radius) -
+        var(--reader-highlight-expansion)
+    )
+  );
+
+  z-index: auto;
+  background: var(--reader-highlight-fill-surface);
+  border-radius: var(--reader-highlight-inner-radius);
+  box-shadow:
+    0 0 0 var(--reader-highlight-expansion)
+    var(--reader-highlight-fill-surface),
+    0 0 0 var(--reader-highlight-outer-width)
+    var(--reader-highlight-outline-color),
+    0 0 var(--reader-highlight-glow) var(--reader-highlight-outer-width)
+    var(--reader-highlight-fill-tint);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+html[data-highlight-rendering='direct'] .word.is-active-word::before {
+  content: none;
 }
 
 @keyframes active-word-highlight-in {
@@ -327,7 +368,7 @@
   transform: translateY(-50%);
 }
 
-@media screen and (max-width: 850px) {
+@media screen and (max-width: 870px) {
   .aliyah-badge.mod-with-audio {
     padding-left: 0;
   }
@@ -366,7 +407,7 @@
   background: color-mix(in srgb, hsl(48, 100%, 62%) 18%, transparent);
 }
 
-@media screen and (max-width: 530px) {
+@media screen and (max-width: 550px) {
 
   .line-gutter.mod-aliyot,
   .location-indicator.mod-aliyot {

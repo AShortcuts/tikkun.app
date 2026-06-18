@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tikkun Mark Book Transform</title>
+    <style>
+      :root {
+        --cream: #fff8e8;
+        --cream-deep: #f2e8ce;
+        --ink: #17191b;
+        --gold: #e7bb4f;
+        --gold-deep: #b9871f;
+        --paper: #f5ecd8;
+        --shadow: rgba(39, 30, 12, 0.18);
+        --p: 0;
+        --fold: 0;
+        --open: 0;
+        --rise: 0;
+        --shine: 0;
+        --book-drop: 0;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        min-height: 100%;
+        margin: 0;
+      }
+
+      body {
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 50% 18%, rgba(255, 248, 231, 0.95), rgba(255, 255, 255, 0) 38%),
+          linear-gradient(145deg, #fffdf8 0%, #f4efe5 52%, #ebe4d7 100%);
+        color: #211c13;
+        font-family: Optima, Candara, "Avenir Next", sans-serif;
+      }
+
+      .wrap {
+        display: grid;
+        gap: clamp(18px, 4vw, 34px);
+        justify-items: center;
+        padding: 24px;
+      }
+
+      .scene {
+        width: min(76vmin, 720px);
+        aspect-ratio: 1;
+        perspective: 1200px;
+        perspective-origin: 50% 40%;
+      }
+
+      .icon {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        border-radius: 21%;
+        background:
+          radial-gradient(circle at 48% 40%, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0) 36%),
+          linear-gradient(145deg, #fffdf6 0%, var(--cream) 54%, #f4ead3 100%);
+        box-shadow:
+          0 34px 75px rgba(58, 48, 30, 0.18),
+          0 10px 28px rgba(49, 41, 22, 0.12),
+          inset 0 1px 0 rgba(255, 255, 255, 0.88),
+          inset 0 -24px 44px rgba(219, 199, 158, 0.2);
+        transform-style: preserve-3d;
+      }
+
+      .icon::after {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        content: "";
+        background:
+          linear-gradient(116deg, rgba(255, 255, 255, 0.56), rgba(255, 255, 255, 0) 36%),
+          radial-gradient(circle at 80% 86%, rgba(176, 130, 34, 0.12), rgba(176, 130, 34, 0) 31%);
+        mix-blend-mode: screen;
+      }
+
+      .gold-bar {
+        position: absolute;
+        top: 50.2%;
+        left: 12.4%;
+        width: 75.2%;
+        height: 6.2%;
+        border-radius: 0 999px 999px 0;
+        background:
+          linear-gradient(90deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0) 18%),
+          linear-gradient(180deg, #f4ce68, var(--gold) 58%, #c79731);
+        box-shadow:
+          inset 0 2px 4px rgba(255, 255, 255, 0.36),
+          inset 0 -2px 5px rgba(129, 87, 15, 0.26),
+          0 5px 12px rgba(125, 90, 25, 0.14);
+        opacity: calc(1 - var(--open) * 0.72);
+        transform:
+          translateY(calc(var(--book-drop) * 19.5vmin))
+          rotateX(calc(var(--fold) * 70deg))
+          scaleX(calc(1 - var(--fold) * 0.34))
+          scaleY(calc(1 + var(--fold) * 0.22))
+          translateZ(calc(var(--fold) * -18px));
+        transform-origin: 50% 50%;
+        transform-style: preserve-3d;
+      }
+
+      .book {
+        position: absolute;
+        right: 0;
+        bottom: -0.4%;
+        left: 0;
+        height: 36%;
+        opacity: calc(var(--open) * 0.98);
+        transform:
+          translateY(calc((1 - var(--book-drop)) * -52%))
+          rotateX(calc((1 - var(--open)) * 70deg))
+          scaleX(calc(0.36 + var(--open) * 0.64))
+          scaleY(calc(0.12 + var(--open) * 0.88));
+        transform-origin: 50% 100%;
+        transform-style: preserve-3d;
+      }
+
+      .page {
+        position: absolute;
+        bottom: -1.2%;
+        width: 51.8%;
+        height: 97%;
+        overflow: hidden;
+        background:
+          radial-gradient(ellipse at 50% 100%, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0) 46%),
+          linear-gradient(155deg, #fff7e5 0%, var(--paper) 45%, var(--cream-deep) 100%);
+        border-top: clamp(2px, 0.5vmin, 5px) solid rgba(196, 146, 43, 0.84);
+        box-shadow:
+          inset 0 20px 26px rgba(255, 255, 255, 0.45),
+          inset 0 -18px 30px rgba(177, 139, 75, 0.17),
+          0 -2px 0 rgba(255, 255, 255, 0.45);
+        transform-style: preserve-3d;
+      }
+
+      .page.left {
+        left: 0;
+        border-top-right-radius: 100% 54%;
+        transform-origin: 100% 100%;
+        transform:
+          rotateZ(calc(var(--open) * -12deg))
+          rotateY(calc((1 - var(--open)) * -54deg + var(--open) * 11deg))
+          translateX(calc(var(--open) * -0.6%));
+      }
+
+      .page.right {
+        right: 0;
+        border-top-left-radius: 100% 54%;
+        transform-origin: 0 100%;
+        transform:
+          rotateZ(calc(var(--open) * 12deg))
+          rotateY(calc((1 - var(--open)) * 54deg + var(--open) * -11deg))
+          translateX(calc(var(--open) * 0.6%));
+      }
+
+      .page::before,
+      .page::after {
+        position: absolute;
+        right: 9%;
+        left: 9%;
+        height: 2px;
+        content: "";
+        background: rgba(190, 151, 77, 0.22);
+        transform: rotate(calc(var(--angle, 1) * 4deg));
+      }
+
+      .page::before {
+        top: 24%;
+      }
+
+      .page::after {
+        top: 42%;
+      }
+
+      .page.left::before,
+      .page.left::after {
+        --angle: -1;
+      }
+
+      .spine {
+        position: absolute;
+        bottom: -4%;
+        left: 50%;
+        width: 1.6%;
+        height: 90%;
+        border-radius: 999px 999px 0 0;
+        background: linear-gradient(180deg, #f1c962, #a87517 82%);
+        box-shadow:
+          0 0 0 1px rgba(138, 95, 20, 0.18),
+          0 0 24px rgba(219, 169, 59, 0.36);
+        transform: translateX(-50%) rotateX(12deg);
+      }
+
+      .gold-ray {
+        position: absolute;
+        top: 33.4%;
+        left: 46.8%;
+        width: 6.4%;
+        height: 41%;
+        opacity: calc(var(--open) * 0.58);
+        background: linear-gradient(180deg, rgba(236, 187, 72, 0.98), rgba(236, 187, 72, 0.02));
+        clip-path: polygon(18% 0, 82% 0, 50% 100%);
+        filter: blur(0.2px);
+        transform:
+          translateY(calc((1 - var(--open)) * 18%))
+          scaleY(calc(0.62 + var(--open) * 0.38));
+      }
+
+      .tav {
+        position: absolute;
+        top: 42.6%;
+        left: 51.1%;
+        z-index: 3;
+        width: 54%;
+        height: 55%;
+        filter: drop-shadow(0 15px 16px rgba(28, 25, 18, 0.18));
+        transform:
+          translate(-50%, -50%)
+          translateY(calc(var(--rise) * -5.6vmin))
+          translateZ(calc(var(--rise) * 52px))
+          rotateX(calc(var(--rise) * -5deg))
+          scale(calc(1 + var(--rise) * 0.025));
+        transform-style: preserve-3d;
+        will-change: transform;
+      }
+
+      .tav::before {
+        position: absolute;
+        inset: 19% 23% 18% 34%;
+        z-index: -1;
+        content: "";
+        border-radius: 38% 44% 22% 32%;
+        background: rgba(255, 243, 205, 0.4);
+        filter: blur(22px);
+        opacity: var(--shine);
+      }
+
+      .tav-piece {
+        position: absolute;
+        background: var(--ink);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      }
+
+      .tav-top {
+        top: 13%;
+        left: 18%;
+        width: 69%;
+        height: 22%;
+        border-radius: 1.2% 22% 12% 1.2%;
+        clip-path: polygon(0 0, 84% 0, 94% 3%, 100% 14%, 100% 100%, 0 100%);
+      }
+
+      .tav-cap {
+        top: 12%;
+        left: 15%;
+        width: 17%;
+        height: 25%;
+        border-radius: 7% 0 0 8%;
+        clip-path: polygon(0 0, 100% 0, 100% 100%, 22% 100%, 0 80%);
+      }
+
+      .tav-right {
+        top: 23%;
+        right: 5.2%;
+        width: 18.8%;
+        height: 61%;
+        border-radius: 0 34% 2% 0;
+      }
+
+      .tav-left {
+        top: 29%;
+        left: 23%;
+        width: 21%;
+        height: 58%;
+        border-radius: 16% 10% 23% 24%;
+        clip-path: polygon(10% 0, 100% 0, 92% 54%, 78% 74%, 50% 86%, 2% 88%, 13% 60%, 19% 39%);
+      }
+
+      .tav-cut {
+        position: absolute;
+        top: 35%;
+        left: 15%;
+        width: 28%;
+        height: 27%;
+        border-radius: 0 0 30% 0;
+        background: var(--cream);
+      }
+
+      .cast-shadow {
+        position: absolute;
+        right: 18%;
+        bottom: 19.2%;
+        left: 17%;
+        height: 13%;
+        border-radius: 999px;
+        background: radial-gradient(ellipse, var(--shadow), rgba(39, 30, 12, 0) 72%);
+        opacity: calc(0.12 + var(--open) * 0.22);
+        transform: scaleX(calc(0.58 + var(--open) * 0.42));
+      }
+
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        width: min(78vmin, 760px);
+      }
+
+      button {
+        min-width: 92px;
+        min-height: 42px;
+        border: 1px solid rgba(109, 83, 35, 0.22);
+        border-radius: 999px;
+        background: rgba(255, 251, 241, 0.78);
+        box-shadow: 0 8px 22px rgba(64, 49, 23, 0.08);
+        color: #2b2214;
+        cursor: pointer;
+        font: 700 14px/1 Optima, Candara, "Avenir Next", sans-serif;
+      }
+
+      input[type="range"] {
+        flex: 1;
+        accent-color: var(--gold-deep);
+      }
+
+      @media (max-width: 640px) {
+        .scene,
+        .controls {
+          width: min(92vmin, 760px);
+        }
+
+        .wrap {
+          padding: 18px;
+        }
+
+        .tav {
+          width: 58%;
+          height: 56%;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .wrap {
+          --fold: 1;
+          --open: 1;
+          --rise: 1;
+          --shine: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap" aria-label="Tikkun mark transforming into an open book">
+      <section class="scene" aria-hidden="true">
+        <div class="icon" id="icon">
+          <div class="cast-shadow"></div>
+          <div class="gold-bar"></div>
+          <div class="book">
+            <div class="page left"></div>
+            <div class="page right"></div>
+            <div class="spine"></div>
+          </div>
+          <div class="gold-ray"></div>
+          <div class="tav">
+            <span class="tav-piece tav-top"></span>
+            <span class="tav-piece tav-cap"></span>
+            <span class="tav-piece tav-right"></span>
+            <span class="tav-piece tav-left"></span>
+            <span class="tav-cut"></span>
+          </div>
+        </div>
+      </section>
+      <div class="controls">
+        <button id="toggle" type="button">Pause</button>
+        <input id="timeline" type="range" min="0" max="1000" value="0" aria-label="Animation timeline" />
+      </div>
+    </main>
+
+    <script>
+      const root = document.documentElement
+      const timeline = document.querySelector("#timeline")
+      const toggle = document.querySelector("#toggle")
+      const duration = 5600
+      let playing = true
+      let startedAt = performance.now()
+      let pausedProgress = 0
+
+      const clamp01 = (value) => Math.min(1, Math.max(0, value))
+      const smooth = (value) => {
+        const t = clamp01(value)
+        return t * t * (3 - 2 * t)
+      }
+      const segment = (progress, start, end) => smooth((progress - start) / (end - start))
+
+      function draw(progress) {
+        const fold = segment(progress, 0.05, 0.36)
+        const open = segment(progress, 0.18, 0.76)
+        const bookDrop = segment(progress, 0.08, 0.62)
+        const rise = segment(progress, 0.5, 0.9)
+        const shine = segment(progress, 0.48, 0.76) * (1 - segment(progress, 0.88, 1))
+
+        root.style.setProperty("--p", progress.toFixed(4))
+        root.style.setProperty("--fold", fold.toFixed(4))
+        root.style.setProperty("--open", open.toFixed(4))
+        root.style.setProperty("--rise", rise.toFixed(4))
+        root.style.setProperty("--shine", shine.toFixed(4))
+        root.style.setProperty("--book-drop", bookDrop.toFixed(4))
+        timeline.value = Math.round(progress * 1000)
+      }
+
+      function tick(now) {
+        if (playing) {
+          const progress = Math.min((now - startedAt) / duration, 1)
+          pausedProgress = progress
+          draw(progress)
+          if (progress < 1) {
+            requestAnimationFrame(tick)
+          } else {
+            playing = false
+            toggle.textContent = "Replay"
+          }
+        }
+      }
+
+      toggle.addEventListener("click", () => {
+        if (playing) {
+          playing = false
+          toggle.textContent = "Play"
+          return
+        }
+
+        if (pausedProgress >= 1) {
+          pausedProgress = 0
+        }
+
+        playing = true
+        toggle.textContent = "Pause"
+        startedAt = performance.now() - pausedProgress * duration
+        requestAnimationFrame(tick)
+      })
+
+      timeline.addEventListener("input", () => {
+        pausedProgress = Number(timeline.value) / 1000
+        playing = false
+        toggle.textContent = "Play"
+        draw(pausedProgress)
+      })
+
+      draw(0)
+      requestAnimationFrame(tick)
+    </script>
+  </body>
+</html>

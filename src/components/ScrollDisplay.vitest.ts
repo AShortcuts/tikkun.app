@@ -3,6 +3,7 @@ import type { UserSettings } from '../calendar-model/user-settings'
 import { last } from '../calendar-model/utils'
 import { ScrollViewModel } from '../view-model/scroll-view-model'
 import { ScrollDisplay } from './ScrollDisplay'
+import { getCenteredElementScrollTop } from '../reader-scroll'
 import '/css/master.css'
 
 import { afterEach, beforeEach, expect, test } from 'vitest'
@@ -84,6 +85,24 @@ test('renders the next page', async () => {
   expect(textFromLine(last(root.querySelectorAll('tr')))).toBe(
     'השנית חמשים ללאת עשה ביריעה האחת'
   )
+})
+
+test('centers the first token for the starting line', async () => {
+  // Use Noach for scroll-position regressions: Bereshit is clamped at
+  // the top, so it cannot reveal playback-time scroll adjustments.
+  await renderRun('2026-10-17:shacharis,main')
+
+  const startingLine = [...root.querySelectorAll<HTMLTableRowElement>('tr')].find(
+    (line) => getAliyahLabel(line) === 'נח'
+  )
+  const token = startingLine?.querySelector<HTMLElement>(
+    '.fragment.mod-annotations-off .word'
+  )
+  if (!token) throw new Error('Expected a starting token')
+
+  const expectedScrollTop = getCenteredElementScrollTop(root, token)
+
+  expect(Math.abs(root.scrollTop - expectedScrollTop)).toBeLessThan(5)
 })
 
 test('renders the previous page', async () => {

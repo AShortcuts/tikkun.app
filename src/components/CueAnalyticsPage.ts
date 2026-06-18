@@ -688,13 +688,28 @@ export default function CueAnalyticsPage() {
       <section class="about-card stack small" data-analytics-section="coverage">
         ${renderLoadingState('Building the coverage view…')}
       </section>
-      <section class="about-card stack small" data-analytics-section="aliyah-averages">
-        ${renderLoadingState('Calculating aliyah-level averages…')}
-      </section>
-      <section class="about-card stack small" data-analytics-section="outliers">
-        ${renderLoadingState('Reviewing timing transitions…')}
-      </section>
-      <section class="analytics-modules stack medium" data-analytics-section="records"></section>
+      <details class="analytics-details about-catalog-details stack small">
+        <summary class="about-card about-catalog-summary analytics-details-summary">
+          <svg class="about-catalog-chevron lucide lucide-chevron-right-icon lucide-chevron-right" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+          <span class="about-card-header">
+            <span>
+              <span class="about-catalog-title">Detailed playback breakdown</span>
+              <span class="about-catalog-copy">Average by aliyah, transition review, and individual recording graphs.</span>
+            </span>
+          </span>
+        </summary>
+        <div class="analytics-details-content stack medium">
+          <section class="about-card stack small" data-analytics-section="aliyah-averages">
+            ${renderLoadingState('Calculating aliyah-level averages…')}
+          </section>
+          <section class="about-card stack small" data-analytics-section="outliers">
+            ${renderLoadingState('Reviewing timing transitions…')}
+          </section>
+          <section class="analytics-modules stack medium" data-analytics-section="records"></section>
+        </div>
+      </details>
     </section>
   `
 }

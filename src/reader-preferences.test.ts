@@ -66,6 +66,28 @@ test('falls back to the default theme for an invalid saved theme mode', (t) => {
   t.is(preferences.themeMode, defaultReaderPreferences.themeMode)
 })
 
+test('loads reader focal point mode', (t) => {
+  localStorage.setItem(
+    'tikkun.reader-preferences.v3',
+    JSON.stringify({ focalPointMode: 'browser' })
+  )
+
+  const preferences = loadReaderPreferences()
+
+  t.is(preferences.focalPointMode, 'browser')
+})
+
+test('falls back to the default focal point for an invalid saved mode', (t) => {
+  localStorage.setItem(
+    'tikkun.reader-preferences.v3',
+    JSON.stringify({ focalPointMode: 'middle-ish' })
+  )
+
+  const preferences = loadReaderPreferences()
+
+  t.is(preferences.focalPointMode, defaultReaderPreferences.focalPointMode)
+})
+
 test('does not restore a saved playback rate', (t) => {
   localStorage.setItem(
     'tikkun.reader-preferences.v3',

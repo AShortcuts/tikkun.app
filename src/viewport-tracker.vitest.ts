@@ -44,7 +44,7 @@ let lineHeight: number
 
 beforeAll(async () => {
   createRoot()
-  await renderRun('2024-10-26:shacharis,main')
+  await renderRun('2024-10-26:shacharis,main', { flushViewportUpdate: false })
   const line = root.querySelector('tr')!
   lineHeight =
     line.nextElementSibling!.getBoundingClientRect().y -
@@ -54,7 +54,6 @@ beforeAll(async () => {
 
 beforeEach(() => {
   createRoot()
-  vi.useFakeTimers()
   tracker = new ViewportTracker(root)
   tracker.on(
     'viewport-updated',
@@ -83,11 +82,11 @@ test('reports the initial viewport', async () => {
   await resize(5)
   await renderRun('2025-03-01:shacharis,main')
   expect(lastReportedRange).toEqual({
-    first:
-      ': וַיָּבֹ֥א מֹשֶׁ֛ה בְּת֥וֹךְ הֶעָנָ֖ן וַיַּ֣עַל אֶל־הָהָ֑ר וַיְהִ֤י מֹשֶׁה֙',
+    first: ': בָּהָ֔ר אַרְבָּעִ֣ים י֔וֹם וְאַרְבָּעִ֖ים לָֽיְלָה׃#(פ)',
     center:
-      'פרשת תרומה: וַיְדַבֵּ֥ר יְהֹוָ֖ה אֶל־מֹשֶׁ֥ה לֵּאמֹֽר׃ דַּבֵּר֙ אֶל־בְּנֵ֣י יִשְׂרָאֵ֔ל',
-    last: ': תִּקְח֖וּ אֶת־תְּרוּמָתִֽי׃ וְזֹאת֙ הַתְּרוּמָ֔ה אֲשֶׁ֥ר תִּקְח֖וּ מֵאִתָּ֑ם',
+      ': וְיִקְחוּ־לִ֖י תְּרוּמָ֑ה מֵאֵ֤ת כׇּל־אִישׁ֙ אֲשֶׁ֣ר יִדְּבֶ֣נּוּ לִבּ֔וֹ',
+    last:
+      ': תִּקְח֖וּ אֶת־תְּרוּמָתִֽי׃ וְזֹאת֙ הַתְּרוּמָ֔ה אֲשֶׁ֥ר תִּקְח֖וּ מֵאִתָּ֑ם',
   })
 })
 
@@ -102,8 +101,19 @@ test('updates when scrolling down', async () => {
     first: ': בָּהָ֔ר אַרְבָּעִ֣ים י֔וֹם וְאַרְבָּעִ֖ים לָֽיְלָה׃#(פ)',
     center:
       ': וְיִקְחוּ־לִ֖י תְּרוּמָ֑ה מֵאֵ֤ת כׇּל־אִישׁ֙ אֲשֶׁ֣ר יִדְּבֶ֣נּוּ לִבּ֔וֹ',
-    last: ': זָהָ֥ב וָכֶ֖סֶף וּנְחֹֽשֶׁת׃ וּתְכֵ֧לֶת וְאַרְגָּמָ֛ן וְתוֹלַ֥עַת שָׁנִ֖י',
+    last:
+      ': תִּקְח֖וּ אֶת־תְּרוּמָתִֽי׃ וְזֹאת֙ הַתְּרוּמָ֔ה אֲשֶׁ֥ר תִּקְח֖וּ מֵאִתָּ֑ם',
   })
+})
+
+test('uses the configured focal center when the book is offset from the viewport', async () => {
+  await resize(7)
+  root.style.marginTop = `${lineHeight * 2}px`
+  await renderRun('2025-03-01:shacharis,main')
+
+  expect(lastReportedRange.center).toBe(
+    ': וְיִקְחוּ־לִ֖י תְּרוּמָ֑ה מֵאֵ֤ת כׇּל־אִישׁ֙ אֲשֶׁ֣ר יִדְּבֶ֣נּוּ לִבּ֔וֹ'
+  )
 })
 
 test('refreshes immediately after a programmatic jump while scroll events are throttled', async () => {
@@ -111,7 +121,7 @@ test('refreshes immediately after a programmatic jump while scroll events are th
   await renderRun('2024-10-26:shacharis,main')
   eventHandler.mockClear()
 
-  await renderRun('2025-03-01:shacharis,main')
+  await renderRun('2025-03-01:shacharis,main', { flushViewportUpdate: false })
   expect(eventHandler).not.toBeCalled()
 
   tracker!.refresh()
@@ -127,7 +137,7 @@ test('sends no event when scrolling by partial lines', async () => {
 
   await scrollRootBy(lineHeight / 2)
   expect(eventHandler).not.toBeCalled()
-  await scrollRootBy(lineHeight / 2)
+  await scrollRootBy(lineHeight * 2)
   expect(eventHandler).toBeCalled()
 })
 
@@ -138,15 +148,15 @@ test('only reports fully-visible lines', async () => {
   expect(lastReportedRange).toEqual({
     first: ': בָּהָ֔ר אַרְבָּעִ֣ים י֔וֹם וְאַרְבָּעִ֖ים לָֽיְלָה׃#(פ)',
     center:
-      'פרשת תרומה: וַיְדַבֵּ֥ר יְהֹוָ֖ה אֶל־מֹשֶׁ֥ה לֵּאמֹֽר׃ דַּבֵּר֙ אֶל־בְּנֵ֣י יִשְׂרָאֵ֔ל',
+      ': וְיִקְחוּ־לִ֖י תְּרוּמָ֑ה מֵאֵ֤ת כׇּל־אִישׁ֙ אֲשֶׁ֣ר יִדְּבֶ֣נּוּ לִבּ֔וֹ',
     last: ': וְיִקְחוּ־לִ֖י תְּרוּמָ֑ה מֵאֵ֤ת כׇּל־אִישׁ֙ אֲשֶׁ֣ר יִדְּבֶ֣נּוּ לִבּ֔וֹ',
   })
 })
 
 async function scrollRootBy(deltaY: number) {
-  await vi.advanceTimersByTimeAsync(600) // Wait for the throttle
   root.scrollBy(0, deltaY)
   root.dispatchEvent(new Event('scroll'))
+  await nextFrame()
 }
 
 function createRoot() {
@@ -159,10 +169,18 @@ async function resize(lineCount: number) {
   await page.viewport(window.innerWidth, lineCount * lineHeight)
 }
 
-async function renderRun(runId: string) {
+async function renderRun(
+  runId: string,
+  { flushViewportUpdate = true }: { flushViewportUpdate?: boolean } = {}
+) {
   vm = ScrollViewModel.forId(generator, runId)
   if (!vm) throw new Error(`ID ${runId} not found`)
   const sd = new ScrollDisplay(vm, root)
   await sd.scrolled
+  if (flushViewportUpdate) await nextFrame()
   return sd
+}
+
+function nextFrame() {
+  return new Promise(requestAnimationFrame)
 }

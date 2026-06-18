@@ -1,8 +1,11 @@
+import { setReaderFocalPointMode, type ReaderFocalPointMode } from './reader-scroll.ts'
+
 const STORAGE_KEY = 'tikkun.reader-preferences.v3'
 
 export const TOKENIZATION_VERSION = 'v2'
 
 export const themeModes = ['automatic', 'light', 'sepia', 'dark'] as const
+export const readerFocalPointModes = ['browser', 'reader'] as const
 
 export type ThemeMode = (typeof themeModes)[number]
 
@@ -17,6 +20,7 @@ export interface ReaderPreferences {
   radius: number
   glow: number
   autoScrollWithPlayback: boolean
+  focalPointMode: ReaderFocalPointMode
   disableShiftNekudotHide: boolean
   themeMode: ThemeMode
 }
@@ -32,6 +36,7 @@ export const defaultReaderPreferences: ReaderPreferences = {
   radius: 10,
   glow: 3.5,
   autoScrollWithPlayback: true,
+  focalPointMode: 'reader',
   disableShiftNekudotHide: false,
   themeMode: 'automatic',
 }
@@ -101,6 +106,15 @@ export function isThemeMode(value: unknown): value is ThemeMode {
   )
 }
 
+export function isReaderFocalPointMode(
+  value: unknown
+): value is ReaderFocalPointMode {
+  return (
+    typeof value === 'string' &&
+    readerFocalPointModes.some((mode) => mode === value)
+  )
+}
+
 export function loadReaderPreferences(): ReaderPreferences {
   const defaults = getDefaultReaderPreferences()
   try {
@@ -111,6 +125,9 @@ export function loadReaderPreferences(): ReaderPreferences {
       ...defaults,
       ...parsed,
       playbackRate: defaults.playbackRate,
+      focalPointMode: isReaderFocalPointMode(parsed.focalPointMode)
+        ? parsed.focalPointMode
+        : defaults.focalPointMode,
       themeMode: isThemeMode(parsed.themeMode)
         ? parsed.themeMode
         : defaults.themeMode,
@@ -147,6 +164,7 @@ export function applyReaderPreferences(preferences: ReaderPreferences) {
   const fillAlphaInversePercent = `${(1 - preferences.highlightOpacity) * 100}%`
 
   root.dataset.readerTheme = preferences.themeMode
+  setReaderFocalPointMode(preferences.focalPointMode)
 
   root.style.setProperty('--reader-highlight-fill', preferences.highlightFill)
   root.style.setProperty('--reader-highlight-fill-tint', fillTint)

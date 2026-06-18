@@ -18,6 +18,7 @@ const preferences: ReaderPreferences = {
   radius: 8,
   glow: 2,
   autoScrollWithPlayback: false,
+  focalPointMode: 'browser',
   disableShiftNekudotHide: true,
   themeMode: 'dark',
 }

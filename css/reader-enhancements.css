@@ -648,6 +648,8 @@
 }
 
 .settings-segmented-option {
+  display: grid;
+  gap: 0.18rem;
   border: 1px solid transparent;
   border-radius: 10px;
   background: transparent;
@@ -661,6 +663,14 @@
   transition:
     background-color 0.15s ease,
     border-color 0.15s ease;
+}
+
+.settings-segmented-option small {
+  color: var(--light-text-color);
+  font-size: 0.68rem;
+  font-style: italic;
+  font-weight: 650;
+  line-height: 1.15;
 }
 
 .settings-segmented-option:hover {
@@ -1144,6 +1154,22 @@
   background:
     radial-gradient(circle at top right, color-mix(in srgb, var(--medium-accent-color) 12%, transparent), transparent 34%),
     color-mix(in srgb, var(--paper-color) 94%, transparent);
+}
+
+.analytics-details {
+  gap: 0.9rem;
+}
+
+.analytics-details[open] .about-catalog-chevron {
+  transform: rotate(90deg);
+}
+
+.analytics-details-summary {
+  padding: 1rem 1.25rem;
+}
+
+.analytics-details-content {
+  padding-top: 0.1rem;
 }
 
 .analytics-summary-grid,
@@ -1709,7 +1735,7 @@
   color: rgb(42, 89, 166);
 }
 
-@media screen and (max-width: 700px) {
+@media screen and (max-width: 715px) {
   .analytics-toolbar,
   .analytics-module-header,
   .analytics-coverage-header,
@@ -1942,13 +1968,13 @@
   }
 }
 
-@media screen and (max-width: 1200px) {
+@media screen and (max-width: 1250px) {
   .reader-shell {
     --reader-side-rail-width: 48px;
   }
 }
 
-@media screen and (max-width: 900px) {
+@media screen and (max-width: 920px) {
   .reader-shell {
     --reader-side-rail-width: 24px;
   }
