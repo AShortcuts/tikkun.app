@@ -50,6 +50,15 @@ export type ParshaAliyahChoiceGroup = {
   choices: ParshaAliyahChoice[]
 }
 
+export type CalendarSettings = {
+  israel: boolean
+}
+
+export type ParshaPickerOptions = {
+  calendarSettings: CalendarSettings
+  onCalendarSettingsChange: (settings: CalendarSettings) => void
+}
+
 const doubleParshaPartsByTitle = new Map<string, [string, string]>([
   ['ויקהל־פקודי', ['ויקהל', 'פקודי']],
   ['תזריע־מצרע', ['תזריע', 'מצרע']],
@@ -274,6 +283,19 @@ const ComingUp = (comingUpReadings: LeiningInstance[]) => `
   </section>
 `
 
+export const renderCalendarSettings = ({ israel }: CalendarSettings) => `
+  <section class="calendar-settings" dir="ltr">
+    <label class="calendar-settings-toggle">
+      <input
+        data-target-id="calendar-israel-toggle"
+        type="checkbox"
+        ${israel ? 'checked' : ''}
+      >
+      <span>In Israel</span>
+    </label>
+  </section>
+`
+
 const holidayColumnOrder = ['rosh-hashanah', 'sukkot', 'pesach', 'chanukah'] as const
 
 function holidayColumnFor(leining: LeiningInstance) {
@@ -453,7 +475,13 @@ const search = (leinings: LeiningInstance[], query: string) => {
       })
     )
 }
-export default (generator: LeiningGenerator) => {
+export default (
+  generator: LeiningGenerator,
+  options: ParshaPickerOptions = {
+    calendarSettings: { israel: generator.settings.israel },
+    onCalendarSettingsChange: () => {},
+  }
+) => {
   const leinings = generator
     .forEntireChumash(new HDate())
     .flatMap((ld) => ld.leinings)
@@ -493,6 +521,7 @@ export default (generator: LeiningGenerator) => {
         <div class="centerize">
           <div id="search" style="display: inline-block;"></div>
         </div>
+        ${renderCalendarSettings(options.calendarSettings)}
         ${TorahReferencePicker()}
         ${ComingUp(comingUpReadings)}
         ${Browse(leinings, aliyahChoiceIdFor)}
@@ -530,6 +559,14 @@ export default (generator: LeiningGenerator) => {
   if (!torahReferenceForm || !bookSelect || !chapterSelect || !verseSelect) {
     throw new Error('Torah reference picker failed to mount.')
   }
+
+  self
+    .querySelector<HTMLInputElement>('[data-target-id="calendar-israel-toggle"]')
+    ?.addEventListener('change', (event) => {
+      options.onCalendarSettingsChange({
+        israel: (event.currentTarget as HTMLInputElement).checked,
+      })
+    })
 
   const setNumericOptions = (
     select: HTMLSelectElement,

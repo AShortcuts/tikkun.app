@@ -8,6 +8,7 @@ import {
   calculateAnchoredPopupPosition,
   parshaListTitleForLeining,
   renderAliyahPopupContent,
+  renderCalendarSettings,
 } from './ParshaPicker.ts'
 
 const testSettings: UserSettings = {
@@ -139,6 +140,18 @@ test('positions bottom-edge aliyah popup directly above the selected parsha', (t
     }),
     { left: 950, top: 322 }
   )
+})
+
+test('renders the Israel calendar toggle unchecked by default', (t) => {
+  t.regex(
+    renderCalendarSettings({ israel: false }),
+    /<input[^>]+data-target-id="calendar-israel-toggle"[^>]+type="checkbox"/
+  )
+  t.notRegex(renderCalendarSettings({ israel: false }), /checked/)
+})
+
+test('renders the Israel calendar toggle checked when enabled', (t) => {
+  t.regex(renderCalendarSettings({ israel: true }), /checked/)
 })
 
 function parshiyotForYears(startYear: number, endYear: number) {

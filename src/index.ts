@@ -1,8 +1,10 @@
 import InfiniteScroller from './infinite-scroller.ts'
 import ParshaPicker from './components/ParshaPicker.ts'
+import type { CalendarSettings } from './components/ParshaPicker.ts'
 import utils from './components/utils.ts'
 import { ScrollViewModel } from './view-model/scroll-view-model.ts'
 import { LeiningGenerator } from './calendar-model/generator.ts'
+import type { UserSettings } from './calendar-model/user-settings.ts'
 import { ScrollDisplay } from './components/ScrollDisplay.ts'
 import { ViewportTracker, type ViewportRange } from './viewport-tracker.ts'
 import { TopBarTracker } from './view-model/navigation/top-bar-model.ts'
@@ -69,11 +71,45 @@ import {
 
 const { whenKey } = utils
 
-const generator = new LeiningGenerator({
-  ashkenazi: true,
-  includeModernHolidays: false,
+const CALENDAR_SETTINGS_STORAGE_KEY = 'tikkun.calendar-settings.v1'
+const DEFAULT_CALENDAR_SETTINGS: CalendarSettings = {
   israel: false,
-})
+}
+
+function userSettingsFromCalendarSettings(
+  settings: CalendarSettings
+): UserSettings {
+  return {
+    ashkenazi: true,
+    includeModernHolidays: false,
+    israel: settings.israel,
+  }
+}
+
+function loadCalendarSettings(): CalendarSettings {
+  try {
+    const raw = window.localStorage.getItem(CALENDAR_SETTINGS_STORAGE_KEY)
+    if (!raw) return DEFAULT_CALENDAR_SETTINGS
+
+    const parsed = JSON.parse(raw) as Partial<CalendarSettings>
+    return {
+      israel: parsed.israel === true,
+    }
+  } catch {
+    return DEFAULT_CALENDAR_SETTINGS
+  }
+}
+
+function saveCalendarSettings(settings: CalendarSettings) {
+  window.localStorage.setItem(
+    CALENDAR_SETTINGS_STORAGE_KEY,
+    JSON.stringify(settings)
+  )
+}
+
+let calendarSettings = loadCalendarSettings()
+const createCalendarGenerator = () =>
+  new LeiningGenerator(userSettingsFromCalendarSettings(calendarSettings))
 const recordingMode = getRecordingModeConfig()
 type PlaybackAliyahIndex = Exclude<LeiningAliyah['index'], undefined>
 
@@ -489,10 +525,22 @@ const showParshaPicker = () => {
     { selector: '[data-target-id="tikkun-book"]', visible: false },
   ].forEach(({ selector, visible }) => setVisibility({ selector, visible }))
 
-  const jumper = ParshaPicker(generator)
+  const jumper = ParshaPicker(createCalendarGenerator(), {
+    calendarSettings,
+    onCalendarSettingsChange: updateCalendarSettings,
+  })
   jumper.node.addEventListener('click', (event) => {
     const target = event.target as HTMLElement
-    if (target.closest('a[href^="#/"]')) requestLastReadingSaveAfterRouteRender()
+    const link = target.closest<HTMLAnchorElement>('a[href^="#/"]')
+    if (!link) return
+
+    requestLastReadingSaveAfterRouteRender()
+    if (link.hash !== location.hash || !audioControllerGlobal) return
+
+    const route = parseUrl(createCalendarGenerator(), link.hash.replace(/^#/, ''))
+    if (!route) return
+    event.preventDefault()
+    renderRoute(route, audioControllerGlobal)
   })
   jumper.node.addEventListener('submit', () => {
     requestLastReadingSaveAfterRouteRender()
@@ -528,6 +576,16 @@ const hideParshaPicker = () => {
 
 const isShowingParshaPicker = () =>
   Boolean(document.querySelector('.parsha-picker'))
+
+function updateCalendarSettings(settings: CalendarSettings) {
+  saveCalendarSettings(settings)
+  calendarSettings = settings
+
+  if (isShowingParshaPicker()) {
+    hideParshaPicker()
+    showParshaPicker()
+  }
+}
 
 const toggleParshaPicker = () => {
   const route = parseCurrentRoute()
@@ -575,6 +633,129 @@ const setAppHeight = () => {
   )
 }
 
+let debugFocalMeasureFrame = 0
+
+function removeDebugFocalMeasure() {
+  if (debugFocalMeasureFrame) {
+    cancelAnimationFrame(debugFocalMeasureFrame)
+    debugFocalMeasureFrame = 0
+  }
+
+  document
+    .querySelectorAll('.debug-focal-line, .debug-focal-measure')
+    .forEach((el) => el.remove())
+}
+
+function toggleDebugFocalMeasure() {
+  if (document.querySelector('.debug-focal-line, .debug-focal-measure')) {
+    removeDebugFocalMeasure()
+    return
+  }
+
+  const makeLine = (color: string, label: string) => {
+    const line = document.createElement('div')
+    line.className = 'debug-focal-line'
+    line.style.cssText = `
+      position: fixed;
+      left: 0;
+      right: 0;
+      height: 0;
+      border-top: 2px solid ${color};
+      z-index: 999999;
+      pointer-events: none;
+      font: 13px sans-serif;
+      color: white;
+      text-shadow: 0 1px 2px black;
+    `
+    line.textContent = label
+    document.body.appendChild(line)
+    return line
+  }
+
+  const makeMeasure = (color: string, x: number, labelPrefix: string) => {
+    const line = document.createElement('div')
+    const label = document.createElement('div')
+    line.className = 'debug-focal-measure'
+    label.className = 'debug-focal-measure'
+
+    line.style.cssText = `
+      position: fixed;
+      left: ${x}px;
+      width: 0;
+      border-left: 2px dashed ${color};
+      z-index: 999999;
+      pointer-events: none;
+    `
+
+    label.style.cssText = `
+      position: fixed;
+      left: ${x + 8}px;
+      z-index: 999999;
+      pointer-events: none;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.72);
+      color: white;
+      font: 13px sans-serif;
+      white-space: nowrap;
+    `
+
+    document.body.append(line, label)
+
+    return {
+      update(startY: number, endY: number) {
+        const top = Math.min(startY, endY)
+        const height = Math.abs(endY - startY)
+        line.style.top = `${top}px`
+        line.style.height = `${height}px`
+        label.style.top = `${top + height / 2 - 12}px`
+        label.textContent = `${labelPrefix}: ${Math.round(height)}px`
+      },
+    }
+  }
+
+  const readerBlue = 'lightskyblue'
+  const browser = makeLine('red', 'Browser center')
+  const reader = makeLine(readerBlue, 'Reader center')
+  const browserTop = makeMeasure('red', 24, 'Browser top')
+  const browserBottom = makeMeasure('red', 104, 'Browser bottom')
+  const readerTop = makeMeasure(readerBlue, 220, 'Reader top')
+  const readerBottom = makeMeasure(readerBlue, 300, 'Reader bottom')
+
+  const update = () => {
+    const book = document.querySelector<HTMLElement>('[data-target-id="tikkun-book"]')
+    if (!book || !browser.isConnected) {
+      removeDebugFocalMeasure()
+      return
+    }
+
+    const rect = book.getBoundingClientRect()
+    const browserTopY = 0
+    const browserBottomY = document.documentElement.clientHeight
+    const browserCenterY = browserBottomY / 2
+    const readerTopY = rect.top
+    const readerBottomY = rect.top + book.clientHeight
+    const readerCenterY = readerTopY + book.clientHeight / 2
+
+    browser.style.top = `${browserCenterY}px`
+    reader.style.top = `${readerCenterY}px`
+    browserTop.update(browserTopY, browserCenterY)
+    browserBottom.update(browserCenterY, browserBottomY)
+    readerTop.update(readerTopY, readerCenterY)
+    readerBottom.update(readerCenterY, readerBottomY)
+
+    debugFocalMeasureFrame = requestAnimationFrame(update)
+  }
+
+  update()
+}
+
+function setupDebugControls() {
+  document
+    .querySelectorAll<HTMLButtonElement>('[data-target-id="debug-focal-measure-toggle"]')
+    .forEach((button) => button.addEventListener('click', toggleDebugFocalMeasure))
+}
+
 function listenForRevealGesture(book: HTMLElement) {
   const PULL_THRESHOLD = 30
   const PULL_MAXIMUM = 100
@@ -607,7 +788,7 @@ function listenForRevealGesture(book: HTMLElement) {
 }
 
 function parseCurrentRoute(): AppRoute | null {
-  return parseUrl(generator, location.hash.replace(/^#/, ''))
+  return parseUrl(createCalendarGenerator(), location.hash.replace(/^#/, ''))
 }
 
 function getBook() {
@@ -2962,7 +3143,7 @@ function renderRoute(route: AppRoute, audioController: AudioController) {
 
 function navigateToHash(hash: string, audioController: AudioController) {
   if (location.hash === hash) {
-    const route = parseUrl(generator, hash.replace(/^#/, ''))
+    const route = parseUrl(createCalendarGenerator(), hash.replace(/^#/, ''))
     if (route) renderRoute(route, audioController)
     return
   }
@@ -3028,6 +3209,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setControlIcon(document.querySelector('[data-target-id="settings-toggle"]'), 'settings2')
   updateFloatingPlayer(audioController)
   setupOfflineRecordingPrompt()
+  setupDebugControls()
 
   viewportTracker.on('viewport-updated', (range) => {
     if (!display?.viewModel) return
@@ -3806,7 +3988,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     parseCurrentRoute() ?? {
       view: 'reader' as const,
       canonicalHash: '#/next',
-      model: ScrollViewModel.forDate(generator, new Date()),
+      model: ScrollViewModel.forDate(createCalendarGenerator(), new Date()),
     }
   renderRoute(initialRoute, audioController)
   if (launchLastReading) showLastReadingPrompt(launchLastReading)
