@@ -155,8 +155,8 @@ const adminDraftTimeFormat = Intl.DateTimeFormat(undefined, {
 
 function applyHighlightRenderingDebugMode() {
   const highlightMode = new URLSearchParams(location.search).get('highlight')
-  if (highlightMode === 'direct') {
-    document.documentElement.dataset.highlightRendering = 'direct'
+  if (highlightMode === 'legacy-rectangle') {
+    document.documentElement.dataset.highlightRendering = 'legacy-rectangle'
     return
   }
 
@@ -164,6 +164,10 @@ function applyHighlightRenderingDebugMode() {
 }
 
 applyHighlightRenderingDebugMode()
+
+function getDebugActiveTokenKey() {
+  return new URLSearchParams(location.search).get('debugActiveToken')
+}
 
 const adminState: {
   unlocked: boolean
@@ -325,6 +329,12 @@ const app = {
       refreshReaderChrome()
       if (audioControllerGlobal && highlightControllerGlobal)
         syncCurrentSessionHighlight(audioControllerGlobal, highlightControllerGlobal)
+      const debugActiveToken = getDebugActiveTokenKey()
+      if (debugActiveToken && highlightControllerGlobal) {
+        void highlightControllerGlobal.activateTokenKey(debugActiveToken, {
+          scroll: false,
+        })
+      }
     })
     display.scrolled.then(() => viewportTrackerGlobal?.refresh())
     return rendered
