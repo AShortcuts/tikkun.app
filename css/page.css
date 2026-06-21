@@ -237,8 +237,12 @@
 }
 
 html[data-highlight-rendering='legacy-rectangle'] .word.is-active-word {
+  /* outline: var(--reader-highlight-outline-width) solid
+    var(--reader-highlight-outline-color); */
   z-index: 0;
   background: transparent;
+  /* box-shadow: 0 0 0 var(--reader-highlight-glow) var(--reader-highlight-fill-tint); */
+  /* outline-offset: var(--reader-highlight-outline-offset); */
   border-radius: var(--reader-highlight-border-radius);
   box-shadow: none;
 }
