@@ -87,6 +87,18 @@ test('renders the next page', async () => {
   )
 })
 
+test('renders absolute page numbers inside the page table decoration', async () => {
+  await renderRun('2026-10-17:shacharis,main')
+
+  const page = root.querySelector<HTMLElement>('.tikkun-page')
+  const table = page?.querySelector<HTMLTableElement>('table')
+  const caption = table?.querySelector<HTMLTableCaptionElement>('.tikkun-page-number')
+
+  expect(caption?.textContent).toBe(table?.dataset.pageNumber)
+  expect(caption?.getAttribute('aria-hidden')).toBe('true')
+  expect(caption?.textContent).toMatch(/^\d+$/)
+})
+
 test('centers the first token for the starting line', async () => {
   // Use Noach for scroll-position regressions: Bereshit is clamped at
   // the top, so it cannot reveal playback-time scroll adjustments.

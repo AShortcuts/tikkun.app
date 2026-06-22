@@ -4336,6 +4336,31 @@ function renderRoute(route: AppRoute, audioController: AudioController) {
     shouldSaveLastReadingAfterRouteRender = false
     void rendered.then(() => saveCurrentLastReading())
   }
+  void rendered.then(() => revealPageNumberForRoute(nextReaderHash))
+}
+
+function pageNumberFromPageRouteHash(hash: string | null) {
+  if (!hash) return null
+  const [, page] = hash.match(/^#\/(?:torah|esther)\/page\/(\d+)$/) ?? []
+  if (!page) return null
+  const pageNumber = Number(page)
+  return Number.isInteger(pageNumber) ? pageNumber : null
+}
+
+function revealPageNumberForRoute(hash: string | null) {
+  const pageNumber = pageNumberFromPageRouteHash(hash)
+  if (!pageNumber) return
+
+  const pageNode = display?.getPageNode(pageNumber)
+  const marker = pageNode?.querySelector<HTMLElement>('.tikkun-page-number')
+  if (!marker) return
+
+  marker.classList.remove('mod-route-reveal')
+  void marker.offsetWidth
+  marker.classList.add('mod-route-reveal')
+  window.setTimeout(() => {
+    marker.classList.remove('mod-route-reveal')
+  }, 1900)
 }
 
 function navigateToHash(hash: string, audioController: AudioController) {

@@ -237,22 +237,22 @@
 }
 
 .aliyah-rail-button[data-cue-status='published']::after {
-  border-color: #15803d;
+  border: none;
   background: #16a34a;
 }
 
 .aliyah-rail-button[data-cue-status='local-draft']::after {
-  border-color: #b45309;
+  border: none;
   background: #f59e0b;
 }
 
 .aliyah-rail-button[data-cue-status='generated-review']::after {
-  border-color: #1d4ed8;
+  border: none;
   background: #3b82f6;
 }
 
 .aliyah-rail-button[data-cue-status='blocking-issue']::after {
-  border-color: #b91c1c;
+  border: none;
   background: #dc2626;
 }
 

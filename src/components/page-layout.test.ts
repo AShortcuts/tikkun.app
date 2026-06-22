@@ -37,6 +37,23 @@ test('uses the intended tikkun page responsive breakpoints', () => {
   expect(pageCss.includes('@media screen and (max-width: 850px)')).toBe(false)
 })
 
+test('shows absolute page numbers as hover-only page decoration', () => {
+  expect(pageCss).not.toMatch(/(^|\n)\.tikkun-page\s*{[^}]*position:\s*relative;/)
+  expect(pageCss).toMatch(/\.tikkun-page-number\s*{[\s\S]*?caption-side:\s*top;/)
+  expect(pageCss).toMatch(/\.tikkun-page-number\s*{[\s\S]*?font-family:\s*'Lora', Georgia, serif;/)
+  expect(pageCss).toMatch(/\.tikkun-page-number\s*{[\s\S]*?font-size:\s*1\.15em;/)
+  expect(pageCss).toMatch(/\.tikkun-page-number\s*{[\s\S]*?font-weight:\s*400;/)
+  expect(pageCss).toMatch(/\.tikkun-page-number\s*{[\s\S]*?opacity:\s*0;/)
+  expect(pageCss).toMatch(/\.tikkun-page-number\s*{[\s\S]*?pointer-events:\s*auto;/)
+  expect(pageCss).toMatch(/\.tikkun-page-number\s*{[\s\S]*?user-select:\s*none;/)
+  expect(pageCss).toMatch(/\.tikkun-page:first-child \.tikkun-page-number\s*{[\s\S]*?display:\s*none;/)
+  expect(pageCss).toMatch(/\.tikkun-page:first-child \.tikkun-page-number\.mod-route-reveal\s*{[\s\S]*?display:\s*table-caption;/)
+  expect(pageCss).not.toMatch(/\.tikkun-page:hover \.tikkun-page-number\s*{/)
+  expect(pageCss).toMatch(/\.tikkun-page-number:hover\s*{[\s\S]*?opacity:\s*1;/)
+  expect(pageCss).toMatch(/\.tikkun-page-number\.mod-route-reveal\s*{[\s\S]*?animation:\s*page-number-route-reveal 1\.8s ease-out;/)
+  expect(pageCss).toMatch(/@keyframes page-number-route-reveal\s*{[\s\S]*?42%\s*{[\s\S]*?opacity:\s*1;[\s\S]*?100%\s*{[\s\S]*?opacity:\s*0;/)
+})
+
 test('keeps verse numbers offscreen for the mobile pull gutter', () => {
   const aliyotCollapseIndex = pageCss.indexOf('@media screen and (max-width: 550px)')
   const versesCollapseIndex = pageCss.indexOf('@media screen and (max-width: 455px)')

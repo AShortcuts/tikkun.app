@@ -17,6 +17,51 @@
   color: var(--page-ink-color);
 }
 
+.tikkun-page-number {
+  caption-side: top;
+  height: 0;
+  margin-block-start: -2.5em;
+  margin-block-end: 2.5em;
+  color: color-mix(in srgb, var(--page-ink-color) 26%, transparent);
+  font-family: 'Lora', Georgia, serif;
+  font-size: 1.15em;
+  font-weight: 400;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: auto;
+  text-align: center;
+  transform: translateY(-50%);
+  transition: opacity 140ms ease;
+  user-select: none;
+}
+
+.tikkun-page:first-child .tikkun-page-number {
+  display: none;
+}
+
+.tikkun-page:first-child .tikkun-page-number.mod-route-reveal {
+  display: table-caption;
+}
+
+.tikkun-page-number.mod-route-reveal {
+  animation: page-number-route-reveal 1.8s ease-out;
+}
+
+.tikkun-page-number:hover {
+  opacity: 1;
+}
+
+@keyframes page-number-route-reveal {
+  0%,
+  42% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
 .tikkun-page table {
   transform: translateX(var(--pull-translation));
   transition: transform var(--pull-transform);

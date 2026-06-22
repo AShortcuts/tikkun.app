@@ -16,6 +16,7 @@ export type LineType = {
 
 const Page = (page: RenderedPageInfo) => `
   <table data-page-number="${page.pageNumber}">
+    <caption class="tikkun-page-number" aria-hidden="true">${page.pageNumber}</caption>
     ${page.lines
       .map((line, idx) =>
         Line({ pageNumber: page.pageNumber, lineIndex: idx, ...line })
