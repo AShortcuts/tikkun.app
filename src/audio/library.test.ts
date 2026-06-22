@@ -1,4 +1,4 @@
-import test from 'ava'
+import { expect, test } from 'vitest'
 import { LeiningGenerator } from '../calendar-model/generator.ts'
 import type { UserSettings } from '../calendar-model/user-settings.ts'
 import { findRecordingForRun, parshaSlugForRun } from './recording-lookup.ts'
@@ -11,51 +11,42 @@ const testSettings: UserSettings = {
 
 const generator = new LeiningGenerator(testSettings)
 
-test('audio lookup canonicalizes parsha aliases before matching recordings', (t) => {
+test('audio lookup canonicalizes parsha aliases before matching recordings', () => {
   const run = generator.parseId('2022-10-01:shacharis,main')
 
   if (!run) throw new Error('Missing Vayeilech run')
 
-  t.is(run.leining.date.title.en, 'Parshat Vayeilech')
-  t.is(parshaSlugForRun(run), 'vayelech')
-  t.is(
-    findRecordingForRun({
+  expect(run.leining.date.title.en).toBe('Parshat Vayeilech')
+  expect(parshaSlugForRun(run)).toBe('vayelech')
+  expect(findRecordingForRun({
       narratorId: 'yoni-davidov',
       run,
       aliyahIndex: 1,
-    })?.id,
-    'vayelech-1'
-  )
+    })?.id).toBe('vayelech-1')
 })
 
-test('audio lookup preserves manifest spelling when the route slug differs', (t) => {
+test('audio lookup preserves manifest spelling when the route slug differs', () => {
   const run = generator.parseId('2026-10-10:shacharis,main')
 
   if (!run) throw new Error('Missing Bereshit run')
 
-  t.is(run.leining.date.title.en, 'Parshat Bereshit')
-  t.is(parshaSlugForRun(run), 'bereshit')
-  t.is(
-    findRecordingForRun({
+  expect(run.leining.date.title.en).toBe('Parshat Bereshit')
+  expect(parshaSlugForRun(run)).toBe('bereshit')
+  expect(findRecordingForRun({
       narratorId: 'yoni-davidov',
       run,
       aliyahIndex: 1,
-    })?.id,
-    'bereshit-1'
-  )
+    })?.id).toBe('bereshit-1')
 })
 
-test('audio lookup resolves maftir to the seventh aliyah recording', (t) => {
+test('audio lookup resolves maftir to the seventh aliyah recording', () => {
   const run = generator.parseId('2025-10-25:shacharis,main')
 
   if (!run) throw new Error('Missing Noach run')
 
-  t.is(
-    findRecordingForRun({
+  expect(findRecordingForRun({
       narratorId: 'yoni-davidov',
       run,
       aliyahIndex: 'Maftir',
-    })?.id,
-    'noach-7'
-  )
+    })?.id).toBe('noach-7')
 })

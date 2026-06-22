@@ -1,7 +1,8 @@
-import test from 'ava'
+import { expect, test } from 'vitest'
 import {
   generateAboutUrl,
   generateCueAnalyticsUrl,
+  generatePageUrl,
   generateUrl,
   parseUrl,
 } from './url-parser.ts'
@@ -19,203 +20,228 @@ const testSettings: UserSettings = {
 
 const generator = new LeiningGenerator(testSettings)
 
-test('non-URL input', async (t) => {
-  t.falsy(parseUrl(generator, 'hello world'))
+test('non-URL input', async () => {
+  expect(parseUrl(generator, 'hello world')).toBeFalsy()
 })
 
-test('Empty URL', (t) => {
-  t.falsy(parseUrl(generator, ''))
+test('Empty URL', () => {
+  expect(parseUrl(generator, '')).toBeFalsy()
 })
 
-test('Ignores unrecognized URL types', (t) => {
-  t.falsy(parseUrl(generator, '/kav/tzav'))
+test('Ignores unrecognized URL types', () => {
+  expect(parseUrl(generator, '/kav/tzav')).toBeFalsy()
 })
 
-test('Invalid location reference: Not numbers', (t) => {
-  t.falsy(parseUrl(generator, '/r/foo-bar-baz'))
+test('Invalid location reference: Not numbers', () => {
+  expect(parseUrl(generator, '/r/foo-bar-baz')).toBeFalsy()
 })
 
-test('Invalid location reference: incomplete', (t) => {
-  t.falsy(parseUrl(generator, '/r/5-22'))
+test('Invalid location reference: incomplete', () => {
+  expect(parseUrl(generator, '/r/5-22')).toBeFalsy()
 })
 
-test('Next', (t) => {
-  t.truthy(parseUrl(generator, '/next'))
+test('Next', () => {
+  expect(parseUrl(generator, '/next')).toBeTruthy()
 })
 
-test('About', (t) => {
-  t.deepEqual(parseUrl(generator, '/about'), { view: 'about' })
-  t.is(generateAboutUrl(), '#/about')
+test('About', () => {
+  expect(parseUrl(generator, '/about')).toEqual({ view: 'about' })
+  expect(generateAboutUrl()).toBe('#/about')
 })
 
-test('Playback analytics', (t) => {
-  t.deepEqual(parseUrl(generator, '/about/playback-analytics'), {
+test('Playback analytics', () => {
+  expect(parseUrl(generator, '/about/playback-analytics')).toEqual({
     view: 'cue-analytics',
   })
-  t.deepEqual(parseUrl(generator, '/about/word-analytics'), {
+  expect(parseUrl(generator, '/about/word-analytics')).toEqual({
     view: 'cue-analytics',
   })
-  t.deepEqual(parseUrl(generator, '/about/cue-analytics'), {
+  expect(parseUrl(generator, '/about/cue-analytics')).toEqual({
     view: 'cue-analytics',
   })
-  t.is(generateCueAnalyticsUrl(), '#/about/playback-analytics')
+  expect(generateCueAnalyticsUrl()).toBe('#/about/playback-analytics')
 })
 
-test('Parsha slug resolves Bereshit', async (t) => {
+test('Parsha slug resolves Bereshit', async () => {
   const route = toReaderRoute(
-    parseUrl(generator, '/parsha/beresheet', { now: new Date('2024-10-01') })
+    parseUrl(generator, '/torah/parsha/beresheet', { now: new Date('2024-10-01') })
   )
 
-  t.truthy(route)
-  t.is(route?.canonicalHash, '#/parsha/beresheet')
-  t.is(
-    await renderStartingLineForRoute(route),
-    await renderStartingLineForRoute(
+  expect(route).toBeTruthy()
+  expect(route?.canonicalHash).toBe('#/torah/parsha/beresheet')
+  expect(await renderStartingLineForRoute(route)).toBe(await renderStartingLineForRoute(
       toReaderRoute(parseUrl(generator, '/run/2024-10-26:shacharis,main'))
-    )
-  )
+    ))
 })
 
-test('Parsha alias canonicalizes Bereshit', async (t) => {
+test('Parsha alias canonicalizes Bereshit', async () => {
   const route = toReaderRoute(
-    parseUrl(generator, '/parsha/bereshit', { now: new Date('2024-10-01') })
+    parseUrl(generator, '/torah/parsha/bereshit', { now: new Date('2024-10-01') })
   )
 
-  t.truthy(route)
-  t.is(route?.canonicalHash, '#/parsha/beresheet')
-  t.is(
-    await renderStartingLineForRoute(route),
-    await renderStartingLineForRoute(
+  expect(route).toBeTruthy()
+  expect(route?.canonicalHash).toBe('#/torah/parsha/beresheet')
+  expect(await renderStartingLineForRoute(route)).toBe(await renderStartingLineForRoute(
       toReaderRoute(parseUrl(generator, '/run/2024-10-26:shacharis,main'))
-    )
-  )
+    ))
 })
 
-test('Parsha slug resolves exact solo Vayelech only', async (t) => {
+test('Parsha slug resolves exact solo Vayelech only', async () => {
   const route = toReaderRoute(
-    parseUrl(generator, '/parsha/vayelech', { now: new Date('2026-01-01') })
+    parseUrl(generator, '/torah/parsha/vayelech', { now: new Date('2026-01-01') })
   )
 
-  t.truthy(route)
-  t.is(route?.canonicalHash, '#/parsha/vayelech')
-  t.is(
-    await renderStartingLineForRoute(route),
-    await renderStartingLineForRoute(
+  expect(route).toBeTruthy()
+  expect(route?.canonicalHash).toBe('#/torah/parsha/vayelech')
+  expect(await renderStartingLineForRoute(route)).toBe(await renderStartingLineForRoute(
       toReaderRoute(parseUrl(generator, '/run/2029-09-15:shacharis,main'))
-    )
-  )
+    ))
 })
 
-test('Parsha slug can start at a specific ref', async (t) => {
+test('Parsha slug can start at a specific ref', async () => {
   const route = toReaderRoute(
-    parseUrl(generator, '/parsha/behar/3-25-1', { now: new Date('2026-01-01') })
+    parseUrl(generator, '/torah/parsha/behar/3-25-1', { now: new Date('2026-01-01') })
   )
 
-  t.truthy(route)
-  t.is(route?.canonicalHash, '#/parsha/behar/3-25-1')
-  t.is(
-    await renderStartingLineForRoute(route),
-    await renderStartingLineForRoute(
+  expect(route).toBeTruthy()
+  expect(route?.canonicalHash).toBe('#/torah/parsha/behar/3-25-1')
+  expect(await renderStartingLineForRoute(route)).toBe(await renderStartingLineForRoute(
       toReaderRoute(parseUrl(generator, '/run/2027-05-22:shacharis,main/3-25-1'))
-    )
-  )
+    ))
 })
 
-test('Vezos Haberacha has its own parsha route and display title', async (t) => {
+test('Vezos Haberacha has its own parsha route and display title', async () => {
   const route = toReaderRoute(
-    parseUrl(generator, '/parsha/vezos-haberacha/5-33-1', {
+    parseUrl(generator, '/torah/parsha/vezos-haberacha/5-33-1', {
       now: new Date('2026-01-01'),
     })
   )
 
-  t.truthy(route)
-  t.is(route?.canonicalHash, '#/parsha/vezos-haberacha/5-33-1')
-  t.is(route?.model.displayTitleForRun(route.model.relevantRuns[0]), 'וזאת הברכה')
-  t.regex(await renderStartingLineForRoute(route), /^וזאת הברכה:/)
+  expect(route).toBeTruthy()
+  expect(route?.canonicalHash).toBe('#/torah/parsha/vezos-haberacha/5-33-1')
+  expect(route?.model.displayTitleForRun(route.model.relevantRuns[0])).toBe('וזאת הברכה')
+  expect(await renderStartingLineForRoute(route)).toMatch(/^וזאת הברכה:/)
 })
 
-test('Parsha slug resolves exact solo Nitzavim only', async (t) => {
+test('Parsha slug resolves exact solo Nitzavim only', async () => {
   const route = toReaderRoute(
-    parseUrl(generator, '/parsha/nitzavim', { now: new Date('2026-01-01') })
+    parseUrl(generator, '/torah/parsha/nitzavim', { now: new Date('2026-01-01') })
   )
 
-  t.truthy(route)
-  t.is(route?.canonicalHash, '#/parsha/nitzavim')
-  t.is(
-    await renderStartingLineForRoute(route),
-    await renderStartingLineForRoute(
+  expect(route).toBeTruthy()
+  expect(route?.canonicalHash).toBe('#/torah/parsha/nitzavim')
+  expect(await renderStartingLineForRoute(route)).toBe(await renderStartingLineForRoute(
       toReaderRoute(parseUrl(generator, '/run/2029-09-08:shacharis,main'))
-    )
-  )
+    ))
 })
 
-test('Esther slug resolves to the megillah run', async (t) => {
+test('Esther slug resolves to the megillah run', async () => {
   const route = toReaderRoute(
-    parseUrl(generator, '/parsha/megillah-esther', { now: new Date('2025-01-01') })
+    parseUrl(generator, '/esther/megillah-esther', { now: new Date('2025-01-01') })
   )
 
-  t.truthy(route)
-  t.is(route?.canonicalHash, '#/parsha/megillah-esther')
-  t.is(
-    await renderStartingLineForRoute(route),
-    await renderStartingLineForRoute(
+  expect(route).toBeTruthy()
+  expect(route?.canonicalHash).toBe('#/esther/megillah-esther')
+  expect(route?.model.displayTitleForRun(route.model.relevantRuns[0])).toBe('מגילת אסתר')
+  expect(await renderStartingLineForRoute(route)).toBe(await renderStartingLineForRoute(
       toReaderRoute(parseUrl(generator, '/run/2025-03-14:megillah,megillah'))
-    )
-  )
+    ))
 })
 
-test('Esther aliases canonicalize to megillah-esther', async (t) => {
-  for (const slug of ['/parsha/esther', '/parsha/megillat-esther']) {
+test('Bare Esther route redirects to the megillah route', async () => {
+  const route = toReaderRoute(
+    parseUrl(generator, '/esther', { now: new Date('2025-01-01') })
+  )
+
+  expect(route).toBeTruthy()
+  expect(route?.canonicalHash).toBe('#/esther/megillah-esther')
+  expect(route?.model.displayTitleForRun(route.model.relevantRuns[0])).toBe('מגילת אסתר')
+})
+
+test('Esther aliases canonicalize to megillah-esther', async () => {
+  for (const slug of ['/esther/esther', '/esther/megillat-esther']) {
     const route = toReaderRoute(
       parseUrl(generator, slug, { now: new Date('2025-01-01') })
     )
 
-    t.truthy(route)
-    t.is(route?.canonicalHash, '#/parsha/megillah-esther')
-    t.is(
-      await renderStartingLineForRoute(route),
-      await renderStartingLineForRoute(
+    expect(route).toBeTruthy()
+    expect(route?.canonicalHash).toBe('#/esther/megillah-esther')
+    expect(await renderStartingLineForRoute(route)).toBe(await renderStartingLineForRoute(
         toReaderRoute(parseUrl(generator, '/run/2025-03-14:megillah,megillah'))
-      )
-    )
+      ))
   }
 })
 
-test('Unknown parsha slug is ignored', (t) => {
-  t.falsy(parseUrl(generator, '/parsha/not-a-real-parsha'))
+test('Torah page URL starts directly at the requested page', async () => {
+  const route = toReaderRoute(
+    parseUrl(generator, '/torah/page/12', { now: new Date('2024-10-01') })
+  )
+
+  expect(route).toBeTruthy()
+  expect(route?.canonicalHash).toBe('#/torah/page/12')
+  const { page, lineNumber } = await route!.model.startingLocation
+  expect(page.type).toBe('page')
+  expect(page.pageNumber).toBe(12)
+  expect(lineNumber).toBe(1)
+  expect(generatePageUrl('torah', 12)).toBe('#/torah/page/12')
 })
 
-test('Run ID for פרשת נצבים', async (t) => {
-  t.snapshot(
-    await renderStartingLine(
+test('Esther page URL starts directly at the requested page', async () => {
+  const route = toReaderRoute(
+    parseUrl(generator, '/esther/page/3', { now: new Date('2025-01-01') })
+  )
+
+  expect(route).toBeTruthy()
+  expect(route?.canonicalHash).toBe('#/esther/page/3')
+  expect(route?.model.displayTitleForRun(route.model.relevantRuns[0])).toBe('מגילת אסתר')
+  const { page, lineNumber } = await route!.model.startingLocation
+  expect(page.type).toBe('page')
+  expect(page.pageNumber).toBe(3)
+  expect(lineNumber).toBe(1)
+  expect(generatePageUrl('esther', 3)).toBe('#/esther/page/3')
+})
+
+test('Page URLs reject unknown scrolls and out of range pages', () => {
+  expect(parseUrl(generator, '/torah/page/0')).toBeFalsy()
+  expect(parseUrl(generator, '/torah/page/246')).toBeFalsy()
+  expect(parseUrl(generator, '/esther/page/18')).toBeFalsy()
+  expect(parseUrl(generator, '/page/not-a-scroll/12')).toBeFalsy()
+})
+
+test('Old parsha and page URL families are not parsed', () => {
+  expect(parseUrl(generator, '/parsha/noach')).toBeFalsy()
+  expect(parseUrl(generator, '/page/torah/12')).toBeFalsy()
+  expect(parseUrl(generator, '/page/esther/3')).toBeFalsy()
+  expect(parseUrl(generator, '/torah/parsha/megillah-esther')).toBeFalsy()
+  expect(parseUrl(generator, '/esther/parsha/noach')).toBeFalsy()
+  expect(parseUrl(generator, '/esther/parsha/megillah-esther')).toBeFalsy()
+})
+
+test('Unknown parsha slug is ignored', () => {
+  expect(parseUrl(generator, '/torah/parsha/not-a-real-parsha')).toBeFalsy()
+})
+
+test('Run ID for פרשת נצבים', async () => {
+  expect(await renderStartingLine(
       toModel(parseUrl(generator, '/run/2025-09-20:shacharis,main'))
-    )
-  )
+    )).toMatchSnapshot()
 })
-test('Run ID for אסתר', async (t) => {
-  t.snapshot(
-    await renderStartingLine(
+test('Run ID for אסתר', async () => {
+  expect(await renderStartingLine(
       toModel(parseUrl(generator, '/run/2025-03-14:megillah,megillah'))
-    )
-  )
+    )).toMatchSnapshot()
 })
 
-test('Valid location reference in במדבר', async (t) => {
-  t.snapshot(
-    await renderStartingLine(toModel(parseUrl(generator, '/r/4-13-1')))
-  )
+test('Valid location reference in במדבר', async () => {
+  expect(await renderStartingLine(toModel(parseUrl(generator, '/r/4-13-1')))).toMatchSnapshot()
 })
 
-test('Trailing slash okay', async (t) => {
-  t.is(
-    await renderStartingLine(toModel(parseUrl(generator, '/r/4-13-1/'))),
-    await renderStartingLine(toModel(parseUrl(generator, '/r/4-13-1')))
-  )
+test('Trailing slash okay', async () => {
+  expect(await renderStartingLine(toModel(parseUrl(generator, '/r/4-13-1/')))).toBe(await renderStartingLine(toModel(parseUrl(generator, '/r/4-13-1'))))
 })
 
-test('Generated URLs round-trip', async (t) => {
-  t.is(
-    await renderStartingLine(
+test('Generated URLs round-trip', async () => {
+  expect(await renderStartingLine(
       toModel(
         parseUrl(
         generator,
@@ -225,16 +251,13 @@ test('Generated URLs round-trip', async (t) => {
         )
       )
       )
-    ),
-    await renderStartingLine(
+    )).toBe(await renderStartingLine(
       toModel(parseUrl(generator, '/run/2025-09-20:shacharis,main'))
-    )
-  )
+    ))
 })
 
-test('Generated run URL can start at a specific ref', async (t) => {
-  t.is(
-    await renderStartingLine(
+test('Generated run URL can start at a specific ref', async () => {
+  expect(await renderStartingLine(
       toModel(
         parseUrl(
           generator,
@@ -246,9 +269,7 @@ test('Generated run URL can start at a specific ref', async (t) => {
           }).replace(/^#/, '')
         )
       )
-    ),
-    await renderStartingLine(toModel(parseUrl(generator, '/run/2025-05-03:shacharis,main/3-14-1')))
-  )
+    )).toBe(await renderStartingLine(toModel(parseUrl(generator, '/run/2025-05-03:shacharis,main/3-14-1'))))
 })
 
 async function renderStartingLine(model: ScrollViewModel | null) {

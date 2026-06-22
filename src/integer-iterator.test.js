@@ -1,29 +1,29 @@
-import test from 'ava'
+import { expect, test } from 'vitest'
 
 import IntegerIterator from './integer-iterator.ts'
 
-test('previous once returns 1 less than the start', (t) => {
+test('previous once returns 1 less than the start', () => {
   const sut = IntegerIterator.new({ startingAt: 0 })
 
-  t.is(sut.previous(), -1)
+  expect(sut.previous()).toBe(-1)
 })
 
-test('previous twice returns 1 less each time', (t) => {
+test('previous twice returns 1 less each time', () => {
   const sut = IntegerIterator.new({ startingAt: 42 })
 
-  t.is(sut.previous(), 41)
-  t.is(sut.previous(), 40)
+  expect(sut.previous()).toBe(41)
+  expect(sut.previous()).toBe(40)
 })
 
-test('next multiple times returns 1 more each time', (t) => {
+test('next multiple times returns 1 more each time', () => {
   const sut = IntegerIterator.new({ startingAt: -13 })
 
-  t.is(sut.next(), -12)
-  t.is(sut.next(), -11)
-  t.is(sut.next(), -10)
+  expect(sut.next()).toBe(-12)
+  expect(sut.next()).toBe(-11)
+  expect(sut.next()).toBe(-10)
 })
 
-test('interleaving previous and next always extends the values returned', (t) => {
+test('interleaving previous and next always extends the values returned', () => {
   const sut = IntegerIterator.new({ startingAt: 0 })
 
   sut.previous()
@@ -32,6 +32,6 @@ test('interleaving previous and next always extends the values returned', (t) =>
   sut.previous()
   sut.next()
 
-  t.is(sut.previous(), -3)
-  t.is(sut.next(), 4)
+  expect(sut.previous()).toBe(-3)
+  expect(sut.next()).toBe(4)
 })

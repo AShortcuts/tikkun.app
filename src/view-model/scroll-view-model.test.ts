@@ -1,4 +1,4 @@
-import test, { type ExecutionContext } from 'ava'
+import { expect, test, type TestContext } from 'vitest'
 import { LeiningGenerator } from '../calendar-model/generator.ts'
 import type { UserSettings } from '../calendar-model/user-settings.ts'
 import {
@@ -21,88 +21,70 @@ const generator = new LeiningGenerator(testSettings)
 // Note: We cover the runs included in HolidayViewModel in aliyah-labeller.test.ts
 // This also includes fetchPreviousPage() and fetchNextPage()
 
-test('selects first line of ראש השנה', async (t) => {
-  t.snapshot(await renderFirstLine('2024-10-04:shacharis,main'))
+test('selects first line of ראש השנה', async () => {
+  expect(await renderFirstLine('2024-10-04:shacharis,main')).toMatchSnapshot()
 })
-test('selects first line of פרשת האזינו', async (t) => {
-  t.snapshot(await renderFirstLine('2024-10-05:shacharis,main'))
+test('selects first line of פרשת האזינו', async () => {
+  expect(await renderFirstLine('2024-10-05:shacharis,main')).toMatchSnapshot()
 })
-test('selects first line of פרשת בראשית', async (t) => {
-  t.snapshot(await renderFirstLine('2024-10-26:shacharis,main'))
+test('selects first line of פרשת בראשית', async () => {
+  expect(await renderFirstLine('2024-10-26:shacharis,main')).toMatchSnapshot()
 })
-test('selects first line of פרשת ויחי', async (t) => {
-  t.snapshot(await renderFirstLine('2025-01-11:shacharis,main'))
+test('selects first line of פרשת ויחי', async () => {
+  expect(await renderFirstLine('2025-01-11:shacharis,main')).toMatchSnapshot()
 })
 
-test(`ignores פרשת פרה when labelling פרשת חקת`, async (t) => {
+test(`ignores פרשת פרה when labelling פרשת חקת`, async () => {
   // Make sure we don't label this as מפטיר from פרה, which appears first in the array of runs.
-  t.regex(await renderFirstLine('2025-07-05:shacharis,main'), /פרשת חקת/)
+  expect(await renderFirstLine('2025-07-05:shacharis,main')).toMatch(/חקת/)
 })
 
-test('forDate on שבת', async (t) => {
-  t.deepEqual(
-    await renderScroll(
+test('forDate on שבת', async () => {
+  expect(await renderScroll(
       ScrollViewModel.forId(generator, '2025-01-11:shacharis,main')
-    ),
-    await renderScroll(
+    )).toEqual(await renderScroll(
       ScrollViewModel.forDate(generator, new Date(2025, 0, 11))
-    )
-  )
+    ))
 })
-test('forDate before שבת', async (t) => {
-  t.deepEqual(
-    await renderScroll(
+test('forDate before שבת', async () => {
+  expect(await renderScroll(
       ScrollViewModel.forId(generator, '2025-01-18:shacharis,main')
-    ),
-    await renderScroll(
+    )).toEqual(await renderScroll(
       ScrollViewModel.forDate(generator, new Date(2025, 0, 14))
-    )
-  )
+    ))
 })
 
-test('forDate on צום גדליה', async (t) => {
-  t.deepEqual(
-    await renderScroll(
+test('forDate on צום גדליה', async () => {
+  expect(await renderScroll(
       ScrollViewModel.forId(generator, '2024-10-06:shacharis,main')
-    ),
-    await renderScroll(ScrollViewModel.forDate(generator, new Date(2024, 9, 6)))
-  )
+    )).toEqual(await renderScroll(ScrollViewModel.forDate(generator, new Date(2024, 9, 6))))
 })
 
 // TODO(haftara): Enable after this can read איכה.
-test.skip('forDate before תשעה באב', async (t) => {
-  t.deepEqual(
-    await renderScroll(
+test.skip('forDate before תשעה באב', async () => {
+  expect(await renderScroll(
       ScrollViewModel.forId(generator, '2024-8-13:shacharis,main')
-    ),
-    await renderScroll(
+    )).toEqual(await renderScroll(
       ScrollViewModel.forDate(generator, new Date(2024, 7, 11))
-    )
-  )
+    ))
 })
 
-test('forDate on סוכות', async (t) => {
-  t.deepEqual(
-    await renderScroll(
+test('forDate on סוכות', async () => {
+  expect(await renderScroll(
       ScrollViewModel.forId(generator, '2024-10-17:shacharis,main')
-    ),
-    await renderScroll(
+    )).toEqual(await renderScroll(
       ScrollViewModel.forDate(generator, new Date(2024, 9, 17))
-    )
-  )
+    ))
 })
-test('forDate before סוכות', async (t) => {
-  t.deepEqual(
-    await renderScroll(
+test('forDate before סוכות', async () => {
+  expect(await renderScroll(
       ScrollViewModel.forId(generator, '2024-10-17:shacharis,main')
-    ),
-    await renderScroll(
+    )).toEqual(await renderScroll(
       ScrollViewModel.forDate(generator, new Date(2024, 9, 13))
-    )
-  )
+    ))
 })
 
-test('assigns a run and aliyah to every verse in full torah', async (t) => {
+test('assigns a run and aliyah to every verse in full torah', async () => {
   // Start from a random regular פרשה, in a Hebrew calendar year that does
   // not contain וילך.
   const model = ScrollViewModel.forId(generator, '2025-05-24:shacharis,main')
@@ -120,13 +102,10 @@ test('assigns a run and aliyah to every verse in full torah', async (t) => {
       // This is fine.
       if (!line.verses.length) continue
       const message = renderLine(line)
-      t.truthy(line.run, message)
-      t.notDeepEqual(line.aliyot, [], message)
-      t.truthy(
-        line.aliyot.every((a) => containsRef(a, line.verses)),
-        `Aliyot ${dumpAliyot(line)} don't match line ${message}`
-      )
-      t.truthy(line.aliyot.every((a) => line.run?.aliyot.includes(a)))
+      expect(line.run, message).toBeTruthy()
+      expect(line.aliyot, message).not.toEqual([])
+      expect(line.aliyot.every((a) => containsRef(a, line.verses)), `Aliyot ${dumpAliyot(line)} don't match line ${message}`).toBeTruthy()
+      expect(line.aliyot.every((a) => line.run?.aliyot.includes(a))).toBeTruthy()
     }
   }
 })
@@ -139,26 +118,26 @@ test('includes context in בראשית', async (t) => {
   if (pages?.[0].type !== 'page') throw new Error('First page should be a page')
 
   // First line begins a פסוק and עלייה.
-  t.deepEqual(dumpContext(t, pages[0].lines[0]), runId)
-  t.deepEqual(dumpAliyot(pages[0].lines[0]), [1])
+  expect(dumpContext(t, pages[0].lines[0])).toEqual(runId)
+  expect(dumpAliyot(pages[0].lines[0])).toEqual([1])
   // Second line begins a פסוק but not an עלייה.
-  t.deepEqual(dumpContext(t, pages[0].lines[1]), runId)
-  t.deepEqual(dumpAliyot(pages[0].lines[1]), [1])
+  expect(dumpContext(t, pages[0].lines[1])).toEqual(runId)
+  expect(dumpAliyot(pages[0].lines[1])).toEqual([1])
 
   // This line is entirely within a פסוק.
-  t.deepEqual(pages[0].lines[5].verses, [])
-  t.deepEqual(dumpContext(t, pages[0].lines[5]), runId)
-  t.deepEqual(dumpAliyot(pages[0].lines[5]), [1])
+  expect(pages[0].lines[5].verses).toEqual([])
+  expect(dumpContext(t, pages[0].lines[5])).toEqual(runId)
+  expect(dumpAliyot(pages[0].lines[5])).toEqual([1])
 
   // This is rendering src/data/pages/torah/6.json.
   const maftir = pages[5]
   for (const line of getLinesInRange(maftir, { first: '5:25', until: '6:5' })) {
-    t.deepEqual(dumpContext(t, line), runId, renderLine(line))
-    t.deepEqual(dumpAliyot(line), [7], renderLine(line))
+    expect(dumpContext(t, line), renderLine(line)).toEqual(runId)
+    expect(dumpAliyot(line), renderLine(line)).toEqual([7])
   }
   for (const line of getLinesInRange(maftir, { first: '6:5', until: '6:9' })) {
-    t.deepEqual(dumpContext(t, line), runId, renderLine(line))
-    t.deepEqual(dumpAliyot(line), [7, 'Maftir'], renderLine(line))
+    expect(dumpContext(t, line), renderLine(line)).toEqual(runId)
+    expect(dumpAliyot(line), renderLine(line)).toEqual([7, 'Maftir'])
   }
 })
 
@@ -208,10 +187,10 @@ test('includes context in ראש השנה', async (t) => {
   }).forEach(assertNoRun)
 
   function assertLineInRun(line: RenderedLineInfo) {
-    t.deepEqual(dumpContext(t, line), runId, renderLine(line))
+    expect(dumpContext(t, line), renderLine(line)).toEqual(runId)
   }
   function assertNoRun(line: RenderedLineInfo) {
-    t.falsy(line.run, renderLine(line))
+    expect(line.run, renderLine(line)).toBeFalsy()
   }
 })
 
@@ -221,7 +200,7 @@ test('includes context in תענית ציבור', async (t) => {
 
   // This is rendering src/data/pages/torah/99.json.
   const pages = await fetchPages(model, { fetchPreviousPages: false, count: 9 })
-  t.is(pages.length, 3)
+  expect(pages.length).toBe(3)
 
   getLinesInRange(pages[0], {
     first: null,
@@ -249,10 +228,10 @@ test('includes context in תענית ציבור', async (t) => {
   }).forEach(assertLineInRun)
 
   function assertLineInRun(line: RenderedLineInfo) {
-    t.deepEqual(dumpContext(t, line), runId, renderLine(line))
+    expect(dumpContext(t, line), renderLine(line)).toEqual(runId)
   }
   function assertNoRun(line: RenderedLineInfo) {
-    t.falsy(line.run, renderLine(line))
+    expect(line.run, renderLine(line)).toBeFalsy()
   }
 })
 
@@ -260,15 +239,12 @@ function dumpAliyot(line: RenderedLineInfo) {
   return line.aliyot.map((a) => a.index)
 }
 
-function dumpContext(t: ExecutionContext, line: RenderedLineInfo) {
+function dumpContext(t: TestContext, line: RenderedLineInfo) {
   if (!line.run) return null
   if (line.verses.length) {
-    t.true(
-      line.verses.some((v) => containsRef(line.run!, v)),
-      `Line "${renderLine(line)} is not in run "${line.run!.id}"`
-    )
-    t.notDeepEqual(line.aliyot, [])
-    t.true(line.aliyot.every((a) => containsRef(a, line.verses)))
+    expect(line.verses.some((v) => containsRef(line.run!, v)), `Line "${renderLine(line)} is not in run "${line.run!.id}"`).toBe(true)
+    expect(line.aliyot).not.toEqual([])
+    expect(line.aliyot.every((a) => containsRef(a, line.verses))).toBe(true)
   }
 
   return line.run.id

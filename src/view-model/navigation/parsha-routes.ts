@@ -25,6 +25,7 @@ type MegillahRoute = {
   kind: 'megillah'
   canonicalSlug: 'megillah-esther'
   aliases: string[]
+  displayTitle: 'מגילת אסתר'
 }
 
 type VezosHaberachaRoute = {
@@ -103,6 +104,7 @@ const parshaRouteSpecs: ParshaRouteSpec[] = [
     kind: 'megillah',
     canonicalSlug: 'megillah-esther',
     aliases: ['esther', 'megillat-esther', 'ester', 'megillah-ester'],
+    displayTitle: 'מגילת אסתר',
   },
   // Hebcal emits וזאת הברכה as the Simchat Torah holiday leining, but the TOC
   // treats it as its own parsha. Keep a separate slug and display title so
@@ -133,6 +135,7 @@ for (const spec of parshaRouteSpecs) {
   const aliases = [
     spec.canonicalSlug,
     spec.canonicalSlug.replace(/-/g, ''),
+    ...('titleSlugs' in spec ? spec.titleSlugs : []),
     ...(spec.aliases ?? []),
   ]
 
@@ -147,6 +150,59 @@ function normalizeParshaSlug(slug: string) {
 
 function titleSlug(title: string) {
   return slugify(title.replace(/^Parshat\s+/i, ''))
+}
+
+function uniqueTerms(terms: Array<string | null | undefined>) {
+  const seen = new Set<string>()
+  const result: string[] = []
+
+  for (const term of terms) {
+    const trimmed = term?.trim()
+    if (!trimmed) continue
+    const key = normalizeParshaSlug(trimmed)
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push(trimmed)
+  }
+
+  return result
+}
+
+function searchTermsForRouteSpec(spec: ParshaRouteSpec) {
+  return uniqueTerms([
+    spec.canonicalSlug,
+    spec.canonicalSlug.replace(/-/g, ''),
+    ...('titleSlugs' in spec ? spec.titleSlugs : []),
+    ...(spec.aliases ?? []),
+    spec.kind === 'megillah' ? spec.displayTitle : null,
+    spec.kind === 'vezos-haberacha' ? spec.displayTitle : null,
+  ])
+}
+
+function routeSpecForLeining(leining: LeiningInstance) {
+  if (
+    leining.id === LeiningInstanceId.Megillah &&
+    leining.runs.some((run) => run.type === LeiningRunType.Megillah) &&
+    titleSlug(leining.date.title.en) === PURIM_TITLE_SLUG
+  ) {
+    return routeSpecByCanonicalSlug.get('megillah-esther') ?? null
+  }
+
+  if (
+    leining.id === LeiningInstanceId.Shacharis &&
+    leining.runs.some((run) => run.aliyot[0]?.start.b === 5 && run.aliyot[0]?.start.c === 33)
+  ) {
+    return routeSpecByCanonicalSlug.get('vezos-haberacha') ?? null
+  }
+
+  if (!leining.isParsha || leining.id !== LeiningInstanceId.Shacharis) return null
+
+  const slug = titleSlug(leining.date.title.en)
+  return (
+    parshaRouteSpecs.find(
+      (spec) => spec.kind === 'weekly' && spec.titleSlugs.includes(slug)
+    ) ?? null
+  )
 }
 
 function* futureLeiningDates(generator: LeiningGenerator, now: Date) {
@@ -201,38 +257,41 @@ export function canonicalizeParshaSlug(slug: string): string | null {
   return aliasToCanonicalSlug.get(normalizeParshaSlug(slug)) ?? null
 }
 
-export function generateParshaUrl(slug: string, initialRef?: RefWithScroll) {
-  if (!initialRef) return `#/parsha/${slug}`
+export function getParshaSearchTermsForSlug(slug: string) {
+  const canonicalSlug = canonicalizeParshaSlug(slug)
+  if (!canonicalSlug) return []
 
-  return `#/parsha/${slug}/${initialRef.b}-${initialRef.c}-${initialRef.v}`
+  const spec = routeSpecByCanonicalSlug.get(canonicalSlug)
+  return spec ? searchTermsForRouteSpec(spec) : []
+}
+
+export function getParshaSearchTermsForLeining(leining: LeiningInstance) {
+  const spec = routeSpecForLeining(leining)
+  return spec ? searchTermsForRouteSpec(spec) : []
+}
+
+export function scrollForParshaSlug(slug: string): RefWithScroll['scroll'] | null {
+  const canonicalSlug = canonicalizeParshaSlug(slug)
+  if (!canonicalSlug) return null
+
+  const spec = routeSpecByCanonicalSlug.get(canonicalSlug)
+  if (!spec) return null
+  return spec.kind === 'megillah' ? 'esther' : 'torah'
+}
+
+export function generateParshaUrl(slug: string, initialRef?: RefWithScroll) {
+  const scroll = scrollForParshaSlug(slug) ?? initialRef?.scroll ?? 'torah'
+  const routePrefix = scroll === 'esther' ? `#/${scroll}/${slug}` : `#/${scroll}/parsha/${slug}`
+  if (!initialRef) return routePrefix
+
+  return `${routePrefix}/${initialRef.b}-${initialRef.c}-${initialRef.v}`
 }
 
 export function semanticParshaUrlForLeining(
   leining: LeiningInstance,
   initialRef?: RefWithScroll
 ): string | null {
-  if (
-    leining.id === LeiningInstanceId.Megillah &&
-    leining.runs.some((run) => run.type === LeiningRunType.Megillah) &&
-    titleSlug(leining.date.title.en) === PURIM_TITLE_SLUG
-  ) {
-    return generateParshaUrl('megillah-esther', initialRef)
-  }
-
-  if (
-    leining.id === LeiningInstanceId.Shacharis &&
-    leining.runs.some((run) => run.aliyot[0]?.start.b === 5 && run.aliyot[0]?.start.c === 33)
-  ) {
-    return generateParshaUrl('vezos-haberacha', initialRef)
-  }
-
-  if (!leining.isParsha || leining.id !== LeiningInstanceId.Shacharis) return null
-
-  const slug = titleSlug(leining.date.title.en)
-  const routeSpec = parshaRouteSpecs.find(
-    (spec) => spec.kind === 'weekly' && spec.titleSlugs.includes(slug)
-  )
-
+  const routeSpec = routeSpecForLeining(leining)
   return routeSpec ? generateParshaUrl(routeSpec.canonicalSlug, initialRef) : null
 }
 
@@ -258,7 +317,10 @@ export function resolveParshaRun(
       return {
         canonicalSlug,
         run,
-        displayTitle: spec.kind === 'vezos-haberacha' ? spec.displayTitle : undefined,
+        displayTitle:
+          spec.kind === 'megillah' || spec.kind === 'vezos-haberacha'
+            ? spec.displayTitle
+            : undefined,
       }
     }
   }

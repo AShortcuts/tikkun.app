@@ -1,26 +1,26 @@
-import test from 'ava'
+import { expect, test } from 'vitest'
 import hebrewNumeralFromInteger from './hebrew-numeral.ts'
 
-test('exact value returns the letter', (t) => {
-  t.is(hebrewNumeralFromInteger(4), 'ד')
+test('exact value returns the letter', () => {
+  expect(hebrewNumeralFromInteger(4)).toBe('ד')
 })
 
-test('exact value returns the letter (again)', (t) => {
-  t.is(hebrewNumeralFromInteger(30), 'ל')
+test('exact value returns the letter (again)', () => {
+  expect(hebrewNumeralFromInteger(30)).toBe('ל')
 })
 
-test('two character numbers', (t) => {
-  t.is(hebrewNumeralFromInteger(42), 'מב')
+test('two character numbers', () => {
+  expect(hebrewNumeralFromInteger(42)).toBe('מב')
 })
 
-test('טו gets special treatment', (t) => {
-  t.is(hebrewNumeralFromInteger(15), 'טו')
+test('טו gets special treatment', () => {
+  expect(hebrewNumeralFromInteger(15)).toBe('טו')
 })
 
-test('טז gets special treatment', (t) => {
-  t.is(hebrewNumeralFromInteger(16), 'טז')
+test('טז gets special treatment', () => {
+  expect(hebrewNumeralFromInteger(16)).toBe('טז')
 })
 
-test('three character numbers', (t) => {
-  t.is(hebrewNumeralFromInteger(421), 'תכא')
+test('three character numbers', () => {
+  expect(hebrewNumeralFromInteger(421)).toBe('תכא')
 })

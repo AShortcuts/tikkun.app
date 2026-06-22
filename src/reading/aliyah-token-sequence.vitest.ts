@@ -142,3 +142,36 @@ test('keeps the shared line prefix when the next aliyah begins mid-line', () => 
     })
   ).toEqual(['0:0:0:0', '0:1:0:0', '0:1:0:1'])
 })
+
+test('collects through the rendered content when the final aliyah has no next marker', () => {
+  const book = document.createElement('div')
+  book.innerHTML = `
+    <table>
+      <tr data-class="line" data-line-index="0">
+        <td>
+          <span class="fragment mod-annotations-on">
+            <span class="word" data-token-key="0:0:0:0">לפני</span>
+            <span class="word" data-token-key="0:0:0:1">סיום׃</span>
+            <span class="word" data-token-key="0:0:0:2">תחילת</span>
+          </span>
+        </td>
+      </tr>
+      <tr data-class="line" data-line-index="1">
+        <td>
+          <span class="fragment mod-annotations-on">
+            <span class="word" data-token-key="0:1:0:0">המשך</span>
+          </span>
+        </td>
+      </tr>
+    </table>
+  `
+
+  const lines = [...book.querySelectorAll<HTMLElement>('[data-class="line"]')]
+  expect(
+    collectTokenKeysForAliyahRange({
+      book,
+      startLine: lines[0],
+      endLine: null,
+    })
+  ).toEqual(['0:0:0:0', '0:0:0:1', '0:0:0:2', '0:1:0:0'])
+})

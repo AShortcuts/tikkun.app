@@ -291,7 +291,7 @@ export const renderCalendarSettings = ({ israel }: CalendarSettings) => `
         type="checkbox"
         ${israel ? 'checked' : ''}
       >
-      <span>In Israel</span>
+      <span>🇮🇱 In Israel</span>
     </label>
   </section>
 `

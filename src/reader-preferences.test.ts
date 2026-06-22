@@ -1,4 +1,4 @@
-import test from 'ava'
+import { beforeEach, expect, test } from 'vitest'
 
 import {
   applyReaderPreferences,
@@ -8,7 +8,7 @@ import {
   saveReaderPreferences,
 } from './reader-preferences.ts'
 
-test.beforeEach(() => {
+beforeEach(() => {
   const store = new Map<string, string>()
   ;(globalThis as typeof globalThis & { localStorage: Storage }).localStorage = {
     getItem(key: string) {
@@ -44,7 +44,7 @@ test.beforeEach(() => {
   } as Document
 })
 
-test('loads sepia as a saved theme mode', (t) => {
+test('loads sepia as a saved theme mode', () => {
   localStorage.setItem(
     'tikkun.reader-preferences.v3',
     JSON.stringify({ themeMode: 'sepia' })
@@ -52,10 +52,10 @@ test('loads sepia as a saved theme mode', (t) => {
 
   const preferences = loadReaderPreferences()
 
-  t.is(preferences.themeMode, 'sepia')
+  expect(preferences.themeMode).toBe('sepia')
 })
 
-test('falls back to the default theme for an invalid saved theme mode', (t) => {
+test('falls back to the default theme for an invalid saved theme mode', () => {
   localStorage.setItem(
     'tikkun.reader-preferences.v3',
     JSON.stringify({ themeMode: 'chartreuse' })
@@ -63,10 +63,10 @@ test('falls back to the default theme for an invalid saved theme mode', (t) => {
 
   const preferences = loadReaderPreferences()
 
-  t.is(preferences.themeMode, defaultReaderPreferences.themeMode)
+  expect(preferences.themeMode).toBe(defaultReaderPreferences.themeMode)
 })
 
-test('loads reader focal point mode', (t) => {
+test('loads reader focal point mode', () => {
   localStorage.setItem(
     'tikkun.reader-preferences.v3',
     JSON.stringify({ focalPointMode: 'browser' })
@@ -74,10 +74,10 @@ test('loads reader focal point mode', (t) => {
 
   const preferences = loadReaderPreferences()
 
-  t.is(preferences.focalPointMode, 'browser')
+  expect(preferences.focalPointMode).toBe('browser')
 })
 
-test('falls back to the default focal point for an invalid saved mode', (t) => {
+test('falls back to the default focal point for an invalid saved mode', () => {
   localStorage.setItem(
     'tikkun.reader-preferences.v3',
     JSON.stringify({ focalPointMode: 'middle-ish' })
@@ -85,10 +85,10 @@ test('falls back to the default focal point for an invalid saved mode', (t) => {
 
   const preferences = loadReaderPreferences()
 
-  t.is(preferences.focalPointMode, defaultReaderPreferences.focalPointMode)
+  expect(preferences.focalPointMode).toBe(defaultReaderPreferences.focalPointMode)
 })
 
-test('does not restore a saved playback rate', (t) => {
+test('does not restore a saved playback rate', () => {
   localStorage.setItem(
     'tikkun.reader-preferences.v3',
     JSON.stringify({ playbackRate: 1.75 })
@@ -96,10 +96,10 @@ test('does not restore a saved playback rate', (t) => {
 
   const preferences = loadReaderPreferences()
 
-  t.is(preferences.playbackRate, defaultReaderPreferences.playbackRate)
+  expect(preferences.playbackRate).toBe(defaultReaderPreferences.playbackRate)
 })
 
-test('does not persist a non-default playback rate', (t) => {
+test('does not persist a non-default playback rate', () => {
   saveReaderPreferences({
     ...defaultReaderPreferences,
     playbackRate: 1.75,
@@ -108,19 +108,19 @@ test('does not persist a non-default playback rate', (t) => {
   const raw = localStorage.getItem('tikkun.reader-preferences.v3')
   const stored = raw ? JSON.parse(raw) as Partial<typeof defaultReaderPreferences> : null
 
-  t.is(stored?.playbackRate, defaultReaderPreferences.playbackRate)
+  expect(stored?.playbackRate).toBe(defaultReaderPreferences.playbackRate)
 })
 
-test('applies sepia to the root theme dataset', (t) => {
+test('applies sepia to the root theme dataset', () => {
   applyReaderPreferences({
     ...defaultReaderPreferences,
     themeMode: 'sepia',
   })
 
-  t.is(document.documentElement.dataset.readerTheme, 'sepia')
+  expect(document.documentElement.dataset.readerTheme).toBe('sepia')
 })
 
-test('highlight reset defaults are not read from changed inline styles', (t) => {
+test('highlight reset defaults are not read from changed inline styles', () => {
   applyReaderPreferences({
     ...defaultReaderPreferences,
     outlineOffset: 8,
@@ -130,7 +130,7 @@ test('highlight reset defaults are not read from changed inline styles', (t) => 
 
   const defaults = getDefaultHighlightPreferences()
 
-  t.is(defaults.outlineOffset, defaultReaderPreferences.outlineOffset)
-  t.is(defaults.radius, defaultReaderPreferences.radius)
-  t.is(defaults.glow, defaultReaderPreferences.glow)
+  expect(defaults.outlineOffset).toBe(defaultReaderPreferences.outlineOffset)
+  expect(defaults.radius).toBe(defaultReaderPreferences.radius)
+  expect(defaults.glow).toBe(defaultReaderPreferences.glow)
 })

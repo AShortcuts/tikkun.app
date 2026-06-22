@@ -841,7 +841,7 @@ async function recordOne(recording, options) {
     chrome = launched.chrome
     client = await createPage(launched.browserWsUrl)
 
-    const url = `${options.baseUrl}/?recording=1&audioId=${encodeURIComponent(recording.id)}#/parsha/${recording.parshaSlug}`
+    const url = `${options.baseUrl}/?recording=1&audioId=${encodeURIComponent(recording.id)}#/torah/parsha/${recording.parshaSlug}`
     await navigate(client, url, options)
     const captureOptions = {
       ...options,

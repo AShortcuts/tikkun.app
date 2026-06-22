@@ -95,6 +95,10 @@
             <button class="aliyah-audio-button toolbar-current-aliyah-audio u-hidden"
               data-target-id="toolbar-current-aliyah-audio" type="button" aria-label="Play current aliyah"
               title="Play current aliyah"></button>
+            <button class="toolbar-button mod-icon-label" data-target-id="bookmark-current" type="button"
+              title="Bookmark current word" aria-label="Bookmark current word"></button>
+            <button class="toolbar-button mod-command" data-target-id="command-palette-open" type="button"
+              title="Open command palette" aria-label="Open command palette">⌘K</button>
             <button class="toolbar-button" data-target-id="settings-toggle" type="button" title="Reader settings"
               aria-label="Reader settings"></button>
           </div>
@@ -111,6 +115,7 @@
     <div class="reader-progress-mobile" data-target-id="reader-progress-mobile" aria-hidden="true">
       <div class="reader-progress-mobile-fill" data-target-id="reader-progress-mobile-fill"></div>
     </div>
+    <div class="aliyah-rail u-hidden" data-target-id="aliyah-rail" aria-label="Aliyah navigation"></div>
     <div id="js-app" class="app-body">
       <section class="reader-shell" data-target-id="reader-shell">
         <div class="reader-side mod-left">
@@ -380,6 +385,9 @@
                 <small>Pushes text higher up</small>
               </button>
             </div>
+            <button type="button" class="toolbar-button mod-icon-label" data-target-id="debug-focal-measure-toggle">
+              Focal Measure
+            </button>
           </div>
         </section>
       </form>
@@ -409,9 +417,38 @@
         <button type="button" class="toolbar-button" data-target-id="admin-undo">Undo Last</button>
         <button type="button" class="toolbar-button" data-target-id="admin-reset">Start Over</button>
         <button type="button" class="toolbar-button" data-target-id="admin-export">Export</button>
-        <button type="button" class="toolbar-button" data-target-id="debug-focal-measure-toggle">Focal Measure</button>
       </div>
     </aside>
+    <div class="command-palette u-hidden" data-target-id="command-palette" role="dialog" aria-modal="true"
+      aria-label="Command palette">
+      <div class="command-palette-panel">
+        <input class="command-palette-input" data-target-id="command-palette-input" type="search"
+          autocomplete="off" spellcheck="false" placeholder="Jump to a reading, page, bookmark, or tool" />
+        <div class="command-palette-results" data-target-id="command-palette-results"></div>
+      </div>
+    </div>
+    <div class="recording-issue-modal u-hidden" data-target-id="recording-issue-modal" role="dialog"
+      aria-modal="true" aria-label="Mark recording issue">
+      <div class="recording-issue-card">
+        <div class="settings-pane-header">
+          <h2>Mark Issue</h2>
+          <button class="toolbar-button" type="button" data-target-id="recording-issue-close">Close</button>
+        </div>
+        <div class="recording-issue-options" data-target-id="recording-issue-options"></div>
+        <label class="recording-issue-note">
+          <span>Note</span>
+          <input data-target-id="recording-issue-note" type="text" maxlength="120" />
+        </label>
+        <label class="settings-field mod-checkbox">
+          <input data-target-id="recording-issue-reader-visible" type="checkbox" checked />
+          <span class="settings-field-copy">
+            <span class="settings-field-label">Show to readers</span>
+            <span class="settings-field-helper">Use only when the recording differs from the text in a way readers should know.</span>
+          </span>
+        </label>
+      </div>
+    </div>
+    <div class="reader-issue-toast u-hidden" data-target-id="reader-issue-toast" role="status" aria-live="polite"></div>
     <div class="export-modal u-hidden" data-target-id="export-modal">
       <div class="export-card stack small">
         <div class="settings-pane-header">

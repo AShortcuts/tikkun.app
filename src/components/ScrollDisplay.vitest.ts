@@ -33,27 +33,27 @@ afterEach(() => {
 for (const testCase of [
   {
     name: 'at the top of the page',
-    label: 'פרשת שלח־לך',
+    label: 'שלח־לך',
     runId: '2025-06-21:shacharis,main',
   },
   {
     name: 'near the top of the page',
-    label: 'פרשת ויקהל',
+    label: 'ויקהל',
     runId: '2025-03-22:shacharis,main',
   },
   {
     name: 'at the center of the page',
-    label: 'פרשת נצבים',
+    label: 'נצבים',
     runId: '2025-09-20:shacharis,main',
   },
   {
     name: 'near the bottom of the page',
-    label: 'פרשת תצוה',
+    label: 'תצוה',
     runId: '2025-03-08:shacharis,main',
   },
   {
     name: 'for the very first page',
-    label: 'פרשת בראשית',
+    label: 'בראשית',
     runId: '2024-10-26:shacharis,main',
     // This label should appear at the top of the screen.
     expectedCoordinates: [document.body.clientWidth / 2, 48],

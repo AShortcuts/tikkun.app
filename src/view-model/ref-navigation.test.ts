@@ -1,4 +1,4 @@
-import test from 'ava'
+import { expect, test } from 'vitest'
 import { LeiningGenerator } from '../calendar-model/generator.ts'
 import type { UserSettings } from '../calendar-model/user-settings.ts'
 import { parseUrl } from './navigation/url-parser.ts'
@@ -12,15 +12,12 @@ const testSettings: UserSettings = {
 
 const generator = new LeiningGenerator(testSettings)
 
-test('legacy ref URLs start at the requested verse, not the start of the run', async (t) => {
+test('legacy ref URLs start at the requested verse, not the start of the run', async () => {
   const route = parseUrl(generator, '/r/1-1-10')
   if (!route || route.view !== 'reader') throw new Error('URL did not parse.')
 
   const { page, lineNumber } = await route.model.startingLocation
   if (page.type !== 'page') throw new Error('First page should be a page')
 
-  t.is(
-    renderLine(page.lines[lineNumber - 1]),
-    ': מָק֣וֹם אֶחָ֔ד וְתֵרָאֶ֖ה הַיַּבָּשָׁ֑ה וַֽיְהִי־כֵֽן׃ וַיִּקְרָ֨א אֱלֹהִ֤ים ׀'
-  )
+  expect(renderLine(page.lines[lineNumber - 1])).toBe(': מָק֣וֹם אֶחָ֔ד וְתֵרָאֶ֖ה הַיַּבָּשָׁ֑ה וַֽיְהִי־כֵֽן׃ וַיִּקְרָ֨א אֱלֹהִ֤ים ׀')
 })

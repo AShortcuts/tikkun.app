@@ -70,7 +70,7 @@ export function collectTokenKeysForAliyahRange({
   })
 
   const sharedEndLineWords =
-    endIndex >= 0
+    endLine && endIndex >= 0
       ? adjustEndingLineTokens({
           currentLineWords: annotatedWordsIn(lines[endIndex]),
           previousLineWords:

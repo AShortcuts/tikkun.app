@@ -37,7 +37,8 @@ function isValidLastReading(value: unknown): value is LastReading {
 
 function isReaderHash(hash: string) {
   return hash.startsWith('#/run/') ||
-    hash.startsWith('#/parsha/') ||
+    hash.startsWith('#/torah/') ||
+    hash.startsWith('#/esther/') ||
     hash.startsWith('#/r/')
 }
 

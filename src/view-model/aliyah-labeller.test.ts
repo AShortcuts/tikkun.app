@@ -1,6 +1,6 @@
 /** @fileoverview This file tests both Aliyah labelling and run calculation in HolidayViewModel. */
 
-import test from 'ava'
+import { expect, test } from 'vitest'
 import { LeiningGenerator } from '../calendar-model/generator.ts'
 import type { UserSettings } from '../calendar-model/user-settings.ts'
 import { type RenderedEntry, ScrollViewModel } from './scroll-view-model.ts'
@@ -14,53 +14,53 @@ const testSettings: UserSettings = {
 
 const generator = new LeiningGenerator(testSettings)
 
-test(`יום כיפור on שבת`, async (t) => {
-  t.snapshot(await dumpAliyot('2024-10-12:shacharis,main'))
+test(`יום כיפור on שבת`, async () => {
+  expect(await dumpAliyot('2024-10-12:shacharis,main')).toMatchSnapshot()
 })
 
-test(`חול המוד סוכות`, async (t) => {
-  t.snapshot(await dumpAliyot('2024-10-20:shacharis,main'))
+test(`חול המוד סוכות`, async () => {
+  expect(await dumpAliyot('2024-10-20:shacharis,main')).toMatchSnapshot()
 })
 
-test(`שמחת תורה`, async (t) => {
-  t.snapshot(await dumpAliyot('2024-10-25:shacharis,main'))
+test(`שמחת תורה`, async () => {
+  expect(await dumpAliyot('2024-10-25:shacharis,main')).toMatchSnapshot()
 })
 
-test(`תענית ציבור`, async (t) => {
-  t.snapshot(await dumpAliyot('2025-03-13:mincha,main'))
+test(`תענית ציבור`, async () => {
+  expect(await dumpAliyot('2025-03-13:mincha,main')).toMatchSnapshot()
 })
 
-test(`פרשת האזינו`, async (t) => {
-  t.snapshot(await dumpAliyot('2024-10-05:shacharis,main'))
+test(`פרשת האזינו`, async () => {
+  expect(await dumpAliyot('2024-10-05:shacharis,main')).toMatchSnapshot()
 })
 
-test(`חנוכה`, async (t) => {
-  t.snapshot(await dumpAliyot('2024-12-26:shacharis,main'))
+test(`חנוכה`, async () => {
+  expect(await dumpAliyot('2024-12-26:shacharis,main')).toMatchSnapshot()
 })
 
-test(`ראש חודש חנוכה`, async (t) => {
-  t.snapshot(await dumpAliyot('2024-12-31:shacharis,main'))
+test(`ראש חודש חנוכה`, async () => {
+  expect(await dumpAliyot('2024-12-31:shacharis,main')).toMatchSnapshot()
 })
 
-test(`שקלים / ראש חודש as פרשה`, async (t) => {
+test(`שקלים / ראש חודש as פרשה`, async () => {
   // Fetch the main run so that we get a FullScrollViewModel
-  t.snapshot(await dumpAliyot('2025-03-01:shacharis,main'))
+  expect(await dumpAliyot('2025-03-01:shacharis,main')).toMatchSnapshot()
 })
 
-test(`Weekday ראש חודש`, async (t) => {
-  t.snapshot(await dumpAliyot('2025-02-28:shacharis,main'))
+test(`Weekday ראש חודש`, async () => {
+  expect(await dumpAliyot('2025-02-28:shacharis,main')).toMatchSnapshot()
 })
 
-test(`אסתר`, async (t) => {
+test(`אסתר`, async () => {
   // There are no labels to apply for a מגילה.
   // However, we should verify that it renders and scrolls correctly.
   // This test catchs #134.
-  t.deepEqual(await dumpAliyot('2025-03-14:megillah,megillah'), [])
+  expect(await dumpAliyot('2025-03-14:megillah,megillah')).toEqual([])
 })
 
-test(`שקלים / ראש חודש as מפטיר`, async (t) => {
+test(`שקלים / ראש חודש as מפטיר`, async () => {
   // Fetch a non-main run so that we get a HolidayViewModel
-  t.snapshot(await dumpAliyot('2025-03-01:shacharis,maftir'))
+  expect(await dumpAliyot('2025-03-01:shacharis,maftir')).toMatchSnapshot()
 })
 
 /** Formats the עלייה-labelled lines from a ScrollViewModel to read in the snapshot. */

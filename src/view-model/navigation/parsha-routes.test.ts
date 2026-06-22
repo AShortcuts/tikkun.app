@@ -1,7 +1,12 @@
-import test from 'ava'
+import { expect, test } from 'vitest'
 import { LeiningGenerator } from '../../calendar-model/generator.ts'
 import type { UserSettings } from '../../calendar-model/user-settings.ts'
-import { semanticParshaUrlForLeining } from './parsha-routes.ts'
+import {
+  canonicalizeParshaSlug,
+  getParshaSearchTermsForLeining,
+  getParshaSearchTermsForSlug,
+  semanticParshaUrlForLeining,
+} from './parsha-routes.ts'
 
 const testSettings: UserSettings = {
   ashkenazi: true,
@@ -26,31 +31,55 @@ function findLeining(date: string, predicate: (title: string) => boolean) {
   return leining
 }
 
-test('weekly parsha links use semantic parsha routes', (t) => {
+test('weekly parsha links use semantic parsha routes', () => {
   const beresheet = findLeining(
     '2024-10-26',
     (title) => title === 'Parshat Bereshit'
   )
 
-  t.is(semanticParshaUrlForLeining(beresheet), '#/parsha/beresheet')
+  expect(semanticParshaUrlForLeining(beresheet)).toBe('#/torah/parsha/beresheet')
 })
 
-test('esther links use semantic parsha routes', (t) => {
+test('parsha route aliases canonicalize title and alternate spellings', () => {
+  expect(canonicalizeParshaSlug('Bereshit')).toBe('beresheet')
+  expect(canonicalizeParshaSlug('Noah')).toBe('noach')
+  expect(canonicalizeParshaSlug('Behaalotcha')).toBe('behalotecha')
+  expect(canonicalizeParshaSlug('Vayeilech')).toBe('vayelech')
+})
+
+test('parsha search terms come from canonical route aliases', () => {
+  expect(getParshaSearchTermsForSlug('noach')).toEqual(
+    expect.arrayContaining(['noach', 'noah'])
+  )
+  expect(getParshaSearchTermsForSlug('bereshit')).toEqual(
+    expect.arrayContaining(['beresheet', 'bereshit'])
+  )
+})
+
+test('leining search terms reuse canonical route aliases', () => {
+  const noach = findLeining('2024-11-02', (title) => title === 'Parshat Noach')
+
+  expect(getParshaSearchTermsForLeining(noach)).toEqual(
+    expect.arrayContaining(['noach', 'noah'])
+  )
+})
+
+test('esther links use semantic parsha routes', () => {
   const esther = findLeining('2025-03-14', (title) => title === 'Purim')
 
-  t.is(semanticParshaUrlForLeining(esther), '#/parsha/megillah-esther')
+  expect(semanticParshaUrlForLeining(esther)).toBe('#/esther/megillah-esther')
 })
 
-test('holiday links keep dated run routes', (t) => {
+test('holiday links keep dated run routes', () => {
   const holiday = findLeining(
     '2024-10-03',
     (title) => title === 'Rosh Hashana I'
   )
 
-  t.is(semanticParshaUrlForLeining(holiday), null)
+  expect(semanticParshaUrlForLeining(holiday)).toBe(null)
 })
 
-test('combined parshiyot do not get semantic single-parsha routes', (t) => {
+test('combined parshiyot do not get semantic single-parsha routes', () => {
   const combined = generator
     .forHebrewYear(5786)
     .find((candidate) => candidate.title.en === 'Parshat Nitzavim-Vayeilech')
@@ -58,5 +87,5 @@ test('combined parshiyot do not get semantic single-parsha routes', (t) => {
 
   if (!combined) throw new Error('Missing combined parsha')
 
-  t.is(semanticParshaUrlForLeining(combined), null)
+  expect(semanticParshaUrlForLeining(combined)).toBe(null)
 })

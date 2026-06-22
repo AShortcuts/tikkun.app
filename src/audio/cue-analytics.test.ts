@@ -1,4 +1,4 @@
-import test from 'ava'
+import { expect, test } from 'vitest'
 import { createCueAnalyticsRecord } from './cue-analytics-core.ts'
 import type { AudioRecording, WordCue } from './types.ts'
 
@@ -30,7 +30,7 @@ const createCue = (
   ...overrides,
 })
 
-test('retains invalid ordering transitions as review samples instead of dropping them', (t) => {
+test('retains invalid ordering transitions as review samples instead of dropping them', () => {
   const cues = [createCue(0, 0), createCue(1.2, 1), createCue(1.1, 2)]
 
   const record = createCueAnalyticsRecord({
@@ -39,10 +39,10 @@ test('retains invalid ordering transitions as review samples instead of dropping
     cues,
   })
 
-  t.is(record.intervalCount, 1)
-  t.is(record.transitionCount, 2)
-  t.is(record.invalidTransitionCount, 1)
-  t.like(record.intervalSamples[1], {
+  expect(record.intervalCount).toBe(1)
+  expect(record.transitionCount).toBe(2)
+  expect(record.invalidTransitionCount).toBe(1)
+  expect(record.intervalSamples[1]).toMatchObject({
     gap: -0.1,
     isOutlier: true,
     outlierDirection: 'invalid',
@@ -50,7 +50,7 @@ test('retains invalid ordering transitions as review samples instead of dropping
   })
 })
 
-test('flags only extreme long pauses for review', (t) => {
+test('flags only extreme long pauses for review', () => {
   const cues = [
     createCue(0, 0),
     createCue(1, 1),
@@ -66,17 +66,17 @@ test('flags only extreme long pauses for review', (t) => {
     cues,
   })
 
-  t.like(record.intervalSamples[2], {
+  expect(record.intervalSamples[2]).toMatchObject({
     gap: 8.6,
     isOutlier: true,
     outlierDirection: 'slow',
     reviewLabel: 'Long pause outlier',
   })
-  t.is(record.outlierCount, 1)
-  t.is(record.structuralPauseCount, 0)
+  expect(record.outlierCount).toBe(1)
+  expect(record.structuralPauseCount).toBe(0)
 })
 
-test('ignores compressed transitions that are merely fast', (t) => {
+test('ignores compressed transitions that are merely fast', () => {
   const gaps = [0.6, 1.0, 1.4, 1.8, 2.2, 0.2, 2.6]
   const cues = gaps.reduce<WordCue[]>(
     (allCues, gap, index) => {
@@ -95,8 +95,8 @@ test('ignores compressed transitions that are merely fast', (t) => {
   })
 
   const compressedTransition = record.intervalSamples.find((sample) => sample.gap === 0.2)
-  t.is(record.lowerOutlierThreshold, 0)
-  t.like(compressedTransition, {
+  expect(record.lowerOutlierThreshold).toBe(0)
+  expect(compressedTransition).toMatchObject({
     isOutlier: false,
     outlierDirection: null,
     reviewLabel: 'Within expected range',

@@ -1,4 +1,5 @@
 import InfiniteScroller from './infinite-scroller.ts'
+import { HDate } from '@hebcal/hdate'
 import ParshaPicker from './components/ParshaPicker.ts'
 import type { CalendarSettings } from './components/ParshaPicker.ts'
 import utils from './components/utils.ts'
@@ -9,10 +10,28 @@ import { ScrollDisplay } from './components/ScrollDisplay.ts'
 import { ViewportTracker, type ViewportRange } from './viewport-tracker.ts'
 import { TopBarTracker } from './view-model/navigation/top-bar-model.ts'
 import {
+  createAliyahNavigationActions,
+  createNavigationAction,
+  createPageNavigationActions,
+  filterNavigationActions,
+  type NavigationAction,
+} from './navigation/actions.ts'
+import {
+  holidayLeiningKeywords,
+  selectCommandPaletteHolidayRun,
+} from './navigation/holiday-actions.ts'
+import {
   AppRoute,
   generateAboutUrl,
+  generateCueAnalyticsUrl,
+  generatePageUrl,
   parseUrl,
 } from './view-model/navigation/url-parser.ts'
+import {
+  generateParshaUrl,
+  getParshaSearchTermsForSlug,
+  resolveParshaRun,
+} from './view-model/navigation/parsha-routes.ts'
 import AboutPage from './components/AboutPage.ts'
 import CueAnalyticsPage, { mountCueAnalyticsPage } from './components/CueAnalyticsPage.ts'
 import { iconMarkup, type IconName } from './components/icons.ts'
@@ -31,6 +50,7 @@ import {
 import {
   findRecordingForRun,
   getCuesForRecording,
+  getCueProgressForRecording,
   getCueSavedAtForRecording,
   listNarrators,
   listRecordings,
@@ -41,19 +61,56 @@ import { normalizeFirstCueStart } from './audio/normalize-first-cue.ts'
 import { AudioController, ActiveAudioSession } from './reading/audio-controller.ts'
 import { HighlightController, cueKey } from './reading/highlight-controller.ts'
 import { collectTokenKeysForAliyahRange } from './reading/aliyah-token-sequence.ts'
+import { isLastIndexedAliyahInRun } from './reading/aliyah-range.ts'
 import {
   createLastReadingHash,
   LastReading,
   loadEligibleLastReading,
   saveLastReading,
 } from './reading/last-reading.ts'
+import {
+  checkpointFromCue,
+  checkpointFromIssue,
+  compareCheckpoints,
+  type Checkpoint,
+} from './reader/checkpoints.ts'
+import {
+  createBookmark,
+  loadBookmarks,
+  saveBookmarks,
+  type ReaderBookmark,
+} from './reader/bookmarks.ts'
+import {
+  createRecordingIssue,
+  getReaderVisibleIssues,
+  loadRecordingIssues,
+  recordingIssueKinds,
+  recordingIssueReaderLabel,
+  saveRecordingIssues,
+  type RecordingIssue,
+  type RecordingIssueKind,
+} from './audio/recording-issues.ts'
+import {
+  createShortcutCommand,
+  getShortcutCommand,
+  isShortcutEditableTarget,
+  type ReaderMode,
+  type ShortcutCommand,
+} from './reader/shortcuts.ts'
+import { createWaveformSummary, type WaveformSummary } from './audio/waveform-summary.ts'
 import type { AudioRecording, CueExportPayload, WordCue } from './audio/types.ts'
 import { getWordProgress } from './audio/progress.ts'
-import type { LeiningAliyah, LeiningRun } from './calendar-model/model-types.ts'
+import type { ScrollName } from './ref.ts'
+import {
+  type LeiningAliyah,
+  type LeiningInstance,
+  type LeiningRun,
+} from './calendar-model/model-types.ts'
 import { verifyAdminPassword } from './admin/access.ts'
 import {
   getAdminDraftStorageKey,
   loadAdminDraft,
+  readAdminDraftSummary,
   type AdminDraftPayload,
 } from './admin/draft-storage.ts'
 import hebrewNumeral from './hebrew-numeral.ts'
@@ -121,6 +178,14 @@ type AliyahProgressAnchor = {
   position: number
 }
 
+type AliyahRailCueStatus =
+  | 'none'
+  | 'published'
+  | 'pending'
+  | 'local-draft'
+  | 'generated-review'
+  | 'blocking-issue'
+
 let display: ScrollDisplay
 let viewportTrackerGlobal: ViewportTracker | null = null
 let latestViewportRange: ViewportRange | null = null
@@ -130,6 +195,11 @@ let currentReaderHash: string | null = null
 let progressFrame = 0
 let deferredProgressFrame = 0
 let progressAnchorLoadPromise: Promise<void> | null = null
+let pendingAliyahRailSelection: {
+  runId: string
+  aliyahIndex: PlaybackAliyahIndex
+  expiresAt: number
+} | null = null
 let cueNavigationIndex: number | null = null
 let lastAdminRenderedCueCount = 0
 let lastAdminFollowedCueIndex = -1
@@ -139,6 +209,15 @@ let hasDismissedOfflinePrompt = false
 let pendingNetworkRecordingRetry: (() => Promise<void>) | null = null
 let lastReadingPromptDismissed = false
 let lastReadingPromptTarget: LastReading | null = null
+let commandPaletteActions: NavigationAction[] = []
+let commandPaletteActiveIndex = 0
+let bookmarks: ReaderBookmark[] = []
+let activeRecordingIssues: RecordingIssue[] = []
+let pendingIssueTokenKey: string | null = null
+let pendingIssueTimeStart: number | undefined
+let currentReaderMode: ReaderMode = recordingMode.enabled ? 'recording' : 'normal'
+const waveformSummaryCache = new Map<string, WaveformSummary>()
+let waveformRenderFrame = 0
 let shouldSaveLastReadingAfterRouteRender = false
 let hasUserScrolledReaderForLastReading = false
 const floatingPlayerDesktopMediaQuery = window.matchMedia('(min-width: 716px)')
@@ -382,6 +461,7 @@ function setAdminPanelVisible(
   panel.classList.toggle('u-hidden', !visible)
   persistAdminAccessState()
   syncAdminPanelState(audioController)
+  syncReaderMode()
 }
 
 function closeAdminMode(audioController?: AudioController | null) {
@@ -391,6 +471,7 @@ function closeAdminMode(audioController?: AudioController | null) {
   controller?.pause()
   if (controller) updateFloatingPlayer(controller)
   setAdminPanelVisible(false, controller)
+  syncReaderMode()
 }
 
 const syncReaderProgressVisibility = () => {
@@ -402,6 +483,7 @@ const syncReaderProgressVisibility = () => {
     '[data-target-id="reader-progress-mobile"]',
     '.reader-corner-controls',
   ].forEach((selector) => setVisibility({ selector, visible }))
+  renderAliyahRail()
 }
 
 const syncReaderSideNavigationVisibility = () => {
@@ -520,6 +602,8 @@ function resetReaderSideNavigationState(audioController?: AudioController) {
   if (!audioController) return
   audioController.clearSession()
   highlightControllerGlobal?.clear()
+  activeRecordingIssues = []
+  syncActiveReaderIssueNotice(null)
   updateFloatingPlayer(audioController)
   refreshInlineAudioButtons(audioController)
   syncToolbarCurrentAliyahButton(null, audioController)
@@ -825,6 +909,1034 @@ function isEditableTarget(target: EventTarget | null) {
   )
 }
 
+function getReaderMode(): ReaderMode {
+  if (recordingMode.enabled) return 'recording'
+  if (adminState.unlocked && isAdminPanelVisible()) return 'admin-authoring'
+  return currentReaderMode === 'practice-focus' ? 'practice-focus' : 'normal'
+}
+
+function syncReaderMode() {
+  currentReaderMode = getReaderMode()
+  document.documentElement.dataset.readerMode = currentReaderMode
+}
+
+function getActiveTokenKey() {
+  const highlighted = highlightControllerGlobal?.getActiveTokenKey()
+  if (highlighted) return highlighted
+
+  return getReaderFocalTokenKey()
+}
+
+function getReaderFocalTokenKey() {
+  const target = getReaderFocalPointScrollTarget(getBook())
+  if (!target) return null
+  if (target.dataset.tokenKey) return target.dataset.tokenKey
+
+  return (
+    getFirstVisibleWord(target)?.dataset.tokenKey ??
+    target.querySelector<HTMLElement>('.word[data-token-key]')?.dataset.tokenKey ??
+    null
+  )
+}
+
+function getTokenLabel(tokenKey: string) {
+  const token = document.querySelector<HTMLElement>(`[data-token-key="${tokenKey}"]`)
+  return token?.textContent?.trim().replace(/\s+/g, ' ') || `Word ${tokenKey}`
+}
+
+async function jumpToTokenKey(tokenKey: string, options: { audioTime?: number } = {}) {
+  const [pageNumber] = tokenKey.split(':').map(Number)
+  if (Number.isFinite(pageNumber)) await display?.ensurePageRendered(pageNumber)
+
+  const token = await highlightControllerGlobal?.activateTokenKey(tokenKey, {
+    scroll: true,
+  })
+  if (options.audioTime !== undefined && audioControllerGlobal?.session) {
+    audioControllerGlobal.seek(options.audioTime)
+    updateFloatingPlayer(audioControllerGlobal)
+  }
+  if (token) {
+    syncToolbarCurrentAliyahButton(
+      getAliyahProgressAnchorForElement(token),
+      audioControllerGlobal ?? undefined
+    )
+  }
+  focusReaderSurface()
+}
+
+async function scrollToTokenKey(tokenKey: string) {
+  const [pageNumber] = tokenKey.split(':').map(Number)
+  if (Number.isFinite(pageNumber)) await display?.ensurePageRendered(pageNumber)
+
+  const token = document.querySelector<HTMLElement>(`[data-token-key="${tokenKey}"]`)
+  if (!token) return
+
+  centerElementInScrollRoot(getBook(), token, { behavior: 'smooth' })
+  syncToolbarCurrentAliyahButton(
+    getAliyahProgressAnchorForElement(token),
+    audioControllerGlobal ?? undefined
+  )
+  viewportTrackerGlobal?.refresh()
+  updateReaderProgress()
+  window.setTimeout(() => {
+    viewportTrackerGlobal?.refresh()
+    updateReaderProgress()
+  }, 500)
+  focusReaderSurface()
+}
+
+function bookmarkCurrentToken() {
+  const tokenKey = getReaderFocalTokenKey()
+  if (!tokenKey) return
+
+  const existing = bookmarks.find((bookmark) => bookmark.tokenKey === tokenKey)
+  if (existing) {
+    bookmarks = bookmarks.filter((bookmark) => bookmark.tokenKey !== tokenKey)
+    saveBookmarks(localStorage, bookmarks)
+    refreshCommandPaletteActions()
+    syncBookmarkButton()
+    return
+  }
+
+  const session = audioControllerGlobal?.session
+  const cue = session?.cues.find((candidate) => cueKey(candidate) === tokenKey)
+  const hash = getBookmarkHashForTokenKey(tokenKey)
+  const bookmark = createBookmark({
+    hash,
+    label: getTokenLabel(tokenKey),
+    tokenKey,
+    audioId: session?.recording.id,
+    timeStart: cue?.timeStart,
+  })
+  bookmarks = [bookmark, ...bookmarks.filter((item) => item.tokenKey !== tokenKey)]
+  saveBookmarks(localStorage, bookmarks)
+  refreshCommandPaletteActions()
+  syncBookmarkButton()
+}
+
+function syncBookmarkButton(tokenKey = getReaderFocalTokenKey()) {
+  const button = document.querySelector<HTMLButtonElement>(
+    '[data-target-id="bookmark-current"]'
+  )
+  if (!button) return
+
+  const isBookmarked = Boolean(
+    tokenKey && bookmarks.some((bookmark) => bookmark.tokenKey === tokenKey)
+  )
+  setControlIcon(button, isBookmarked ? 'bookmarkFilled' : 'bookmark')
+  button.classList.toggle('is-active', isBookmarked)
+  button.disabled = !tokenKey
+  button.title = isBookmarked ? 'Remove bookmark' : 'Bookmark current word'
+  button.setAttribute('aria-label', button.title)
+  button.setAttribute('aria-pressed', `${isBookmarked}`)
+}
+
+function getBookmarkHashForTokenKey(tokenKey: string) {
+  const token = document.querySelector<HTMLElement>(`[data-token-key="${tokenKey}"]`)
+  const lineInfo = token ? getLineInfoFromElement(token) : null
+  const verse = lineInfo?.verses[0]
+  const initialRef = verse && lineInfo?.run
+    ? { ...verse, scroll: lineInfo.run.scroll }
+    : lineInfo?.run?.aliyot[0]?.start
+
+  if (lineInfo?.run) return createLastReadingHash(lineInfo.run, initialRef)
+  if (currentReaderHash && currentReaderHash !== '#/next') return currentReaderHash
+  return lastReaderHash && lastReaderHash !== '#/next' ? lastReaderHash : location.hash
+}
+
+function checkpointFromBookmark(bookmark: ReaderBookmark): Checkpoint {
+  return {
+    id: bookmark.id,
+    kind: 'bookmark',
+    source: 'bookmark',
+    label: bookmark.label,
+    hash: bookmark.hash,
+    audioId: bookmark.audioId,
+    tokenKey: bookmark.tokenKey,
+    timeStart: bookmark.timeStart,
+    createdAt: bookmark.createdAt,
+  }
+}
+
+function bookmarkReadingLabel(bookmark: ReaderBookmark) {
+  const runId = /^#\/run\/([^/]+)/.exec(bookmark.hash)?.[1]
+  if (runId) {
+    const run = createCalendarGenerator().parseId(runId)
+    return run ? displayTitleForLeiningRun(run) : null
+  }
+
+  const parshaSlug = /^#\/(?:torah|esther)\/parsha\/([^/]+)/.exec(bookmark.hash)?.[1]
+  return parshaSlug ? parshaSlug.replace(/-/g, ' ') : null
+}
+
+function titleCaseBookmarkBadge(label: string) {
+  if (!/[A-Za-z]/.test(label)) return label
+  return label.replace(/\S+/g, (word) =>
+    word.charAt(0).toLocaleUpperCase() + word.slice(1).toLocaleLowerCase()
+  )
+}
+
+function isBookmarkAction(action: NavigationAction) {
+  return action.id.startsWith('checkpoint.bookmark:')
+}
+
+function getCurrentCheckpoints() {
+  const checkpoints: Checkpoint[] = [
+    ...bookmarks.map(checkpointFromBookmark),
+    ...getReaderVisibleIssues(activeRecordingIssues).map(checkpointFromIssue),
+  ]
+
+  const session = audioControllerGlobal?.session
+  const activeTokenKey = getActiveTokenKey()
+  if (session && activeTokenKey) {
+    const cue = session.cues.find((candidate) => cueKey(candidate) === activeTokenKey)
+    if (cue) {
+      checkpoints.push(
+        checkpointFromCue({
+          audioId: session.recording.id,
+          label: 'Current word',
+          tokenKey: activeTokenKey,
+          timeStart: cue.timeStart,
+        })
+      )
+    }
+  }
+
+  return checkpoints.sort(compareCheckpoints)
+}
+
+function jumpToCheckpoint(checkpoint: Checkpoint) {
+  if (checkpoint.hash && checkpoint.hash !== location.hash) {
+    location.hash = checkpoint.hash
+    window.setTimeout(() => {
+      void jumpToTokenKey(checkpoint.tokenKey, {
+        audioTime: checkpoint.timeStart,
+      })
+    }, 0)
+    return
+  }
+
+  void jumpToTokenKey(checkpoint.tokenKey, { audioTime: checkpoint.timeStart })
+}
+
+function navigateToPage(scroll: ScrollName, page: number) {
+  navigateToHash(generatePageUrl(scroll, page), audioControllerGlobal!)
+}
+
+async function ensureAliyahMarkerRendered(
+  runId: string,
+  aliyahIndex: PlaybackAliyahIndex
+) {
+  const selector = aliyahMarkerSelector(runId, aliyahIndex)
+  let marker = document.querySelector<HTMLElement>(selector)
+  while (!marker) {
+    const renderedPages = display.getRenderedPageNumbers()
+    const lastPage = renderedPages[renderedPages.length - 1]
+    if (!lastPage) return null
+
+    const loaded = await display.ensurePageRendered(lastPage + 1)
+    if (!loaded) return null
+
+    marker = document.querySelector<HTMLElement>(selector)
+  }
+
+  return marker
+}
+
+async function scrollToAliyahMarker(runId: string, aliyahIndex: PlaybackAliyahIndex) {
+  const marker = await ensureAliyahMarkerRendered(runId, aliyahIndex)
+  if (!marker) return
+
+  const line = marker.closest<HTMLElement>('[data-line-index]')
+  centerElementInScrollRoot(getBook(), line ?? marker, { behavior: 'smooth' })
+  syncToolbarCurrentAliyahButton(
+    getAliyahProgressAnchorForElement(line ?? marker),
+    audioControllerGlobal ?? undefined
+  )
+  viewportTrackerGlobal?.refresh()
+  updateReaderProgress()
+  window.setTimeout(() => {
+    viewportTrackerGlobal?.refresh()
+    updateReaderProgress()
+  }, 500)
+  focusReaderSurface()
+}
+
+function groupLabel(group: NavigationAction['group']) {
+  return {
+    reading: 'Reading',
+    page: 'Page',
+    resume: 'Resume',
+    checkpoint: 'Checkpoint',
+    tools: 'Tool',
+    admin: 'Admin',
+  }[group]
+}
+
+function upcomingHolidayLeiningActions() {
+  const generator = createCalendarGenerator()
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const currentHebrewYear = new HDate(today).getFullYear()
+  const actions: NavigationAction[] = []
+  const seenRuns = new Set<string>()
+
+  for (let year = currentHebrewYear; year <= currentHebrewYear + 2; year += 1) {
+    for (const leiningDate of generator.forHebrewYear(year)) {
+      if (leiningDate.date < today) continue
+
+      for (const leining of leiningDate.leinings) {
+        const run = selectCommandPaletteHolidayRun(leining)
+        if (!run || seenRuns.has(run.id)) continue
+
+        seenRuns.add(run.id)
+        const label = `${leiningDate.title.en} / ${leiningDate.title.he}`
+        actions.push(
+          createNavigationAction({
+            id: `reading.holiday.${run.id}`,
+            group: 'reading',
+            label,
+            keywords: holidayLeiningKeywords(leiningDate.title, `${leining.id}`),
+            run: () => navigateToHash(createLastReadingHash(run), audioControllerGlobal!),
+          })
+        )
+        if (actions.length >= 16) return actions
+      }
+    }
+  }
+
+  return actions
+}
+
+function displayTitleForLeiningRun(run: LeiningRun) {
+  return run.leining.date.title.he || run.leining.date.title.en
+}
+
+function searchableParshaActions() {
+  const generator = createCalendarGenerator()
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const currentHebrewYear = new HDate(today).getFullYear()
+  const actions: NavigationAction[] = []
+  const seenRuns = new Set<string>()
+
+  for (let year = currentHebrewYear; year <= currentHebrewYear + 2; year += 1) {
+    for (const leiningDate of generator.forHebrewYear(year)) {
+      if (leiningDate.date < today) continue
+      for (const leining of leiningDate.leinings) {
+        if (!leining.isParsha) continue
+        for (const run of leining.runs) {
+        if (run.scroll !== 'torah' || seenRuns.has(run.id)) continue
+        seenRuns.add(run.id)
+        const parshaSlug = parshaSlugForRun(run)
+        actions.push(
+          ...createAliyahNavigationActions({
+            run,
+            displayTitle: displayTitleForLeiningRun(run),
+            showWhenEmpty: false,
+            dedupeKeyPrefix: parshaSlug ? `reading.parsha.${parshaSlug}` : undefined,
+            navigate: (hash) => navigateToHash(hash, audioControllerGlobal!),
+          })
+        )
+        }
+      }
+    }
+  }
+
+  return actions
+}
+
+function selectSearchableHolidayRuns(leining: LeiningInstance) {
+  const run = selectCommandPaletteHolidayRun(leining)
+  return run ? [run] : []
+}
+
+function searchableHolidayActions() {
+  const generator = createCalendarGenerator()
+  const today = new Date()
+  const currentHebrewYear = new HDate(today).getFullYear()
+  const actions: NavigationAction[] = []
+  const seenRuns = new Set<string>()
+
+  for (let year = currentHebrewYear; year <= currentHebrewYear + 1; year += 1) {
+    for (const leiningDate of generator.forHebrewYear(year)) {
+      for (const leining of leiningDate.leinings) {
+        if (leining.isParsha) continue
+        for (const run of selectSearchableHolidayRuns(leining)) {
+          if (seenRuns.has(run.id)) continue
+          seenRuns.add(run.id)
+          actions.push(
+            ...createAliyahNavigationActions({
+              run,
+              displayTitle: displayTitleForLeiningRun(run),
+              showWhenEmpty: false,
+              navigate: (hash) => navigateToHash(hash, audioControllerGlobal!),
+            })
+          )
+        }
+      }
+    }
+  }
+
+  return actions
+}
+
+function recordingActionKeywords(recording: AudioRecording) {
+  const terms = [
+    recording.parshaSlug,
+    recording.parshaName,
+    ...getParshaSearchTermsForSlug(recording.parshaSlug),
+  ]
+  return [
+    ...terms,
+    ...terms.flatMap((term) => [
+      `${term} ${recording.aliyah}`,
+      `${term} Aliyah ${recording.aliyah}`,
+    ]),
+  ]
+}
+
+function refreshCommandPaletteActions() {
+  const actions: NavigationAction[] = [
+    createNavigationAction({
+      id: 'reading.current',
+      group: 'reading',
+      label: 'Today / Next Reading',
+      keywords: ['today', 'next shabbat', 'next reading'],
+      run: () => navigateToHash('#/next', audioControllerGlobal!),
+    }),
+    createNavigationAction({
+      id: 'tools.analytics',
+      group: 'tools',
+      label: 'Cue Analytics',
+      keywords: ['playback analytics', 'word analytics', 'timing'],
+      run: () => navigateToHash(generateCueAnalyticsUrl(), audioControllerGlobal!),
+    }),
+    createNavigationAction({
+      id: 'tools.settings',
+      group: 'tools',
+      label: 'Reader Settings',
+      keywords: ['theme', 'highlight', 'preferences'],
+      run: () =>
+        document
+          .querySelector<HTMLElement>('[data-target-id="settings-pane"]')
+          ?.classList.remove('u-hidden'),
+    }),
+    createNavigationAction({
+      id: 'admin.open',
+      group: 'admin',
+      label: 'Admin Timing Mode',
+      keywords: ['timing', 'authoring', 'record cues'],
+      available: adminState.unlocked,
+      run: () => setAdminPanelVisible(true, audioControllerGlobal),
+    }),
+  ]
+
+  actions.push(...upcomingHolidayLeiningActions())
+
+  if (display?.viewModel) {
+    const anchors = getAliyahProgressAnchors()
+    const activeRun =
+      getCurrentAliyahFromViewportRange(latestViewportRange, anchors)?.run ??
+      anchors.find((anchor) => anchor.run)?.run ??
+      null
+    if (activeRun) {
+      const activeParshaSlug = activeRun.leining.isParsha
+        ? parshaSlugForRun(activeRun)
+        : null
+      actions.push(
+        ...createAliyahNavigationActions({
+          run: activeRun,
+          displayTitle: display.viewModel.displayTitleForRun(activeRun),
+          dedupeKeyPrefix: activeParshaSlug
+            ? `reading.parsha.${activeParshaSlug}`
+            : undefined,
+          navigate: (hash) => navigateToHash(hash, audioControllerGlobal!),
+        })
+      )
+    }
+  }
+
+  for (const recording of listRecordings()) {
+    if (recording.status !== 'available') continue
+    const resolved = resolveParshaRun(createCalendarGenerator(), recording.parshaSlug)
+    const aliyah = resolved?.run.aliyot.find(
+      (candidate) => candidate.index === recording.aliyah
+    )
+    const targetHash = resolved && aliyah
+      ? createLastReadingHash(resolved.run, aliyah.start)
+      : generateParshaUrl(recording.parshaSlug)
+    actions.push(
+      createNavigationAction({
+        id: `reading.${recording.id}`,
+        group: 'reading',
+        label: `${recording.parshaName} Aliyah ${recording.aliyah}`,
+        dedupeKey: `reading.parsha.${recording.parshaSlug}.${recording.aliyah}`,
+        keywords: recordingActionKeywords(recording),
+        run: () => navigateToHash(targetHash, audioControllerGlobal!),
+      })
+    )
+  }
+
+  actions.push(...searchableParshaActions())
+  actions.push(...searchableHolidayActions())
+  actions.push(...createPageNavigationActions({ navigateToPage }))
+
+  const lastReading = loadEligibleLastReading(localStorage)
+  if (lastReading) {
+    actions.push(
+      createNavigationAction({
+        id: 'resume.last-reading',
+        group: 'resume',
+        label: `Resume ${lastReading.aliyahLabel ? `${lastReading.parshaName}, ${lastReading.aliyahLabel}` : lastReading.parshaName}`,
+        keywords: ['resume', 'last reading'],
+        run: () => navigateToHash(lastReading.hash, audioControllerGlobal!),
+      })
+    )
+  }
+
+  for (const checkpoint of getCurrentCheckpoints()) {
+    const bookmark = checkpoint.kind === 'bookmark'
+      ? bookmarks.find((candidate) => candidate.id === checkpoint.id)
+      : null
+    actions.push(
+      createNavigationAction({
+        id: `checkpoint.${checkpoint.id}`,
+        group: checkpoint.kind === 'bookmark' ? 'resume' : 'checkpoint',
+        label: checkpoint.label,
+        badgeLabel: bookmark ? bookmarkReadingLabel(bookmark) ?? undefined : undefined,
+        keywords: ['bookmark', 'checkpoint', checkpoint.tokenKey],
+        run: () => jumpToCheckpoint(checkpoint),
+      })
+    )
+  }
+
+  commandPaletteActions = actions
+}
+
+function getCommandPaletteElements() {
+  return {
+    root: document.querySelector<HTMLElement>('[data-target-id="command-palette"]'),
+    input: document.querySelector<HTMLInputElement>('[data-target-id="command-palette-input"]'),
+    results: document.querySelector<HTMLElement>('[data-target-id="command-palette-results"]'),
+  }
+}
+
+function renderCommandPaletteResults() {
+  const { input, results } = getCommandPaletteElements()
+  if (!input || !results) return
+  const matches = filterNavigationActions(commandPaletteActions, input.value)
+  commandPaletteActiveIndex = Math.min(commandPaletteActiveIndex, Math.max(matches.length - 1, 0))
+  results.replaceChildren()
+
+  if (!matches.length) {
+    const empty = document.createElement('div')
+    empty.className = 'command-palette-empty'
+    empty.textContent = 'No matching command'
+    results.appendChild(empty)
+    return
+  }
+
+  matches.forEach((action, index) => {
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'command-palette-result'
+    button.classList.toggle('is-active', index === commandPaletteActiveIndex)
+    button.dataset.actionId = action.id
+    button.innerHTML = `<span class="command-palette-label"></span><span class="command-palette-group"></span>`
+    const label = button.querySelector('.command-palette-label')!
+    label.textContent = action.label
+    if (isBookmarkAction(action)) {
+      const icon = document.createElement('span')
+      icon.className = 'command-palette-inline-icon'
+      icon.innerHTML = iconMarkup('bookmarkFilled')
+      label.prepend(icon, ' ')
+    }
+    if (action.badgeLabel) {
+      const badge = document.createElement('span')
+      badge.className = 'command-palette-inline-badge'
+      badge.textContent = titleCaseBookmarkBadge(action.badgeLabel)
+      label.append(' ', badge)
+    }
+    button.querySelector('.command-palette-group')!.textContent = groupLabel(action.group)
+    button.addEventListener('click', () => runCommandPaletteAction(action))
+    results.appendChild(button)
+  })
+}
+
+function openCommandPalette() {
+  refreshCommandPaletteActions()
+  const { root, input } = getCommandPaletteElements()
+  if (!root || !input) return
+  root.classList.remove('u-hidden')
+  input.value = ''
+  commandPaletteActiveIndex = 0
+  renderCommandPaletteResults()
+  input.focus({ preventScroll: true })
+}
+
+function closeCommandPalette() {
+  getCommandPaletteElements().root?.classList.add('u-hidden')
+}
+
+function runCommandPaletteAction(action: NavigationAction) {
+  closeCommandPalette()
+  void action.run()
+}
+
+function setupCommandPalette() {
+  const { root, input } = getCommandPaletteElements()
+  const openButton = document.querySelector<HTMLButtonElement>(
+    '[data-target-id="command-palette-open"]'
+  )
+  if (!root || !input || !openButton) return
+
+  openButton.addEventListener('click', openCommandPalette)
+  root.addEventListener('pointerdown', (event) => {
+    if (event.target === root) closeCommandPalette()
+  })
+  input.addEventListener('input', () => {
+    commandPaletteActiveIndex = 0
+    renderCommandPaletteResults()
+  })
+  input.addEventListener('keydown', (event) => {
+    const matches = filterNavigationActions(commandPaletteActions, input.value)
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      commandPaletteActiveIndex = Math.min(commandPaletteActiveIndex + 1, Math.max(matches.length - 1, 0))
+      renderCommandPaletteResults()
+      return
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      commandPaletteActiveIndex = Math.max(commandPaletteActiveIndex - 1, 0)
+      renderCommandPaletteResults()
+      return
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      const action = matches[commandPaletteActiveIndex]
+      if (action) runCommandPaletteAction(action)
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      closeCommandPalette()
+      focusReaderSurface()
+    }
+  })
+}
+
+function setupBookmarkButton() {
+  document
+    .querySelector<HTMLButtonElement>('[data-target-id="bookmark-current"]')
+    ?.addEventListener('click', () => {
+      bookmarkCurrentToken()
+      focusReaderSurface()
+    })
+}
+
+function setupRecordingIssueUi() {
+  document
+    .querySelector<HTMLButtonElement>('[data-target-id="recording-issue-close"]')
+    ?.addEventListener('click', closeRecordingIssueModal)
+  document
+    .querySelector<HTMLButtonElement>('[data-target-id="admin-mark-issue"]')
+    ?.addEventListener('click', openRecordingIssueModal)
+  document
+    .querySelector<HTMLElement>('[data-target-id="recording-issue-modal"]')
+    ?.addEventListener('pointerdown', (event) => {
+      if (event.target === event.currentTarget) closeRecordingIssueModal()
+    })
+}
+
+function setupAdminWaveformInteractions() {
+  document
+    .querySelector<HTMLElement>('[data-target-id="admin-waveform-lane"]')
+    ?.addEventListener('click', (event) => {
+      const controller = audioControllerGlobal
+      if (!controller?.session || !Number.isFinite(controller.audio.duration)) return
+      const lane = event.currentTarget as HTMLElement
+      const rect = lane.getBoundingClientRect()
+      const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / Math.max(rect.width, 1)))
+      controller.seek(ratio * controller.audio.duration)
+      scheduleWaveformRender(controller)
+    })
+}
+
+function setupShortcutCommands() {
+  const commands: ShortcutCommand[] = [
+    createShortcutCommand({
+      id: 'palette.open',
+      key: 'k',
+      metaOrCtrl: true,
+      modes: ['normal', 'practice-focus', 'admin-authoring'],
+      run: openCommandPalette,
+    }),
+    createShortcutCommand({
+      id: 'issue.mark',
+      key: 'm',
+      modes: ['admin-authoring'],
+      run: openRecordingIssueModal,
+    }),
+    createShortcutCommand({
+      id: 'phrase.replay',
+      key: 'r',
+      modes: ['admin-authoring'],
+      run: () => {
+        const controller = audioControllerGlobal
+        if (!controller) return
+        void controller.replayCurrentCue()
+      },
+    }),
+  ]
+
+  document.addEventListener(
+    'keydown',
+    (event) => {
+      if (isShortcutEditableTarget(event.target)) return
+      syncReaderMode()
+      const command = getShortcutCommand(commands, event, currentReaderMode)
+      if (!command) return
+      event.preventDefault()
+      event.stopPropagation()
+      event.stopImmediatePropagation()
+      command.run()
+    },
+    { capture: true }
+  )
+}
+
+function renderAliyahRail(range: ViewportRange | null = latestViewportRange) {
+  const rail = document.querySelector<HTMLElement>('[data-target-id="aliyah-rail"]')
+  if (!rail) return
+
+  const visible = parseCurrentRoute()?.view === 'reader' && !isShowingParshaPicker()
+  rail.classList.toggle('u-hidden', !visible)
+  if (!visible) return
+
+  const anchors = getAliyahProgressAnchors()
+  const current = getCurrentAliyahFromViewportRange(range, anchors)
+  const currentRun = current?.run ?? anchors.find((anchor) => anchor.run)?.run ?? null
+  const activeAliyahIndex = getAliyahRailActiveIndex(current, currentRun)
+  rail.replaceChildren()
+
+  if (!currentRun) return
+
+  for (const aliyah of currentRun.aliyot) {
+    if (!aliyah.index) continue
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'aliyah-rail-button'
+    const recording = findRecordingForRun({
+      narratorId: readerPreferences.narratorId,
+      run: currentRun,
+      aliyahIndex: aliyah.index,
+    })
+    const status = getAliyahRailCueStatus(recording)
+    button.textContent = aliyah.index === 'Maftir' ? 'M' : `${aliyah.index}`
+    button.classList.toggle('is-active', activeAliyahIndex === aliyah.index)
+    button.dataset.cueStatus = status
+    button.title = `${getPlaybackAliyahLabel(aliyah.index)} · ${aliyahRailCueStatusLabel(status)}`
+    button.dataset.runId = currentRun.id
+    button.dataset.aliyahIndex = `${aliyah.index}`
+    rail.appendChild(button)
+  }
+}
+
+function setAliyahRailActiveButton(rail: HTMLElement, aliyahIndex: PlaybackAliyahIndex) {
+  rail.querySelectorAll<HTMLButtonElement>('.aliyah-rail-button').forEach((button) => {
+    button.classList.toggle('is-active', button.dataset.aliyahIndex === `${aliyahIndex}`)
+  })
+}
+
+function setupAliyahRailInteractions() {
+  const rail = document.querySelector<HTMLElement>('[data-target-id="aliyah-rail"]')
+  if (!rail) return
+
+  rail.addEventListener('click', (event) => {
+    const button = (event.target as Element | null)?.closest<HTMLButtonElement>(
+      '.aliyah-rail-button'
+    )
+    if (!button || !rail.contains(button)) return
+
+    const runId = button.dataset.runId
+    const aliyahIndex = parsePlaybackAliyahIndex(button.dataset.aliyahIndex)
+    if (!runId || !aliyahIndex) return
+
+    pendingAliyahRailSelection = {
+      runId,
+      aliyahIndex,
+      expiresAt: performance.now() + 1800,
+    }
+    setAliyahRailActiveButton(rail, aliyahIndex)
+
+    void scrollToAliyahMarker(runId, aliyahIndex)
+  })
+}
+
+function getAliyahRailActiveIndex(
+  current: AliyahProgressAnchor | null,
+  currentRun: LeiningRun | null
+) {
+  const pending = pendingAliyahRailSelection
+  if (pending) {
+    const expired = pending.expiresAt <= performance.now()
+    const caughtUp =
+      current?.run?.id === pending.runId &&
+      current.aliyahIndex === pending.aliyahIndex
+    if (expired || caughtUp) {
+      pendingAliyahRailSelection = null
+    } else if (currentRun?.id === pending.runId) {
+      return pending.aliyahIndex
+    }
+  }
+
+  return current?.aliyahIndex ?? null
+}
+
+function getAliyahRailCueStatus(recording: AudioRecording | null): AliyahRailCueStatus {
+  if (!recording) return 'none'
+
+  const hasBlockingIssue = getReaderVisibleIssues(activeRecordingIssues).some(
+    (issue) => issue.audioId === recording.id
+  )
+  if (hasBlockingIssue) return 'blocking-issue'
+
+  const draftSummary = readAdminDraftSummary(recording.id)
+  if (draftSummary?.cueCount) return 'local-draft'
+
+  const progress = getCueProgressForRecording(recording)
+  if (progress?.isComplete) return 'published'
+  if (progress?.isUnfinished) return 'pending'
+
+  return 'none'
+}
+
+function aliyahRailCueStatusLabel(status: AliyahRailCueStatus) {
+  return {
+    none: 'no cues',
+    pending: 'partial published cues',
+    published: 'complete published cues',
+    'local-draft': 'local draft',
+    'generated-review': 'generated draft needs review',
+    'blocking-issue': 'blocking cue issue',
+  }[status]
+}
+
+function loadIssuesForActiveSession() {
+  const session = audioControllerGlobal?.session
+  activeRecordingIssues = session
+    ? loadRecordingIssues(localStorage, session.recording.id, TOKENIZATION_VERSION)
+    : []
+  applyReaderVisibleIssueMarkers()
+  refreshCommandPaletteActions()
+}
+
+function issueKindLabel(kind: RecordingIssueKind) {
+  return recordingIssueReaderLabel({ kind }).replace(/\bhere$/, '').trim()
+}
+
+function applyReaderVisibleIssueMarkers(root: ParentNode = getBook()) {
+  root.querySelectorAll<HTMLElement>('.word[data-recording-issue]').forEach((word) => {
+    word.removeAttribute('data-recording-issue')
+    word.removeAttribute('title')
+  })
+
+  for (const issue of getReaderVisibleIssues(activeRecordingIssues)) {
+    root
+      .querySelectorAll<HTMLElement>(`[data-token-key="${issue.tokenKey}"]`)
+      .forEach((word) => {
+        word.dataset.recordingIssue = issue.kind
+        word.title = recordingIssueReaderLabel(issue)
+      })
+  }
+}
+
+function syncActiveReaderIssueNotice(tokenKey = getActiveTokenKey()) {
+  const toast = document.querySelector<HTMLElement>('[data-target-id="reader-issue-toast"]')
+  if (!toast) return
+
+  const issue = tokenKey
+    ? getReaderVisibleIssues(activeRecordingIssues).find((candidate) => candidate.tokenKey === tokenKey)
+    : null
+
+  if (!issue) {
+    toast.classList.add('u-hidden')
+    toast.textContent = ''
+    return
+  }
+
+  toast.textContent = issue.note?.trim() || recordingIssueReaderLabel(issue)
+  toast.classList.remove('u-hidden')
+}
+
+function openRecordingIssueModal() {
+  const session = audioControllerGlobal?.session
+  if (!session) return
+  const tokenKey = getActiveTokenKey()
+  if (!tokenKey) return
+
+  const cue = session.cues.find((candidate) => cueKey(candidate) === tokenKey)
+  pendingIssueTokenKey = tokenKey
+  pendingIssueTimeStart = cue?.timeStart ?? audioControllerGlobal?.audio.currentTime
+
+  const modal = document.querySelector<HTMLElement>('[data-target-id="recording-issue-modal"]')
+  const options = document.querySelector<HTMLElement>('[data-target-id="recording-issue-options"]')
+  const note = document.querySelector<HTMLInputElement>('[data-target-id="recording-issue-note"]')
+  if (!modal || !options || !note) return
+
+  note.value = ''
+  options.replaceChildren()
+  for (const kind of recordingIssueKinds) {
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'recording-issue-option'
+    button.dataset.issueKind = kind
+    button.textContent = issueKindLabel(kind)
+    button.addEventListener('click', () => saveRecordingIssue(kind))
+    options.appendChild(button)
+  }
+  modal.classList.remove('u-hidden')
+  options.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true })
+}
+
+function closeRecordingIssueModal() {
+  document
+    .querySelector<HTMLElement>('[data-target-id="recording-issue-modal"]')
+    ?.classList.add('u-hidden')
+  pendingIssueTokenKey = null
+  pendingIssueTimeStart = undefined
+}
+
+function saveRecordingIssue(kind: RecordingIssueKind) {
+  const session = audioControllerGlobal?.session
+  if (!session || !pendingIssueTokenKey) return
+  const note = document.querySelector<HTMLInputElement>('[data-target-id="recording-issue-note"]')
+  const readerVisible = document.querySelector<HTMLInputElement>(
+    '[data-target-id="recording-issue-reader-visible"]'
+  )
+  const issue = createRecordingIssue({
+    audioId: session.recording.id,
+    tokenKey: pendingIssueTokenKey,
+    timeStart: pendingIssueTimeStart,
+    kind,
+    visibility: readerVisible?.checked ? 'readerVisible' : 'authoringOnly',
+    severity: kind === 'other' ? 'low' : 'medium',
+    note: note?.value.trim() || undefined,
+    createdAt: Date.now(),
+    tokenizationVersion: TOKENIZATION_VERSION,
+  })
+
+  activeRecordingIssues = [
+    ...activeRecordingIssues.filter(
+      (candidate) => !(candidate.tokenKey === issue.tokenKey && candidate.kind === issue.kind)
+    ),
+    issue,
+  ]
+  saveRecordingIssues(localStorage, session.recording.id, activeRecordingIssues)
+  applyReaderVisibleIssueMarkers()
+  syncActiveReaderIssueNotice(issue.tokenKey)
+  renderAdminCueList(audioControllerGlobal)
+  renderAdminWaveform(audioControllerGlobal)
+  refreshCommandPaletteActions()
+  closeRecordingIssueModal()
+}
+
+async function getWaveformSummaryForSession(session: ActiveAudioSession) {
+  const cached = waveformSummaryCache.get(session.recording.id)
+  if (cached) return cached
+
+  try {
+    const response = await fetch(session.recording.playSrc)
+    if (!response.ok) return null
+    const buffer = await response.arrayBuffer()
+    const audioContext = new AudioContext()
+    const decoded = await audioContext.decodeAudioData(buffer.slice(0))
+    const samples = decoded.getChannelData(0)
+    const summary = createWaveformSummary({
+      audioId: session.recording.id,
+      duration: decoded.duration,
+      samples,
+      bucketCount: 160,
+    })
+    void audioContext.close()
+    waveformSummaryCache.set(session.recording.id, summary)
+    return summary
+  } catch (error) {
+    console.error('Failed to build waveform summary', error)
+    return null
+  }
+}
+
+function renderAdminWaveform(audioController?: AudioController | null) {
+  const controller = audioController ?? audioControllerGlobal
+  const session = controller?.session
+  const lane = document.querySelector<HTMLElement>('[data-target-id="admin-waveform-lane"]')
+  const bars = document.querySelector<HTMLElement>('[data-target-id="admin-waveform-bars"]')
+  const status = document.querySelector<HTMLElement>('[data-target-id="admin-waveform-status"]')
+  if (!lane || !bars || !status) return
+
+  lane.querySelectorAll('.admin-waveform-cue, .admin-waveform-issue, .admin-waveform-playhead').forEach((node) => node.remove())
+  if (!session) {
+    bars.replaceChildren()
+    delete bars.dataset.audioId
+    status.textContent = 'Load a recording to show the waveform.'
+    return
+  }
+
+  const duration = Number.isFinite(controller.audio.duration) && controller.audio.duration > 0
+    ? controller.audio.duration
+    : waveformSummaryCache.get(session.recording.id)?.duration
+  const safeDuration = duration && duration > 0 ? duration : 1
+  const summary = waveformSummaryCache.get(session.recording.id)
+
+  if (summary && bars.dataset.audioId !== summary.audioId) {
+    bars.replaceChildren(
+      ...summary.buckets.map((peak) => {
+        const bar = document.createElement('span')
+        bar.className = 'admin-waveform-bar'
+        bar.style.setProperty('--waveform-peak', `${peak}`)
+        return bar
+      })
+    )
+    bars.dataset.audioId = summary.audioId
+  }
+
+  status.textContent = summary ? 'Waveform lane' : 'Preparing waveform…'
+  if (!summary) {
+    void getWaveformSummaryForSession(session).then(() => renderAdminWaveform(controller))
+  }
+
+  for (const cue of adminState.cues) {
+    const marker = document.createElement('span')
+    marker.className = 'admin-waveform-cue'
+    marker.style.setProperty('--timeline-ratio', `${Math.max(0, Math.min(1, cue.timeStart / safeDuration))}`)
+    lane.appendChild(marker)
+  }
+
+  for (const issue of activeRecordingIssues) {
+    if (issue.timeStart === undefined) continue
+    const marker = document.createElement('span')
+    marker.className = 'admin-waveform-issue'
+    marker.title = recordingIssueReaderLabel(issue)
+    marker.style.setProperty('--timeline-ratio', `${Math.max(0, Math.min(1, issue.timeStart / safeDuration))}`)
+    lane.appendChild(marker)
+  }
+
+  const playhead = document.createElement('span')
+  playhead.className = 'admin-waveform-playhead'
+  playhead.style.setProperty('--timeline-ratio', `${Math.max(0, Math.min(1, controller.audio.currentTime / safeDuration))}`)
+  lane.appendChild(playhead)
+}
+
+function scheduleWaveformRender(audioController?: AudioController | null) {
+  if (waveformRenderFrame) return
+  waveformRenderFrame = requestAnimationFrame(() => {
+    waveformRenderFrame = 0
+    renderAdminWaveform(audioController)
+  })
+}
+
 function getAudioButtonElements() {
   return [
     ...document.querySelectorAll<HTMLButtonElement>('[data-audio-button="true"]'),
@@ -990,6 +2102,19 @@ function isSameRunMaftirMarker(marker: HTMLElement | null, runId: string) {
   return marker?.dataset.runId === runId && marker.dataset.aliyahIndex === 'Maftir'
 }
 
+function isLastAliyahInRun(runId: string, aliyahIndex: PlaybackAliyahIndex) {
+  const run = display?.viewModel.relevantRuns.find((candidate) => candidate.id === runId)
+  return isLastIndexedAliyahInRun(run, aliyahIndex)
+}
+
+function isLastAliyahProgressAnchor(anchor: AliyahProgressAnchor | null | undefined) {
+  return Boolean(
+    anchor?.run?.id &&
+      anchor.aliyahIndex &&
+      isLastAliyahInRun(anchor.run.id, anchor.aliyahIndex)
+  )
+}
+
 const aliyahTokenKeysCache = new Map<string, string[]>()
 
 function getAliyahTokenKeysCacheKey(
@@ -1026,7 +2151,7 @@ function getAliyahProgressAnchors(): AliyahProgressAnchor[] {
       const rect = line.getBoundingClientRect()
       const label = line.querySelector('.aliyah-label-text')?.textContent?.trim() ?? '—'
       const aliyahStarts = (line.dataset.aliyahStarts ?? '').split(',')
-      const aliyahIndex = parsePlaybackAliyahIndex(aliyahStarts[0])
+      const aliyahIndex = parsePlaybackAliyahIndex(aliyahStarts[aliyahStarts.length - 1])
       const lineInfo = getLineInfoFromElement(line)
       const progressLabel = aliyahStarts.includes('1') ? 'ראשון' : label
       return {
@@ -1052,7 +2177,7 @@ function getCurrentAliyahFromViewportRange(
   anchors: AliyahProgressAnchor[]
 ): AliyahProgressAnchor | null {
   const center = range?.center
-  const centerAliyah = center?.aliyot[0]
+  const centerAliyah = center?.aliyot[center.aliyot.length - 1]
   const centerRun = center?.run
   if (!centerRun || !centerAliyah?.index) return null
 
@@ -1147,6 +2272,19 @@ async function ensureNextProgressAnchorLoaded(currentIndex: number) {
   })
 
   return progressAnchorLoadPromise
+}
+
+async function ensureRenderedThroughAvailableContent() {
+  if (!display) return
+
+  while (true) {
+    const renderedPages = display.getRenderedPageNumbers()
+    const lastPage = renderedPages[renderedPages.length - 1]
+    if (!lastPage) return
+
+    const loaded = await display.ensurePageRendered(lastPage + 1)
+    if (!loaded) return
+  }
 }
 
 function getLineInfoFromElement(element: Element) {
@@ -1265,6 +2403,7 @@ async function collectAliyahTokenKeys({
   const cacheKey = getAliyahTokenKeysCacheKey(runId, aliyahIndex)
   const cachedTokenKeys = aliyahTokenKeysCache.get(cacheKey)
   if (cachedTokenKeys) return [...cachedTokenKeys]
+  const isFinalAliyah = isLastAliyahInRun(runId, aliyahIndex)
 
   const markerSelector = aliyahMarkerSelector(runId, aliyahIndex)
   let marker = document.querySelector<HTMLElement>(markerSelector)
@@ -1281,9 +2420,19 @@ async function collectAliyahTokenKeys({
 
   let markers = getAliyahMarkerElements()
   let markerIndex = markers.indexOf(marker)
-  let nextMarker = markers[markerIndex + 1] ?? null
+  if (isFinalAliyah) {
+    await ensureRenderedThroughAvailableContent()
+    markers = getAliyahMarkerElements()
+    marker = document.querySelector<HTMLElement>(markerSelector)
+    if (!marker) return []
+    markerIndex = markers.indexOf(marker)
+  }
 
-  while (!nextMarker) {
+  let nextMarker = isFinalAliyah
+    ? null
+    : markers[markerIndex + 1] ?? null
+
+  while (!nextMarker && !isFinalAliyah) {
     const renderedPages = display.getRenderedPageNumbers()
     const lastPage = renderedPages[renderedPages.length - 1]
     const loaded = await display.ensurePageRendered(lastPage + 1)
@@ -2044,6 +3193,8 @@ function updateReaderProgress(range: ViewportRange | null = latestViewportRange)
     percent.textContent = '0%'
     mobileFill?.style.setProperty('width', '0%')
     syncToolbarCurrentAliyahButton(null, audioControllerGlobal ?? undefined)
+    syncBookmarkButton()
+    renderAliyahRail(range)
     return
   }
 
@@ -2062,6 +3213,8 @@ function updateReaderProgress(range: ViewportRange | null = latestViewportRange)
     currentForChrome ?? null,
     audioControllerGlobal ?? undefined
   )
+  syncBookmarkButton()
+  renderAliyahRail(range)
   const matchingProgressIndex =
     currentForChrome && currentForChrome.line
       ? anchors.findIndex((anchor) => anchor.line === currentForChrome.line)
@@ -2070,8 +3223,13 @@ function updateReaderProgress(range: ViewportRange | null = latestViewportRange)
     matchingProgressIndex >= 0 ? matchingProgressIndex : currentIndex
   const progressCurrent = anchors[progressIndex] ?? current
   const next = anchors[progressIndex + 1]
+  const progressEndPosition = next?.position ?? (
+    isLastAliyahProgressAnchor(progressCurrent)
+      ? Math.max(progressCurrent.position + 1, book.scrollHeight)
+      : null
+  )
 
-  if (!progressCurrent || !next) {
+  if (!progressCurrent || progressEndPosition === null) {
     if (progressCurrent) {
       void ensureNextProgressAnchorLoaded(progressIndex).then(() =>
         scheduleDeferredProgressRefresh()
@@ -2081,6 +3239,8 @@ function updateReaderProgress(range: ViewportRange | null = latestViewportRange)
     fill.style.height = '0%'
     percent.textContent = '0%'
     mobileFill?.style.setProperty('width', '0%')
+    syncBookmarkButton()
+    renderAliyahRail(range)
     return
   }
 
@@ -2089,7 +3249,7 @@ function updateReaderProgress(range: ViewportRange | null = latestViewportRange)
     Math.min(
       1,
       (viewportCenter - progressCurrent.position) /
-        (next.position - progressCurrent.position)
+        (progressEndPosition - progressCurrent.position)
     )
   )
   fill.style.height = `${Math.round(progress * 100)}%`
@@ -2140,6 +3300,7 @@ function mountAdminEditorUi() {
         <button type="button" class="toolbar-button" data-target-id="admin-prev-saved">Prev Saved</button>
         <button type="button" class="toolbar-button" data-target-id="admin-play-current">Play Current</button>
         <button type="button" class="toolbar-button" data-target-id="admin-next-saved">Next Saved</button>
+        <button type="button" class="toolbar-button" data-target-id="admin-mark-issue">Mark Issue</button>
         <button type="button" class="toolbar-button" data-target-id="admin-trim-here">Trim From Here</button>
       </div>
       <div class="admin-panel-actions mod-secondary mod-timing">
@@ -2167,6 +3328,15 @@ function mountAdminEditorUi() {
           <div class="floating-player-progress-track">
             <div class="floating-player-progress-fill mod-audio"></div>
           </div>
+        </div>
+      </div>
+      <div class="admin-waveform" data-target-id="admin-waveform">
+        <div class="admin-waveform-head">
+          <span data-target-id="admin-waveform-status">Load a recording to show the waveform.</span>
+          <span>cues · issues · playhead</span>
+        </div>
+        <div class="admin-waveform-lane" data-target-id="admin-waveform-lane">
+          <div class="admin-waveform-bars" data-target-id="admin-waveform-bars"></div>
         </div>
       </div>
     `
@@ -2557,6 +3727,9 @@ function syncAdminPanelState(audioController?: AudioController | null) {
   const trimHereButton = document.querySelector<HTMLButtonElement>(
     '[data-target-id="admin-trim-here"]'
   )
+  const markIssueButton = document.querySelector<HTMLButtonElement>(
+    '[data-target-id="admin-mark-issue"]'
+  )
   const draftStatus = document.querySelector<HTMLElement>(
     '[data-target-id="admin-draft-status"]'
   )
@@ -2621,6 +3794,7 @@ function syncAdminPanelState(audioController?: AudioController | null) {
   if (playCurrentButton) playCurrentButton.disabled = !hasSelectedCue
   if (nextSavedButton) nextSavedButton.disabled = !hasNextSavedCue
   if (trimHereButton) trimHereButton.disabled = !hasSelectedCue
+  if (markIssueButton) markIssueButton.disabled = !hasSession
   for (const button of nudgeButtons) {
     button.disabled = !hasSelectedCue
   }
@@ -2631,7 +3805,9 @@ function syncAdminPanelState(audioController?: AudioController | null) {
     syncNote.hidden = !adminState.recording
   }
   renderAdminCueList(audioController)
+  scheduleWaveformRender(audioController)
   syncAdminRecordButton()
+  syncReaderMode()
 }
 
 async function resetAdminRecorder(
@@ -2984,12 +4160,23 @@ function setupSettingsPane(audioController: AudioController) {
     const shouldSmoothRecenter =
       updates.focalPointMode !== undefined &&
       updates.focalPointMode !== readerPreferences.focalPointMode
+    const shouldFadeTheme =
+      updates.themeMode !== undefined &&
+      updates.themeMode !== readerPreferences.themeMode &&
+      !recordingMode.enabled &&
+      !window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const scrollTarget = shouldSmoothRecenter
       ? getReaderFocalPointScrollTarget(book)
       : null
+    if (shouldFadeTheme) document.documentElement.classList.add('mod-theme-transition')
     readerPreferences = mergeReaderPreferences(readerPreferences, updates)
     saveReaderPreferences(readerPreferences)
     applyReaderPreferences(readerPreferences)
+    if (shouldFadeTheme) {
+      window.setTimeout(() => {
+        document.documentElement.classList.remove('mod-theme-transition')
+      }, 220)
+    }
     syncForm()
     recenterReaderFocalPoint(scrollTarget, { behavior: 'smooth' })
     refreshReaderChrome(audioController)
@@ -3188,6 +4375,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     ? applyRecordingModePreferences(loadReaderPreferences())
     : loadReaderPreferences()
   applyReaderPreferences(readerPreferences)
+  bookmarks = loadBookmarks(localStorage)
 
   const audioController = new AudioController(audioElement)
   audioControllerGlobal = audioController
@@ -3198,6 +4386,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   const highlightController = new HighlightController(book)
   highlightControllerGlobal = highlightController
   mountAdminEditorUi()
+  setupCommandPalette()
+  setupBookmarkButton()
+  setupRecordingIssueUi()
+  setupAdminWaveformInteractions()
+  setupAliyahRailInteractions()
+  setupShortcutCommands()
   setupLastReadingPrompt()
   const launchLastReading =
     openedHashless && !recordingMode.enabled
@@ -3217,6 +4411,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setControlIcon(document.querySelector('[data-target-id="floating-download"]'), 'download')
   setControlIcon(document.querySelector('[data-target-id="floating-video-download"]'), 'download')
   setControlIcon(document.querySelector('[data-target-id="settings-toggle"]'), 'settings2')
+  syncBookmarkButton()
   updateFloatingPlayer(audioController)
   setupOfflineRecordingPrompt()
   setupDebugControls()
@@ -3287,6 +4482,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   book.addEventListener('page-rendered', (event) => {
     const renderedPage = event instanceof CustomEvent ? event.detail?.node : null
     applyRecordingModePageLabels(renderedPage instanceof Element ? renderedPage : book)
+    applyReaderVisibleIssueMarkers(renderedPage instanceof Element ? renderedPage : book)
     refreshReaderChrome(audioController)
     scheduleDeferredProgressRefresh()
     syncCurrentSessionHighlight(audioController, highlightController)
@@ -3360,6 +4556,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       audioController
     )
     saveLastReadingFromAnchor(getAliyahProgressAnchorForElement(activeElement ?? word))
+    syncActiveReaderIssueNotice(tokenKey)
   })
 
   audioController.on('playback-updated', () => {
@@ -3370,9 +4567,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   audioController.on('session-loaded', (session) => {
     cueNavigationIndex = session.cues.length ? 0 : null
     highlightController.setSequence(session.tokenKeys)
+    loadIssuesForActiveSession()
     updateFloatingPlayer(audioController)
     refreshInlineAudioButtons(audioController)
     syncAdminPanelState(audioController)
+    renderAliyahRail()
+    renderAdminWaveform(audioController)
   })
   audioController.on('time-updated', () => {
     updateFloatingPlayerAudioProgress(audioController)
@@ -3382,6 +4582,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     )
     if (adminPanel && !adminPanel.classList.contains('u-hidden')) {
       renderAdminCueList(audioController)
+      scheduleWaveformRender(audioController)
     }
   })
   audioController.on('frame-updated', ({ currentTime }) => {
@@ -3396,11 +4597,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const cue = session.cues[cueIndex]
     syncAdminCueListCurrentIndex(cueIndex)
     updateFloatingPlayerCueProgress(audioController, cueIndex)
-    if (highlightController.getActiveTokenKey() === cueKey(cue)) return
+    if (highlightController.getActiveTokenKey() === cueKey(cue)) {
+      syncActiveReaderIssueNotice(cueKey(cue))
+      return
+    }
 
     void highlightController.activateCue(cue, {
       scroll: readerPreferences.autoScrollWithPlayback,
-    })
+    }).then(() => syncActiveReaderIssueNotice(cueKey(cue)))
   })
   for (const eventName of ['loadedmetadata', 'durationchange', 'emptied'] as const) {
     audioElement.addEventListener(eventName, () => {
@@ -3594,6 +4798,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         .querySelector<HTMLButtonElement>('[data-target-id="floating-speed-toggle"]')
         ?.setAttribute('aria-expanded', 'false')
       hideExportModal()
+      closeCommandPalette()
+      closeRecordingIssueModal()
     })
   )
 
@@ -3716,6 +4922,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const provided = window.prompt('Admin password')
         if (!provided || !verifyAdminPassword(provided)) return
         adminState.unlocked = true
+        refreshCommandPaletteActions()
       }
       const isHidden = getAdminPanel()?.classList.contains('u-hidden') ?? true
       setAdminPanelVisible(isHidden, audioController)

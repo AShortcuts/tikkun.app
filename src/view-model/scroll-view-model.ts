@@ -1,5 +1,5 @@
 import type { LineType } from '../components/Page.ts'
-import type { Ref, RefWithScroll } from '../ref.ts'
+import type { Ref, RefWithScroll, ScrollName } from '../ref.ts'
 import { LeiningGenerator } from '../calendar-model/generator.ts'
 import type {
   LeiningAliyah,
@@ -22,6 +22,12 @@ import { AliyahLabeller } from './aliyah-labeller.ts'
 import { loadScroll, ScrollResolver } from '../location.ts'
 
 type PageLoader = () => Promise<LineType[]>
+export type PageStartLocation = {
+  scroll: ScrollName
+  pageNumber: number
+  lineNumber?: number
+}
+export type StartLocation = RefWithScroll | PageStartLocation
 
 const isNodeRuntime =
   typeof process !== 'undefined' && Boolean(process.versions?.node)
@@ -105,7 +111,7 @@ export abstract class ScrollViewModel {
     readonly generator: LeiningGenerator,
     /** The "view" (set of runs and contained עליות) that the user can scroll through. */
     readonly relevantRuns: LeiningRun[],
-    initialRef: RefWithScroll,
+    initialRef: StartLocation,
     private readonly displayTitleByRunId: Record<string, string> = {}
   ) {
     this.resolver = loadScroll(initialRef.scroll)
@@ -119,10 +125,15 @@ export abstract class ScrollViewModel {
   displayTitleForRun(run: LeiningRun) {
     return this.displayTitleByRunId[run.id] ?? run.leining.date.title.he
   }
-  private async loadAndConsumeScroll(initialRef: RefWithScroll) {
+  private async loadAndConsumeScroll(initialRef: StartLocation) {
     const scrollResolver = await this.resolver
     const { pageNumber, lineNumber } =
-      await scrollResolver.physicalLocationFromRef(initialRef)
+      'pageNumber' in initialRef
+        ? {
+            pageNumber: initialRef.pageNumber,
+            lineNumber: initialRef.lineNumber ?? 1,
+          }
+        : await scrollResolver.physicalLocationFromRef(initialRef)
 
     const startingContentIndex = await this.contentIndexFromPageNumber(
       pageNumber
@@ -144,7 +155,7 @@ export abstract class ScrollViewModel {
   static forId(
     generator: LeiningGenerator,
     runId: string,
-    initialRef?: RefWithScroll,
+    initialRef?: StartLocation,
     options: { displayTitle?: string } = {}
   ): ScrollViewModel | null {
     const run = generator.parseId(runId)
@@ -296,7 +307,7 @@ class FullScrollViewModel extends ScrollViewModel {
   constructor(
     generator: LeiningGenerator,
     run: LeiningRun,
-    initialRef: RefWithScroll = run.aliyot[0].start,
+    initialRef: StartLocation = run.aliyot[0].start,
     displayTitleByRunId: Record<string, string> = {}
   ) {
     super(
@@ -361,7 +372,7 @@ class HolidayViewModel extends ScrollViewModel {
   constructor(
     generator: LeiningGenerator,
     run: LeiningRun,
-    initialRef: RefWithScroll = run.aliyot[0].start,
+    initialRef: StartLocation = run.aliyot[0].start,
     displayTitleByRunId: Record<string, string> = {}
   ) {
     // TODO(decide): Should this include the whole LeiningDate?

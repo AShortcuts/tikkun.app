@@ -8,6 +8,8 @@ export type IconName =
   | 'settings2'
   | 'expand'
   | 'collapse'
+  | 'bookmark'
+  | 'bookmarkFilled'
 
 // Icons are from https://lucide.dev/icons v1.0.
 const iconPaths: Record<IconName, string> = {
@@ -54,6 +56,12 @@ const iconPaths: Record<IconName, string> = {
     <path d="M14 21v-7h7" />
     <path d="m3 10 7-7" />
     <path d="m21 14-7 7" />
+  `,
+  bookmark: `
+    <path d="M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z" />
+  `,
+  bookmarkFilled: `
+    <path d="M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z" fill="currentColor" stroke="none" />
   `,
 }
 

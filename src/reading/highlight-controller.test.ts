@@ -1,4 +1,4 @@
-import test from 'ava'
+import { expect, test } from 'vitest'
 import type { WordCue } from '../audio/types.ts'
 import { HighlightController } from './highlight-controller.ts'
 
@@ -175,7 +175,7 @@ function createBookWithVisibleTokens(tokenKeys: string[]) {
   } as unknown as HTMLElement
 }
 
-test('returns the latest cue at or before the current time', (t) => {
+test('returns the latest cue at or before the current time', () => {
   const controller = new HighlightController(createBookStub())
 
   const cues: WordCue[] = [
@@ -185,48 +185,48 @@ test('returns the latest cue at or before the current time', (t) => {
     { timeStart: 0.45, pageNumber: 1, lineIndex: 0, fragmentIndex: 0, wordIndex: 3 },
   ]
 
-  t.is(controller.getCueIndex(cues, -0.01), -1)
-  t.is(controller.getCueIndex(cues, 0), 0)
-  t.is(controller.getCueIndex(cues, 0.149), 0)
-  t.is(controller.getCueIndex(cues, 0.3), 2)
-  t.is(controller.getCueIndex(cues, 1), 3)
+  expect(controller.getCueIndex(cues, -0.01)).toBe(-1)
+  expect(controller.getCueIndex(cues, 0)).toBe(0)
+  expect(controller.getCueIndex(cues, 0.149)).toBe(0)
+  expect(controller.getCueIndex(cues, 0.3)).toBe(2)
+  expect(controller.getCueIndex(cues, 1)).toBe(3)
 })
 
-test('tracks the active token key as highlights move', async (t) => {
+test('tracks the active token key as highlights move', async () => {
   const book = createBookWithTokens(['12:7:0:2', '12:8:0:0'])
   const controller = new HighlightController(book)
   await controller.activateTokenKey('12:7:0:2', { scroll: false })
 
-  t.is(controller.getActiveTokenKey(), '12:7:0:2')
+  expect(controller.getActiveTokenKey()).toBe('12:7:0:2')
 
   await controller.activateTokenKey('12:8:0:0', { scroll: false })
-  t.is(controller.getActiveTokenKey(), '12:8:0:0')
+  expect(controller.getActiveTokenKey()).toBe('12:8:0:0')
 })
 
-test('scrolls whenever the highlighted token changes', async (t) => {
+test('scrolls whenever the highlighted token changes', async () => {
   const book = createBookWithTokens(['12:7:0:2', '12:7:0:3', '12:8:0:0']) as HTMLElement & {
     scrollCalls: unknown[]
   }
   const controller = new HighlightController(book)
 
   await controller.activateTokenKey('12:7:0:2', { scroll: true })
-  t.is(book.scrollCalls.length, 1)
-  t.deepEqual(book.scrollCalls[0], {
+  expect(book.scrollCalls.length).toBe(1)
+  expect(book.scrollCalls[0]).toEqual({
     top: 165,
     behavior: 'smooth',
   })
 
   await controller.activateTokenKey('12:7:0:3', { scroll: true })
-  t.is(book.scrollCalls.length, 2)
+  expect(book.scrollCalls.length).toBe(2)
 
   await controller.activateTokenKey('12:8:0:0', { scroll: true })
-  t.is(book.scrollCalls.length, 3)
+  expect(book.scrollCalls.length).toBe(3)
 
   await controller.activateTokenKey('12:8:0:0', { scroll: true })
-  t.is(book.scrollCalls.length, 3)
+  expect(book.scrollCalls.length).toBe(3)
 })
 
-test('recenters even when the next highlighted token is already visible', async (t) => {
+test('recenters even when the next highlighted token is already visible', async () => {
   const book = createBookWithVisibleTokens(['12:7:0:2', '12:7:0:3']) as HTMLElement & {
     scrollCalls: unknown[]
   }
@@ -235,10 +235,10 @@ test('recenters even when the next highlighted token is already visible', async 
   await controller.activateTokenKey('12:7:0:2', { scroll: true })
   await controller.activateTokenKey('12:7:0:3', { scroll: true })
 
-  t.is(book.scrollCalls.length, 2)
+  expect(book.scrollCalls.length).toBe(2)
 })
 
-test('uses element geometry to center tokens inside the book', async (t) => {
+test('uses element geometry to center tokens inside the book', async () => {
   const scrollCalls: unknown[] = []
   const book = {
     addEventListener() {},
@@ -301,7 +301,7 @@ test('uses element geometry to center tokens inside the book', async (t) => {
   const controller = new HighlightController(book)
   await controller.activateTokenKey('12:7:0:2', { scroll: true })
 
-  t.deepEqual(scrollCalls, [
+  expect(scrollCalls).toEqual([
     {
       top: 120,
       behavior: 'smooth',

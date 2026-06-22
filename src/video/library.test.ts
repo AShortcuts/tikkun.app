@@ -1,4 +1,4 @@
-import test from 'ava'
+import { expect, test } from 'vitest'
 import {
   createAliyahVideoManifest,
   findVideoForRecording,
@@ -62,7 +62,7 @@ const metadata = (
   ...overrides,
 })
 
-test('complete cue eligibility requires available recording and full token coverage', (t) => {
+test('complete cue eligibility requires available recording and full token coverage', () => {
   const complete = recording()
   const incomplete = recording({ id: 'bereshit-2', aliyah: 2 })
   const unavailable = recording({
@@ -85,13 +85,10 @@ test('complete cue eligibility requires available recording and full token cover
     ]),
   })
 
-  t.deepEqual(
-    eligible.map((entry) => entry.id),
-    ['bereshit-1']
-  )
+  expect(eligible.map((entry) => entry.id)).toEqual(['bereshit-1'])
 })
 
-test('video links merge only validated metadata with registered Koofr links', (t) => {
+test('video links merge only validated metadata with registered Koofr links', () => {
   const links: VideoLinkRegistry = {
     'bereshit-1': {
       videoSrc: 'https://koofr.eu/links/video',
@@ -119,8 +116,8 @@ test('video links merge only validated metadata with registered Koofr links', (t
     links,
   })
 
-  t.is(manifest.length, 1)
-  t.like(manifest[0], {
+  expect(manifest.length).toBe(1)
+  expect(manifest[0]).toMatchObject({
     audioId: 'bereshit-1',
     videoSrc: 'https://koofr.eu/links/video',
     downloadSrc: 'https://koofr.eu/links/download',
@@ -130,7 +127,7 @@ test('video links merge only validated metadata with registered Koofr links', (t
   })
 })
 
-test('generated manifest preserves audio metadata and excludes recordings without links', (t) => {
+test('generated manifest preserves audio metadata and excludes recordings without links', () => {
   const manifest = createAliyahVideoManifest({
     recordings: [recording(), recording({ id: 'bereshit-2', aliyah: 2 })],
     metadata: [metadata(), metadata({ audioId: 'bereshit-2' })],
@@ -142,8 +139,8 @@ test('generated manifest preserves audio metadata and excludes recordings withou
     },
   })
 
-  t.is(manifest.length, 1)
-  t.like(manifest[0], {
+  expect(manifest.length).toBe(1)
+  expect(manifest[0]).toMatchObject({
     audioId: 'bereshit-1',
     narratorId: 'yoni-davidov',
     narratorInitials: 'yd',
@@ -153,7 +150,7 @@ test('generated manifest preserves audio metadata and excludes recordings withou
   })
 })
 
-test('findVideoForRecording returns null when a recording has no manifest entry', (t) => {
+test('findVideoForRecording returns null when a recording has no manifest entry', () => {
   const manifest = [
     {
       ...metadata(),
@@ -162,6 +159,6 @@ test('findVideoForRecording returns null when a recording has no manifest entry'
     },
   ]
 
-  t.is(findVideoForRecording('bereshit-1', manifest)?.downloadSrc, manifest[0].downloadSrc)
-  t.is(findVideoForRecording('bereshit-2', manifest), null)
+  expect(findVideoForRecording('bereshit-1', manifest)?.downloadSrc).toBe(manifest[0].downloadSrc)
+  expect(findVideoForRecording('bereshit-2', manifest)).toBe(null)
 })

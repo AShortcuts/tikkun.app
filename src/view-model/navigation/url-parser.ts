@@ -1,6 +1,6 @@
 import { LeiningGenerator } from '../../calendar-model/generator.ts'
 import type { LeiningRun } from '../../calendar-model/model-types.ts'
-import type { RefWithScroll } from '../../ref.ts'
+import type { RefWithScroll, ScrollName } from '../../ref.ts'
 import { ScrollViewModel } from '../scroll-view-model.ts'
 import { generateParshaUrl, resolveParshaRun } from './parsha-routes.ts'
 
@@ -34,6 +34,10 @@ export function generateAboutUrl() {
 
 export function generateCueAnalyticsUrl() {
   return '#/about/playback-analytics'
+}
+
+export function generatePageUrl(scroll: ScrollName, page: number) {
+  return `#/${scroll}/page/${page}`
 }
 
 // TODO(decide): Should we support links to a specific עלייה in a run?
@@ -79,11 +83,37 @@ const pathHandlers: Record<
       model: ScrollViewModel.forDate(generator, options?.now ?? new Date()),
     }
   },
-  parsha(generator, [slug, ref], options) {
+  torah(generator, pathParts, options) {
+    return parseTorahRoute(generator, pathParts, options)
+  },
+  esther(generator, pathParts, options) {
+    return parseEstherRoute(generator, pathParts, options)
+  },
+  about(_generator, [page]) {
+    if (!page) return { view: 'about' }
+    if (
+      page === 'playback-analytics' ||
+      page === 'word-analytics' ||
+      page === 'cue-analytics'
+    ) {
+      return { view: 'cue-analytics' }
+    }
+    return null
+  },
+}
+
+function parseTorahRoute(
+  generator: LeiningGenerator,
+  [routeType, ...pathParts]: string[],
+  options?: ParseUrlOptions
+): AppRoute | null {
+  if (routeType === 'parsha') {
+    const [slug, ref] = pathParts
     if (!slug) return null
 
     const resolved = resolveParshaRun(generator, slug, options?.now)
     if (!resolved) return null
+    if (resolved.run.scroll !== 'torah') return null
 
     const initialRef = refFromPath(ref, resolved.run.scroll)
     if (ref && !initialRef) return null
@@ -104,18 +134,89 @@ const pathHandlers: Record<
         initialRef ?? undefined
       ),
     }
-  },
-  about(_generator, [page]) {
-    if (!page) return { view: 'about' }
-    if (
-      page === 'playback-analytics' ||
-      page === 'word-analytics' ||
-      page === 'cue-analytics'
-    ) {
-      return { view: 'cue-analytics' }
-    }
+  }
+
+  if (routeType === 'page') {
+    return parsePageRoute(generator, 'torah', pathParts, options)
+  }
+
+  return null
+}
+
+function parseEstherRoute(
+  generator: LeiningGenerator,
+  [routeType, ...pathParts]: string[],
+  options?: ParseUrlOptions
+): AppRoute | null {
+  if (routeType === 'page') return parsePageRoute(generator, 'esther', pathParts, options)
+  if (routeType === 'parsha') return null
+
+  const [ref] = pathParts
+  const resolved = resolveParshaRun(
+    generator,
+    routeType ?? 'megillah-esther',
+    options?.now
+  )
+  if (!resolved || resolved.run.scroll !== 'esther') return null
+
+  const initialRef = refFromPath(ref, resolved.run.scroll)
+  if (ref && !initialRef) return null
+
+  const model = ScrollViewModel.forId(
+    generator,
+    resolved.run.id,
+    initialRef ?? undefined,
+    { displayTitle: resolved.displayTitle }
+  )
+  if (!model) return null
+
+  return {
+    view: 'reader',
+    model,
+    canonicalHash: generateParshaUrl(
+      resolved.canonicalSlug,
+      initialRef ?? undefined
+    ),
+  }
+}
+
+function parsePageRoute(
+  generator: LeiningGenerator,
+  scroll: ScrollName,
+  [page]: string[],
+  options?: ParseUrlOptions
+): AppRoute | null {
+  const pageNumber = Number(page)
+  if (!Number.isInteger(pageNumber) || !isValidPageNumber(scroll, pageNumber)) {
     return null
-  },
+  }
+
+  const slug = scroll === 'torah' ? 'beresheet' : 'megillah-esther'
+  const resolved = resolveParshaRun(generator, slug, options?.now)
+  if (!resolved) return null
+
+  const model = ScrollViewModel.forId(
+    generator,
+    resolved.run.id,
+    {
+      scroll,
+      pageNumber,
+      lineNumber: 1,
+    },
+    { displayTitle: resolved.displayTitle }
+  )
+  if (!model) return null
+
+  return {
+    view: 'reader',
+    model,
+    canonicalHash: generatePageUrl(scroll, pageNumber),
+  }
+}
+
+function isValidPageNumber(scroll: ScrollName, page: number) {
+  const pageCount = scroll === 'torah' ? 245 : 17
+  return page >= 1 && page <= pageCount
 }
 
 function refFromPath(ref: string | undefined, scroll: RefWithScroll['scroll']) {

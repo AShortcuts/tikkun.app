@@ -1,4 +1,4 @@
-import test, { type ExecutionContext } from 'ava'
+import { afterEach, expect, test, type TestContext } from 'vitest'
 import {
   type RenderedEntry,
   type RenderedLineInfo,
@@ -30,12 +30,12 @@ async function createModel(
   pages = await fetchPages(viewModel, fetch)
 }
 
-test.afterEach('reset state', () => {
+afterEach(() => {
   viewModel = null
   pages = []
 })
 
-test.serial('renders across runs for שמיני עצרת', async (t) => {
+test('renders across runs for שמיני עצרת', async (t) => {
   await createModel('2024-10-24:shacharis,main', {
     count: 5,
     fetchPreviousPages: false,
@@ -63,7 +63,7 @@ test.serial('renders across runs for שמיני עצרת', async (t) => {
   // Scroll to a screen entirely between runs, which should remember the last position
   let betweenRuns = cachedTracker.setLine(viewModel!, linesBetweenRuns)
 
-  t.deepEqual(betweenRuns, inMainLeining)
+  expect(betweenRuns).toEqual(inMainLeining)
 
   const inMaftir = cachedTracker.setLine(viewModel!, {
     first: getLine(
@@ -77,10 +77,9 @@ test.serial('renders across runs for שמיני עצרת', async (t) => {
   // When we scroll to the same lines again, use the last position.
   betweenRuns = cachedTracker.setLine(viewModel!, linesBetweenRuns)
 
-  t.deepEqual(betweenRuns, inMaftir)
+  expect(betweenRuns).toEqual(inMaftir)
 
-  t.snapshot(
-    renderResult(t, {
+  expect(renderResult(t, {
       first: getLine(
         'וּבְחַ֥ג הַשָּׁבֻע֖וֹת וּבְחַ֣ג הַסֻּכּ֑וֹת וְלֹ֧א יֵרָאֶ֛ה אֶת־פְּנֵ֥י'
       ),
@@ -88,12 +87,10 @@ test.serial('renders across runs for שמיני עצרת', async (t) => {
       last: getLine(
         'תִּהְיֶ֣ה לָכֶ֑ם כׇּל־מְלֶ֥אכֶת עֲבֹדָ֖ה לֹ֥א תַעֲשֽׂוּ׃ וְהִקְרַבְתֶּ֨ם'
       ),
-    }),
-    'spanning main leining and מפטיר'
-  )
+    }), 'spanning main leining and מפטיר').toMatchSnapshot()
 })
 
-function renderRoshCodesh(t: ExecutionContext) {
+function renderRoshCodesh(t: TestContext) {
   return renderResult(t, {
     first: getLine(
       'וְאָמַרְתָּ֖ אֲלֵהֶ֑ם אֶת־קׇרְבָּנִ֨י לַחְמִ֜י לְאִשַּׁ֗י רֵ֚יחַ נִֽיחֹחִ֔י'
@@ -107,7 +104,7 @@ function renderRoshCodesh(t: ExecutionContext) {
   })
 }
 
-test.serial('collapses adjacent days of ראש חודש', async (t) => {
+test('collapses adjacent days of ראש חודש', async (t) => {
   await createModel('2024-09-03:shacharis,main', {
     count: 2,
     fetchPreviousPages: false,
@@ -120,11 +117,11 @@ test.serial('collapses adjacent days of ראש חודש', async (t) => {
   })
   const secondDay = renderRoshCodesh(t)
 
-  t.deepEqual(firstDay.previousLink, secondDay.previousLink)
-  t.deepEqual(firstDay.nextLink, secondDay.nextLink)
+  expect(firstDay.previousLink).toEqual(secondDay.previousLink)
+  expect(firstDay.nextLink).toEqual(secondDay.nextLink)
 })
 
-test.serial('preserves unequal days of ראש חודש', async (t) => {
+test('preserves unequal days of ראש חודש', async (t) => {
   await createModel('2024-11-01:shacharis,main', {
     count: 2,
     fetchPreviousPages: false,
@@ -137,12 +134,12 @@ test.serial('preserves unequal days of ראש חודש', async (t) => {
   })
   const secondDay = renderRoshCodesh(t)
 
-  t.notDeepEqual(firstDay.previousLink, secondDay.previousLink)
-  t.deepEqual(firstDay.currentRun?.id, secondDay.previousLink?.targetRun)
-  t.deepEqual(firstDay.nextLink?.targetRun, secondDay.relatedRuns[0]?.targetRun)
+  expect(firstDay.previousLink).not.toEqual(secondDay.previousLink)
+  expect(firstDay.currentRun?.id).toEqual(secondDay.previousLink?.targetRun)
+  expect(firstDay.nextLink?.targetRun).toEqual(secondDay.relatedRuns[0]?.targetRun)
 })
 
-test.serial('renders from only one line', async (t) => {
+test('renders from only one line', async (t) => {
   await createModel('2024-09-28:shacharis,main', {
     count: 5,
     fetchPreviousPages: false,
@@ -170,13 +167,13 @@ test.serial('renders from only one line', async (t) => {
     }),
   }
 
-  t.is(results.fromFirst.currentRun?.title, 'פרשת נצבים־וילך שחרית Main')
+  expect(results.fromFirst.currentRun?.title).toBe('פרשת נצבים־וילך שחרית Main')
 
-  t.deepEqual(results.fromFirst, results.fromCenter)
-  t.deepEqual(results.fromCenter, results.fromLast)
+  expect(results.fromFirst).toEqual(results.fromCenter)
+  expect(results.fromCenter).toEqual(results.fromLast)
 })
 
-test.serial('picks primary run', async (t) => {
+test('picks primary run', async (t) => {
   await createModel('2025-03-01:shacharis,main', {
     count: 5,
     fetchPreviousPages: false,
@@ -193,8 +190,8 @@ test.serial('picks primary run', async (t) => {
       'אֲנִי֙ מַרְאֶ֣ה אוֹתְךָ֔ אֵ֚ת תַּבְנִ֣ית הַמִּשְׁכָּ֔ן וְאֵ֖ת תַּבְנִ֣ית כׇּל־'
     ),
   })
-  t.is(centerInTerumah.currentRun?.title, 'פרשת תרומה שחרית Main')
-  t.deepEqual(centerInTerumah.aliyahRange, ['פרשת משפטים שביעי', 'ראשון'])
+  expect(centerInTerumah.currentRun?.title).toBe('פרשת תרומה שחרית Main')
+  expect(centerInTerumah.aliyahRange).toEqual(['פרשת משפטים שביעי', 'ראשון'])
 
   const centerInMishpatim = renderResult(t, {
     first: getLine(
@@ -207,48 +204,43 @@ test.serial('picks primary run', async (t) => {
       'אֲנִי֙ מַרְאֶ֣ה אוֹתְךָ֔ אֵ֚ת תַּבְנִ֣ית הַמִּשְׁכָּ֔ן וְאֵ֖ת תַּבְנִ֣ית כׇּל־'
     ),
   })
-  t.is(centerInMishpatim.currentRun?.title, 'פרשת משפטים שחרית Main')
-  t.deepEqual(centerInMishpatim.aliyahRange, ['שביעי', 'פרשת תרומה ראשון'])
+  expect(centerInMishpatim.currentRun?.title).toBe('פרשת משפטים שחרית Main')
+  expect(centerInMishpatim.aliyahRange).toEqual(['שביעי', 'פרשת תרומה ראשון'])
 })
 
-test.serial('renders for the beginning of בראשית', async (t) => {
+test('renders for the beginning of בראשית', async (t) => {
   await createModel('2024-10-26:shacharis,main', {
     count: 5,
     fetchPreviousPages: false,
   })
 
-  t.snapshot(
-    renderResult(t, {
+  expect(renderResult(t, {
       first: firstLine(pages[0]),
       center: null,
       last: firstLine(pages[1]),
-    })
-  )
+    })).toMatchSnapshot()
 })
 
-test.serial('renders for שמחת תורה', async (t) => {
+test('renders for שמחת תורה', async (t) => {
   await createModel('2024-10-25:shacharis,main', {
     count: 5,
     fetchPreviousPages: false,
   })
 
-  t.snapshot(
-    renderResult(t, {
+  expect(renderResult(t, {
       first: firstLine(pages[0]),
       center: null,
       last: firstLine(pages[1]),
-    })
-  )
+    })).toMatchSnapshot()
 })
 
-test.serial('שקלים / ראש חודש', async (t) => {
+test('שקלים / ראש חודש', async (t) => {
   await createModel('2025-03-01:shacharis,main', {
     count: 5,
     fetchPreviousPages: false,
   })
 
-  t.snapshot(
-    renderResult(t, {
+  expect(renderResult(t, {
       first: getLine(
         'וַיְדַבֵּ֥ר יְהֹוָ֖ה אֶל־מֹשֶׁ֥ה לֵּאמֹֽר׃ דַּבֵּר֙ אֶל־בְּנֵ֣י יִשְׂרָאֵ֔ל'
       ),
@@ -256,18 +248,16 @@ test.serial('שקלים / ראש חודש', async (t) => {
       last: getLine(
         'זָהָ֣ב טָה֑וֹר אַמָּתַ֤יִם וָחֵ֙צִי֙ אׇרְכָּ֔הּ וְאַמָּ֥ה וָחֵ֖צִי רׇחְבָּֽהּ׃'
       ),
-    })
-  )
+    })).toMatchSnapshot()
 })
 
-test.serial('renders for חול המועד סוכות', async (t) => {
+test('renders for חול המועד סוכות', async (t) => {
   await createModel('2024-10-22:shacharis,main', {
     count: 5,
     fetchPreviousPages: false,
   })
 
-  t.snapshot(
-    renderResult(t, {
+  expect(renderResult(t, {
       first: getLine(
         'הַחֲמִישִׁ֛י פָּרִ֥ים תִּשְׁעָ֖ה אֵילִ֣ם שְׁנָ֑יִם כְּבָשִׂ֧ים בְּנֵֽי'
       ),
@@ -277,18 +267,17 @@ test.serial('renders for חול המועד סוכות', async (t) => {
       last: getLine(
         'וּשְׂעִ֥יר חַטָּ֖את אֶחָ֑ד מִלְּבַד֙ עֹלַ֣ת הַתָּמִ֔יד מִנְחָתָ֖הּ'
       ),
-    })
-  )
+    })).toMatchSnapshot()
 })
 
 function renderResult(
-  t: ExecutionContext,
+  t: TestContext,
   lines: Parameters<TopBarTracker['setLine']>[1]
 ) {
   if (!viewModel) throw new Error('Must create viewModel first')
   const cachedResult = cachedTracker.setLine(viewModel, lines)
   const freshResult = new TopBarTracker().setLine(viewModel, lines)
-  t.deepEqual(cachedResult, freshResult)
+  expect(cachedResult).toEqual(freshResult)
   return {
     aliyahRange: cachedResult.aliyahRange,
     currentRun: cachedResult.currentRun && {

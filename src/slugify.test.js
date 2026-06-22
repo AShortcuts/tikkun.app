@@ -1,18 +1,18 @@
-import test from 'ava'
+import { expect, test } from 'vitest'
 import slugify from './slugify.ts'
 
-test('slugify lowercases all letters', (t) => {
-  t.assert(slugify('HelLo') === 'hello')
+test('slugify lowercases all letters', () => {
+  expect(slugify('HelLo') === 'hello').toBeTruthy()
 })
 
-test('hyphenates multiple words', (t) => {
-  t.assert(slugify('Hello all the People') === 'hello-all-the-people')
+test('hyphenates multiple words', () => {
+  expect(slugify('Hello all the People') === 'hello-all-the-people').toBeTruthy()
 })
 
-test('collapses multiple spaces', (t) => {
-  t.assert(slugify('multiple      spaces') === 'multiple-spaces')
+test('collapses multiple spaces', () => {
+  expect(slugify('multiple      spaces') === 'multiple-spaces').toBeTruthy()
 })
 
-test('removes non-alpha-numeric', (t) => {
-  t.assert(slugify(`k33'#p*( )Th--_i#s`) === 'k33p-this')
+test('removes non-alpha-numeric', () => {
+  expect(slugify(`k33'#p*( )Th--_i#s`) === 'k33p-this').toBeTruthy()
 })

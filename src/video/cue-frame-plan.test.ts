@@ -1,4 +1,4 @@
-import test from 'ava'
+import { expect, test } from 'vitest'
 import {
   buildCueFramePlan,
   createCueConcatEntries,
@@ -15,7 +15,7 @@ const cue = (timeStart: number, timeEnd?: number): WordCue => ({
   wordIndex: Math.round(timeStart * 1000),
 })
 
-test('cue frame plan captures one cue frame and a burst before cue end', (t) => {
+test('cue frame plan captures one cue frame and a burst before cue end', () => {
   const plan = buildCueFramePlan({
     cues: [cue(0.5, 1.2), cue(1.7, 1.9)],
     durationSeconds: 2,
@@ -24,26 +24,14 @@ test('cue frame plan captures one cue frame and a burst before cue end', (t) => 
     burstMaxMs: 300,
   })
 
-  t.is(plan.frameCount, 20)
-  t.deepEqual(
-    plan.entries.map((entry) => entry.frameIndex),
-    [0, 5, 6, 10, 11, 12, 13, 17, 18, 19]
-  )
-  t.deepEqual(
-    plan.entries.map((entry) => entry.seconds),
-    [0.5, 0.5, 0.5, 1, 1.1, 1.2, 1.3, 1.7, 1.7, 1.9]
-  )
-  t.deepEqual(
-    plan.entries.map((entry) => entry.settleMs ?? 0),
-    [100, 0, 100, 0, 0, 0, 0, 0, 100, 0]
-  )
-  t.deepEqual(
-    plan.entries.map((entry) => entry.highlightAnimationMs ?? null),
-    [null, 100, null, null, null, null, null, 100, null, null]
-  )
+  expect(plan.frameCount).toBe(20)
+  expect(plan.entries.map((entry) => entry.frameIndex)).toEqual([0, 5, 6, 10, 11, 12, 13, 17, 18, 19])
+  expect(plan.entries.map((entry) => entry.seconds)).toEqual([0.5, 0.5, 0.5, 1, 1.1, 1.2, 1.3, 1.7, 1.7, 1.9])
+  expect(plan.entries.map((entry) => entry.settleMs ?? 0)).toEqual([100, 0, 100, 0, 0, 0, 0, 0, 100, 0])
+  expect(plan.entries.map((entry) => entry.highlightAnimationMs ?? null)).toEqual([null, 100, null, null, null, null, null, 100, null, null])
 })
 
-test('cue start held frames settle before capture without moving the output frame', (t) => {
+test('cue start held frames settle before capture without moving the output frame', () => {
   const plan = buildCueFramePlan({
     cues: [cue(0.5, 0.8)],
     durationSeconds: 1,
@@ -53,10 +41,10 @@ test('cue start held frames settle before capture without moving the output fram
   })
 
   const cueStart = plan.entries.find((entry) => entry.frameIndex === 18)
-  t.deepEqual(cueStart, { frameIndex: 18, seconds: 0.5, settleMs: 100 })
+  expect(cueStart).toEqual({ frameIndex: 18, seconds: 0.5, settleMs: 100 })
 })
 
-test('cue start frames capture the highlight animation before the held frame', (t) => {
+test('cue start frames capture the highlight animation before the held frame', () => {
   const plan = buildCueFramePlan({
     cues: [cue(0.5, 0.8)],
     durationSeconds: 1,
@@ -68,14 +56,12 @@ test('cue start frames capture the highlight animation before the held frame', (
   const animationFrames = plan.entries.filter(
     (entry) => entry.highlightAnimationMs !== undefined
   )
-  t.deepEqual(
-    animationFrames.map((entry) => ({
+  expect(animationFrames.map((entry) => ({
       frameIndex: entry.frameIndex,
       seconds: entry.seconds,
       highlightAnimationMs: entry.highlightAnimationMs,
       settleBeforeAnimation: entry.settleBeforeAnimation ?? false,
-    })),
-    [
+    }))).toEqual([
       {
         frameIndex: 15,
         seconds: 0.5,
@@ -94,11 +80,10 @@ test('cue start frames capture the highlight animation before the held frame', (
         highlightAnimationMs: 100,
         settleBeforeAnimation: false,
       },
-    ]
-  )
+    ])
 })
 
-test('line changes capture a scroll transition before the held frame', (t) => {
+test('line changes capture a scroll transition before the held frame', () => {
   const plan = buildCueFramePlan({
     cues: [
       { ...cue(0.5, 0.8), lineIndex: 0 },
@@ -111,15 +96,13 @@ test('line changes capture a scroll transition before the held frame', (t) => {
   })
 
   const transition = plan.entries.filter((entry) => entry.seconds === 0.9)
-  t.deepEqual(
-    transition.map((entry) => ({
+  expect(transition.map((entry) => ({
       frameIndex: entry.frameIndex,
       scrollTransition: entry.scrollTransition ?? false,
       settleBeforeAnimation: entry.settleBeforeAnimation ?? false,
       transitionWaitMs: entry.transitionWaitMs,
       settleMs: entry.settleMs ?? 0,
-    })),
-    [
+    }))).toEqual([
       {
         frameIndex: 27,
         scrollTransition: true,
@@ -169,11 +152,10 @@ test('line changes capture a scroll transition before the held frame', (t) => {
         transitionWaitMs: undefined,
         settleMs: 100,
       },
-    ]
-  )
+    ])
 })
 
-test('cue starts never collapse onto the same output frame', (t) => {
+test('cue starts never collapse onto the same output frame', () => {
   const plan = buildCueFramePlan({
     cues: [cue(0.5, 0.54), cue(0.516, 0.58), cue(0.548, 0.62)],
     durationSeconds: 1,
@@ -182,22 +164,19 @@ test('cue starts never collapse onto the same output frame', (t) => {
     burstMaxMs: 100,
   })
 
-  t.deepEqual(
-    [0.5, 0.516, 0.548].map((seconds) => {
+  expect([0.5, 0.516, 0.548].map((seconds) => {
       const entry = plan.entries.find(
         (candidate) => candidate.seconds === seconds && candidate.frameIndex > 0
       )
       return [entry?.frameIndex, seconds]
-    }),
-    [
+    })).toEqual([
       [15, 0.5],
       [16, 0.516],
       [17, 0.548],
-    ]
-  )
+    ])
 })
 
-test('cue frame plan clamps windows to the output duration', (t) => {
+test('cue frame plan clamps windows to the output duration', () => {
   const plan = buildCueFramePlan({
     cues: [cue(0.01, 0.1), cue(1.99, 2.2)],
     durationSeconds: 2,
@@ -206,13 +185,10 @@ test('cue frame plan clamps windows to the output duration', (t) => {
     burstMaxMs: 500,
   })
 
-  t.deepEqual(
-    plan.entries.map((entry) => entry.frameIndex),
-    [0, 1, 2, 3, 4, 5, 19]
-  )
+  expect(plan.entries.map((entry) => entry.frameIndex)).toEqual([0, 1, 2, 3, 4, 5, 19])
 })
 
-test('concat entries hold each captured frame until the next planned output frame', (t) => {
+test('concat entries hold each captured frame until the next planned output frame', () => {
   const plan = buildCueFramePlan({
     cues: [cue(0.5, 0.8)],
     durationSeconds: 1,
@@ -226,7 +202,7 @@ test('concat entries hold each captured frame until the next planned output fram
     frameName: (index) => `frame-${index}.png`,
   })
 
-  t.deepEqual(entries, [
+  expect(entries).toEqual([
     { file: 'frame-0.png', durationSeconds: 0.5 },
     { file: 'frame-1.png', durationSeconds: 0.1 },
     { file: 'frame-2.png', durationSeconds: 0.1 },
@@ -234,13 +210,11 @@ test('concat entries hold each captured frame until the next planned output fram
     { file: 'frame-4.png', durationSeconds: 0.1 },
     { file: 'frame-5.png', durationSeconds: 0.1 },
   ])
-  t.true(
-    Math.abs(entries.reduce((total, entry) => total + entry.durationSeconds, 0) - 1) <
-      Number.EPSILON
-  )
+  expect(Math.abs(entries.reduce((total, entry) => total + entry.durationSeconds, 0) - 1) <
+      Number.EPSILON).toBe(true)
 })
 
-test('cue frame plan caps bursts before the next cue begins', (t) => {
+test('cue frame plan caps bursts before the next cue begins', () => {
   const plan = buildCueFramePlan({
     cues: [cue(1, 1.9), cue(2, 2.3)],
     durationSeconds: 3,
@@ -249,23 +223,17 @@ test('cue frame plan caps bursts before the next cue begins', (t) => {
     burstMaxMs: 500,
   })
 
-  t.deepEqual(
-    plan.entries.map((entry) => entry.frameIndex),
-    [
+  expect(plan.entries.map((entry) => entry.frameIndex)).toEqual([
       0, 30, 31, 32, 33, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62,
       63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 89,
-    ]
-  )
+    ])
 })
 
-test('concat file repeats final frame and escapes single quotes', (t) => {
+test('concat file repeats final frame and escapes single quotes', () => {
   const source = renderCueConcatFile([
     { file: "frame-'0'.png", durationSeconds: 0.5 },
     { file: 'frame-1.png', durationSeconds: 0.1 },
   ])
 
-  t.is(
-    source,
-    "file 'frame-'\\''0'\\''.png'\nduration 0.500000\nfile 'frame-1.png'\nduration 0.100000\nfile 'frame-1.png'\n"
-  )
+  expect(source).toBe("file 'frame-'\\''0'\\''.png'\nduration 0.500000\nfile 'frame-1.png'\nduration 0.100000\nfile 'frame-1.png'\n")
 })

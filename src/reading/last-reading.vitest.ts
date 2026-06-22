@@ -46,7 +46,7 @@ test('loads a recent last reading with display labels', () => {
   saveLastReading(
     storage,
     {
-      hash: '#/parsha/beresheet/1-1-1',
+      hash: '#/torah/parsha/beresheet/1-1-1',
       parshaName: 'בראשית',
       aliyahLabel: 'ראשון',
     },
@@ -56,7 +56,7 @@ test('loads a recent last reading with display labels', () => {
   const lastReading = loadEligibleLastReading(storage, now + 60_000)
 
   expect(lastReading).toMatchObject({
-    hash: '#/parsha/beresheet/1-1-1',
+    hash: '#/torah/parsha/beresheet/1-1-1',
     parshaName: 'בראשית',
     aliyahLabel: 'ראשון',
     savedAt: now,
@@ -68,7 +68,7 @@ test('hides and clears a last reading older than forty eight hours', () => {
   saveLastReading(
     storage,
     {
-      hash: '#/parsha/noach',
+      hash: '#/torah/parsha/noach',
       parshaName: 'נח',
     },
     now - LAST_READING_MAX_AGE_MS - 1
@@ -118,6 +118,6 @@ test('prefers semantic parsha urls with verse refs for last reading links', () =
   if (!run) throw new Error('Missing Bereshit run')
 
   expect(createLastReadingHash(run, run.aliyot[0].start)).toBe(
-    '#/parsha/beresheet/1-1-1'
+    '#/torah/parsha/beresheet/1-1-1'
   )
 })
