@@ -44,7 +44,7 @@ const weeklyParshaRoutes: WeeklyParshaRoute[] = [
   { kind: 'weekly', canonicalSlug: 'vayera', titleSlugs: ['vayera'] },
   { kind: 'weekly', canonicalSlug: 'chayei-sara', titleSlugs: ['chayei-sara'] },
   { kind: 'weekly', canonicalSlug: 'toldot', titleSlugs: ['toldot'] },
-  { kind: 'weekly', canonicalSlug: 'vayetzei', titleSlugs: ['vayetzei'] },
+  { kind: 'weekly', canonicalSlug: 'vayetzei', titleSlugs: ['vayetzei'], aliases: ['vayetze'] },
   { kind: 'weekly', canonicalSlug: 'vayishlach', titleSlugs: ['vayishlach'] },
   { kind: 'weekly', canonicalSlug: 'vayeshev', titleSlugs: ['vayeshev'] },
   { kind: 'weekly', canonicalSlug: 'miketz', titleSlugs: ['miketz'] },
@@ -280,8 +280,11 @@ export function scrollForParshaSlug(slug: string): RefWithScroll['scroll'] | nul
 }
 
 export function generateParshaUrl(slug: string, initialRef?: RefWithScroll) {
-  const scroll = scrollForParshaSlug(slug) ?? initialRef?.scroll ?? 'torah'
-  const routePrefix = scroll === 'esther' ? `#/${scroll}/${slug}` : `#/${scroll}/parsha/${slug}`
+  const canonicalSlug = canonicalizeParshaSlug(slug) ?? slug
+  const scroll = scrollForParshaSlug(canonicalSlug) ?? initialRef?.scroll ?? 'torah'
+  const routePrefix = scroll === 'esther'
+    ? `#/${scroll}/${canonicalSlug}`
+    : `#/${scroll}/parsha/${canonicalSlug}`
   if (!initialRef) return routePrefix
 
   return `${routePrefix}/${initialRef.b}-${initialRef.c}-${initialRef.v}`

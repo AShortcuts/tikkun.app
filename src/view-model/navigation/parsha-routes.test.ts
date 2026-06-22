@@ -3,6 +3,7 @@ import { LeiningGenerator } from '../../calendar-model/generator.ts'
 import type { UserSettings } from '../../calendar-model/user-settings.ts'
 import {
   canonicalizeParshaSlug,
+  generateParshaUrl,
   getParshaSearchTermsForLeining,
   getParshaSearchTermsForSlug,
   semanticParshaUrlForLeining,
@@ -45,6 +46,11 @@ test('parsha route aliases canonicalize title and alternate spellings', () => {
   expect(canonicalizeParshaSlug('Noah')).toBe('noach')
   expect(canonicalizeParshaSlug('Behaalotcha')).toBe('behalotecha')
   expect(canonicalizeParshaSlug('Vayeilech')).toBe('vayelech')
+  expect(canonicalizeParshaSlug('Vayetze')).toBe('vayetzei')
+})
+
+test('parsha URL generation emits canonical route slugs for aliases', () => {
+  expect(generateParshaUrl('vayetze')).toBe('#/torah/parsha/vayetzei')
 })
 
 test('parsha search terms come from canonical route aliases', () => {

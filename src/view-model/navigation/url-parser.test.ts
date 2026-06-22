@@ -86,6 +86,18 @@ test('Parsha alias canonicalizes Bereshit', async () => {
     ))
 })
 
+test('Parsha alias canonicalizes Vayetze recording slug', async () => {
+  const route = toReaderRoute(
+    parseUrl(generator, '/torah/parsha/vayetze', { now: new Date('2026-01-01') })
+  )
+
+  expect(route).toBeTruthy()
+  expect(route?.canonicalHash).toBe('#/torah/parsha/vayetzei')
+  expect(await renderStartingLineForRoute(route)).toBe(await renderStartingLineForRoute(
+      toReaderRoute(parseUrl(generator, '/run/2026-11-21:shacharis,main'))
+    ))
+})
+
 test('Parsha slug resolves exact solo Vayelech only', async () => {
   const route = toReaderRoute(
     parseUrl(generator, '/torah/parsha/vayelech', { now: new Date('2026-01-01') })
