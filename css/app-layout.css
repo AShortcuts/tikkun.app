@@ -341,11 +341,11 @@
 }
 
 .admin-waveform-bars {
+  position: relative;
   display: flex;
   align-items: center;
   height: 100%;
   gap: 1px;
-  padding: 0 0.25rem;
 }
 
 .admin-waveform-bar {
@@ -353,7 +353,7 @@
   min-width: 1px;
   height: max(2px, calc(var(--waveform-peak, 0) * 100%));
   border-radius: 999px;
-  background: color-mix(in srgb, var(--text-color) 36%, transparent);
+  background: color-mix(in srgb, var(--text-color) 34%, transparent);
 }
 
 .admin-waveform-cue,

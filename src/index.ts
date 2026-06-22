@@ -227,6 +227,11 @@ const PLAYBACK_RATE_MAGNET_THRESHOLD = 0.09
 const PLAYBACK_RATE_MARKS = [0.5, 1, 1.5, 2, 3] as const
 const ADMIN_SESSION_UNLOCKED_KEY = 'tikkun-admin-unlocked'
 const ADMIN_SESSION_PANEL_OPEN_KEY = 'tikkun-admin-panel-open'
+const WAVEFORM_SUMMARY_BUCKETS = 800
+const WAVEFORM_VISIBLE_BARS = 160
+const WAVEFORM_AUTO_WINDOW_SECONDS = 24
+const WAVEFORM_FULL_VIEW_MAX_SECONDS = 30
+const WAVEFORM_WINDOW_STEP_SECONDS = 1
 const adminDraftTimeFormat = Intl.DateTimeFormat(undefined, {
   dateStyle: 'medium',
   timeStyle: 'short',
@@ -461,6 +466,7 @@ function setAdminPanelVisible(
   panel.classList.toggle('u-hidden', !visible)
   persistAdminAccessState()
   syncAdminPanelState(audioController)
+  if (visible) renderAdminWaveform(audioController)
   syncReaderMode()
 }
 
@@ -1479,6 +1485,21 @@ function closeCommandPalette() {
   getCommandPaletteElements().root?.classList.add('u-hidden')
 }
 
+function isCommandPaletteOpen() {
+  const { root } = getCommandPaletteElements()
+  return Boolean(root && !root.classList.contains('u-hidden'))
+}
+
+function toggleCommandPalette() {
+  if (isCommandPaletteOpen()) {
+    closeCommandPalette()
+    focusReaderSurface()
+    return
+  }
+
+  openCommandPalette()
+}
+
 function runCommandPaletteAction(action: NavigationAction) {
   closeCommandPalette()
   void action.run()
@@ -1556,11 +1577,24 @@ function setupAdminWaveformInteractions() {
       const controller = audioControllerGlobal
       if (!controller?.session || !Number.isFinite(controller.audio.duration)) return
       const lane = event.currentTarget as HTMLElement
-      const rect = lane.getBoundingClientRect()
+      const bars = lane.querySelector<HTMLElement>('[data-target-id="admin-waveform-bars"]')
+      const rect = (bars ?? lane).getBoundingClientRect()
       const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / Math.max(rect.width, 1)))
-      controller.seek(ratio * controller.audio.duration)
+      const windowStart = Number(lane.dataset.windowStart)
+      const windowEnd = Number(lane.dataset.windowEnd)
+      const duration = Number.isFinite(windowStart) &&
+        Number.isFinite(windowEnd) &&
+        windowEnd > windowStart
+        ? windowEnd - windowStart
+        : controller.audio.duration
+      const start = Number.isFinite(windowStart) ? windowStart : 0
+      controller.seek(Math.max(0, Math.min(controller.audio.duration, start + ratio * duration)))
       scheduleWaveformRender(controller)
     })
+
+  const renderAfterResize = () => scheduleWaveformRender(audioControllerGlobal)
+  window.addEventListener('resize', renderAfterResize)
+  window.visualViewport?.addEventListener('resize', renderAfterResize)
 }
 
 function setupShortcutCommands() {
@@ -1570,7 +1604,7 @@ function setupShortcutCommands() {
       key: 'k',
       metaOrCtrl: true,
       modes: ['normal', 'practice-focus', 'admin-authoring'],
-      run: openCommandPalette,
+      run: toggleCommandPalette,
     }),
     createShortcutCommand({
       id: 'issue.mark',
@@ -1593,10 +1627,12 @@ function setupShortcutCommands() {
   document.addEventListener(
     'keydown',
     (event) => {
-      if (isShortcutEditableTarget(event.target)) return
       syncReaderMode()
       const command = getShortcutCommand(commands, event, currentReaderMode)
       if (!command) return
+      const isPaletteToggleWhileOpen =
+        command.id === 'palette.open' && isCommandPaletteOpen()
+      if (isShortcutEditableTarget(event.target) && !isPaletteToggleWhileOpen) return
       event.preventDefault()
       event.stopPropagation()
       event.stopImmediatePropagation()
@@ -1857,7 +1893,7 @@ async function getWaveformSummaryForSession(session: ActiveAudioSession) {
       audioId: session.recording.id,
       duration: decoded.duration,
       samples,
-      bucketCount: 160,
+      bucketCount: WAVEFORM_SUMMARY_BUCKETS,
     })
     void audioContext.close()
     waveformSummaryCache.set(session.recording.id, summary)
@@ -1866,6 +1902,91 @@ async function getWaveformSummaryForSession(session: ActiveAudioSession) {
     console.error('Failed to build waveform summary', error)
     return null
   }
+}
+
+type WaveformWindow = {
+  start: number
+  end: number
+  zoomed: boolean
+}
+
+function clampWaveformTime(value: number, duration: number) {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.min(duration, value))
+}
+
+function getAdminWaveformFocusTime(controller: AudioController, duration: number) {
+  return clampWaveformTime(controller.audio.currentTime, duration)
+}
+
+function getAdminWaveformWindow(controller: AudioController, duration: number): WaveformWindow {
+  if (duration <= WAVEFORM_FULL_VIEW_MAX_SECONDS) {
+    return { start: 0, end: duration, zoomed: false }
+  }
+
+  const windowDuration = Math.min(duration, WAVEFORM_AUTO_WINDOW_SECONDS)
+  const focusTime = getAdminWaveformFocusTime(controller, duration)
+  const unclampedStart = focusTime - windowDuration / 2
+  const steppedStart =
+    Math.floor(unclampedStart / WAVEFORM_WINDOW_STEP_SECONDS) *
+    WAVEFORM_WINDOW_STEP_SECONDS
+  const start = Math.max(0, Math.min(duration - windowDuration, steppedStart))
+
+  return {
+    start,
+    end: start + windowDuration,
+    zoomed: true,
+  }
+}
+
+function timeToWaveformWindowRatio(time: number, window: WaveformWindow) {
+  if (time < window.start || time > window.end) return null
+  return (time - window.start) / Math.max(window.end - window.start, 1)
+}
+
+function getWaveformWindowBars(
+  summary: WaveformSummary,
+  window: WaveformWindow,
+  timelineDuration: number
+) {
+  if (!summary.buckets.length || summary.duration <= 0 || timelineDuration <= 0) {
+    return []
+  }
+
+  const count = Math.max(2, WAVEFORM_VISIBLE_BARS)
+  const windowDuration = Math.max(window.end - window.start, 0.001)
+  const peaks = Array.from({ length: count }, (_, index) => {
+    const ratio = index / (count - 1)
+    const timelineTime = window.start + ratio * windowDuration
+    const summaryTime = (timelineTime / timelineDuration) * summary.duration
+    const summaryRatio = summaryTime / summary.duration
+    const rawIndex = Math.max(
+      0,
+      Math.min(summary.buckets.length - 1, summaryRatio * (summary.buckets.length - 1))
+    )
+    const lowerIndex = Math.floor(rawIndex)
+    const upperIndex = Math.min(summary.buckets.length - 1, lowerIndex + 1)
+    const mix = rawIndex - lowerIndex
+    const lowerPeak = summary.buckets[lowerIndex] ?? 0
+    const upperPeak = summary.buckets[upperIndex] ?? lowerPeak
+
+    return lowerPeak + (upperPeak - lowerPeak) * mix
+  })
+
+  return peaks.map((peak, index) => {
+    const previous = peaks[index - 1] ?? peak
+    const next = peaks[index + 1] ?? peak
+    return Number(((previous + peak * 2 + next) / 4).toFixed(3))
+  })
+}
+
+function createWaveformBars(peaks: number[]) {
+  return peaks.map((peak) => {
+    const bar = document.createElement('span')
+    bar.className = 'admin-waveform-bar'
+    bar.style.setProperty('--waveform-peak', `${peak}`)
+    return bar
+  })
 }
 
 function renderAdminWaveform(audioController?: AudioController | null) {
@@ -1880,6 +2001,10 @@ function renderAdminWaveform(audioController?: AudioController | null) {
   if (!session) {
     bars.replaceChildren()
     delete bars.dataset.audioId
+    delete bars.dataset.windowStart
+    delete bars.dataset.windowEnd
+    delete lane.dataset.windowStart
+    delete lane.dataset.windowEnd
     status.textContent = 'Load a recording to show the waveform.'
     return
   }
@@ -1889,44 +2014,66 @@ function renderAdminWaveform(audioController?: AudioController | null) {
     : waveformSummaryCache.get(session.recording.id)?.duration
   const safeDuration = duration && duration > 0 ? duration : 1
   const summary = waveformSummaryCache.get(session.recording.id)
+  const visibleWindow = getAdminWaveformWindow(controller, safeDuration)
+  lane.dataset.windowStart = `${visibleWindow.start}`
+  lane.dataset.windowEnd = `${visibleWindow.end}`
 
-  if (summary && bars.dataset.audioId !== summary.audioId) {
-    bars.replaceChildren(
-      ...summary.buckets.map((peak) => {
-        const bar = document.createElement('span')
-        bar.className = 'admin-waveform-bar'
-        bar.style.setProperty('--waveform-peak', `${peak}`)
-        return bar
-      })
+  if (
+    summary &&
+    (bars.dataset.audioId !== summary.audioId ||
+      bars.dataset.windowStart !== lane.dataset.windowStart ||
+      bars.dataset.windowEnd !== lane.dataset.windowEnd)
+  ) {
+    const visiblePeaks = getWaveformWindowBars(
+      summary,
+      visibleWindow,
+      safeDuration
     )
+    bars.replaceChildren(...createWaveformBars(visiblePeaks))
     bars.dataset.audioId = summary.audioId
+    bars.dataset.windowStart = lane.dataset.windowStart
+    bars.dataset.windowEnd = lane.dataset.windowEnd
   }
 
-  status.textContent = summary ? 'Waveform lane' : 'Preparing waveform…'
+  status.textContent = summary
+    ? visibleWindow.zoomed
+      ? `Waveform lane · ${formatDuration(visibleWindow.start)}-${formatDuration(visibleWindow.end)}`
+      : 'Waveform lane · full recording'
+    : 'Preparing waveform…'
   if (!summary) {
     void getWaveformSummaryForSession(session).then(() => renderAdminWaveform(controller))
   }
 
   for (const cue of adminState.cues) {
+    const ratio = timeToWaveformWindowRatio(cue.timeStart, visibleWindow)
+    if (ratio === null) continue
     const marker = document.createElement('span')
     marker.className = 'admin-waveform-cue'
-    marker.style.setProperty('--timeline-ratio', `${Math.max(0, Math.min(1, cue.timeStart / safeDuration))}`)
-    lane.appendChild(marker)
+    marker.style.setProperty('--timeline-ratio', `${Math.max(0, Math.min(1, ratio))}`)
+    bars.appendChild(marker)
   }
 
   for (const issue of activeRecordingIssues) {
     if (issue.timeStart === undefined) continue
+    const ratio = timeToWaveformWindowRatio(issue.timeStart, visibleWindow)
+    if (ratio === null) continue
     const marker = document.createElement('span')
     marker.className = 'admin-waveform-issue'
     marker.title = recordingIssueReaderLabel(issue)
-    marker.style.setProperty('--timeline-ratio', `${Math.max(0, Math.min(1, issue.timeStart / safeDuration))}`)
-    lane.appendChild(marker)
+    marker.style.setProperty('--timeline-ratio', `${Math.max(0, Math.min(1, ratio))}`)
+    bars.appendChild(marker)
   }
 
-  const playhead = document.createElement('span')
-  playhead.className = 'admin-waveform-playhead'
-  playhead.style.setProperty('--timeline-ratio', `${Math.max(0, Math.min(1, controller.audio.currentTime / safeDuration))}`)
-  lane.appendChild(playhead)
+  const playheadRatio = timeToWaveformWindowRatio(
+    controller.audio.currentTime,
+    visibleWindow
+  )
+  if (playheadRatio !== null) {
+    const playhead = document.createElement('span')
+    playhead.className = 'admin-waveform-playhead'
+    playhead.style.setProperty('--timeline-ratio', `${Math.max(0, Math.min(1, playheadRatio))}`)
+    bars.appendChild(playhead)
+  }
 }
 
 function scheduleWaveformRender(audioController?: AudioController | null) {
@@ -4611,6 +4758,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   })
   audioController.on('frame-updated', ({ currentTime }) => {
+    if (isAdminPanelVisible()) scheduleWaveformRender(audioController)
     if (adminState.recording) return
     const session = audioController.session
     if (!session?.cues.length) return
