@@ -185,6 +185,7 @@ type AliyahRailCueStatus =
   | 'local-draft'
   | 'generated-review'
   | 'blocking-issue'
+type AliyahRailVisibilityState = 'hidden' | 'peek' | 'expanded'
 
 let display: ScrollDisplay
 let viewportTrackerGlobal: ViewportTracker | null = null
@@ -199,7 +200,13 @@ let pendingAliyahRailSelection: {
   runId: string
   aliyahIndex: PlaybackAliyahIndex
   expiresAt: number
+  maxExpiresAt: number
 } | null = null
+let aliyahRailVisibilityState: AliyahRailVisibilityState = 'hidden'
+let aliyahRailHideTimer: ReturnType<typeof window.setTimeout> | null = null
+let lastAliyahRailScrollTop: number | null = null
+let isAliyahRailPointerInside = false
+let isAliyahRailFocusInside = false
 let cueNavigationIndex: number | null = null
 let lastAdminRenderedCueCount = 0
 let lastAdminFollowedCueIndex = -1
@@ -1024,17 +1031,34 @@ function syncBookmarkButton(tokenKey = getReaderFocalTokenKey()) {
   const button = document.querySelector<HTMLButtonElement>(
     '[data-target-id="bookmark-current"]'
   )
-  if (!button) return
-
   const isBookmarked = Boolean(
     tokenKey && bookmarks.some((bookmark) => bookmark.tokenKey === tokenKey)
   )
-  setControlIcon(button, isBookmarked ? 'bookmarkFilled' : 'bookmark')
-  button.classList.toggle('is-active', isBookmarked)
-  button.disabled = !tokenKey
-  button.title = isBookmarked ? 'Remove bookmark' : 'Bookmark current word'
-  button.setAttribute('aria-label', button.title)
-  button.setAttribute('aria-pressed', `${isBookmarked}`)
+  const title = isBookmarked ? 'Remove bookmark' : 'Bookmark current word'
+  if (button) {
+    setControlIcon(button, isBookmarked ? 'bookmarkFilled' : 'bookmark')
+    button.classList.toggle('is-active', isBookmarked)
+    button.disabled = !tokenKey
+    button.title = title
+    button.setAttribute('aria-label', button.title)
+    button.setAttribute('aria-pressed', `${isBookmarked}`)
+  }
+
+  const menuButton = document.querySelector<HTMLButtonElement>(
+    '[data-toolbar-overflow-action="bookmark"]'
+  )
+  const menuIcon = document.querySelector<HTMLElement>(
+    '[data-target-id="toolbar-overflow-bookmark-icon"]'
+  )
+  const menuLabel = document.querySelector<HTMLElement>(
+    '[data-target-id="toolbar-overflow-bookmark-label"]'
+  )
+  if (menuIcon) menuIcon.innerHTML = iconMarkup(isBookmarked ? 'bookmarkFilled' : 'bookmark')
+  if (menuLabel) menuLabel.textContent = isBookmarked ? 'Remove Bookmark' : 'Bookmark Word'
+  if (menuButton) {
+    menuButton.disabled = !tokenKey
+    menuButton.setAttribute('aria-pressed', `${isBookmarked}`)
+  }
 }
 
 function getBookmarkHashForTokenKey(tokenKey: string) {
@@ -1556,6 +1580,233 @@ function setupBookmarkButton() {
     })
 }
 
+function getToolbarOverflowMenuElements() {
+  return {
+    toggle: document.querySelector<HTMLButtonElement>(
+      '[data-target-id="toolbar-overflow-toggle"]'
+    ),
+    menu: document.querySelector<HTMLElement>(
+      '[data-target-id="toolbar-overflow-menu"]'
+    ),
+  }
+}
+
+function syncToolbarOverflowMenu() {
+  const railButton = document.querySelector<HTMLButtonElement>(
+    '[data-toolbar-overflow-action="aliyah-rail"]'
+  )
+  if (railButton) railButton.disabled = !isAliyahRailRouteAvailable()
+  syncBookmarkButton()
+}
+
+function setToolbarOverflowMenuOpen(open: boolean) {
+  const { toggle, menu } = getToolbarOverflowMenuElements()
+  if (!toggle || !menu) return
+
+  if (open) syncToolbarOverflowMenu()
+  menu.classList.toggle('u-hidden', !open)
+  toggle.setAttribute('aria-expanded', `${open}`)
+}
+
+function closeToolbarOverflowMenu() {
+  setToolbarOverflowMenuOpen(false)
+}
+
+function toggleToolbarOverflowMenu() {
+  const { menu } = getToolbarOverflowMenuElements()
+  setToolbarOverflowMenuOpen(Boolean(menu?.classList.contains('u-hidden')))
+}
+
+function setupToolbarOverflowMenu() {
+  const { toggle, menu } = getToolbarOverflowMenuElements()
+  if (!toggle || !menu) return
+
+  toggle.addEventListener('click', (event) => {
+    event.stopPropagation()
+    toggleToolbarOverflowMenu()
+  })
+
+  menu.addEventListener('click', (event) => {
+    const button = (event.target as Element | null)?.closest<HTMLButtonElement>(
+      '[data-toolbar-overflow-action]'
+    )
+    if (!button || !menu.contains(button) || button.disabled) return
+
+    closeToolbarOverflowMenu()
+    const action = button.dataset.toolbarOverflowAction
+    if (action === 'command') {
+      openCommandPalette()
+      return
+    }
+    if (action === 'bookmark') {
+      bookmarkCurrentToken()
+      focusReaderSurface()
+      return
+    }
+    if (action === 'aliyah-rail') {
+      revealAliyahRail('expanded')
+      scheduleAliyahRailHide(3200)
+      focusReaderSurface()
+    }
+  })
+
+  document.addEventListener('pointerdown', (event) => {
+    const target = event.target as HTMLElement
+    if (menu.classList.contains('u-hidden')) return
+    if (target.closest('[data-target-id="toolbar-overflow-menu"]')) return
+    if (target.closest('[data-target-id="toolbar-overflow-toggle"]')) return
+    closeToolbarOverflowMenu()
+  })
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || menu.classList.contains('u-hidden')) return
+    event.preventDefault()
+    closeToolbarOverflowMenu()
+    toggle.focus({ preventScroll: true })
+  })
+}
+
+const aliyahStartMarkerMediaQuery = window.matchMedia('(max-width: 550px)')
+let aliyahStartPopup: HTMLElement | null = null
+let aliyahStartPopupLine: HTMLElement | null = null
+
+function getAliyahStartPopup() {
+  if (aliyahStartPopup) return aliyahStartPopup
+
+  aliyahStartPopup = document.createElement('div')
+  aliyahStartPopup.className = 'aliyah-start-popup u-hidden'
+  aliyahStartPopup.setAttribute('role', 'dialog')
+  aliyahStartPopup.setAttribute('aria-label', 'Aliyah start')
+  document.body.appendChild(aliyahStartPopup)
+  return aliyahStartPopup
+}
+
+function closeAliyahStartPopup() {
+  aliyahStartPopup?.classList.add('u-hidden')
+  aliyahStartPopupLine = null
+}
+
+function isPointerInAliyahStartMarker(event: MouseEvent, line: HTMLElement) {
+  const content = line.querySelector<HTMLElement>('.line-content')
+  if (!content) return false
+
+  const rect = content.getBoundingClientRect()
+  const hitInset = 28
+  return (
+    event.clientX >= rect.right - hitInset &&
+    event.clientX <= rect.right + 10 &&
+    event.clientY >= rect.top - hitInset &&
+    event.clientY <= rect.top + hitInset
+  )
+}
+
+function appendAliyahStartPopupRow(
+  popup: HTMLElement,
+  label: string,
+  value: string
+) {
+  if (!value) return
+
+  const row = document.createElement('div')
+  row.className = 'aliyah-start-popup-row'
+
+  const rowLabel = document.createElement('span')
+  rowLabel.className = 'aliyah-start-popup-label'
+  rowLabel.textContent = label
+
+  const rowValue = document.createElement('span')
+  rowValue.className = 'aliyah-start-popup-value'
+  rowValue.textContent = value
+
+  row.append(rowLabel, rowValue)
+  popup.appendChild(row)
+}
+
+function positionAliyahStartPopup(popup: HTMLElement, line: HTMLElement) {
+  const content = line.querySelector<HTMLElement>('.line-content')
+  if (!content) return
+
+  const rect = content.getBoundingClientRect()
+  const popupRect = popup.getBoundingClientRect()
+  const margin = 8
+  const markerX = rect.right - 4
+  const markerY = rect.top - 6
+  const left = Math.max(
+    margin,
+    Math.min(markerX - popupRect.width, window.innerWidth - popupRect.width - margin)
+  )
+  const topAbove = markerY - popupRect.height - margin
+  const top = topAbove >= margin ? topAbove : Math.min(markerY + 24, window.innerHeight - popupRect.height - margin)
+
+  popup.style.left = `${left}px`
+  popup.style.top = `${Math.max(margin, top)}px`
+}
+
+function openAliyahStartPopup(line: HTMLElement) {
+  if (
+    aliyahStartPopupLine === line &&
+    aliyahStartPopup &&
+    !aliyahStartPopup.classList.contains('u-hidden')
+  ) {
+    positionAliyahStartPopup(aliyahStartPopup, line)
+    return
+  }
+
+  const popup = getAliyahStartPopup()
+  aliyahStartPopupLine = line
+  popup.replaceChildren()
+  appendAliyahStartPopupRow(popup, 'Parsha', line.dataset.aliyahStartTitle ?? '')
+  appendAliyahStartPopupRow(popup, 'Aliyah', line.dataset.aliyahStartLabel ?? '')
+  appendAliyahStartPopupRow(popup, 'Verses:', line.dataset.aliyahStartVerse ?? '')
+  popup.classList.remove('u-hidden')
+  positionAliyahStartPopup(popup, line)
+}
+
+function setupAliyahStartPopup() {
+  const book = getBook()
+
+  book.addEventListener('click', (event) => {
+    if (!aliyahStartMarkerMediaQuery.matches) {
+      closeAliyahStartPopup()
+      return
+    }
+    if (!(event instanceof MouseEvent)) return
+    const target = event.target as Element | null
+    const line = target?.closest<HTMLElement>('[data-aliyah-starts]')
+    if (!line || !book.contains(line)) {
+      closeAliyahStartPopup()
+      return
+    }
+    if (!isPointerInAliyahStartMarker(event, line)) return
+
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    openAliyahStartPopup(line)
+  })
+
+  book.addEventListener('pointermove', (event) => {
+    if (!aliyahStartMarkerMediaQuery.matches || event.pointerType === 'touch') return
+    const target = event.target as Element | null
+    if (target && aliyahStartPopup?.contains(target)) return
+    const line = target?.closest<HTMLElement>('[data-aliyah-starts]')
+    if (!line || !book.contains(line)) return
+    if (!isPointerInAliyahStartMarker(event, line)) return
+
+    openAliyahStartPopup(line)
+  })
+
+  book.addEventListener('pointerleave', closeAliyahStartPopup)
+  book.addEventListener('scroll', closeAliyahStartPopup, { passive: true })
+  window.addEventListener('resize', closeAliyahStartPopup)
+  document.addEventListener('pointerdown', (event) => {
+    const target = event.target as Element | null
+    if (!aliyahStartPopup || aliyahStartPopup.classList.contains('u-hidden')) return
+    if (target && aliyahStartPopup.contains(target)) return
+    if (target?.closest('[data-aliyah-starts]')) return
+    closeAliyahStartPopup()
+  })
+}
+
 function setupRecordingIssueUi() {
   document
     .querySelector<HTMLButtonElement>('[data-target-id="recording-issue-close"]')
@@ -1642,13 +1893,86 @@ function setupShortcutCommands() {
   )
 }
 
-function renderAliyahRail(range: ViewportRange | null = latestViewportRange) {
-  const rail = document.querySelector<HTMLElement>('[data-target-id="aliyah-rail"]')
+function getAliyahRailElement() {
+  return document.querySelector<HTMLElement>('[data-target-id="aliyah-rail"]')
+}
+
+function isAliyahRailRouteAvailable() {
+  return parseCurrentRoute()?.view === 'reader' && !isShowingParshaPicker()
+}
+
+function syncAliyahRailPosition() {
+  const toolbar = document.querySelector<HTMLElement>('.app-toolbar')
+  if (!toolbar) return
+  document.documentElement.style.setProperty(
+    '--aliyah-rail-top',
+    `${toolbar.getBoundingClientRect().bottom}px`
+  )
+}
+
+function clearAliyahRailHideTimer() {
+  if (!aliyahRailHideTimer) return
+  window.clearTimeout(aliyahRailHideTimer)
+  aliyahRailHideTimer = null
+}
+
+function syncAliyahRailVisibilityClass() {
+  const rail = getAliyahRailElement()
   if (!rail) return
 
-  const visible = parseCurrentRoute()?.view === 'reader' && !isShowingParshaPicker()
-  rail.classList.toggle('u-hidden', !visible)
-  if (!visible) return
+  const hidden = aliyahRailVisibilityState === 'hidden'
+  rail.dataset.visibility = aliyahRailVisibilityState
+  rail.classList.toggle('is-peeking', aliyahRailVisibilityState === 'peek')
+  rail.classList.toggle('is-expanded', aliyahRailVisibilityState === 'expanded')
+  rail.setAttribute('aria-hidden', hidden ? 'true' : 'false')
+  rail.toggleAttribute('inert', hidden)
+}
+
+function hideAliyahRail() {
+  clearAliyahRailHideTimer()
+  aliyahRailVisibilityState = 'hidden'
+  syncAliyahRailVisibilityClass()
+}
+
+function scheduleAliyahRailHide(delayMs = 1200) {
+  clearAliyahRailHideTimer()
+  aliyahRailHideTimer = window.setTimeout(() => {
+    if (isAliyahRailPointerInside || isAliyahRailFocusInside) return
+    hideAliyahRail()
+  }, delayMs)
+}
+
+function revealAliyahRail(
+  state: Exclude<AliyahRailVisibilityState, 'hidden'> = 'peek',
+  { autoHideMs = 1200 }: { autoHideMs?: number } = {}
+) {
+  if (!isAliyahRailRouteAvailable()) return
+
+  syncAliyahRailPosition()
+  aliyahRailVisibilityState = state
+  syncAliyahRailVisibilityClass()
+
+  if (state === 'expanded') clearAliyahRailHideTimer()
+  else scheduleAliyahRailHide(autoHideMs)
+}
+
+function revealAliyahRailForMovement() {
+  revealAliyahRail('peek', { autoHideMs: 2200 })
+}
+
+function renderAliyahRail(range: ViewportRange | null = latestViewportRange) {
+  const rail = getAliyahRailElement()
+  if (!rail) return
+
+  const available = isAliyahRailRouteAvailable()
+  rail.classList.toggle('u-hidden', !available)
+  if (!available) {
+    hideAliyahRail()
+    return
+  }
+
+  syncAliyahRailPosition()
+  syncAliyahRailVisibilityClass()
 
   const anchors = getAliyahProgressAnchors()
   const current = getCurrentAliyahFromViewportRange(range, anchors)
@@ -1657,6 +1981,12 @@ function renderAliyahRail(range: ViewportRange | null = latestViewportRange) {
   rail.replaceChildren()
 
   if (!currentRun) return
+
+  const caption = document.createElement('span')
+  caption.className = 'aliyah-rail-caption'
+  caption.textContent = 'Aliyah'
+  caption.setAttribute('aria-hidden', 'true')
+  rail.appendChild(caption)
 
   for (const aliyah of currentRun.aliyot) {
     if (!aliyah.index) continue
@@ -1686,9 +2016,29 @@ function setAliyahRailActiveButton(rail: HTMLElement, aliyahIndex: PlaybackAliya
 }
 
 function setupAliyahRailInteractions() {
-  const rail = document.querySelector<HTMLElement>('[data-target-id="aliyah-rail"]')
+  const rail = getAliyahRailElement()
   if (!rail) return
 
+  rail.addEventListener('pointerenter', () => {
+    isAliyahRailPointerInside = true
+    revealAliyahRail('expanded')
+  })
+  rail.addEventListener('pointerleave', () => {
+    isAliyahRailPointerInside = false
+    scheduleAliyahRailHide(1100)
+  })
+  rail.addEventListener('focusin', () => {
+    isAliyahRailFocusInside = true
+    revealAliyahRail('expanded')
+  })
+  rail.addEventListener('focusout', () => {
+    window.setTimeout(() => {
+      isAliyahRailFocusInside = document.activeElement
+        ? rail.contains(document.activeElement)
+        : false
+      if (!isAliyahRailFocusInside) scheduleAliyahRailHide(1100)
+    }, 0)
+  })
   rail.addEventListener('click', (event) => {
     const button = (event.target as Element | null)?.closest<HTMLButtonElement>(
       '.aliyah-rail-button'
@@ -1702,12 +2052,27 @@ function setupAliyahRailInteractions() {
     pendingAliyahRailSelection = {
       runId,
       aliyahIndex,
-      expiresAt: performance.now() + 1800,
+      expiresAt: performance.now() + 2500,
+      maxExpiresAt: performance.now() + 6000,
     }
     setAliyahRailActiveButton(rail, aliyahIndex)
+    revealAliyahRail('expanded')
+    scheduleAliyahRailHide(2400)
 
     void scrollToAliyahMarker(runId, aliyahIndex)
   })
+
+  const syncPositionAfterResize = () => syncAliyahRailPosition()
+  window.addEventListener('resize', syncPositionAfterResize)
+  window.visualViewport?.addEventListener('resize', syncPositionAfterResize)
+}
+
+function extendPendingAliyahRailSelectionForScroll() {
+  if (!pendingAliyahRailSelection) return
+  pendingAliyahRailSelection.expiresAt = Math.min(
+    pendingAliyahRailSelection.maxExpiresAt,
+    performance.now() + 500
+  )
 }
 
 function getAliyahRailActiveIndex(
@@ -4474,6 +4839,9 @@ function renderRoute(route: AppRoute, audioController: AudioController) {
   if (readerRouteChanged) resetReaderSideNavigationState(audioController)
   if (readerRouteChanged && isShowingParshaPicker()) hideParshaPicker()
   if (readerRouteChanged) latestViewportRange = null
+  if (readerRouteChanged) closeToolbarOverflowMenu()
+  if (readerRouteChanged) closeAliyahStartPopup()
+  if (readerRouteChanged) revealAliyahRail('peek', { autoHideMs: 1600 })
   currentReaderHash = nextReaderHash
   lastReaderHash = nextReaderHash
   syncReaderProgressVisibility()
@@ -4560,6 +4928,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   mountAdminEditorUi()
   setupCommandPalette()
   setupBookmarkButton()
+  setupToolbarOverflowMenu()
+  setupAliyahStartPopup()
   setupRecordingIssueUi()
   setupAdminWaveformInteractions()
   setupAliyahRailInteractions()
@@ -4583,6 +4953,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setControlIcon(document.querySelector('[data-target-id="floating-download"]'), 'download')
   setControlIcon(document.querySelector('[data-target-id="floating-video-download"]'), 'download')
   setControlIcon(document.querySelector('[data-target-id="settings-toggle"]'), 'settings2')
+  setControlIcon(document.querySelector('[data-target-id="toolbar-overflow-toggle"]'), 'chevronDown')
   syncBookmarkButton()
   updateFloatingPlayer(audioController)
   setupOfflineRecordingPrompt()
@@ -4634,14 +5005,31 @@ document.addEventListener('DOMContentLoaded', async () => {
   )
   book.addEventListener(
     'keydown',
-    whenKey('PageDown', markUserScrolledReaderForLastReading)
+    whenKey('PageDown', (event) => {
+      markUserScrolledReaderForLastReading(event)
+      revealAliyahRailForMovement()
+    })
   )
   book.addEventListener(
     'keydown',
-    whenKey('PageUp', markUserScrolledReaderForLastReading)
+    whenKey('PageUp', (event) => {
+      markUserScrolledReaderForLastReading(event)
+      revealAliyahRailForMovement()
+    })
   )
 
   book.addEventListener('scroll', () => {
+    const scrollTop = book.scrollTop
+    const previousScrollTop = lastAliyahRailScrollTop
+    lastAliyahRailScrollTop = scrollTop
+    extendPendingAliyahRailSelectionForScroll()
+    if (
+      previousScrollTop !== null &&
+      Math.abs(scrollTop - previousScrollTop) >= 28 &&
+      (audioController.audio.paused || audioController.audio.ended)
+    ) {
+      revealAliyahRailForMovement()
+    }
     if (!progressFrame) {
       progressFrame = requestAnimationFrame(() => {
         progressFrame = 0
@@ -4973,6 +5361,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       hideExportModal()
       closeCommandPalette()
       closeRecordingIssueModal()
+      closeAliyahStartPopup()
     })
   )
 

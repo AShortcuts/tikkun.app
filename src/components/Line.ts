@@ -1,6 +1,7 @@
 import type { LeiningAliyah } from '../calendar-model/model-types.ts'
 import type { RenderedLineInfo } from '../view-model/scroll-view-model.ts'
 import displayRange from '../display-range.ts'
+import hebrewNumeralFromInteger from '../hebrew-numeral.ts'
 import textFilter from '../text-filter.ts'
 import { iconMarkup } from './icons.ts'
 
@@ -65,6 +66,50 @@ const renderWords = ({
 const addLabelBreakOpportunities = (label: string) =>
   label.replace(/([־-])/g, '$1<wbr>')
 
+const escapeAttribute = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+
+const aliyahStartTitle = (run: RenderedLineInfo['run']) =>
+  run?.leining.date.title.he.replace(/^פרשת /, '') ??
+  run?.leining.date.title.en.replace(/^Parshat\s+/i, '') ??
+  ''
+
+const aliyahIndexLabels = new Map<LeiningAliyah['index'], string>([
+  [1, 'ראשון'],
+  [2, 'שני'],
+  [3, 'שלישי'],
+  [4, 'רביעי'],
+  [5, 'חמישי'],
+  [6, 'ששי'],
+  [7, 'שביעי'],
+  ['Maftir', 'מפטיר'],
+])
+
+const aliyahStartLabel = (aliyahStarts: LeiningAliyah[]) =>
+  aliyahStarts
+    .map((aliyah) => aliyahIndexLabels.get(aliyah.index))
+    .filter(Boolean)
+    .join(', ')
+
+const formatRefChapterVerse = ({ c, v }: { c: number; v: number }) =>
+  `${hebrewNumeralFromInteger(c)}:${hebrewNumeralFromInteger(v)}`
+
+const aliyahStartVerseRange = (aliyahStarts: LeiningAliyah[]) =>
+  aliyahStarts
+    .map((aliyah) => {
+      const start = formatRefChapterVerse(aliyah.start)
+      const end =
+        aliyah.start.c === aliyah.end.c
+          ? hebrewNumeralFromInteger(aliyah.end.v)
+          : formatRefChapterVerse(aliyah.end)
+      return start === end ? start : `${start}-${end}`
+    })
+    .join(', ')
+
 const renderLabelBadge = (
   label: string,
   runId: string | undefined,
@@ -104,7 +149,12 @@ const Line = ({
 }: {
   pageNumber: number
   lineIndex: number
-} & RenderedLineInfo) => `
+} & RenderedLineInfo) => {
+  const startLabel = aliyahStartLabel(aliyahStarts)
+  const startTitle = aliyahStartTitle(run)
+  const startVerse = aliyahStartVerseRange(aliyahStarts)
+
+  return `
   <tr
     data-class="line"
     data-line-index="${lineIndex}"
@@ -115,6 +165,21 @@ const Line = ({
         ? `data-aliyah-starts="${aliyahStarts
             .map((aliyah) => aliyah.index)
             .join(',')}"`
+        : ''
+    }
+    ${
+      aliyahStarts.length && startTitle
+        ? `data-aliyah-start-title="${escapeAttribute(startTitle)}"`
+        : ''
+    }
+    ${
+      aliyahStarts.length && startLabel
+        ? `data-aliyah-start-label="${escapeAttribute(startLabel)}"`
+        : ''
+    }
+    ${
+      aliyahStarts.length && startVerse
+        ? `data-aliyah-start-verse="${escapeAttribute(startVerse)}"`
         : ''
     }
   >
@@ -164,5 +229,6 @@ const Line = ({
     </td>
   </tr>
 `
+}
 
 export default Line

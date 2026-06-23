@@ -53,6 +53,69 @@
   white-space: nowrap;
 }
 
+.toolbar-button.mod-icon-label.toolbar-overflow-toggle {
+  display: none;
+}
+
+.toolbar-overflow-menu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 170;
+  min-width: 12.5rem;
+  border: 1px solid color-mix(in srgb, var(--text-color) 14%, transparent);
+  border-radius: 8px;
+  padding: 0.28rem;
+  background: var(--paper-color);
+  color: var(--text-color);
+  box-shadow: 0 14px 42px color-mix(in srgb, black 22%, transparent);
+}
+
+.toolbar-overflow-item {
+  display: flex;
+  align-items: center;
+  gap: 0.48rem;
+  justify-content: space-between;
+  width: 100%;
+  border: none;
+  border-radius: 6px;
+  padding: 0.58rem 0.66rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.toolbar-overflow-item:hover,
+.toolbar-overflow-item:focus-visible {
+  background: var(--light-accent-color);
+  outline: none;
+}
+
+.toolbar-overflow-item:disabled {
+  cursor: default;
+  opacity: 0.52;
+}
+
+.toolbar-overflow-icon {
+  display: inline-flex;
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.toolbar-overflow-icon .ui-icon {
+  width: 100%;
+  height: 100%;
+}
+
+.toolbar-overflow-shortcut {
+  color: var(--light-text-color);
+  font-size: 0.78rem;
+}
+
 .parsha-title:hover {
   background-color: var(--medium-accent-color);
 }
@@ -62,6 +125,32 @@
 }
 
 @media screen and (max-width: 550px) {
+  .toolbar-content {
+    gap: 0.35rem;
+    padding: 0 6px;
+  }
+
+  .toolbar-item {
+    gap: 0.3rem;
+  }
+
+  .parsha-title {
+    max-width: min(44vw, 11.5rem);
+    padding-inline: 1.1rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .toolbar-button.mod-icon-label[data-target-id='bookmark-current'],
+  .toolbar-button[data-target-id='command-palette-open'] {
+    display: none;
+  }
+
+  .toolbar-button.mod-icon-label.toolbar-overflow-toggle {
+    display: inline-flex;
+  }
+
   .toolbar-current-aliyah-label:not(.u-hidden) {
     display: inline;
   }

@@ -62,6 +62,48 @@
   }
 }
 
+.aliyah-start-popup {
+  position: fixed;
+  z-index: 26;
+  display: grid;
+  gap: 0.28rem;
+  min-width: 11rem;
+  max-width: min(17rem, calc(100vw - 1rem));
+  padding: 0.52rem 0.62rem;
+  border: 1px solid color-mix(in srgb, var(--medium-accent-color) 82%, transparent);
+  border-radius: var(--button-border-radius);
+  background-color: color-mix(in srgb, var(--paper-color) 94%, var(--heavy-accent-color));
+  box-shadow: 0 0.65rem 1.6rem oklch(0% 0 0 / 0.18);
+  color: var(--text-color);
+  direction: ltr;
+  font-family: -apple-system, sans-serif;
+  font-size: 0.84rem;
+  line-height: 1.2;
+  pointer-events: auto;
+}
+
+.aliyah-start-popup-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.aliyah-start-popup-label {
+  color: var(--light-text-color);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.aliyah-start-popup-value {
+  direction: rtl;
+  color: var(--text-color);
+  font-weight: 650;
+  text-align: right;
+}
+
 .tikkun-page table {
   transform: translateX(var(--pull-translation));
   transition: transform var(--pull-transform);
@@ -501,5 +543,28 @@ html[data-highlight-rendering='legacy-rectangle'] .word.is-active-word::before {
   .tikkun-page {
     --aliyah-column-width: 0ch;
     --aliyah-gutter-gap: 0ch;
+  }
+
+  tr[data-aliyah-starts] .line-content {
+    position: relative;
+  }
+
+  tr[data-aliyah-starts] .line-content::before {
+    content: '';
+    position: absolute;
+    top: -0.52em;
+    right: -0.18rem;
+    width: 0.72rem;
+    height: 0.72rem;
+    background-color: color-mix(in srgb, hsl(206, 100%, 49%) 76%, var(--page-ink-color));
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+    opacity: 0.74;
+    pointer-events: none;
+  }
+
+  tr[data-aliyah-starts] .line-content:hover::before,
+  tr[data-aliyah-starts] .line-content:focus-within::before {
+    opacity: 0.94;
   }
 }

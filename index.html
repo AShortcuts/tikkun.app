@@ -99,6 +99,23 @@
               title="Bookmark current word" aria-label="Bookmark current word"></button>
             <button class="toolbar-button mod-command" data-target-id="command-palette-open" type="button"
               title="Open command palette" aria-label="Open command palette">⌘K</button>
+            <button class="toolbar-button mod-icon-label toolbar-overflow-toggle" data-target-id="toolbar-overflow-toggle"
+              type="button" title="More reader actions" aria-label="More reader actions" aria-haspopup="menu"
+              aria-expanded="false" aria-controls="toolbar-overflow-menu"></button>
+            <div class="toolbar-overflow-menu u-hidden" data-target-id="toolbar-overflow-menu" id="toolbar-overflow-menu"
+              role="menu" aria-label="Reader actions">
+              <button class="toolbar-overflow-item" type="button" role="menuitem" data-toolbar-overflow-action="command">
+                <span>Command Palette</span>
+                <span class="toolbar-overflow-shortcut">⌘K</span>
+              </button>
+              <button class="toolbar-overflow-item" type="button" role="menuitem" data-toolbar-overflow-action="bookmark">
+                <span data-target-id="toolbar-overflow-bookmark-label">Bookmark Word</span>
+                <span class="toolbar-overflow-icon" data-target-id="toolbar-overflow-bookmark-icon"></span>
+              </button>
+              <button class="toolbar-overflow-item" type="button" role="menuitem" data-toolbar-overflow-action="aliyah-rail">
+                <span>Show Aliyah Rail</span>
+              </button>
+            </div>
             <button class="toolbar-button" data-target-id="settings-toggle" type="button" title="Reader settings"
               aria-label="Reader settings"></button>
           </div>
