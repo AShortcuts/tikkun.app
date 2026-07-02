@@ -277,6 +277,9 @@
         var(--reader-highlight-expansion)
     )
   );
+  --reader-active-highlight-fill-surface: var(--reader-highlight-fill-surface);
+  --reader-active-highlight-fill-tint: var(--reader-highlight-fill-tint);
+  --reader-active-highlight-outline-color: var(--reader-highlight-outline-color);
 
   background-color: transparent;
   box-shadow:
@@ -296,15 +299,15 @@
 .word.is-active-word {
   outline: none;
   z-index: auto;
-  background-color: var(--reader-highlight-fill-surface);
+  background-color: var(--reader-active-highlight-fill-surface);
   border-radius: var(--reader-highlight-inner-radius);
   box-shadow:
     0 0 0 var(--reader-highlight-outline-offset)
-    var(--reader-highlight-fill-surface),
+    var(--reader-active-highlight-fill-surface),
     0 0 0 var(--reader-highlight-expansion)
-    var(--reader-highlight-outline-color),
+    var(--reader-active-highlight-outline-color),
     0 0 var(--reader-highlight-glow) var(--reader-highlight-expansion)
-    var(--reader-highlight-fill-tint);
+    var(--reader-active-highlight-fill-tint);
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
@@ -314,10 +317,31 @@
 }
 
 .word[data-recording-issue] {
-  text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, #c2410c 65%, transparent);
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.2em;
+  --reader-recording-issue-highlight-color: #fb923c;
+  --reader-recording-issue-highlight-fill-color: #fbbf24;
+  --reader-active-highlight-fill-surface: color-mix(
+    in oklch,
+    var(--paper-color, white) var(--reader-highlight-fill-alpha-inverse-percent),
+    var(--reader-recording-issue-highlight-fill-color) var(--reader-highlight-fill-alpha-percent)
+  );
+  --reader-active-highlight-fill-tint: color-mix(
+    in oklch,
+    var(--reader-recording-issue-highlight-fill-color) var(--reader-highlight-fill-alpha-percent),
+    transparent
+  );
+  --reader-active-highlight-outline-color: var(--reader-recording-issue-highlight-color);
+}
+
+html[data-reader-theme='dark'] .word[data-recording-issue] {
+  --reader-recording-issue-highlight-color: #f97316;
+  --reader-recording-issue-highlight-fill-color: #fb923c;
+}
+
+@media (prefers-color-scheme: dark) {
+  html[data-reader-theme='automatic'] .word[data-recording-issue] {
+    --reader-recording-issue-highlight-color: #f97316;
+    --reader-recording-issue-highlight-fill-color: #fb923c;
+  }
 }
 
 .word[data-recording-issue]::after {
@@ -327,7 +351,7 @@
   right: -0.38em;
   width: 0.56em;
   height: 0.56em;
-  background: #c2410c;
+  background: var(--reader-recording-issue-highlight-color);
   -webkit-mask-image: url('../assets/images/recording-issue-mark.svg');
   mask-image: url('../assets/images/recording-issue-mark.svg');
   -webkit-mask-position: center;
@@ -370,10 +394,10 @@ html[data-highlight-rendering='legacy-rectangle'] .word.is-active-word::before {
   );
   z-index: -1;
   border: var(--reader-highlight-outline-width) solid
-    var(--reader-highlight-outline-color);
+    var(--reader-active-highlight-outline-color);
   border-radius: var(--reader-highlight-border-radius);
-  background: var(--reader-highlight-fill-surface);
-  box-shadow: 0 0 var(--reader-highlight-glow) var(--reader-highlight-fill-tint);
+  background: var(--reader-active-highlight-fill-surface);
+  box-shadow: 0 0 var(--reader-highlight-glow) var(--reader-active-highlight-fill-tint);
   pointer-events: none;
   animation: active-word-highlight-in 0.1s ease;
   animation-delay: var(--recording-highlight-animation-delay, 0s);
