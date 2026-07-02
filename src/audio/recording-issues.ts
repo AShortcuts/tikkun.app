@@ -91,6 +91,17 @@ function isRecordingIssue(value: unknown, audioId: string, tokenizationVersion: 
   )
 }
 
+export function filterRecordingIssues(
+  issues: unknown,
+  audioId: string,
+  tokenizationVersion: string
+) {
+  if (!Array.isArray(issues)) return []
+  return issues
+    .filter((issue) => isRecordingIssue(issue, audioId, tokenizationVersion))
+    .sort((a, b) => a.createdAt - b.createdAt)
+}
+
 export function loadRecordingIssues(
   storage: Storage,
   audioId: string,
@@ -101,14 +112,20 @@ export function loadRecordingIssues(
 
   try {
     const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed
-      .filter((issue) => isRecordingIssue(issue, audioId, tokenizationVersion))
-      .sort((a, b) => a.createdAt - b.createdAt)
+    return filterRecordingIssues(parsed, audioId, tokenizationVersion)
   } catch {
     storage.removeItem(storageKey(audioId))
     return []
   }
+}
+
+export function mergeRecordingIssues(...issueGroups: RecordingIssue[][]) {
+  const issuesById = new Map<string, RecordingIssue>()
+  for (const issue of issueGroups.flat()) {
+    issuesById.set(issue.id, issue)
+  }
+
+  return [...issuesById.values()].sort((a, b) => a.createdAt - b.createdAt)
 }
 
 export function saveRecordingIssues(

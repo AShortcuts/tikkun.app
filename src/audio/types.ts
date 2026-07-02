@@ -1,3 +1,5 @@
+import type { RecordingIssue } from './recording-issues.ts'
+
 export type AudioFormat = 'mp3' | 'm4a'
 
 export interface AudioNarrator {
@@ -45,5 +47,6 @@ export interface CueExportPayload {
   tokenizationVersion: string
   audioVersion?: string
   savedAt?: string
+  issues?: RecordingIssue[]
   cues: WordCue[]
 }

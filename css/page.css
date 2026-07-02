@@ -315,21 +315,27 @@
 
 .word[data-recording-issue] {
   text-decoration: underline;
-  text-decoration-color: #c2410c;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 0.18em;
+  text-decoration-color: color-mix(in srgb, #c2410c 65%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
 }
 
 .word[data-recording-issue]::after {
   content: '';
   position: absolute;
-  inset-inline-start: 50%;
-  bottom: -0.34em;
-  width: 0.32em;
-  height: 0.32em;
-  border-radius: 50%;
+  top: -0.35em;
+  right: -0.38em;
+  width: 0.56em;
+  height: 0.56em;
   background: #c2410c;
-  transform: translateX(-50%);
+  -webkit-mask-image: url('../assets/images/recording-issue-mark.svg');
+  mask-image: url('../assets/images/recording-issue-mark.svg');
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
 }
 
 @starting-style {

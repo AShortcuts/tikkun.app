@@ -193,6 +193,7 @@ test('Torah page URL starts directly at the requested page', async () => {
   expect(route?.canonicalHash).toBe('#/torah/page/12')
   const { page, lineNumber } = await route!.model.startingLocation
   expect(page.type).toBe('page')
+  if (page.type !== 'page') throw new Error('Expected page route to start at a page')
   expect(page.pageNumber).toBe(12)
   expect(lineNumber).toBe(1)
   expect(generatePageUrl('torah', 12)).toBe('#/torah/page/12')
@@ -208,6 +209,7 @@ test('Esther page URL starts directly at the requested page', async () => {
   expect(route?.model.displayTitleForRun(route.model.relevantRuns[0])).toBe('מגילת אסתר')
   const { page, lineNumber } = await route!.model.startingLocation
   expect(page.type).toBe('page')
+  if (page.type !== 'page') throw new Error('Expected page route to start at a page')
   expect(page.pageNumber).toBe(3)
   expect(lineNumber).toBe(1)
   expect(generatePageUrl('esther', 3)).toBe('#/esther/page/3')

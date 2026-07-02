@@ -1,8 +1,10 @@
 import { expect, test } from 'vitest'
 import {
   createRecordingIssue,
+  filterRecordingIssues,
   getReaderVisibleIssues,
   loadRecordingIssues,
+  mergeRecordingIssues,
   recordingIssueReaderLabel,
   saveRecordingIssues,
 } from './recording-issues.ts'
@@ -79,4 +81,41 @@ test('drops stored issues from incompatible tokenization versions', () => {
   ])
 
   expect(loadRecordingIssues(storage, 'bereshit-1', 'v2')).toEqual([])
+})
+
+test('filters published issue payloads with the same validation as local storage', () => {
+  const issue = createRecordingIssue({
+    audioId: 'bereshit-1',
+    tokenKey: '1:0:0:0',
+    kind: 'hesitation',
+    visibility: 'authoringOnly',
+    severity: 'low',
+    createdAt: 1,
+    tokenizationVersion: 'v2',
+  })
+
+  expect(filterRecordingIssues([issue, { ...issue, audioId: 'other' }], 'bereshit-1', 'v2')).toEqual([issue])
+})
+
+test('merges published and local issues without duplicating the same mark', () => {
+  const published = createRecordingIssue({
+    audioId: 'bereshit-1',
+    tokenKey: '1:0:0:0',
+    kind: 'hesitation',
+    visibility: 'authoringOnly',
+    severity: 'low',
+    createdAt: 1,
+    tokenizationVersion: 'v2',
+  })
+  const local = createRecordingIssue({
+    audioId: 'bereshit-1',
+    tokenKey: '1:0:0:1',
+    kind: 'other',
+    visibility: 'readerVisible',
+    severity: 'low',
+    createdAt: 2,
+    tokenizationVersion: 'v2',
+  })
+
+  expect(mergeRecordingIssues([published], [published, local])).toEqual([published, local])
 })

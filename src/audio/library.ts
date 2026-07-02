@@ -5,6 +5,7 @@ import {
 } from '../data/audio-manifest.generated.ts'
 import type { AudioNarrator, AudioRecording, WordCue } from './types.ts'
 import { normalizeFirstCueStart } from './normalize-first-cue.ts'
+import { filterRecordingIssues } from './recording-issues.ts'
 export {
   findRecordingForRun,
   parshaSlugForRun,
@@ -20,6 +21,14 @@ export function listRecordings(): AudioRecording[] {
 
 export function getCuesForRecording(recording: AudioRecording): WordCue[] {
   return normalizeFirstCueStart(audioCuePayloadsByAudioId[recording.id]?.cues ?? [])
+}
+
+export function getIssuesForRecording(recording: AudioRecording, tokenizationVersion: string) {
+  return filterRecordingIssues(
+    audioCuePayloadsByAudioId[recording.id]?.issues,
+    recording.id,
+    tokenizationVersion
+  )
 }
 
 export function getCueSavedAtForRecording(recording: AudioRecording) {

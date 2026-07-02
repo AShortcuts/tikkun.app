@@ -308,3 +308,41 @@ test('uses element geometry to center tokens inside the book', async () => {
     },
   ])
 })
+
+test('drops cached token elements when the display changes', async () => {
+  const oldToken = createVisibleCenteredTokenElement('12:7:0:2')
+  const newToken = createVisibleCenteredTokenElement('12:7:0:2')
+  let activeToken = oldToken
+  const book = {
+    addEventListener() {},
+    clientHeight: 100,
+    scrollTop: 0,
+    querySelectorAll(selector: string): HTMLElement[] {
+      return selector === '[data-token-key="12:7:0:2"]' ? [activeToken] : []
+    },
+    scrollTo() {},
+    getBoundingClientRect() {
+      return {
+        top: 0,
+        bottom: 100,
+        left: 0,
+        right: 100,
+        width: 100,
+        height: 100,
+        x: 0,
+        y: 0,
+        toJSON() {
+          return {}
+        },
+      }
+    },
+  } as unknown as HTMLElement
+  const controller = new HighlightController(book)
+
+  expect(await controller.activateTokenKey('12:7:0:2', { scroll: false })).toBe(oldToken)
+
+  activeToken = newToken
+  controller.setDisplay({} as never)
+
+  expect(await controller.activateTokenKey('12:7:0:2', { scroll: false })).toBe(newToken)
+})

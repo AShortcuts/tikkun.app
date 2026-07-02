@@ -52,6 +52,7 @@ import {
   getCuesForRecording,
   getCueProgressForRecording,
   getCueSavedAtForRecording,
+  getIssuesForRecording,
   listNarrators,
   listRecordings,
   parshaSlugForRun,
@@ -84,6 +85,7 @@ import {
   createRecordingIssue,
   getReaderVisibleIssues,
   loadRecordingIssues,
+  mergeRecordingIssues,
   recordingIssueKinds,
   recordingIssueReaderLabel,
   saveRecordingIssues,
@@ -203,7 +205,7 @@ let pendingAliyahRailSelection: {
   maxExpiresAt: number
 } | null = null
 let aliyahRailVisibilityState: AliyahRailVisibilityState = 'hidden'
-let aliyahRailHideTimer: ReturnType<typeof window.setTimeout> | null = null
+let aliyahRailHideTimer: number | null = null
 let lastAliyahRailScrollTop: number | null = null
 let isAliyahRailPointerInside = false
 let isAliyahRailFocusInside = false
@@ -224,6 +226,9 @@ let pendingIssueTokenKey: string | null = null
 let pendingIssueTimeStart: number | undefined
 let currentReaderMode: ReaderMode = recordingMode.enabled ? 'recording' : 'normal'
 const waveformSummaryCache = new Map<string, WaveformSummary>()
+const waveformSummaryRequests = new Map<string, Promise<WaveformSummary | null>>()
+const waveformSummaryRenderRequests = new Set<string>()
+const waveformWindowCache = new Map<string, WaveformWindow>()
 let waveformRenderFrame = 0
 let shouldSaveLastReadingAfterRouteRender = false
 let hasUserScrolledReaderForLastReading = false
@@ -239,6 +244,10 @@ const WAVEFORM_VISIBLE_BARS = 160
 const WAVEFORM_AUTO_WINDOW_SECONDS = 24
 const WAVEFORM_FULL_VIEW_MAX_SECONDS = 30
 const WAVEFORM_WINDOW_STEP_SECONDS = 1
+const WAVEFORM_FOLLOW_LEFT_RATIO = 0.38
+const WAVEFORM_FOLLOW_RIGHT_RATIO = 0.68
+const WAVEFORM_FOLLOW_BACKWARD_TARGET_RATIO = 0.48
+const WAVEFORM_FOLLOW_FORWARD_TARGET_RATIO = 0.58
 const adminDraftTimeFormat = Intl.DateTimeFormat(undefined, {
   dateStyle: 'medium',
   timeStyle: 'short',
@@ -974,27 +983,6 @@ async function jumpToTokenKey(tokenKey: string, options: { audioTime?: number } 
       audioControllerGlobal ?? undefined
     )
   }
-  focusReaderSurface()
-}
-
-async function scrollToTokenKey(tokenKey: string) {
-  const [pageNumber] = tokenKey.split(':').map(Number)
-  if (Number.isFinite(pageNumber)) await display?.ensurePageRendered(pageNumber)
-
-  const token = document.querySelector<HTMLElement>(`[data-token-key="${tokenKey}"]`)
-  if (!token) return
-
-  centerElementInScrollRoot(getBook(), token, { behavior: 'smooth' })
-  syncToolbarCurrentAliyahButton(
-    getAliyahProgressAnchorForElement(token),
-    audioControllerGlobal ?? undefined
-  )
-  viewportTrackerGlobal?.refresh()
-  updateReaderProgress()
-  window.setTimeout(() => {
-    viewportTrackerGlobal?.refresh()
-    updateReaderProgress()
-  }, 500)
   focusReaderSurface()
 }
 
@@ -2127,7 +2115,10 @@ function aliyahRailCueStatusLabel(status: AliyahRailCueStatus) {
 function loadIssuesForActiveSession() {
   const session = audioControllerGlobal?.session
   activeRecordingIssues = session
-    ? loadRecordingIssues(localStorage, session.recording.id, TOKENIZATION_VERSION)
+    ? mergeRecordingIssues(
+        getIssuesForRecording(session.recording, TOKENIZATION_VERSION),
+        loadRecordingIssues(localStorage, session.recording.id, TOKENIZATION_VERSION)
+      )
     : []
   applyReaderVisibleIssueMarkers()
   refreshCommandPaletteActions()
@@ -2243,15 +2234,15 @@ function saveRecordingIssue(kind: RecordingIssueKind) {
   closeRecordingIssueModal()
 }
 
-async function getWaveformSummaryForSession(session: ActiveAudioSession) {
-  const cached = waveformSummaryCache.get(session.recording.id)
-  if (cached) return cached
+async function buildWaveformSummaryForSession(session: ActiveAudioSession) {
+  let audioContext: AudioContext | null = null
 
   try {
     const response = await fetch(session.recording.playSrc)
     if (!response.ok) return null
+
     const buffer = await response.arrayBuffer()
-    const audioContext = new AudioContext()
+    audioContext = new AudioContext()
     const decoded = await audioContext.decodeAudioData(buffer.slice(0))
     const samples = decoded.getChannelData(0)
     const summary = createWaveformSummary({
@@ -2260,13 +2251,47 @@ async function getWaveformSummaryForSession(session: ActiveAudioSession) {
       samples,
       bucketCount: WAVEFORM_SUMMARY_BUCKETS,
     })
-    void audioContext.close()
     waveformSummaryCache.set(session.recording.id, summary)
     return summary
   } catch (error) {
     console.error('Failed to build waveform summary', error)
     return null
+  } finally {
+    if (audioContext && audioContext.state !== 'closed') {
+      void audioContext.close()
+    }
   }
+}
+
+function getWaveformSummaryForSession(session: ActiveAudioSession): Promise<WaveformSummary | null> {
+  const audioId = session.recording.id
+  const cached = waveformSummaryCache.get(audioId)
+  if (cached) return Promise.resolve(cached)
+
+  const existingRequest = waveformSummaryRequests.get(audioId)
+  if (existingRequest) return existingRequest
+
+  const request = buildWaveformSummaryForSession(session).finally(() => {
+    waveformSummaryRequests.delete(audioId)
+  })
+  waveformSummaryRequests.set(audioId, request)
+  return request
+}
+
+function requestWaveformSummaryRender(
+  session: ActiveAudioSession,
+  controller: AudioController
+) {
+  const audioId = session.recording.id
+  if (waveformSummaryRenderRequests.has(audioId)) return
+
+  waveformSummaryRenderRequests.add(audioId)
+  void getWaveformSummaryForSession(session).finally(() => {
+    waveformSummaryRenderRequests.delete(audioId)
+    if (controller.session?.recording.id === audioId) {
+      renderAdminWaveform(controller)
+    }
+  })
 }
 
 type WaveformWindow = {
@@ -2284,13 +2309,8 @@ function getAdminWaveformFocusTime(controller: AudioController, duration: number
   return clampWaveformTime(controller.audio.currentTime, duration)
 }
 
-function getAdminWaveformWindow(controller: AudioController, duration: number): WaveformWindow {
-  if (duration <= WAVEFORM_FULL_VIEW_MAX_SECONDS) {
-    return { start: 0, end: duration, zoomed: false }
-  }
-
+function getCenteredWaveformWindow(focusTime: number, duration: number): WaveformWindow {
   const windowDuration = Math.min(duration, WAVEFORM_AUTO_WINDOW_SECONDS)
-  const focusTime = getAdminWaveformFocusTime(controller, duration)
   const unclampedStart = focusTime - windowDuration / 2
   const steppedStart =
     Math.floor(unclampedStart / WAVEFORM_WINDOW_STEP_SECONDS) *
@@ -2302,6 +2322,63 @@ function getAdminWaveformWindow(controller: AudioController, duration: number): 
     end: start + windowDuration,
     zoomed: true,
   }
+}
+
+function getFollowedWaveformWindow({
+  previousWindow,
+  focusTime,
+  duration,
+}: {
+  previousWindow: WaveformWindow
+  focusTime: number
+  duration: number
+}) {
+  const windowDuration = previousWindow.end - previousWindow.start
+  if (windowDuration <= 0 || focusTime < previousWindow.start || focusTime > previousWindow.end) {
+    return getCenteredWaveformWindow(focusTime, duration)
+  }
+
+  const focusRatio = (focusTime - previousWindow.start) / windowDuration
+  const targetRatio =
+    focusRatio < WAVEFORM_FOLLOW_LEFT_RATIO
+      ? WAVEFORM_FOLLOW_BACKWARD_TARGET_RATIO
+      : focusRatio > WAVEFORM_FOLLOW_RIGHT_RATIO
+        ? WAVEFORM_FOLLOW_FORWARD_TARGET_RATIO
+        : null
+  if (targetRatio === null) return previousWindow
+
+  const unclampedStart = focusTime - windowDuration * targetRatio
+  const steppedStart =
+    Math.floor(unclampedStart / WAVEFORM_WINDOW_STEP_SECONDS) *
+    WAVEFORM_WINDOW_STEP_SECONDS
+  const start = Math.max(0, Math.min(duration - windowDuration, steppedStart))
+  return {
+    start,
+    end: start + windowDuration,
+    zoomed: true,
+  }
+}
+
+function getAdminWaveformWindow(controller: AudioController, duration: number): WaveformWindow {
+  const audioId = controller.session?.recording.id ?? null
+  if (duration <= WAVEFORM_FULL_VIEW_MAX_SECONDS) {
+    if (audioId) waveformWindowCache.delete(audioId)
+    return { start: 0, end: duration, zoomed: false }
+  }
+
+  const focusTime = getAdminWaveformFocusTime(controller, duration)
+  if (!audioId || controller.audio.paused || controller.audio.ended) {
+    const centeredWindow = getCenteredWaveformWindow(focusTime, duration)
+    if (audioId) waveformWindowCache.set(audioId, centeredWindow)
+    return centeredWindow
+  }
+
+  const previousWindow = waveformWindowCache.get(audioId)
+  const nextWindow = previousWindow
+    ? getFollowedWaveformWindow({ previousWindow, focusTime, duration })
+    : getCenteredWaveformWindow(focusTime, duration)
+  waveformWindowCache.set(audioId, nextWindow)
+  return nextWindow
 }
 
 function timeToWaveformWindowRatio(time: number, window: WaveformWindow) {
@@ -2406,7 +2483,7 @@ function renderAdminWaveform(audioController?: AudioController | null) {
       : 'Waveform lane · full recording'
     : 'Preparing waveform…'
   if (!summary) {
-    void getWaveformSummaryForSession(session).then(() => renderAdminWaveform(controller))
+    requestWaveformSummaryRender(session, controller)
   }
 
   for (const cue of adminState.cues) {
@@ -4386,6 +4463,7 @@ async function exportAdminCues(audioController: AudioController) {
     tokenizationVersion: TOKENIZATION_VERSION,
     audioVersion: session.recording.notes,
     savedAt: new Date().toISOString(),
+    issues: activeRecordingIssues,
     cues: exportCues,
   }
 
@@ -4984,7 +5062,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const saveLastReadingDebounced = debounce(() => saveCurrentLastReading(), 1000)
 
-  const markUserScrolledReaderForLastReading = () => {
+  const markUserScrolledReaderForLastReading: (_event?: Event) => void = () => {
     hasUserScrolledReaderForLastReading = true
     dismissLastReadingPrompt()
   }
@@ -5415,6 +5493,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         resumeDraftWrap.hidden = adminState.recording
       }
       syncAdminPanelState(audioController)
+      focusReaderSurface()
     })
   document
     .querySelector('[data-target-id="admin-step-back"]')!

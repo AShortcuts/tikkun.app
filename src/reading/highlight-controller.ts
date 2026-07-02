@@ -28,6 +28,8 @@ export class HighlightController {
   }
 
   setDisplay(display: ScrollDisplay) {
+    this.clear()
+    this.tokenElementsByKey.clear()
     this.display = display
   }
 
