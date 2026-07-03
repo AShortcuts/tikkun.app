@@ -61,8 +61,16 @@ import { cueFileRelativePath, formatCueFileJson } from './audio/cue-file.ts'
 import { normalizeFirstCueStart } from './audio/normalize-first-cue.ts'
 import { AudioController, ActiveAudioSession } from './reading/audio-controller.ts'
 import { HighlightController, cueKey } from './reading/highlight-controller.ts'
+import {
+  aliyahRailItemsSignature,
+  getAliyahRailItemsForRun,
+} from './reading/aliyah-rail.ts'
 import { collectTokenKeysForAliyahRange } from './reading/aliyah-token-sequence.ts'
 import { isLastIndexedAliyahInRun } from './reading/aliyah-range.ts'
+import {
+  isActivePlaybackTarget,
+  playbackTokenRangeAliyahIndex,
+} from './reading/playback-session.ts'
 import {
   createLastReadingHash,
   LastReading,
@@ -115,6 +123,7 @@ import {
   readAdminDraftSummary,
   type AdminDraftPayload,
 } from './admin/draft-storage.ts'
+import { areCueDraftsEquivalent } from './admin/draft-cue-comparison.ts'
 import hebrewNumeral from './hebrew-numeral.ts'
 import { findVideoForRecording } from './video/library.ts'
 import {
@@ -186,7 +195,6 @@ type AliyahRailCueStatus =
   | 'pending'
   | 'local-draft'
   | 'generated-review'
-  | 'blocking-issue'
 type AliyahRailVisibilityState = 'hidden' | 'peek' | 'expanded'
 
 let display: ScrollDisplay
@@ -207,6 +215,7 @@ let pendingAliyahRailSelection: {
 let aliyahRailVisibilityState: AliyahRailVisibilityState = 'hidden'
 let aliyahRailHideTimer: number | null = null
 let lastAliyahRailScrollTop: number | null = null
+let aliyahRailRenderedSignature: string | null = null
 let isAliyahRailPointerInside = false
 let isAliyahRailFocusInside = false
 let cueNavigationIndex: number | null = null
@@ -414,6 +423,7 @@ function saveAdminDraft(audioController?: AudioController | null) {
   window.localStorage.setItem(storageKey, JSON.stringify(payload))
   adminState.draftOrigin = 'local'
   adminState.draftSavedAt = updatedAt
+  invalidateAliyahRailRender()
 }
 
 const app = {
@@ -1955,6 +1965,7 @@ function renderAliyahRail(range: ViewportRange | null = latestViewportRange) {
   const available = isAliyahRailRouteAvailable()
   rail.classList.toggle('u-hidden', !available)
   if (!available) {
+    aliyahRailRenderedSignature = null
     hideAliyahRail()
     return
   }
@@ -1966,9 +1977,23 @@ function renderAliyahRail(range: ViewportRange | null = latestViewportRange) {
   const current = getCurrentAliyahFromViewportRange(range, anchors)
   const currentRun = current?.run ?? anchors.find((anchor) => anchor.run)?.run ?? null
   const activeAliyahIndex = getAliyahRailActiveIndex(current, currentRun)
-  rail.replaceChildren()
+  const activeRunId = getAliyahRailActiveRunId(current, activeAliyahIndex)
 
-  if (!currentRun) return
+  if (!currentRun) {
+    aliyahRailRenderedSignature = null
+    rail.replaceChildren()
+    return
+  }
+
+  const railItems = getAliyahRailItemsForRun(currentRun)
+  const signature = `${readerPreferences.narratorId}:${aliyahRailItemsSignature(railItems)}`
+  if (signature === aliyahRailRenderedSignature) {
+    setAliyahRailActiveButton(rail, activeRunId, activeAliyahIndex)
+    return
+  }
+
+  aliyahRailRenderedSignature = signature
+  rail.replaceChildren()
 
   const caption = document.createElement('span')
   caption.className = 'aliyah-rail-caption'
@@ -1976,30 +2001,44 @@ function renderAliyahRail(range: ViewportRange | null = latestViewportRange) {
   caption.setAttribute('aria-hidden', 'true')
   rail.appendChild(caption)
 
-  for (const aliyah of currentRun.aliyot) {
+  for (const { run, aliyah } of railItems) {
     if (!aliyah.index) continue
     const button = document.createElement('button')
     button.type = 'button'
     button.className = 'aliyah-rail-button'
     const recording = findRecordingForRun({
       narratorId: readerPreferences.narratorId,
-      run: currentRun,
+      run,
       aliyahIndex: aliyah.index,
     })
     const status = getAliyahRailCueStatus(recording)
     button.textContent = aliyah.index === 'Maftir' ? 'M' : `${aliyah.index}`
-    button.classList.toggle('is-active', activeAliyahIndex === aliyah.index)
+    button.classList.toggle(
+      'is-active',
+      activeRunId === run.id && activeAliyahIndex === aliyah.index
+    )
     button.dataset.cueStatus = status
     button.title = `${getPlaybackAliyahLabel(aliyah.index)} · ${aliyahRailCueStatusLabel(status)}`
-    button.dataset.runId = currentRun.id
+    button.dataset.runId = run.id
     button.dataset.aliyahIndex = `${aliyah.index}`
     rail.appendChild(button)
   }
 }
 
-function setAliyahRailActiveButton(rail: HTMLElement, aliyahIndex: PlaybackAliyahIndex) {
+function invalidateAliyahRailRender() {
+  aliyahRailRenderedSignature = null
+}
+
+function setAliyahRailActiveButton(
+  rail: HTMLElement,
+  runId: string | null,
+  aliyahIndex: PlaybackAliyahIndex | null
+) {
   rail.querySelectorAll<HTMLButtonElement>('.aliyah-rail-button').forEach((button) => {
-    button.classList.toggle('is-active', button.dataset.aliyahIndex === `${aliyahIndex}`)
+    button.classList.toggle(
+      'is-active',
+      button.dataset.runId === runId && button.dataset.aliyahIndex === `${aliyahIndex}`
+    )
   })
 }
 
@@ -2043,7 +2082,7 @@ function setupAliyahRailInteractions() {
       expiresAt: performance.now() + 2500,
       maxExpiresAt: performance.now() + 6000,
     }
-    setAliyahRailActiveButton(rail, aliyahIndex)
+    setAliyahRailActiveButton(rail, runId, aliyahIndex)
     revealAliyahRail('expanded')
     scheduleAliyahRailHide(2400)
 
@@ -2075,7 +2114,10 @@ function getAliyahRailActiveIndex(
       current.aliyahIndex === pending.aliyahIndex
     if (expired || caughtUp) {
       pendingAliyahRailSelection = null
-    } else if (currentRun?.id === pending.runId) {
+    } else if (
+      currentRun?.id === pending.runId ||
+      currentRun?.leining.runs.some((run) => run.id === pending.runId)
+    ) {
       return pending.aliyahIndex
     }
   }
@@ -2083,18 +2125,35 @@ function getAliyahRailActiveIndex(
   return current?.aliyahIndex ?? null
 }
 
+function getAliyahRailActiveRunId(
+  current: AliyahProgressAnchor | null,
+  activeAliyahIndex: PlaybackAliyahIndex | null
+) {
+  const pending = pendingAliyahRailSelection
+  if (pending && activeAliyahIndex === pending.aliyahIndex) {
+    return pending.runId
+  }
+
+  return current?.run?.id ?? null
+}
+
 function getAliyahRailCueStatus(recording: AudioRecording | null): AliyahRailCueStatus {
   if (!recording) return 'none'
 
-  const hasBlockingIssue = getReaderVisibleIssues(activeRecordingIssues).some(
-    (issue) => issue.audioId === recording.id
-  )
-  if (hasBlockingIssue) return 'blocking-issue'
-
-  const draftSummary = readAdminDraftSummary(recording.id)
-  if (draftSummary?.cueCount) return 'local-draft'
-
   const progress = getCueProgressForRecording(recording)
+  const draftSummary = readAdminDraftSummary(recording.id)
+  if (draftSummary?.cueCount) {
+    const draft = loadAdminDraft(recording.id, draftSummary.tokenCount)
+    const publishedCues = getCuesForRecording(recording)
+    if (
+      !publishedCues.length ||
+      !draft ||
+      !areCueDraftsEquivalent(draft.cues, publishedCues)
+    ) {
+      return 'local-draft'
+    }
+  }
+
   if (progress?.isComplete) return 'published'
   if (progress?.isUnfinished) return 'pending'
 
@@ -2108,7 +2167,6 @@ function aliyahRailCueStatusLabel(status: AliyahRailCueStatus) {
     published: 'complete published cues',
     'local-draft': 'local draft',
     'generated-review': 'generated draft needs review',
-    'blocking-issue': 'blocking cue issue',
   }[status]
 }
 
@@ -2683,6 +2741,30 @@ function recordingAliyahIndexForPlayback(
   return aliyahIndex === 'Maftir' ? 7 : aliyahIndex
 }
 
+function isCurrentPlaybackTarget(
+  audioController: AudioController | undefined,
+  {
+    recording,
+    runId,
+    aliyahIndex,
+  }: {
+    recording: AudioRecording | null | undefined
+    runId: string | undefined
+    aliyahIndex: PlaybackAliyahIndex | null | undefined
+  }
+) {
+  return Boolean(
+    recording &&
+      runId &&
+      aliyahIndex &&
+      isActivePlaybackTarget(audioController?.session, {
+        recordingId: recording.id,
+        runId,
+        aliyahIndex,
+      })
+  )
+}
+
 function aliyahMarkerSelector(runId: string, aliyahIndex: PlaybackAliyahIndex) {
   return `[data-aliyah-marker="true"][data-run-id="${runId}"][data-aliyah-index="${aliyahIndex}"]`
 }
@@ -2905,10 +2987,11 @@ function refreshInlineAudioButtons(audioController: AudioController) {
   for (const button of getAudioButtonElements()) {
     const state = getSessionButtonState(button)
     const available = Boolean(state?.recording)
-    const isCurrentSession = Boolean(
-      available &&
-        audioController.session?.recording.id === state?.recording?.id
-    )
+    const isCurrentSession = isCurrentPlaybackTarget(audioController, {
+      recording: state?.recording,
+      runId: state?.lineInfo.run?.id,
+      aliyahIndex: state?.aliyahIndex,
+    })
     const isPlayingCurrentSession = Boolean(
       isCurrentSession && !audioController.audio.paused
     )
@@ -2961,9 +3044,11 @@ function syncToolbarCurrentAliyahButton(
       recording &&
       !isTableOfContentsVisible
   )
-  const isCurrentSession = Boolean(
-    available && audioController?.session?.recording.id === recording?.id
-  )
+  const isCurrentSession = isCurrentPlaybackTarget(audioController, {
+    recording,
+    runId: current?.run?.id,
+    aliyahIndex: current?.aliyahIndex,
+  })
   const isPlayingCurrentSession = Boolean(
     isCurrentSession && audioController && !audioController.audio.paused
   )
@@ -3111,24 +3196,26 @@ async function loadAudioSessionForRecording(
   audioController: AudioController,
   highlightController: HighlightController
 ) {
-  const recordingAliyahIndex = recordingAliyahIndexForPlayback(aliyahIndex)
-  const isMaftirPlaybackRequest = aliyahIndex === 'Maftir'
+  const playbackAliyahIndex = playbackTokenRangeAliyahIndex(aliyahIndex)
   const tokenKeys = await collectAliyahTokenKeys({
     runId,
-    aliyahIndex: recordingAliyahIndex,
+    aliyahIndex: playbackAliyahIndex,
   })
   if (!tokenKeys.length) return null
 
-  if (audioController.session?.recording.id === recording.id) {
-    if (isMaftirPlaybackRequest) {
-      const requestedTokenKeys = await collectAliyahTokenKeys({ runId, aliyahIndex })
-      highlightController.setSequence(tokenKeys)
-      await seekAudioSessionToTokenKey(
-        audioController,
-        highlightController,
-        requestedTokenKeys[0] ?? tokenKeys[0]
-      )
-    }
+  if (
+    isActivePlaybackTarget(audioController.session, {
+      recordingId: recording.id,
+      runId,
+      aliyahIndex,
+    })
+  ) {
+    highlightController.setSequence(tokenKeys)
+    await seekAudioSessionToTokenKey(
+      audioController,
+      highlightController,
+      tokenKeys[0]
+    )
     return audioController.session
   }
 
@@ -3136,7 +3223,7 @@ async function loadAudioSessionForRecording(
     recording,
     cues: cloneCues(getCuesForRecording(recording)),
     runId,
-    aliyahIndex: recordingAliyahIndex,
+    aliyahIndex,
     tokenKeys,
   }
 
@@ -3154,18 +3241,8 @@ async function loadAudioSessionForRecording(
   cueNavigationIndex = session.cues.length ? 0 : null
   syncAdminPanelState(audioController)
 
-  if (isMaftirPlaybackRequest) {
-    const requestedTokenKeys = await collectAliyahTokenKeys({ runId, aliyahIndex })
-    await seekAudioSessionToTokenKey(
-      audioController,
-      highlightController,
-      requestedTokenKeys[0] ?? tokenKeys[0]
-    )
-  } else if (session.cues.length) {
-    audioController.seek(session.cues[0].timeStart)
-    await highlightController.activateCue(session.cues[0], {
-      scroll: true,
-    })
+  if (session.cues.length) {
+    await seekAudioSessionToTokenKey(audioController, highlightController, tokenKeys[0])
   } else if (tokenKeys[0]) {
     await highlightController.activateTokenKey(tokenKeys[0], {
       scroll: true,
@@ -3484,7 +3561,13 @@ async function startPlaybackForButton(
   const state = getSessionButtonState(button)
   if (!state?.recording || !state.lineInfo.run) return
 
-  if (audioController.session?.recording.id === state.recording.id) {
+  if (
+    isActivePlaybackTarget(audioController.session, {
+      recordingId: state.recording.id,
+      runId: state.lineInfo.run.id,
+      aliyahIndex: state.aliyahIndex,
+    })
+  ) {
     if (state.aliyahIndex === 'Maftir') {
       if (!audioController.audio.paused) {
         pauseCurrentRecording(audioController)
@@ -3601,7 +3684,13 @@ async function startPlaybackForToolbarCurrentAliyah(
   })
   if (!recording) return
 
-  if (audioController.session?.recording.id === recording.id) {
+  if (
+    isActivePlaybackTarget(audioController.session, {
+      recordingId: recording.id,
+      runId,
+      aliyahIndex,
+    })
+  ) {
     if (aliyahIndex === 'Maftir') {
       if (!audioController.audio.paused) {
         pauseCurrentRecording(audioController)

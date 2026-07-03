@@ -8,7 +8,7 @@
   "cueCount": 340,
   "tokenizationVersion": "v2",
   "audioVersion": "Source file: פרשת נח ז׳.m4a",
-  "savedAt": "2026-07-02T16:55:03.715Z",
+  "savedAt": "2026-07-03T01:12:13.654Z",
   "issues": [
     {
       "audioId": "noach-7",
@@ -20,6 +20,17 @@
       "createdAt": 1783010974342,
       "tokenizationVersion": "v2",
       "id": "issue:noach-7:11:19:0:3:1783010974342"
+    },
+    {
+      "audioId": "noach-7",
+      "tokenKey": "12:1:0:2",
+      "timeStart": 310.175,
+      "kind": "mistaken-pronunciation",
+      "visibility": "readerVisible",
+      "severity": "medium",
+      "createdAt": 1783041128537,
+      "tokenizationVersion": "v2",
+      "id": "issue:noach-7:12:1:0:2:1783041128537"
     }
   ],
   "cues": [

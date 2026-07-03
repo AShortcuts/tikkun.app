@@ -286,11 +286,6 @@
   background: #3b82f6;
 }
 
-.aliyah-rail-button[data-cue-status='blocking-issue']::after {
-  border: none;
-  background: #dc2626;
-}
-
 @media (max-width: 34rem) {
   .aliyah-rail-caption {
     display: none;

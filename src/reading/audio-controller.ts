@@ -1,11 +1,12 @@
 import { EventEmitter } from '../event-emitter.ts'
 import type { AudioRecording, WordCue } from '../audio/types.ts'
+import type { PlaybackSessionAliyahIndex } from './playback-session.ts'
 
 export interface ActiveAudioSession {
   recording: AudioRecording
   cues: WordCue[]
   runId: string
-  aliyahIndex: number
+  aliyahIndex: PlaybackSessionAliyahIndex
   tokenKeys: string[]
 }
 
