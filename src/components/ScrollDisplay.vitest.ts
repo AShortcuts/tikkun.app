@@ -131,6 +131,33 @@ test('renders the previous page', async () => {
   )
 })
 
+test('renders earlier aliyah markers when started later in Noach', async () => {
+  vm = ScrollViewModel.forId(generator, '2026-10-17:shacharis,main', {
+    scroll: 'torah',
+    b: 1,
+    c: 9,
+    v: 18,
+  })
+  if (!vm) throw new Error('Noach model not found')
+  const sd = new ScrollDisplay(vm, root)
+  await sd.scrolled
+
+  const resolver = await vm.resolver
+  const target = resolver.physicalLocationFromRef({
+    scroll: 'torah',
+    b: 1,
+    c: 8,
+    v: 15,
+  })
+  await sd.ensurePageRendered(target.pageNumber)
+
+  expect(
+    root.querySelector(
+      '[data-aliyah-marker="true"][data-run-id="2026-10-17:shacharis,main"][data-aliyah-index="4"]'
+    )
+  ).not.toBeNull()
+})
+
 test('renders message entries', async () => {
   // ראש חודש חנוכה has a page, then a message, then one more page.
   const sd = await renderRun('2025-01-01:shacharis,main')

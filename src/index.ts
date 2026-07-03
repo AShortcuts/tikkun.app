@@ -72,6 +72,11 @@ import {
   playbackTokenRangeAliyahIndex,
 } from './reading/playback-session.ts'
 import {
+  getAliyahStartLocationFromViewModel,
+  lineIndexFromLocation,
+  type PlaybackAliyahIndex,
+} from './reading/aliyah-dom-target.ts'
+import {
   createLastReadingHash,
   LastReading,
   loadEligibleLastReading,
@@ -112,7 +117,6 @@ import type { AudioRecording, CueExportPayload, WordCue } from './audio/types.ts
 import { getWordProgress } from './audio/progress.ts'
 import type { ScrollName } from './ref.ts'
 import {
-  type LeiningAliyah,
   type LeiningInstance,
   type LeiningRun,
 } from './calendar-model/model-types.ts'
@@ -179,7 +183,6 @@ let calendarSettings = loadCalendarSettings()
 const createCalendarGenerator = () =>
   new LeiningGenerator(userSettingsFromCalendarSettings(calendarSettings))
 const recordingMode = getRecordingModeConfig()
-type PlaybackAliyahIndex = Exclude<LeiningAliyah['index'], undefined>
 
 type AliyahProgressAnchor = {
   line: HTMLElement | null
@@ -1151,12 +1154,64 @@ function navigateToPage(scroll: ScrollName, page: number) {
   navigateToHash(generatePageUrl(scroll, page), audioControllerGlobal!)
 }
 
-async function ensureAliyahMarkerRendered(
+type AliyahDomTarget = {
+  element: HTMLElement
+  marker: HTMLElement | null
+}
+
+async function getAliyahStartLocationForRun(
   runId: string,
   aliyahIndex: PlaybackAliyahIndex
 ) {
+  const run =
+    display?.viewModel.relevantRuns.find((candidate) => candidate.id === runId) ??
+    createCalendarGenerator().parseId(runId)
+  if (!run) return null
+
+  return getAliyahStartLocationFromViewModel(display.viewModel, run, aliyahIndex)
+}
+
+function getRenderedLineForLocation(location: {
+  pageNumber: number
+  lineNumber: number
+}) {
+  const pageNode = display.getPageNode(location.pageNumber)
+  const lineIndex = lineIndexFromLocation(location)
+  return (
+    pageNode?.querySelector<HTMLElement>(`[data-line-index="${lineIndex}"]`) ??
+    null
+  )
+}
+
+function getNextAliyahMarkerAfterLine(line: HTMLElement) {
+  return getAliyahMarkerElements().find((marker) => {
+    const markerLine = marker.closest<HTMLElement>('[data-line-index]')
+    return Boolean(
+      markerLine &&
+        (line.compareDocumentPosition(markerLine) &
+          Node.DOCUMENT_POSITION_FOLLOWING)
+    )
+  }) ?? null
+}
+
+async function ensureAliyahDomTargetRendered(
+  runId: string,
+  aliyahIndex: PlaybackAliyahIndex
+): Promise<AliyahDomTarget | null> {
   const selector = aliyahMarkerSelector(runId, aliyahIndex)
   let marker = document.querySelector<HTMLElement>(selector)
+  if (marker) return { element: marker, marker }
+
+  const location = await getAliyahStartLocationForRun(runId, aliyahIndex)
+  if (location) {
+    await display.ensurePageRendered(location.pageNumber)
+    marker = document.querySelector<HTMLElement>(selector)
+    if (marker) return { element: marker, marker }
+
+    const line = getRenderedLineForLocation(location)
+    if (line) return { element: line, marker: null }
+  }
+
   while (!marker) {
     const renderedPages = display.getRenderedPageNumbers()
     const lastPage = renderedPages[renderedPages.length - 1]
@@ -1168,17 +1223,17 @@ async function ensureAliyahMarkerRendered(
     marker = document.querySelector<HTMLElement>(selector)
   }
 
-  return marker
+  return { element: marker, marker }
 }
 
 async function scrollToAliyahMarker(runId: string, aliyahIndex: PlaybackAliyahIndex) {
-  const marker = await ensureAliyahMarkerRendered(runId, aliyahIndex)
-  if (!marker) return
+  const target = await ensureAliyahDomTargetRendered(runId, aliyahIndex)
+  if (!target) return
 
-  const line = marker.closest<HTMLElement>('[data-line-index]')
-  centerElementInScrollRoot(getBook(), line ?? marker, { behavior: 'smooth' })
+  const line = target.element.closest<HTMLElement>('[data-line-index]')
+  centerElementInScrollRoot(getBook(), line ?? target.element, { behavior: 'smooth' })
   syncToolbarCurrentAliyahButton(
-    getAliyahProgressAnchorForElement(line ?? marker),
+    getAliyahProgressAnchorForElement(line ?? target.element),
     audioControllerGlobal ?? undefined
   )
   viewportTrackerGlobal?.refresh()
@@ -3080,31 +3135,24 @@ async function collectAliyahTokenKeys({
   const isFinalAliyah = isLastAliyahInRun(runId, aliyahIndex)
 
   const markerSelector = aliyahMarkerSelector(runId, aliyahIndex)
-  let marker = document.querySelector<HTMLElement>(markerSelector)
-  while (!marker) {
-    const renderedPages = display.getRenderedPageNumbers()
-    const lastPage = renderedPages[renderedPages.length - 1]
-    if (!lastPage) return []
-
-    const loaded = await display.ensurePageRendered(lastPage + 1)
-    if (!loaded) return []
-
-    marker = document.querySelector<HTMLElement>(markerSelector)
-  }
+  const target = await ensureAliyahDomTargetRendered(runId, aliyahIndex)
+  if (!target) return []
+  let marker = target.marker
 
   let markers = getAliyahMarkerElements()
-  let markerIndex = markers.indexOf(marker)
+  let markerIndex = marker ? markers.indexOf(marker) : -1
   if (isFinalAliyah) {
     await ensureRenderedThroughAvailableContent()
     markers = getAliyahMarkerElements()
     marker = document.querySelector<HTMLElement>(markerSelector)
-    if (!marker) return []
-    markerIndex = markers.indexOf(marker)
+    markerIndex = marker ? markers.indexOf(marker) : -1
   }
 
   let nextMarker = isFinalAliyah
     ? null
-    : markers[markerIndex + 1] ?? null
+    : marker
+      ? markers[markerIndex + 1] ?? null
+      : getNextAliyahMarkerAfterLine(target.element)
 
   while (!nextMarker && !isFinalAliyah) {
     const renderedPages = display.getRenderedPageNumbers()
@@ -3113,16 +3161,19 @@ async function collectAliyahTokenKeys({
     if (!loaded) break
     markers = getAliyahMarkerElements()
     marker = document.querySelector<HTMLElement>(markerSelector)
-    if (!marker) break
-    markerIndex = markers.indexOf(marker)
-    nextMarker = markers[markerIndex + 1] ?? null
+    if (marker) {
+      markerIndex = markers.indexOf(marker)
+      nextMarker = markers[markerIndex + 1] ?? null
+    } else {
+      nextMarker = getNextAliyahMarkerAfterLine(target.element)
+    }
   }
 
-  if (aliyahIndex === 7 && isSameRunMaftirMarker(nextMarker, runId)) {
+  if (marker && aliyahIndex === 7 && isSameRunMaftirMarker(nextMarker, runId)) {
     nextMarker = markers[markerIndex + 2] ?? null
   }
 
-  const startLine = marker.closest<HTMLElement>('[data-class="line"]')
+  const startLine = target.element.closest<HTMLElement>('[data-class="line"]')
   const endLine = nextMarker?.closest<HTMLElement>('[data-class="line"]') ?? null
   if (!startLine) return []
 
