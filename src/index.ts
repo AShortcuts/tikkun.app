@@ -65,17 +65,23 @@ import {
   aliyahRailItemsSignature,
   getAliyahRailItemsForRun,
 } from './reading/aliyah-rail.ts'
-import { collectTokenKeysForAliyahRange } from './reading/aliyah-token-sequence.ts'
+import {
+  collectStartingLineTokenKeys,
+  collectTokenKeysForAliyahRange,
+} from './reading/aliyah-token-sequence.ts'
 import { isLastIndexedAliyahInRun } from './reading/aliyah-range.ts'
 import {
+  firstCueAtOrAfterLocation,
+  firstCueForTokenKeys,
   isActivePlaybackTarget,
   playbackTokenRangeAliyahIndex,
 } from './reading/playback-session.ts'
 import {
-  getAliyahStartLocationFromViewModel,
+  AliyahTargetLocationCache,
   lineIndexFromLocation,
   type PlaybackAliyahIndex,
 } from './reading/aliyah-dom-target.ts'
+import { LatestAction } from './reading/latest-action.ts'
 import {
   createLastReadingHash,
   LastReading,
@@ -431,6 +437,7 @@ function saveAdminDraft(audioController?: AudioController | null) {
 
 const app = {
   jumpTo: (target: ScrollViewModel) => {
+    resetAliyahDomCaches()
     display = new ScrollDisplay(
       target,
       document.querySelector<HTMLElement>('[data-target-id="tikkun-book"]')!
@@ -1168,19 +1175,46 @@ async function getAliyahStartLocationForRun(
     createCalendarGenerator().parseId(runId)
   if (!run) return null
 
-  return getAliyahStartLocationFromViewModel(display.viewModel, run, aliyahIndex)
+  return aliyahTargetLocationCache.get(display.viewModel, run, aliyahIndex)
+}
+
+function getAliyahMarkerElement(
+  runId: string,
+  aliyahIndex: PlaybackAliyahIndex
+) {
+  const cacheKey = getAliyahTokenKeysCacheKey(runId, aliyahIndex)
+  const cached = aliyahMarkerElementsByKey.get(cacheKey)
+  if (cached?.isConnected) return cached
+
+  const marker = document.querySelector<HTMLElement>(
+    aliyahMarkerSelector(runId, aliyahIndex)
+  )
+  if (marker) aliyahMarkerElementsByKey.set(cacheKey, marker)
+  else aliyahMarkerElementsByKey.delete(cacheKey)
+  return marker
 }
 
 function getRenderedLineForLocation(location: {
   pageNumber: number
   lineNumber: number
 }) {
-  const pageNode = display.getPageNode(location.pageNumber)
   const lineIndex = lineIndexFromLocation(location)
-  return (
+  const cached = renderedLinesByLocationKey.get(
+    getRenderedLineLocationKey(location.pageNumber, lineIndex)
+  )
+  if (cached?.isConnected) return cached
+
+  const pageNode = display.getPageNode(location.pageNumber)
+  const line =
     pageNode?.querySelector<HTMLElement>(`[data-line-index="${lineIndex}"]`) ??
     null
-  )
+  if (line) {
+    renderedLinesByLocationKey.set(
+      getRenderedLineLocationKey(location.pageNumber, lineIndex),
+      line
+    )
+  }
+  return line
 }
 
 function getNextAliyahMarkerAfterLine(line: HTMLElement) {
@@ -1198,14 +1232,13 @@ async function ensureAliyahDomTargetRendered(
   runId: string,
   aliyahIndex: PlaybackAliyahIndex
 ): Promise<AliyahDomTarget | null> {
-  const selector = aliyahMarkerSelector(runId, aliyahIndex)
-  let marker = document.querySelector<HTMLElement>(selector)
+  let marker = getAliyahMarkerElement(runId, aliyahIndex)
   if (marker) return { element: marker, marker }
 
   const location = await getAliyahStartLocationForRun(runId, aliyahIndex)
   if (location) {
     await display.ensurePageRendered(location.pageNumber)
-    marker = document.querySelector<HTMLElement>(selector)
+    marker = getAliyahMarkerElement(runId, aliyahIndex)
     if (marker) return { element: marker, marker }
 
     const line = getRenderedLineForLocation(location)
@@ -1220,14 +1253,19 @@ async function ensureAliyahDomTargetRendered(
     const loaded = await display.ensurePageRendered(lastPage + 1)
     if (!loaded) return null
 
-    marker = document.querySelector<HTMLElement>(selector)
+    marker = getAliyahMarkerElement(runId, aliyahIndex)
   }
 
   return { element: marker, marker }
 }
 
-async function scrollToAliyahMarker(runId: string, aliyahIndex: PlaybackAliyahIndex) {
+async function scrollToAliyahMarker(
+  runId: string,
+  aliyahIndex: PlaybackAliyahIndex,
+  actionToken = railScrollAction.start()
+) {
   const target = await ensureAliyahDomTargetRendered(runId, aliyahIndex)
+  if (!railScrollAction.isCurrent(actionToken)) return
   if (!target) return
 
   const line = target.element.closest<HTMLElement>('[data-line-index]')
@@ -2042,6 +2080,7 @@ function renderAliyahRail(range: ViewportRange | null = latestViewportRange) {
 
   const railItems = getAliyahRailItemsForRun(currentRun)
   const signature = `${readerPreferences.narratorId}:${aliyahRailItemsSignature(railItems)}`
+  scheduleAliyahRailPrewarm(railItems, signature)
   if (signature === aliyahRailRenderedSignature) {
     setAliyahRailActiveButton(rail, activeRunId, activeAliyahIndex)
     return
@@ -2141,7 +2180,8 @@ function setupAliyahRailInteractions() {
     revealAliyahRail('expanded')
     scheduleAliyahRailHide(2400)
 
-    void scrollToAliyahMarker(runId, aliyahIndex)
+    const actionToken = railScrollAction.start()
+    void scrollToAliyahMarker(runId, aliyahIndex, actionToken)
   })
 
   const syncPositionAfterResize = () => syncAliyahRailPosition()
@@ -2739,6 +2779,7 @@ async function playNetworkRecording(
   retry?: () => Promise<void>
 ) {
   if (audioController.audio.paused && !canPlayNetworkRecording(retry)) return false
+  cancelAliyahRailPrewarm()
   if (audioController.audio.error && audioController.session) audioController.audio.load()
   await audioController.play()
   return true
@@ -2842,12 +2883,171 @@ function isLastAliyahProgressAnchor(anchor: AliyahProgressAnchor | null | undefi
 }
 
 const aliyahTokenKeysCache = new Map<string, string[]>()
+const aliyahTargetLocationCache = new AliyahTargetLocationCache()
+const aliyahMarkerElementsByKey = new Map<string, HTMLElement>()
+const renderedLinesByLocationKey = new Map<string, HTMLElement>()
+const railScrollAction = new LatestAction()
+const playbackAction = new LatestAction()
+let aliyahRailPrewarmTimer = 0
+let aliyahRailPrewarmSignature: string | null = null
+let playbackIdleFinalizationTimer = 0
+const preloadedAudioLinks = new Map<string, HTMLLinkElement>()
+const PLAYBACK_IDLE_BACKGROUND_DELAY_MS = 900
 
 function getAliyahTokenKeysCacheKey(
   runId: string,
   aliyahIndex: PlaybackAliyahIndex
 ) {
   return `${runId}:${aliyahIndex}`
+}
+
+function getRenderedLineLocationKey(pageNumber: number, lineIndex: number) {
+  return `${pageNumber}:${lineIndex}`
+}
+
+function resetAliyahDomCaches() {
+  aliyahTargetLocationCache.clear()
+  aliyahMarkerElementsByKey.clear()
+  renderedLinesByLocationKey.clear()
+  aliyahTokenKeysCache.clear()
+  railScrollAction.cancel()
+  playbackAction.cancel()
+  cancelPlaybackIdleFinalization()
+  if (aliyahRailPrewarmTimer) {
+    cancelIdleTask(aliyahRailPrewarmTimer)
+    aliyahRailPrewarmTimer = 0
+  }
+  aliyahRailPrewarmSignature = null
+  clearAudioPreloads()
+}
+
+function isPlaybackActive(audioController = audioControllerGlobal) {
+  const audio = audioController?.audio
+  return Boolean(audio && !audio.paused && !audio.ended)
+}
+
+function cancelAliyahRailPrewarm() {
+  if (!aliyahRailPrewarmTimer) return
+  cancelIdleTask(aliyahRailPrewarmTimer)
+  aliyahRailPrewarmTimer = 0
+}
+
+function cancelPlaybackIdleFinalization() {
+  if (!playbackIdleFinalizationTimer) return
+  window.clearTimeout(playbackIdleFinalizationTimer)
+  playbackIdleFinalizationTimer = 0
+}
+
+function indexAliyahDomTargets(root: ParentNode) {
+  root.querySelectorAll<HTMLElement>('[data-page-number][data-line-index]').forEach((line) => {
+    const pageNumber = Number(line.dataset.pageNumber)
+    const lineIndex = Number(line.dataset.lineIndex)
+    if (Number.isFinite(pageNumber) && Number.isFinite(lineIndex)) {
+      renderedLinesByLocationKey.set(
+        getRenderedLineLocationKey(pageNumber, lineIndex),
+        line
+      )
+    }
+  })
+
+  root.querySelectorAll<HTMLElement>('[data-aliyah-marker="true"]').forEach((marker) => {
+    const runId = marker.dataset.runId
+    const aliyahIndex = parsePlaybackAliyahIndex(marker.dataset.aliyahIndex)
+    if (!runId || !aliyahIndex) return
+    aliyahMarkerElementsByKey.set(
+      getAliyahTokenKeysCacheKey(runId, aliyahIndex),
+      marker
+    )
+  })
+}
+
+function scheduleIdleTask(task: () => void) {
+  const idleWindow = window as Window & {
+    requestIdleCallback?: (callback: IdleRequestCallback) => number
+    cancelIdleCallback?: (handle: number) => void
+  }
+
+  if (idleWindow.requestIdleCallback) {
+    return idleWindow.requestIdleCallback(task)
+  }
+
+  return window.setTimeout(task, 150)
+}
+
+function cancelIdleTask(handle: number) {
+  const idleWindow = window as Window & {
+    cancelIdleCallback?: (handle: number) => void
+  }
+  idleWindow.cancelIdleCallback?.(handle)
+  window.clearTimeout(handle)
+}
+
+function scheduleAliyahRailPrewarm(
+  railItems: ReturnType<typeof getAliyahRailItemsForRun>,
+  signature: string
+) {
+  if (signature === aliyahRailPrewarmSignature) return
+  aliyahRailPrewarmSignature = signature
+  cancelAliyahRailPrewarm()
+
+  let index = 0
+  const prewarmNext = () => {
+    aliyahRailPrewarmTimer = 0
+
+    if (isPlaybackActive()) {
+      aliyahRailPrewarmTimer = window.setTimeout(
+        prewarmNext,
+        PLAYBACK_IDLE_BACKGROUND_DELAY_MS
+      )
+      return
+    }
+
+    const item = railItems[index]
+    if (!item) return
+    index += 1
+
+    void (async () => {
+      const { run, aliyah } = item
+      if (!aliyah.index) return
+      const location = await getAliyahStartLocationForRun(run.id, aliyah.index)
+      if (location && !isPlaybackActive()) {
+        await display.ensurePageRenderedPreservingScroll(location.pageNumber)
+      }
+      if (isPlaybackActive()) return
+
+      const recording = findRecordingForRun({
+        narratorId: readerPreferences.narratorId,
+        run,
+        aliyahIndex: aliyah.index,
+      })
+      if (recording) {
+        getCuesForRecording(recording)
+        preloadAudioSource(recording.playSrc)
+      }
+    })().finally(() => {
+      if (index < railItems.length) {
+        aliyahRailPrewarmTimer = scheduleIdleTask(prewarmNext)
+      }
+    })
+  }
+
+  aliyahRailPrewarmTimer = scheduleIdleTask(prewarmNext)
+}
+
+function preloadAudioSource(src: string) {
+  if (!src || preloadedAudioLinks.has(src)) return
+
+  const link = document.createElement('link')
+  link.rel = 'preload'
+  link.as = 'audio'
+  link.href = src
+  document.head.appendChild(link)
+  preloadedAudioLinks.set(src, link)
+}
+
+function clearAudioPreloads() {
+  preloadedAudioLinks.forEach((link) => link.remove())
+  preloadedAudioLinks.clear()
 }
 
 function setControlIcon(element: HTMLElement | null, icon: IconName) {
@@ -3134,7 +3334,6 @@ async function collectAliyahTokenKeys({
   if (cachedTokenKeys) return [...cachedTokenKeys]
   const isFinalAliyah = isLastAliyahInRun(runId, aliyahIndex)
 
-  const markerSelector = aliyahMarkerSelector(runId, aliyahIndex)
   const target = await ensureAliyahDomTargetRendered(runId, aliyahIndex)
   if (!target) return []
   let marker = target.marker
@@ -3144,7 +3343,7 @@ async function collectAliyahTokenKeys({
   if (isFinalAliyah) {
     await ensureRenderedThroughAvailableContent()
     markers = getAliyahMarkerElements()
-    marker = document.querySelector<HTMLElement>(markerSelector)
+    marker = getAliyahMarkerElement(runId, aliyahIndex)
     markerIndex = marker ? markers.indexOf(marker) : -1
   }
 
@@ -3160,7 +3359,7 @@ async function collectAliyahTokenKeys({
     const loaded = await display.ensurePageRendered(lastPage + 1)
     if (!loaded) break
     markers = getAliyahMarkerElements()
-    marker = document.querySelector<HTMLElement>(markerSelector)
+    marker = getAliyahMarkerElement(runId, aliyahIndex)
     if (marker) {
       markerIndex = markers.indexOf(marker)
       nextMarker = markers[markerIndex + 1] ?? null
@@ -3186,32 +3385,26 @@ async function collectAliyahTokenKeys({
   return [...tokenKeys]
 }
 
-async function seekAudioSessionToTokenKey(
-  audioController: AudioController,
-  highlightController: HighlightController,
-  tokenKey: string | undefined
-) {
-  const session = audioController.session
-  if (!session) return
+async function collectAliyahStartTokenKeys({
+  runId,
+  aliyahIndex,
+}: {
+  runId: string
+  aliyahIndex: PlaybackAliyahIndex
+}) {
+  const cachedTokenKeys = aliyahTokenKeysCache.get(
+    getAliyahTokenKeysCacheKey(runId, aliyahIndex)
+  )
+  if (cachedTokenKeys?.length) return [cachedTokenKeys[0]]
 
-  const cueIndex = tokenKey
-    ? session.cues.findIndex((candidate) => cueKey(candidate) === tokenKey)
-    : session.cues.length ? 0 : -1
-  const cue = cueIndex >= 0 ? session.cues[cueIndex] : undefined
+  const target = await ensureAliyahDomTargetRendered(runId, aliyahIndex)
+  const startLine = target?.element.closest<HTMLElement>('[data-class="line"]')
+  if (!startLine) return []
 
-  if (cue) {
-    audioController.seek(cue.timeStart)
-    cueNavigationIndex = cueIndex
-    await highlightController.activateCue(cue, { scroll: true })
-    return
-  }
-
-  const fallbackTokenKey = tokenKey ?? session.tokenKeys[0]
-  if (fallbackTokenKey) {
-    await highlightController.activateTokenKey(fallbackTokenKey, {
-      scroll: true,
-    })
-  }
+  return collectStartingLineTokenKeys({
+    book: getBook(),
+    startLine,
+  })
 }
 
 function isCurrentPlaybackWithinTokenKeys(
@@ -3234,6 +3427,87 @@ function isCurrentPlaybackWithinTokenKeys(
   return tokenKeys.includes(cueKey(session.cues[cueIndex]))
 }
 
+async function finalizeAudioSessionTokenKeys({
+  session,
+  tokenKeysPromise,
+  audioController,
+  highlightController,
+  actionToken,
+}: {
+  session: ActiveAudioSession
+  tokenKeysPromise: Promise<string[]>
+  audioController: AudioController
+  highlightController: HighlightController
+  actionToken: number
+}) {
+  const tokenKeys = await tokenKeysPromise
+  if (!playbackAction.isCurrent(actionToken)) return
+  if (audioController.session !== session) return
+  if (!tokenKeys.length) return
+
+  session.tokenKeys = tokenKeys
+  highlightController.setSequence(tokenKeys)
+  adminState.sourceCues = cloneCues(session.cues)
+  const draft = loadAdminDraft(session.recording.id, tokenKeys.length)
+  assignAdminCues(draft?.cues ?? cloneCues(adminState.sourceCues), audioController)
+  adminState.tokenPointer =
+    draft?.tokenPointer ?? getAdminResumeTokenPointer(tokenKeys.length)
+  adminState.draftOrigin = draft ? 'local' : adminState.sourceCues.length ? 'published' : 'none'
+  adminState.draftSavedAt =
+    draft?.updatedAt ?? getCueSavedAtForRecording(session.recording) ?? null
+  adminState.recording = false
+  cueNavigationIndex =
+    session.cues.length && audioController.audio.currentTime
+      ? getCurrentCueIndex(session, audioController.audio.currentTime)
+      : session.cues.length ? 0 : null
+  syncAdminPanelState(audioController)
+  updateFloatingPlayer(audioController)
+  refreshInlineAudioButtons(audioController)
+}
+
+function scheduleAudioIdleTokenFinalization({
+  session,
+  getTokenKeysPromise,
+  audioController,
+  highlightController,
+  actionToken,
+}: {
+  session: ActiveAudioSession
+  getTokenKeysPromise: () => Promise<string[]>
+  audioController: AudioController
+  highlightController: HighlightController
+  actionToken: number
+}) {
+  cancelPlaybackIdleFinalization()
+
+  const runWhenIdle = () => {
+    playbackIdleFinalizationTimer = 0
+    if (!playbackAction.isCurrent(actionToken)) return
+    if (audioController.session !== session) return
+
+    if (isPlaybackActive(audioController)) {
+      playbackIdleFinalizationTimer = window.setTimeout(
+        runWhenIdle,
+        PLAYBACK_IDLE_BACKGROUND_DELAY_MS
+      )
+      return
+    }
+
+    void finalizeAudioSessionTokenKeys({
+      session,
+      tokenKeysPromise: getTokenKeysPromise(),
+      audioController,
+      highlightController,
+      actionToken,
+    })
+  }
+
+  playbackIdleFinalizationTimer = window.setTimeout(
+    runWhenIdle,
+    PLAYBACK_IDLE_BACKGROUND_DELAY_MS
+  )
+}
+
 async function loadAudioSessionForRecording(
   {
     recording,
@@ -3245,14 +3519,38 @@ async function loadAudioSessionForRecording(
     aliyahIndex: PlaybackAliyahIndex
   },
   audioController: AudioController,
-  highlightController: HighlightController
+  highlightController: HighlightController,
+  actionToken = playbackAction.start()
 ) {
   const playbackAliyahIndex = playbackTokenRangeAliyahIndex(aliyahIndex)
-  const tokenKeys = await collectAliyahTokenKeys({
+  const cues = cloneCues(getCuesForRecording(recording))
+  const startLocationPromise = getAliyahStartLocationForRun(
     runId,
-    aliyahIndex: playbackAliyahIndex,
-  })
-  if (!tokenKeys.length) return null
+    playbackAliyahIndex
+  )
+  let tokenKeysPromise: Promise<string[]> | null = null
+  const getTokenKeysPromise = () => {
+    tokenKeysPromise ??= collectAliyahTokenKeys({
+      runId,
+      aliyahIndex: playbackAliyahIndex,
+    })
+    return tokenKeysPromise
+  }
+  const startTokenKeysPromise =
+    aliyahIndex === 'Maftir'
+      ? collectAliyahStartTokenKeys({ runId, aliyahIndex: playbackAliyahIndex })
+      : null
+  const startLocation = await startLocationPromise
+  if (!playbackAction.isCurrent(actionToken)) return null
+  const startTokenKeys = startTokenKeysPromise
+    ? await startTokenKeysPromise
+    : null
+  if (!playbackAction.isCurrent(actionToken)) return null
+  const startCue =
+    startTokenKeys
+      ? firstCueForTokenKeys(cues, startTokenKeys) ??
+        firstCueAtOrAfterLocation(cues, startLocation)
+      : firstCueAtOrAfterLocation(cues, startLocation)
 
   if (
     isActivePlaybackTarget(audioController.session, {
@@ -3261,41 +3559,56 @@ async function loadAudioSessionForRecording(
       aliyahIndex,
     })
   ) {
-    highlightController.setSequence(tokenKeys)
-    await seekAudioSessionToTokenKey(
+    if (startCue) {
+      audioController.seek(startCue.timeStart)
+      cueNavigationIndex = cues.indexOf(startCue)
+      void highlightController.activateCue(startCue, { scroll: true })
+    }
+    scheduleAudioIdleTokenFinalization({
+      session: audioController.session!,
+      getTokenKeysPromise,
       audioController,
       highlightController,
-      tokenKeys[0]
-    )
+      actionToken,
+    })
+    if (!playbackAction.isCurrent(actionToken)) return null
     return audioController.session
   }
 
   const session: ActiveAudioSession = {
     recording,
-    cues: cloneCues(getCuesForRecording(recording)),
+    cues,
     runId,
     aliyahIndex,
-    tokenKeys,
+    tokenKeys: [],
   }
 
   await audioController.loadSession(session)
-  highlightController.setSequence(tokenKeys)
-  adminState.sourceCues = cloneCues(session.cues)
-  const draft = loadAdminDraft(session.recording.id, tokenKeys.length)
-  assignAdminCues(draft?.cues ?? cloneCues(adminState.sourceCues), audioController)
-  adminState.tokenPointer =
-    draft?.tokenPointer ?? getAdminResumeTokenPointer(tokenKeys.length)
-  adminState.draftOrigin = draft ? 'local' : adminState.sourceCues.length ? 'published' : 'none'
-  adminState.draftSavedAt =
-    draft?.updatedAt ?? getCueSavedAtForRecording(session.recording) ?? null
-  adminState.recording = false
-  cueNavigationIndex = session.cues.length ? 0 : null
-  syncAdminPanelState(audioController)
+  if (!playbackAction.isCurrent(actionToken)) return null
 
-  if (session.cues.length) {
-    await seekAudioSessionToTokenKey(audioController, highlightController, tokenKeys[0])
-  } else if (tokenKeys[0]) {
-    await highlightController.activateTokenKey(tokenKeys[0], {
+  if (startCue) {
+    audioController.seek(startCue.timeStart)
+    cueNavigationIndex = cues.indexOf(startCue)
+    void highlightController.activateCue(startCue, { scroll: true })
+    scheduleAudioIdleTokenFinalization({
+      session,
+      getTokenKeysPromise,
+      audioController,
+      highlightController,
+      actionToken,
+    })
+  } else {
+    const tokenKeys = await getTokenKeysPromise()
+    if (!playbackAction.isCurrent(actionToken)) return null
+    if (!tokenKeys.length) return null
+    await finalizeAudioSessionTokenKeys({
+      session,
+      tokenKeysPromise: Promise.resolve(tokenKeys),
+      audioController,
+      highlightController,
+      actionToken,
+    })
+    if (session.tokenKeys[0]) await highlightController.activateTokenKey(session.tokenKeys[0], {
       scroll: true,
     })
   }
@@ -3611,6 +3924,7 @@ async function startPlaybackForButton(
 ) {
   const state = getSessionButtonState(button)
   if (!state?.recording || !state.lineInfo.run) return
+  const actionToken = playbackAction.start()
 
   if (
     isActivePlaybackTarget(audioController.session, {
@@ -3629,6 +3943,7 @@ async function startPlaybackForButton(
         runId: state.lineInfo.run.id,
         aliyahIndex: state.aliyahIndex,
       })
+      if (!playbackAction.isCurrent(actionToken)) return
 
       if (isCurrentPlaybackWithinTokenKeys(audioController, highlightController, maftirTokenKeys)) {
         await toggleCurrentRecordingPlayback(audioController, () =>
@@ -3644,9 +3959,11 @@ async function startPlaybackForButton(
           aliyahIndex: state.aliyahIndex,
         },
         audioController,
-        highlightController
+        highlightController,
+        actionToken
       )
       if (!session) return
+      if (!playbackAction.isCurrent(actionToken)) return
 
       await playNetworkRecording(audioController, () =>
         startPlaybackForButton(button, audioController, highlightController)
@@ -3702,9 +4019,11 @@ async function startPlaybackForButton(
       aliyahIndex: state.aliyahIndex,
     },
     audioController,
-    highlightController
+    highlightController,
+    actionToken
   )
   if (!session) return
+  if (!playbackAction.isCurrent(actionToken)) return
 
   await playNetworkRecording(audioController, () =>
     startPlaybackForButton(button, audioController, highlightController)
@@ -3719,10 +4038,11 @@ async function startPlaybackForToolbarCurrentAliyah(
   const runId = button.dataset.runId
   const aliyahIndex = parsePlaybackAliyahIndex(button.dataset.aliyahIndex)
   if (!runId || !aliyahIndex) return
+  const actionToken = playbackAction.start()
 
-  const marker = document.querySelector<HTMLElement>(
-    aliyahMarkerSelector(runId, aliyahIndex)
-  )
+  const target = await ensureAliyahDomTargetRendered(runId, aliyahIndex)
+  if (!playbackAction.isCurrent(actionToken)) return
+  const marker = target?.marker ?? target?.element
   if (!marker) return
 
   const lineInfo = getLineInfoFromElement(marker)
@@ -3749,6 +4069,7 @@ async function startPlaybackForToolbarCurrentAliyah(
       }
 
       const maftirTokenKeys = await collectAliyahTokenKeys({ runId, aliyahIndex })
+      if (!playbackAction.isCurrent(actionToken)) return
 
       if (
         isCurrentPlaybackWithinTokenKeys(
@@ -3770,9 +4091,11 @@ async function startPlaybackForToolbarCurrentAliyah(
           aliyahIndex,
         },
         audioController,
-        highlightController
+        highlightController,
+        actionToken
       )
       if (!session) return
+      if (!playbackAction.isCurrent(actionToken)) return
 
       await playNetworkRecording(audioController, () =>
         startPlaybackForToolbarCurrentAliyah(button, audioController, highlightController)
@@ -3802,9 +4125,11 @@ async function startPlaybackForToolbarCurrentAliyah(
       aliyahIndex,
     },
     audioController,
-    highlightController
+    highlightController,
+    actionToken
   )
   if (!session) return
+  if (!playbackAction.isCurrent(actionToken)) return
 
   await playNetworkRecording(audioController, () =>
     startPlaybackForToolbarCurrentAliyah(button, audioController, highlightController)
@@ -5259,8 +5584,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   book.addEventListener('page-rendered', (event) => {
     const renderedPage = event instanceof CustomEvent ? event.detail?.node : null
+    indexAliyahDomTargets(renderedPage instanceof Element ? renderedPage : book)
     applyRecordingModePageLabels(renderedPage instanceof Element ? renderedPage : book)
     applyReaderVisibleIssueMarkers(renderedPage instanceof Element ? renderedPage : book)
+    if (isPlaybackActive(audioController)) return
     refreshReaderChrome(audioController)
     scheduleDeferredProgressRefresh()
     syncCurrentSessionHighlight(audioController, highlightController)
@@ -5350,7 +5677,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     refreshInlineAudioButtons(audioController)
     syncAdminPanelState(audioController)
     renderAliyahRail()
-    renderAdminWaveform(audioController)
+    if (isAdminPanelVisible()) renderAdminWaveform(audioController)
   })
   audioController.on('time-updated', () => {
     updateFloatingPlayerAudioProgress(audioController)

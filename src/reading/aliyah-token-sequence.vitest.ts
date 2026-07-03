@@ -2,6 +2,7 @@ import { expect, test } from 'vitest'
 import {
   adjustEndingLineTokens,
   adjustStartingLineTokens,
+  collectStartingLineTokenKeys,
   collectTokenKeysForAliyahRange,
 } from './aliyah-token-sequence.ts'
 
@@ -174,4 +175,37 @@ test('collects through the rendered content when the final aliyah has no next ma
       endLine: null,
     })
   ).toEqual(['0:0:0:0', '0:0:0:1', '0:0:0:2', '0:1:0:0'])
+})
+
+test('collects starting line token keys without walking the final aliyah range', () => {
+  const book = document.createElement('div')
+  book.innerHTML = `
+    <table>
+      <tr data-class="line" data-line-index="0">
+        <td>
+          <span class="fragment mod-annotations-on">
+            <span class="word" data-token-key="0:0:0:0">לפני</span>
+          </span>
+        </td>
+      </tr>
+      <tr data-class="line" data-line-index="1">
+        <td>
+          <span class="fragment mod-annotations-on">
+            <span class="word" data-token-key="0:1:0:0">קודם</span>
+            <span class="word" data-token-key="0:1:0:1">סיום׃</span>
+            <span class="word" data-token-key="0:1:0:2">מפטיר</span>
+            <span class="word" data-token-key="0:1:0:3">מתחיל</span>
+          </span>
+        </td>
+      </tr>
+    </table>
+  `
+
+  const lines = [...book.querySelectorAll<HTMLElement>('[data-class="line"]')]
+  expect(
+    collectStartingLineTokenKeys({
+      book,
+      startLine: lines[1],
+    })
+  ).toEqual(['0:1:0:2', '0:1:0:3'])
 })

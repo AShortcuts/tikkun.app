@@ -104,6 +104,7 @@ function createVisibleCenteredTokenElement(tokenKey: string) {
   const classes = new Set<string>()
   return {
     dataset: { tokenKey },
+    isConnected: true,
     offsetTop: 40,
     offsetHeight: 20,
     offsetParent: { offsetTop: 0 },
@@ -133,6 +134,14 @@ function createVisibleCenteredTokenElement(tokenKey: string) {
         },
       }
     },
+  } as unknown as HTMLElement
+}
+
+function createConnectedTokenElement(tokenKey: string, label: string) {
+  return {
+    ...createVisibleCenteredTokenElement(tokenKey),
+    textContent: label,
+    isConnected: true,
   } as unknown as HTMLElement
 }
 
@@ -345,4 +354,51 @@ test('drops cached token elements when the display changes', async () => {
   controller.setDisplay({} as never)
 
   expect(await controller.activateTokenKey('12:7:0:2', { scroll: false })).toBe(newToken)
+})
+
+test('evicts old token element cache entries instead of retaining every highlighted word', async () => {
+  const tokens = new Map<string, HTMLElement>()
+  for (let index = 0; index < 405; index++) {
+    const key = `12:7:0:${index}`
+    tokens.set(key, createConnectedTokenElement(key, `old-${index}`))
+  }
+  const book = {
+    addEventListener() {},
+    clientHeight: 100,
+    scrollTop: 0,
+    querySelectorAll(selector: string): HTMLElement[] {
+      const match = selector.match(/\[data-token-key="(.+)"\]/)
+      if (!match) return []
+      const token = tokens.get(match[1])
+      return token ? [token] : []
+    },
+    scrollTo() {},
+    getBoundingClientRect() {
+      return {
+        top: 0,
+        bottom: 100,
+        left: 0,
+        right: 100,
+        width: 100,
+        height: 100,
+        x: 0,
+        y: 0,
+        toJSON() {
+          return {}
+        },
+      }
+    },
+  } as unknown as HTMLElement
+  const controller = new HighlightController(book)
+
+  for (let index = 0; index < 405; index++) {
+    await controller.activateTokenKey(`12:7:0:${index}`, { scroll: false })
+  }
+
+  const replacement = createConnectedTokenElement('12:7:0:0', 'new-0')
+  tokens.set('12:7:0:0', replacement)
+
+  expect(await controller.activateTokenKey('12:7:0:0', { scroll: false })).toBe(
+    replacement
+  )
 })

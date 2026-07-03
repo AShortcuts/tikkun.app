@@ -3,6 +3,7 @@ import type { ScrollDisplay } from '../components/ScrollDisplay.ts'
 import { centerElementInScrollRoot } from '../reader-scroll.ts'
 
 const ACTIVE_CLASS = 'is-active-word'
+const MAX_TOKEN_ELEMENT_CACHE_KEYS = 400
 
 const cueToTokenKey = (cue: WordCue) =>
   `${cue.pageNumber}:${cue.lineIndex}:${cue.fragmentIndex}:${cue.wordIndex}`
@@ -18,14 +19,7 @@ export class HighlightController {
   private display: ScrollDisplay | null = null
   private tokenElementsByKey = new Map<string, HTMLElement[]>()
 
-  constructor(private readonly book: HTMLElement) {
-    this.book.addEventListener('page-rendered', (event) => {
-      const renderedNode = (event as CustomEvent<{ node?: Element }>).detail?.node
-      if (renderedNode instanceof HTMLElement) {
-        this.indexTokenElements(renderedNode)
-      }
-    })
-  }
+  constructor(private readonly book: HTMLElement) {}
 
   setDisplay(display: ScrollDisplay) {
     this.clear()
@@ -56,7 +50,6 @@ export class HighlightController {
   }
 
   clear() {
-    if (!this.activeTokenKey) return
     this.activeElements.forEach((element) => element.classList.remove(ACTIVE_CLASS))
     this.activeElements = []
     this.activeTokenKey = null
@@ -149,12 +142,19 @@ export class HighlightController {
 
   private getTokenElements(tokenKey: string) {
     const cached = this.tokenElementsByKey.get(tokenKey)
-    if (cached) return cached
+    if (cached) {
+      const connected = cached.filter((element) => element.isConnected)
+      if (connected.length) {
+        this.rememberTokenElements(tokenKey, connected)
+        return connected
+      }
+      this.tokenElementsByKey.delete(tokenKey)
+    }
 
     const elements = [
       ...this.book.querySelectorAll<HTMLElement>(`[data-token-key="${tokenKey}"]`),
     ]
-    this.tokenElementsByKey.set(tokenKey, elements)
+    this.rememberTokenElements(tokenKey, elements)
     return elements
   }
 
@@ -174,23 +174,25 @@ export class HighlightController {
     centerElementInScrollRoot(this.book, element, { behavior: 'smooth' })
   }
 
-  private indexTokenElements(root: ParentNode) {
-    root.querySelectorAll<HTMLElement>('[data-token-key]').forEach((element) => {
-      const tokenKey = element.dataset.tokenKey
-      if (!tokenKey) return
-
-      const existing = this.tokenElementsByKey.get(tokenKey)
-      if (!existing) {
-        this.tokenElementsByKey.set(tokenKey, [element])
-        return
-      }
-
-      if (!existing.includes(element)) {
-        existing.push(element)
-      }
-    })
+  private rememberTokenElements(tokenKey: string, elements: HTMLElement[]) {
+    this.tokenElementsByKey.delete(tokenKey)
+    this.tokenElementsByKey.set(tokenKey, elements)
+    this.pruneTokenElementCache()
   }
 
+  private pruneTokenElementCache() {
+    while (this.tokenElementsByKey.size > MAX_TOKEN_ELEMENT_CACHE_KEYS) {
+      const oldestKey = this.tokenElementsByKey.keys().next().value
+      if (!oldestKey) return
+      if (oldestKey === this.activeTokenKey) {
+        const activeElements = this.tokenElementsByKey.get(oldestKey)
+        this.tokenElementsByKey.delete(oldestKey)
+        if (activeElements) this.tokenElementsByKey.set(oldestKey, activeElements)
+        continue
+      }
+      this.tokenElementsByKey.delete(oldestKey)
+    }
+  }
 }
 
 export function cueKey(cue: WordCue) {

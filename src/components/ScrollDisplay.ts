@@ -98,21 +98,36 @@ export class ScrollDisplay {
   async ensurePageRendered(pageNumber: number) {
     if (this.renderedPages.has(pageNumber)) return this.renderedPages.get(pageNumber)!
 
-    let attempts = 0
-    while (!this.renderedPages.has(pageNumber) && attempts < 300) {
-      attempts++
-      const rendered = this.getRenderedPageNumbers()
-      const firstPage = rendered[0]
-      const entry =
-        pageNumber < firstPage
-          ? await this.viewModel.fetchPreviousPage()
-          : await this.viewModel.fetchNextPage()
-      if (!entry) break
-      if (pageNumber < firstPage) this.renderPrevious(entry)
-      else this.renderNext(entry)
+    const rendered = this.getRenderedPageNumbers()
+    const firstPage = rendered[0]
+    const entry = await this.viewModel.fetchPageByPageNumber(pageNumber)
+    if (!entry) return null
+
+    if (firstPage !== undefined && pageNumber < firstPage) {
+      this.renderPrevious(entry)
+    } else {
+      this.renderNext(entry)
     }
 
     return this.renderedPages.get(pageNumber) ?? null
+  }
+
+  async ensurePageRenderedPreservingScroll(pageNumber: number) {
+    if (this.renderedPages.has(pageNumber)) return this.renderedPages.get(pageNumber)!
+
+    const rendered = this.getRenderedPageNumbers()
+    const firstPage = rendered[0]
+    const preserveScroll = firstPage !== undefined && pageNumber < firstPage
+    const previousScrollHeight = this.root.scrollHeight
+    const previousScrollTop = this.root.scrollTop
+    const node = await this.ensurePageRendered(pageNumber)
+
+    if (node && preserveScroll) {
+      this.root.scrollTop =
+        previousScrollTop + (this.root.scrollHeight - previousScrollHeight)
+    }
+
+    return node
   }
 }
 

@@ -212,6 +212,12 @@ export abstract class ScrollViewModel {
     return this.fetchPage((await this.currentContentIndex).next())
   }
 
+  async fetchPageByPageNumber(pageNumber: number): Promise<RenderedEntry | null> {
+    const contentIndex = await this.contentIndexFromPageNumber(pageNumber)
+    if (contentIndex < 0) return null
+    return this.fetchPage(contentIndex)
+  }
+
   /**
    * Calculates the page number (within the scroll) to fetch, or
    * a fixed string, to render for the given (contiguous) index.

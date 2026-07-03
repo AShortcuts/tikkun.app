@@ -46,6 +46,31 @@ export async function getAliyahStartLocationFromViewModel(
   )
 }
 
+export class AliyahTargetLocationCache {
+  private readonly locations = new Map<string, AliyahPhysicalLocation | null>()
+
+  clear() {
+    this.locations.clear()
+  }
+
+  async get(
+    viewModel: AliyahLocationViewModel,
+    run: LeiningRun | null | undefined,
+    aliyahIndex: PlaybackAliyahIndex
+  ) {
+    const key = run ? `${run.id}:${aliyahIndex}` : `missing:${aliyahIndex}`
+    if (this.locations.has(key)) return this.locations.get(key) ?? null
+
+    const location = await getAliyahStartLocationFromViewModel(
+      viewModel,
+      run,
+      aliyahIndex
+    )
+    this.locations.set(key, location)
+    return location
+  }
+}
+
 export function lineIndexFromLocation(location: Pick<AliyahPhysicalLocation, 'lineNumber'>) {
   return Math.max(0, location.lineNumber - 1)
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { LeiningRun } from '../calendar-model/model-types.ts'
 import {
+  AliyahTargetLocationCache,
   getAliyahStartLocation,
   getAliyahStartLocationFromViewModel,
   lineIndexFromLocation,
@@ -55,5 +56,39 @@ describe('aliyah DOM target helpers', () => {
     await expect(
       getAliyahStartLocationFromViewModel(viewModel, run, 4)
     ).resolves.toEqual({ pageNumber: 8, lineNumber: 12 })
+  })
+
+  it('caches resolved start locations by run and aliyah', async () => {
+    let resolveCount = 0
+    const cache = new AliyahTargetLocationCache()
+    const run = {
+      id: '2026-10-17:shacharis,main',
+      aliyot: [
+        {
+          index: 4,
+          start: { scroll: 'torah', b: 1, c: 8, v: 15 },
+          end: { scroll: 'torah', b: 1, c: 8, v: 19 },
+        },
+      ],
+    } as LeiningRun
+    const viewModel = {
+      resolver: Promise.resolve({
+        physicalLocationFromRef() {
+          resolveCount += 1
+          return { pageNumber: 8, lineNumber: 12 }
+        },
+      }),
+    }
+
+    await expect(cache.get(viewModel, run, 4)).resolves.toEqual({
+      pageNumber: 8,
+      lineNumber: 12,
+    })
+    await expect(cache.get(viewModel, run, 4)).resolves.toEqual({
+      pageNumber: 8,
+      lineNumber: 12,
+    })
+
+    expect(resolveCount).toBe(1)
   })
 })

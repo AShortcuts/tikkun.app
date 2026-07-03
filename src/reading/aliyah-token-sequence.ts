@@ -97,3 +97,22 @@ export function collectTokenKeysForAliyahRange({
     .map((word) => word.dataset.tokenKey)
     .filter((key): key is string => Boolean(key))
 }
+
+export function collectStartingLineTokenKeys({
+  book,
+  startLine,
+}: {
+  book: ParentNode
+  startLine: HTMLElement
+}) {
+  const lines = [...book.querySelectorAll<HTMLElement>('[data-class="line"]')]
+  const startIndex = lines.indexOf(startLine)
+  if (startIndex < 0) return []
+
+  return adjustStartingLineTokens({
+    currentLineWords: annotatedWordsIn(startLine),
+    previousLineWords: startIndex > 0 ? annotatedWordsIn(lines[startIndex - 1]) : [],
+  })
+    .map((word) => word.dataset.tokenKey)
+    .filter((key): key is string => Boolean(key))
+}
