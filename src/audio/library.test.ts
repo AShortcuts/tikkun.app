@@ -1,7 +1,12 @@
 import { expect, test } from 'vitest'
 import { LeiningGenerator } from '../calendar-model/generator.ts'
 import type { UserSettings } from '../calendar-model/user-settings.ts'
-import { findRecordingForRun, parshaSlugForRun } from './recording-lookup.ts'
+import {
+  findRecordingForRun,
+  getCuePayloadForRecording,
+  listRecordings,
+  parshaSlugForRun,
+} from './library.ts'
 
 const testSettings: UserSettings = {
   ashkenazi: true,
@@ -49,4 +54,16 @@ test('audio lookup resolves maftir to the seventh aliyah recording', () => {
       run,
       aliyahIndex: 'Maftir',
     })?.id).toBe('noach-7')
+})
+
+test('loads cue payloads for a recording on demand', async () => {
+  const recording = listRecordings().find((entry) => entry.id === 'bereshit-1')
+
+  if (!recording) throw new Error('Missing Bereshit recording')
+
+  await expect(getCuePayloadForRecording(recording)).resolves.toMatchObject({
+    audioId: 'bereshit-1',
+    cueCount: 400,
+    tokenCount: 400,
+  })
 })

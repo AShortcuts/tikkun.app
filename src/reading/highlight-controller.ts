@@ -69,7 +69,7 @@ export class HighlightController {
     }
 
     const activation = (async () => {
-      await this.display?.ensurePageRendered(cue.pageNumber)
+      await this.display?.ensurePageMounted(cue.pageNumber)
       return this.activateTokenKey(tokenKey, options)
     })()
 

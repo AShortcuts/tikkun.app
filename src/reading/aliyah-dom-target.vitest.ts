@@ -10,16 +10,16 @@ import {
 
 describe('aliyah DOM target helpers', () => {
   it('resolves the start location for a Maftir aliyah independently of the main run', () => {
-    const maftirStart = { scroll: 'torah', book: 'Shemos', chapter: 30, verse: 11 }
+    const maftirStart = { scroll: 'torah', b: 2, c: 30, v: 11 } as const
     const run = {
       aliyot: [
         {
           index: 'Maftir',
           start: maftirStart,
-          end: { scroll: 'torah', book: 'Shemos', chapter: 30, verse: 16 },
+          end: { scroll: 'torah', b: 2, c: 30, v: 16 },
         },
       ],
-    } as LeiningRun
+    } as unknown as LeiningRun
 
     const location = getAliyahStartLocation(run, 'Maftir', (ref) => {
       expect(ref).toBe(maftirStart)
@@ -30,7 +30,7 @@ describe('aliyah DOM target helpers', () => {
   })
 
   it('converts one-based physical line numbers into rendered line indexes', () => {
-    expect(lineIndexFromLocation({ pageNumber: 42, lineNumber: 7 })).toBe(6)
+    expect(lineIndexFromLocation({ lineNumber: 7 })).toBe(6)
   })
 
   it('resolves start locations through a view model resolver', async () => {
@@ -43,7 +43,7 @@ describe('aliyah DOM target helpers', () => {
           end: { scroll: 'torah', b: 1, c: 8, v: 19 },
         },
       ],
-    } as LeiningRun
+    } as unknown as LeiningRun
     const viewModel = {
       resolver: Promise.resolve({
         physicalLocationFromRef(ref: typeof aliyahStart) {
@@ -70,7 +70,7 @@ describe('aliyah DOM target helpers', () => {
           end: { scroll: 'torah', b: 1, c: 8, v: 19 },
         },
       ],
-    } as LeiningRun
+    } as unknown as LeiningRun
     const viewModel = {
       resolver: Promise.resolve({
         physicalLocationFromRef() {

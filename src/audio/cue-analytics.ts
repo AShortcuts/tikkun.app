@@ -64,7 +64,7 @@ function median(values: number[]) {
     : sorted[middle]!
 }
 
-export function listCueAnalyticsRecords(options?: {
+export async function listCueAnalyticsRecords(options?: {
   cueOverrides?: Map<string, WordCue[]>
   cueSourceByAudioId?: Map<string, 'published' | 'draft'>
   cueUpdatedAtByAudioId?: Map<string, number | null>
@@ -73,22 +73,28 @@ export function listCueAnalyticsRecords(options?: {
     listNarrators().map((narrator) => [narrator.id, narrator.displayName])
   )
 
-  return listRecordings()
-    .filter((recording) => recording.status === 'available')
-    .map((recording) => {
-      const cues = options?.cueOverrides?.has(recording.id)
-        ? options.cueOverrides.get(recording.id) ?? []
-        : getCuesForRecording(recording)
+  const records = await Promise.all(
+    listRecordings()
+      .filter((recording) => recording.status === 'available')
+      .map(async (recording) => {
+        const cues = options?.cueOverrides?.has(recording.id)
+          ? options.cueOverrides.get(recording.id) ?? []
+          : await getCuesForRecording(recording)
+        const cueUpdatedAt =
+          options?.cueUpdatedAtByAudioId?.get(recording.id) ??
+          (await getCueSavedAtForRecording(recording))
 
-      return createCueAnalyticsRecord({
-        recording,
-        narratorName: narratorNames.get(recording.narratorId) ?? recording.narratorId,
-        cues,
-        cueSource: options?.cueSourceByAudioId?.get(recording.id) ?? 'published',
-        cueUpdatedAt:
-          options?.cueUpdatedAtByAudioId?.get(recording.id) ?? getCueSavedAtForRecording(recording),
+        return createCueAnalyticsRecord({
+          recording,
+          narratorName: narratorNames.get(recording.narratorId) ?? recording.narratorId,
+          cues,
+          cueSource: options?.cueSourceByAudioId?.get(recording.id) ?? 'published',
+          cueUpdatedAt,
+        })
       })
-    })
+  )
+
+  return records
     .sort(
       (left, right) =>
         (left.recording.parshaNumber ?? Number.MAX_SAFE_INTEGER) -

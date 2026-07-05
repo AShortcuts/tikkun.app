@@ -17,6 +17,7 @@ export default defineWorkspace([
       name: 'browser',
       browser: {
         enabled: true,
+        headless: true,
         name: 'chromium',
         provider: 'playwright',
         // https://playwright.dev

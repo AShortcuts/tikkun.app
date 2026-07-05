@@ -11,6 +11,8 @@ export type IconName =
   | 'chevronDown'
   | 'bookmark'
   | 'bookmarkFilled'
+  | 'link'
+  | 'check'
 
 // Icons are from https://lucide.dev/icons v1.0.
 const iconPaths: Record<IconName, string> = {
@@ -66,6 +68,13 @@ const iconPaths: Record<IconName, string> = {
   `,
   bookmarkFilled: `
     <path d="M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z" fill="currentColor" stroke="none" />
+  `,
+  link: `
+    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+  `,
+  check: `
+    <path d="M20 6 9 17l-5-5" />
   `,
 }
 

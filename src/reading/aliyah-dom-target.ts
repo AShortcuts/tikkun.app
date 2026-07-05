@@ -49,6 +49,10 @@ export async function getAliyahStartLocationFromViewModel(
 export class AliyahTargetLocationCache {
   private readonly locations = new Map<string, AliyahPhysicalLocation | null>()
 
+  get size() {
+    return this.locations.size
+  }
+
   clear() {
     this.locations.clear()
   }

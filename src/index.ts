@@ -1,12 +1,29 @@
 import InfiniteScroller from './infinite-scroller.ts'
 import { HDate } from '@hebcal/hdate'
 import ParshaPicker from './components/ParshaPicker.ts'
-import type { CalendarSettings } from './components/ParshaPicker.ts'
 import utils from './components/utils.ts'
 import { ScrollViewModel } from './view-model/scroll-view-model.ts'
 import { LeiningGenerator } from './calendar-model/generator.ts'
-import type { UserSettings } from './calendar-model/user-settings.ts'
+import {
+  loadCalendarSettings,
+  saveCalendarSettings,
+  userSettingsFromCalendarSettings,
+  type CalendarSettings,
+} from './calendar-settings.ts'
 import { ScrollDisplay } from './components/ScrollDisplay.ts'
+import type { PageLifecycleSnapshot } from './components/page-lifecycle.ts'
+import {
+  applyPageWindowPolicyEviction,
+  computePageWindowPolicy,
+  type PageWindowPolicyConfig,
+  type PageVirtualizationApplication,
+  type PageWindowPolicyResult,
+} from './components/page-window-policy.ts'
+import {
+  createPageVirtualizationMetrics,
+  createPageVirtualizationSettings,
+  type PageVirtualizationDiagnostics,
+} from './components/page-virtualization-debug.ts'
 import { ViewportTracker, type ViewportRange } from './viewport-tracker.ts'
 import { TopBarTracker } from './view-model/navigation/top-bar-model.ts'
 import {
@@ -60,6 +77,7 @@ import {
 import { cueFileRelativePath, formatCueFileJson } from './audio/cue-file.ts'
 import { normalizeFirstCueStart } from './audio/normalize-first-cue.ts'
 import { AudioController, ActiveAudioSession } from './reading/audio-controller.ts'
+import { handleAliyahPermalinkClick } from './reader/aliyah-permalink.ts'
 import { HighlightController, cueKey } from './reading/highlight-controller.ts'
 import {
   aliyahRailItemsSignature,
@@ -148,42 +166,6 @@ import {
 } from './reader-scroll.ts'
 
 const { whenKey } = utils
-
-const CALENDAR_SETTINGS_STORAGE_KEY = 'tikkun.calendar-settings.v1'
-const DEFAULT_CALENDAR_SETTINGS: CalendarSettings = {
-  israel: false,
-}
-
-function userSettingsFromCalendarSettings(
-  settings: CalendarSettings
-): UserSettings {
-  return {
-    ashkenazi: true,
-    includeModernHolidays: false,
-    israel: settings.israel,
-  }
-}
-
-function loadCalendarSettings(): CalendarSettings {
-  try {
-    const raw = window.localStorage.getItem(CALENDAR_SETTINGS_STORAGE_KEY)
-    if (!raw) return DEFAULT_CALENDAR_SETTINGS
-
-    const parsed = JSON.parse(raw) as Partial<CalendarSettings>
-    return {
-      israel: parsed.israel === true,
-    }
-  } catch {
-    return DEFAULT_CALENDAR_SETTINGS
-  }
-}
-
-function saveCalendarSettings(settings: CalendarSettings) {
-  window.localStorage.setItem(
-    CALENDAR_SETTINGS_STORAGE_KEY,
-    JSON.stringify(settings)
-  )
-}
 
 let calendarSettings = loadCalendarSettings()
 const createCalendarGenerator = () =>
@@ -307,6 +289,27 @@ const adminState: {
 
 declare global {
   interface Window {
+    tikkunReaderDiagnostics?: () => {
+      pages: PageLifecycleSnapshot | null
+      pageWindowPolicy: PageWindowPolicyResult | null
+      pageVirtualization: PageVirtualizationDiagnostics
+      caches: {
+        aliyahTokenKeys: number
+        aliyahTargetLocations: number | null
+        aliyahMarkerElements: number
+        renderedLines: number
+        preloadedAudio: number
+      }
+    }
+    tikkunReaderVirtualization?: {
+      state: () => PageVirtualizationDiagnostics
+      enable: () => PageVirtualizationDiagnostics
+      disable: () => PageVirtualizationDiagnostics
+      setEnabled: (enabled: boolean) => PageVirtualizationDiagnostics
+      resetMetrics: () => PageVirtualizationDiagnostics
+      applyNow: () => PageVirtualizationDiagnostics
+      remountAll: () => Promise<PageVirtualizationDiagnostics>
+    }
     tikkunRecorder?: {
       ready: () => Promise<void>
       loadAudio: (audioId: string) => Promise<ActiveAudioSession | null>
@@ -437,11 +440,16 @@ function saveAdminDraft(audioController?: AudioController | null) {
 
 const app = {
   jumpTo: (target: ScrollViewModel) => {
+    display?.destroy()
     resetAliyahDomCaches()
+    const book = document.querySelector<HTMLElement>('[data-target-id="tikkun-book"]')!
+    const hideUntilSettled = pageVirtualizationSettings.state().enabled
+    book.style.visibility = hideUntilSettled ? 'hidden' : ''
     display = new ScrollDisplay(
       target,
-      document.querySelector<HTMLElement>('[data-target-id="tikkun-book"]')!
+      book
     )
+    const currentDisplay = display
     highlightControllerGlobal?.setDisplay(display)
 
     const rendered = display.rendered.then(() => {
@@ -456,9 +464,31 @@ const app = {
         })
       }
     })
-    display.scrolled.then(() => viewportTrackerGlobal?.refresh())
-    return rendered
+    const settled = currentDisplay.scrolled.then(async () => {
+      viewportTrackerGlobal?.refresh()
+      markPageVirtualizationReady(currentDisplay)
+      if (hideUntilSettled) await waitForAnimationFrames(2)
+      if (display === currentDisplay) book.style.visibility = ''
+    })
+    void settled.catch((error) => {
+      if (display === currentDisplay) book.style.visibility = ''
+      console.error(error)
+    })
+    return hideUntilSettled ? rendered.then(() => settled) : rendered
   },
+}
+
+function waitForAnimationFrames(count: number) {
+  return new Promise<void>((resolve) => {
+    const wait = (remaining: number) => {
+      if (remaining <= 0) {
+        resolve()
+        return
+      }
+      requestAnimationFrame(() => wait(remaining - 1))
+    }
+    wait(count)
+  })
 }
 
 const setVisibility = ({
@@ -988,7 +1018,7 @@ function getTokenLabel(tokenKey: string) {
 
 async function jumpToTokenKey(tokenKey: string, options: { audioTime?: number } = {}) {
   const [pageNumber] = tokenKey.split(':').map(Number)
-  if (Number.isFinite(pageNumber)) await display?.ensurePageRendered(pageNumber)
+  if (Number.isFinite(pageNumber)) await display?.ensurePageMounted(pageNumber)
 
   const token = await highlightControllerGlobal?.activateTokenKey(tokenKey, {
     scroll: true,
@@ -1204,7 +1234,7 @@ function getRenderedLineForLocation(location: {
   )
   if (cached?.isConnected) return cached
 
-  const pageNode = display.getPageNode(location.pageNumber)
+  const pageNode = display.getMountedPageNode(location.pageNumber)
   const line =
     pageNode?.querySelector<HTMLElement>(`[data-line-index="${lineIndex}"]`) ??
     null
@@ -1215,6 +1245,12 @@ function getRenderedLineForLocation(location: {
     )
   }
   return line
+}
+
+function pageNumberFromMountedElement(element: HTMLElement) {
+  const pageElement = element.closest<HTMLElement>('[data-page-number]')
+  const pageNumber = Number(pageElement?.dataset.pageNumber)
+  return Number.isInteger(pageNumber) && pageNumber > 0 ? pageNumber : null
 }
 
 function getNextAliyahMarkerAfterLine(line: HTMLElement) {
@@ -1233,11 +1269,15 @@ async function ensureAliyahDomTargetRendered(
   aliyahIndex: PlaybackAliyahIndex
 ): Promise<AliyahDomTarget | null> {
   let marker = getAliyahMarkerElement(runId, aliyahIndex)
-  if (marker) return { element: marker, marker }
+  if (marker) {
+    latestRailTargetPageNumber = pageNumberFromMountedElement(marker)
+    return { element: marker, marker }
+  }
 
   const location = await getAliyahStartLocationForRun(runId, aliyahIndex)
   if (location) {
-    await display.ensurePageRendered(location.pageNumber)
+    latestRailTargetPageNumber = location.pageNumber
+    await display.ensurePageMounted(location.pageNumber)
     marker = getAliyahMarkerElement(runId, aliyahIndex)
     if (marker) return { element: marker, marker }
 
@@ -1246,11 +1286,11 @@ async function ensureAliyahDomTargetRendered(
   }
 
   while (!marker) {
-    const renderedPages = display.getRenderedPageNumbers()
+    const renderedPages = display.getMountedPageNumbers()
     const lastPage = renderedPages[renderedPages.length - 1]
     if (!lastPage) return null
 
-    const loaded = await display.ensurePageRendered(lastPage + 1)
+    const loaded = await display.ensurePageMounted(lastPage + 1)
     if (!loaded) return null
 
     marker = getAliyahMarkerElement(runId, aliyahIndex)
@@ -2105,7 +2145,7 @@ function renderAliyahRail(range: ViewportRange | null = latestViewportRange) {
       run,
       aliyahIndex: aliyah.index,
     })
-    const status = getAliyahRailCueStatus(recording)
+    const status: AliyahRailCueStatus = 'none'
     button.textContent = aliyah.index === 'Maftir' ? 'M' : `${aliyah.index}`
     button.classList.toggle(
       'is-active',
@@ -2116,6 +2156,7 @@ function renderAliyahRail(range: ViewportRange | null = latestViewportRange) {
     button.dataset.runId = run.id
     button.dataset.aliyahIndex = `${aliyah.index}`
     rail.appendChild(button)
+    void syncAliyahRailCueStatus(button, recording, aliyah.index)
   }
 }
 
@@ -2232,14 +2273,16 @@ function getAliyahRailActiveRunId(
   return current?.run?.id ?? null
 }
 
-function getAliyahRailCueStatus(recording: AudioRecording | null): AliyahRailCueStatus {
+async function getAliyahRailCueStatus(
+  recording: AudioRecording | null
+): Promise<AliyahRailCueStatus> {
   if (!recording) return 'none'
 
-  const progress = getCueProgressForRecording(recording)
+  const progress = await getCueProgressForRecording(recording)
   const draftSummary = readAdminDraftSummary(recording.id)
   if (draftSummary?.cueCount) {
     const draft = loadAdminDraft(recording.id, draftSummary.tokenCount)
-    const publishedCues = getCuesForRecording(recording)
+    const publishedCues = await getCuesForRecording(recording)
     if (
       !publishedCues.length ||
       !draft ||
@@ -2255,6 +2298,18 @@ function getAliyahRailCueStatus(recording: AudioRecording | null): AliyahRailCue
   return 'none'
 }
 
+async function syncAliyahRailCueStatus(
+  button: HTMLButtonElement,
+  recording: AudioRecording | null,
+  aliyahIndex: PlaybackAliyahIndex
+) {
+  const status = await getAliyahRailCueStatus(recording)
+  if (!button.isConnected) return
+
+  button.dataset.cueStatus = status
+  button.title = `${getPlaybackAliyahLabel(aliyahIndex)} · ${aliyahRailCueStatusLabel(status)}`
+}
+
 function aliyahRailCueStatusLabel(status: AliyahRailCueStatus) {
   return {
     none: 'no cues',
@@ -2265,11 +2320,11 @@ function aliyahRailCueStatusLabel(status: AliyahRailCueStatus) {
   }[status]
 }
 
-function loadIssuesForActiveSession() {
+async function loadIssuesForActiveSession() {
   const session = audioControllerGlobal?.session
   activeRecordingIssues = session
     ? mergeRecordingIssues(
-        getIssuesForRecording(session.recording, TOKENIZATION_VERSION),
+        await getIssuesForRecording(session.recording, TOKENIZATION_VERSION),
         loadRecordingIssues(localStorage, session.recording.id, TOKENIZATION_VERSION)
       )
     : []
@@ -2831,12 +2886,6 @@ function parsePlaybackAliyahIndex(
   return Number.isInteger(index) && index >= 1 ? index : null
 }
 
-function recordingAliyahIndexForPlayback(
-  aliyahIndex: PlaybackAliyahIndex
-): number {
-  return aliyahIndex === 'Maftir' ? 7 : aliyahIndex
-}
-
 function isCurrentPlaybackTarget(
   audioController: AudioController | undefined,
   {
@@ -2893,6 +2942,24 @@ let aliyahRailPrewarmSignature: string | null = null
 let playbackIdleFinalizationTimer = 0
 const preloadedAudioLinks = new Map<string, HTMLLinkElement>()
 const PLAYBACK_IDLE_BACKGROUND_DELAY_MS = 900
+const pageVirtualizationSettings = createPageVirtualizationSettings({
+  search: location.search,
+  storage: localStorage,
+})
+const pageVirtualizationMetrics = createPageVirtualizationMetrics()
+const PAGE_WINDOW_POLICY_CONFIG: PageWindowPolicyConfig = {
+  viewportRadius: 2,
+  playbackForwardPageCount: 2,
+}
+const VIEWPORT_PLACEHOLDER_REMOUNT_MARGIN_RATIO = 2
+let latestRailTargetPageNumber: number | null = null
+let latestPageVirtualizationApplication: PageVirtualizationApplication = {
+  enabled: pageVirtualizationSettings.state().enabled,
+  evictedPages: [],
+}
+let pageVirtualizationEvictionPaused = false
+let pageVirtualizationReadyForDisplay: ScrollDisplay | null = null
+let viewportPlaceholderRemountFrame = 0
 
 function getAliyahTokenKeysCacheKey(
   runId: string,
@@ -2903,6 +2970,11 @@ function getAliyahTokenKeysCacheKey(
 
 function getRenderedLineLocationKey(pageNumber: number, lineIndex: number) {
   return `${pageNumber}:${lineIndex}`
+}
+
+function getPageNumberFromRenderedLineLocationKey(key: string) {
+  const [pageNumber] = key.split(':').map(Number)
+  return Number.isInteger(pageNumber) ? pageNumber : null
 }
 
 function resetAliyahDomCaches() {
@@ -2918,7 +2990,212 @@ function resetAliyahDomCaches() {
     aliyahRailPrewarmTimer = 0
   }
   aliyahRailPrewarmSignature = null
+  latestRailTargetPageNumber = null
+  latestPageVirtualizationApplication = {
+    enabled: pageVirtualizationSettings.state().enabled,
+    evictedPages: [],
+  }
+  pageVirtualizationMetrics.reset()
+  pageVirtualizationReadyForDisplay = null
+  cancelViewportPlaceholderRemount()
   clearAudioPreloads()
+}
+
+function getReaderDiagnosticsSnapshot() {
+  const pageWindowPolicy = getPageWindowPolicySnapshot()
+
+  return {
+    pages: display?.getPageLifecycleSnapshot() ?? null,
+    pageWindowPolicy,
+    pageVirtualization: getPageVirtualizationDiagnostics(),
+    caches: {
+      aliyahTokenKeys: aliyahTokenKeysCache.size,
+      aliyahTargetLocations: aliyahTargetLocationCache.size,
+      aliyahMarkerElements: aliyahMarkerElementsByKey.size,
+      renderedLines: renderedLinesByLocationKey.size,
+      preloadedAudio: preloadedAudioLinks.size,
+    },
+  }
+}
+
+window.tikkunReaderDiagnostics = getReaderDiagnosticsSnapshot
+
+window.tikkunReaderVirtualization = {
+  state: getPageVirtualizationDiagnostics,
+  enable: () => setPageVirtualizationEnabled(true),
+  disable: () => setPageVirtualizationEnabled(false),
+  setEnabled: (enabled: boolean) => setPageVirtualizationEnabled(enabled),
+  resetMetrics() {
+    pageVirtualizationMetrics.reset()
+    return getPageVirtualizationDiagnostics()
+  },
+  applyNow() {
+    applyPageVirtualization()
+    return getPageVirtualizationDiagnostics()
+  },
+  async remountAll() {
+    await remountAllEvictedPages()
+    return getPageVirtualizationDiagnostics()
+  },
+}
+
+function getPageVirtualizationDiagnostics(): PageVirtualizationDiagnostics {
+  const settings = pageVirtualizationSettings.state()
+  return {
+    enabled: settings.enabled,
+    source: settings.source,
+    latestApplication: latestPageVirtualizationApplication,
+    metrics: pageVirtualizationMetrics.snapshot(),
+  }
+}
+
+function setPageVirtualizationEnabled(enabled: boolean) {
+  const settings = pageVirtualizationSettings.setEnabled(enabled)
+  latestPageVirtualizationApplication = {
+    ...latestPageVirtualizationApplication,
+    enabled: settings.enabled,
+  }
+  pageVirtualizationMetrics.recordToggle(settings)
+  applyPageVirtualization()
+  return getPageVirtualizationDiagnostics()
+}
+
+async function remountAllEvictedPages() {
+  if (!display) return []
+  const evictedPages = display
+    .getPageLifecycleSnapshot()
+    .pages.filter((page) => page.state === 'evicted')
+    .map((page) => page.pageNumber)
+  const remountedPages: number[] = []
+  pageVirtualizationEvictionPaused = true
+  try {
+    for (const pageNumber of evictedPages) {
+      const mounted = await display.ensurePageMounted(pageNumber)
+      if (mounted) remountedPages.push(pageNumber)
+    }
+  } finally {
+    pageVirtualizationEvictionPaused = false
+  }
+  return remountedPages
+}
+
+function scheduleViewportPlaceholderRemount() {
+  if (!isPageVirtualizationReady()) return
+  if (viewportPlaceholderRemountFrame) return
+  viewportPlaceholderRemountFrame = requestAnimationFrame(() => {
+    viewportPlaceholderRemountFrame = 0
+    void remountEvictedPagesNearViewport()
+  })
+}
+
+function cancelViewportPlaceholderRemount() {
+  if (!viewportPlaceholderRemountFrame) return
+  cancelAnimationFrame(viewportPlaceholderRemountFrame)
+  viewportPlaceholderRemountFrame = 0
+}
+
+async function remountEvictedPagesNearViewport() {
+  if (!display) return []
+  const marginPx =
+    display.root.clientHeight * VIEWPORT_PLACEHOLDER_REMOUNT_MARGIN_RATIO
+  const evictedPages = display.getEvictedPageNumbersNearViewport({ marginPx })
+  if (!evictedPages.length) return []
+
+  pageVirtualizationEvictionPaused = true
+  try {
+    return await display.ensureEvictedPagesMountedNearViewport({ marginPx })
+  } finally {
+    pageVirtualizationEvictionPaused = false
+  }
+}
+
+function getPageWindowPolicySnapshot() {
+  return display
+    ? computePageWindowPolicy({
+        mountedPageNumbers: display.getMountedPageNumbers(),
+        viewportPageNumber: display.getViewportAnchorPageNumber(),
+        railTargetPageNumber: latestRailTargetPageNumber,
+        playbackPageNumbers: getPlaybackProtectedPageNumbers(),
+        config: PAGE_WINDOW_POLICY_CONFIG,
+      })
+    : null
+}
+
+function applyPageVirtualization() {
+  if (!display) return latestPageVirtualizationApplication
+  if (!isPageVirtualizationReady()) return latestPageVirtualizationApplication
+  const policy = getPageWindowPolicySnapshot()
+  if (!policy) return latestPageVirtualizationApplication
+  const settings = pageVirtualizationSettings.state()
+  const evictionEnabled = settings.enabled && !pageVirtualizationEvictionPaused
+  const application = applyPageWindowPolicyEviction({
+    enabled: evictionEnabled,
+    policy,
+    evictPages: (pageNumbers) => display.evictPages(pageNumbers),
+  })
+  latestPageVirtualizationApplication = {
+    enabled: settings.enabled,
+    evictedPages: application.evictedPages,
+  }
+  const lifecycle = display.getPageLifecycleSnapshot()
+  pageVirtualizationMetrics.recordPolicyApplication({
+    enabled: evictionEnabled,
+    source: settings.source,
+    policy,
+    evictedPages: latestPageVirtualizationApplication.evictedPages,
+    mountedPageCount: lifecycle.mountedPageCount,
+    knownPageCount: lifecycle.pages.length,
+    evictedPageCount: countEvictedLifecyclePages(lifecycle),
+  })
+  return latestPageVirtualizationApplication
+}
+
+function markPageVirtualizationReady(displayToMark: ScrollDisplay) {
+  if (display !== displayToMark) return
+  pageVirtualizationReadyForDisplay = displayToMark
+}
+
+function isPageVirtualizationReady() {
+  return Boolean(display && pageVirtualizationReadyForDisplay === display)
+}
+
+function countEvictedLifecyclePages(lifecycle: PageLifecycleSnapshot) {
+  return lifecycle.pages.filter((page) => page.state === 'evicted').length
+}
+
+function getPlaybackProtectedPageNumbers(
+  audioController = audioControllerGlobal,
+  highlightController = highlightControllerGlobal
+) {
+  const session = audioController?.session
+  if (!session?.cues.length || !highlightController) return []
+
+  const cueIndex = Math.max(
+    0,
+    highlightController.getCueIndex(
+      session.cues,
+      audioController.audio.currentTime
+    )
+  )
+  const protectedPages: number[] = []
+
+  for (
+    let index = cueIndex;
+    index < session.cues.length &&
+    protectedPages.length <= PAGE_WINDOW_POLICY_CONFIG.playbackForwardPageCount;
+    index += 1
+  ) {
+    const pageNumber = session.cues[index]?.pageNumber
+    if (
+      Number.isInteger(pageNumber) &&
+      pageNumber > 0 &&
+      !protectedPages.includes(pageNumber)
+    ) {
+      protectedPages.push(pageNumber)
+    }
+  }
+
+  return protectedPages
 }
 
 function isPlaybackActive(audioController = audioControllerGlobal) {
@@ -2959,6 +3236,20 @@ function indexAliyahDomTargets(root: ParentNode) {
       marker
     )
   })
+}
+
+function unindexAliyahDomTargetsForPage(pageNumber: number) {
+  for (const [key] of renderedLinesByLocationKey) {
+    if (getPageNumberFromRenderedLineLocationKey(key) === pageNumber) {
+      renderedLinesByLocationKey.delete(key)
+    }
+  }
+
+  for (const [key, marker] of aliyahMarkerElementsByKey) {
+    if (pageNumberFromMountedElement(marker) === pageNumber || !marker.isConnected) {
+      aliyahMarkerElementsByKey.delete(key)
+    }
+  }
 }
 
 function scheduleIdleTask(task: () => void) {
@@ -3021,7 +3312,7 @@ function scheduleAliyahRailPrewarm(
         aliyahIndex: aliyah.index,
       })
       if (recording) {
-        getCuesForRecording(recording)
+        await getCuesForRecording(recording)
         preloadAudioSource(recording.playSrc)
       }
     })().finally(() => {
@@ -3187,9 +3478,9 @@ async function ensureNextProgressAnchorLoaded(currentIndex: number) {
   progressAnchorLoadPromise = (async () => {
     let anchors = getAliyahProgressAnchors()
     while (anchors.length <= currentIndex + 1) {
-      const renderedPages = display.getRenderedPageNumbers()
+      const renderedPages = display.getMountedPageNumbers()
       const lastPage = renderedPages[renderedPages.length - 1]
-      const loaded = await display.ensurePageRendered(lastPage + 1)
+      const loaded = await display.ensurePageMounted(lastPage + 1)
       if (!loaded) break
       anchors = getAliyahProgressAnchors()
     }
@@ -3204,11 +3495,11 @@ async function ensureRenderedThroughAvailableContent() {
   if (!display) return
 
   while (true) {
-    const renderedPages = display.getRenderedPageNumbers()
+    const renderedPages = display.getMountedPageNumbers()
     const lastPage = renderedPages[renderedPages.length - 1]
     if (!lastPage) return
 
-    const loaded = await display.ensurePageRendered(lastPage + 1)
+    const loaded = await display.ensurePageMounted(lastPage + 1)
     if (!loaded) return
   }
 }
@@ -3354,9 +3645,9 @@ async function collectAliyahTokenKeys({
       : getNextAliyahMarkerAfterLine(target.element)
 
   while (!nextMarker && !isFinalAliyah) {
-    const renderedPages = display.getRenderedPageNumbers()
+    const renderedPages = display.getMountedPageNumbers()
     const lastPage = renderedPages[renderedPages.length - 1]
-    const loaded = await display.ensurePageRendered(lastPage + 1)
+    const loaded = await display.ensurePageMounted(lastPage + 1)
     if (!loaded) break
     markers = getAliyahMarkerElements()
     marker = getAliyahMarkerElement(runId, aliyahIndex)
@@ -3454,7 +3745,7 @@ async function finalizeAudioSessionTokenKeys({
     draft?.tokenPointer ?? getAdminResumeTokenPointer(tokenKeys.length)
   adminState.draftOrigin = draft ? 'local' : adminState.sourceCues.length ? 'published' : 'none'
   adminState.draftSavedAt =
-    draft?.updatedAt ?? getCueSavedAtForRecording(session.recording) ?? null
+    draft?.updatedAt ?? (await getCueSavedAtForRecording(session.recording)) ?? null
   adminState.recording = false
   cueNavigationIndex =
     session.cues.length && audioController.audio.currentTime
@@ -3508,6 +3799,39 @@ function scheduleAudioIdleTokenFinalization({
   )
 }
 
+async function finalizeAudioSessionTokenKeysForCurrentMode({
+  session,
+  getTokenKeysPromise,
+  audioController,
+  highlightController,
+  actionToken,
+}: {
+  session: ActiveAudioSession
+  getTokenKeysPromise: () => Promise<string[]>
+  audioController: AudioController
+  highlightController: HighlightController
+  actionToken: number
+}) {
+  if (adminState.unlocked && isAdminPanelVisible()) {
+    await finalizeAudioSessionTokenKeys({
+      session,
+      tokenKeysPromise: getTokenKeysPromise(),
+      audioController,
+      highlightController,
+      actionToken,
+    })
+    return
+  }
+
+  scheduleAudioIdleTokenFinalization({
+    session,
+    getTokenKeysPromise,
+    audioController,
+    highlightController,
+    actionToken,
+  })
+}
+
 async function loadAudioSessionForRecording(
   {
     recording,
@@ -3523,7 +3847,7 @@ async function loadAudioSessionForRecording(
   actionToken = playbackAction.start()
 ) {
   const playbackAliyahIndex = playbackTokenRangeAliyahIndex(aliyahIndex)
-  const cues = cloneCues(getCuesForRecording(recording))
+  const cues = cloneCues(await getCuesForRecording(recording))
   const startLocationPromise = getAliyahStartLocationForRun(
     runId,
     playbackAliyahIndex
@@ -3564,7 +3888,7 @@ async function loadAudioSessionForRecording(
       cueNavigationIndex = cues.indexOf(startCue)
       void highlightController.activateCue(startCue, { scroll: true })
     }
-    scheduleAudioIdleTokenFinalization({
+    await finalizeAudioSessionTokenKeysForCurrentMode({
       session: audioController.session!,
       getTokenKeysPromise,
       audioController,
@@ -3590,7 +3914,7 @@ async function loadAudioSessionForRecording(
     audioController.seek(startCue.timeStart)
     cueNavigationIndex = cues.indexOf(startCue)
     void highlightController.activateCue(startCue, { scroll: true })
-    scheduleAudioIdleTokenFinalization({
+    await finalizeAudioSessionTokenKeysForCurrentMode({
       session,
       getTokenKeysPromise,
       audioController,
@@ -5409,7 +5733,7 @@ function revealPageNumberForRoute(hash: string | null) {
   const pageNumber = pageNumberFromPageRouteHash(hash)
   if (!pageNumber) return
 
-  const pageNode = display?.getPageNode(pageNumber)
+  const pageNode = display?.getMountedPageNode(pageNumber)
   const marker = pageNode?.querySelector<HTMLElement>('.tikkun-page-number')
   if (!marker) return
 
@@ -5579,6 +5903,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateReaderProgress()
       })
     }
+    scheduleViewportPlaceholderRemount()
     if (hasUserScrolledReaderForLastReading) saveLastReadingDebounced()
   })
 
@@ -5587,13 +5912,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     indexAliyahDomTargets(renderedPage instanceof Element ? renderedPage : book)
     applyRecordingModePageLabels(renderedPage instanceof Element ? renderedPage : book)
     applyReaderVisibleIssueMarkers(renderedPage instanceof Element ? renderedPage : book)
+    applyPageVirtualization()
     if (isPlaybackActive(audioController)) return
     refreshReaderChrome(audioController)
     scheduleDeferredProgressRefresh()
     syncCurrentSessionHighlight(audioController, highlightController)
   })
 
+  book.addEventListener('page-evicted', (event) => {
+    const pageNumber = event instanceof CustomEvent ? event.detail?.pageNumber : null
+    if (Number.isInteger(pageNumber)) {
+      unindexAliyahDomTargetsForPage(pageNumber)
+      pageVirtualizationMetrics.recordPageEvicted(pageNumber)
+    }
+  })
+
+  book.addEventListener('page-remounted', (event) => {
+    const pageNumber = event instanceof CustomEvent ? event.detail?.pageNumber : null
+    if (Number.isInteger(pageNumber)) {
+      pageVirtualizationMetrics.recordPageRemounted(pageNumber)
+    }
+  })
+
   book.addEventListener('click', async (event) => {
+    if (await handleAliyahPermalinkClick(event)) return
+
     const target = event.target as HTMLElement
     const playButton = target.closest<HTMLButtonElement>('[data-audio-button="true"]')
     if (playButton) {
@@ -5672,7 +6015,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   audioController.on('session-loaded', (session) => {
     cueNavigationIndex = session.cues.length ? 0 : null
     highlightController.setSequence(session.tokenKeys)
-    loadIssuesForActiveSession()
+    void loadIssuesForActiveSession()
     updateFloatingPlayer(audioController)
     refreshInlineAudioButtons(audioController)
     syncAdminPanelState(audioController)

@@ -749,7 +749,7 @@ export async function mountCueAnalyticsPage(container: HTMLElement) {
 
   for (const recording of availableRecordings) {
     const draftSummary = readAdminDraftSummary(recording.id)
-    const cueProgress = getCueProgressForRecording(recording)
+    const cueProgress = await getCueProgressForRecording(recording)
 
     if (draftSummary?.cueCount) {
       const draft = loadAdminDraft(recording.id, draftSummary.tokenCount)
@@ -780,7 +780,7 @@ export async function mountCueAnalyticsPage(container: HTMLElement) {
     }
   }
 
-  const allRecords = listCueAnalyticsRecords({
+  const allRecords = await listCueAnalyticsRecords({
     cueOverrides,
     cueSourceByAudioId,
     cueUpdatedAtByAudioId,

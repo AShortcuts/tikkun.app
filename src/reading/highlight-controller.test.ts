@@ -356,6 +356,57 @@ test('drops cached token elements when the display changes', async () => {
   expect(await controller.activateTokenKey('12:7:0:2', { scroll: false })).toBe(newToken)
 })
 
+test('mounts the cue page before activating a cue token', async () => {
+  const tokenKey = '12:7:0:2'
+  const token = createVisibleCenteredTokenElement(tokenKey)
+  const calls: number[] = []
+  const book = {
+    addEventListener() {},
+    clientHeight: 100,
+    scrollTop: 0,
+    querySelectorAll(selector: string): HTMLElement[] {
+      return selector === `[data-token-key="${tokenKey}"]` ? [token] : []
+    },
+    scrollTo() {},
+    getBoundingClientRect() {
+      return {
+        top: 0,
+        bottom: 100,
+        left: 0,
+        right: 100,
+        width: 100,
+        height: 100,
+        x: 0,
+        y: 0,
+        toJSON() {
+          return {}
+        },
+      }
+    },
+  } as unknown as HTMLElement
+  const controller = new HighlightController(book)
+
+  controller.setDisplay({
+    async ensurePageMounted(pageNumber: number): Promise<null> {
+      calls.push(pageNumber)
+      return null
+    },
+  } as never)
+
+  await controller.activateCue(
+    {
+      timeStart: 0,
+      pageNumber: 12,
+      lineIndex: 7,
+      fragmentIndex: 0,
+      wordIndex: 2,
+    },
+    { scroll: false }
+  )
+
+  expect(calls).toEqual([12])
+})
+
 test('evicts old token element cache entries instead of retaining every highlighted word', async () => {
   const tokens = new Map<string, HTMLElement>()
   for (let index = 0; index < 405; index++) {

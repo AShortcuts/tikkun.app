@@ -21,6 +21,8 @@ const excludedExtensions = new Set([
   '.wav',
   '.webm',
 ])
+const audioCueChunkPattern =
+  /^assets\/[a-z0-9-]+-[אבגדהוז]-[a-z0-9]+-[A-Za-z0-9_-]+\.js$/u
 
 function toUrlPath(filePath) {
   return `/${filePath.split(path.sep).map(encodeURIComponent).join('/')}`
@@ -32,6 +34,7 @@ function shouldPrecache(relativePath) {
   if (excludedPathPrefixes.some((prefix) => normalized.startsWith(prefix))) {
     return false
   }
+  if (audioCueChunkPattern.test(normalized)) return false
   return !excludedExtensions.has(path.extname(normalized).toLowerCase())
 }
 

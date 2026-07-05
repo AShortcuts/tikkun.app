@@ -501,6 +501,48 @@ html[data-highlight-rendering='legacy-rectangle'] .word.is-active-word::before {
   word-break: normal;
 }
 
+.aliyah-link {
+  position: absolute;
+  top: 50%;
+  right: -1.75rem;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.45rem;
+  height: 1.45rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: color-mix(in srgb, currentColor 74%, transparent);
+  cursor: pointer;
+  font: inherit;
+  opacity: 0;
+  transition:
+    opacity 0.15s ease,
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.aliyah-badge:hover .aliyah-link,
+.aliyah-badge:focus-within .aliyah-link {
+  opacity: 0.62;
+}
+
+.aliyah-link:hover,
+.aliyah-link:focus-visible {
+  color: currentColor;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  opacity: 1;
+}
+
+.aliyah-link[data-copy-state='copied'] {
+  color: oklch(61% 0.17 150);
+  background: color-mix(in srgb, currentColor 13%, transparent);
+  opacity: 1;
+}
+
 .aliyah-audio-button {
   border: none;
   display: inline-flex;

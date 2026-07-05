@@ -2,6 +2,7 @@ import type { LeiningAliyah } from '../calendar-model/model-types.ts'
 import type { RenderedLineInfo } from '../view-model/scroll-view-model.ts'
 import displayRange from '../display-range.ts'
 import hebrewNumeralFromInteger from '../hebrew-numeral.ts'
+import { createLastReadingHash } from '../reading/last-reading.ts'
 import textFilter from '../text-filter.ts'
 import { iconMarkup } from './icons.ts'
 
@@ -113,7 +114,8 @@ const aliyahStartVerseRange = (aliyahStarts: LeiningAliyah[]) =>
 const renderLabelBadge = (
   label: string,
   runId: string | undefined,
-  aliyah: LeiningAliyah | undefined
+  aliyah: LeiningAliyah | undefined,
+  run: RenderedLineInfo['run']
 ) => `
   <span
     class="aliyah-badge${aliyah?.index ? ' mod-with-audio' : ''}"
@@ -134,8 +136,29 @@ const renderLabelBadge = (
         : ''
     }
     <span class="aliyah-label-text">${addLabelBreakOpportunities(label)}</span>
+    ${renderAliyahLink(label, run, aliyah)}
   </span>
 `
+
+const renderAliyahLink = (
+  label: string,
+  run: RenderedLineInfo['run'],
+  aliyah: LeiningAliyah | undefined
+) => {
+  if (!run || !aliyah?.start) return ''
+
+  const href = createLastReadingHash(run, aliyah.start)
+  return `
+    <button
+      type="button"
+      class="aliyah-link"
+      data-aliyah-link="true"
+      data-aliyah-url="${escapeAttribute(href)}"
+      aria-label="Copy link to ${escapeAttribute(label)}"
+      title="Copy link to ${escapeAttribute(label)}"
+    ><span data-aliyah-link-icon="link">${iconMarkup('link')}</span><span data-aliyah-link-icon="check" hidden>${iconMarkup('check')}</span></button>
+  `
+}
 
 const Line = ({
   pageNumber,
@@ -223,7 +246,7 @@ const Line = ({
       </div>
       <div class="line-gutter mod-aliyot">
         <span class="location-indicator mod-aliyot" data-target-id="aliyot-range">${labels
-          .map((label, idx) => renderLabelBadge(label, run?.id, aliyahStarts[idx]))
+          .map((label, idx) => renderLabelBadge(label, run?.id, aliyahStarts[idx], run))
           .join('')}</span>
       </div>
     </td>

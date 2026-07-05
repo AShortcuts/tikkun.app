@@ -1,4 +1,4 @@
-import { audioCuePayloadsByAudioId } from '../data/audio-cues/index.ts'
+import { loadCuePayloadForRecording } from '../data/audio-cues/index.ts'
 import {
   audioNarrators,
   audioRecordings,
@@ -19,28 +19,38 @@ export function listRecordings(): AudioRecording[] {
   return audioRecordings
 }
 
-export function getCuesForRecording(recording: AudioRecording): WordCue[] {
-  return normalizeFirstCueStart(audioCuePayloadsByAudioId[recording.id]?.cues ?? [])
+export async function getCuePayloadForRecording(recording: AudioRecording) {
+  return loadCuePayloadForRecording(recording)
 }
 
-export function getIssuesForRecording(recording: AudioRecording, tokenizationVersion: string) {
+export async function getCuesForRecording(recording: AudioRecording): Promise<WordCue[]> {
+  const payload = await getCuePayloadForRecording(recording)
+  return normalizeFirstCueStart(payload?.cues ?? [])
+}
+
+export async function getIssuesForRecording(
+  recording: AudioRecording,
+  tokenizationVersion: string
+) {
+  const payload = await getCuePayloadForRecording(recording)
   return filterRecordingIssues(
-    audioCuePayloadsByAudioId[recording.id]?.issues,
+    payload?.issues,
     recording.id,
     tokenizationVersion
   )
 }
 
-export function getCueSavedAtForRecording(recording: AudioRecording) {
-  const savedAt = audioCuePayloadsByAudioId[recording.id]?.savedAt
+export async function getCueSavedAtForRecording(recording: AudioRecording) {
+  const payload = await getCuePayloadForRecording(recording)
+  const savedAt = payload?.savedAt
   if (typeof savedAt !== 'string') return null
 
   const parsed = Date.parse(savedAt)
   return Number.isFinite(parsed) ? parsed : null
 }
 
-export function getCueProgressForRecording(recording: AudioRecording) {
-  const payload = audioCuePayloadsByAudioId[recording.id]
+export async function getCueProgressForRecording(recording: AudioRecording) {
+  const payload = await getCuePayloadForRecording(recording)
   const cueCount = payload?.cueCount ?? payload?.cues.length ?? 0
   const tokenCount = payload?.tokenCount ?? 0
 
