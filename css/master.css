@@ -246,6 +246,7 @@ html[data-reader-theme='dark'] {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  overflow-anchor: none;
   -webkit-overflow-scrolling: touch;
   /*https://css-tricks.com/snippets/css/momentum-scrolling-on-ios-overflow-elements/*/
   box-sizing: border-box;

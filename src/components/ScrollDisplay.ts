@@ -47,6 +47,7 @@ export class ScrollDisplay {
   private accessCounter = 0
 
   constructor(readonly viewModel: ScrollViewModel, readonly root: HTMLElement) {
+    root.scrollTop = 0
     purgeNode(root)
 
     this.rendered = viewModel.startingLocation.then(
@@ -71,6 +72,7 @@ export class ScrollDisplay {
     this.scrolled = this.rendered.then(async (line) => {
       // Wait for parsha picker to close (from `this.rendered`)
       // so that we become measurable.
+      await waitForDocumentFonts()
       await new Promise(requestAnimationFrame)
       this.scrollTo({ element: line })
     })
@@ -507,4 +509,10 @@ function getFirstVisibleWord(line: HTMLElement) {
     const rect = word.getBoundingClientRect()
     return rect.width > 0 && rect.height > 0
   }) ?? null
+}
+
+async function waitForDocumentFonts() {
+  const fonts = document.fonts
+  if (!fonts || fonts.status === 'loaded') return
+  await fonts.ready
 }

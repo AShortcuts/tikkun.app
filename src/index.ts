@@ -4658,6 +4658,48 @@ function updateAdminCounter(tokenCount: number) {
   counter.textContent = `${adminState.cues.length} / ${tokenCount} Words · ${pointer}`
 }
 
+const adminRecordIconMarkup = `
+  <span class="admin-record-icon-stack" aria-hidden="true">
+    <svg class="admin-record-icon mod-record" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+      <circle cx="12" cy="12" r="10"/>
+      <circle cx="12" cy="12" r="5.41" fill="currentColor" stroke="none"/>
+    </svg>
+    <svg class="admin-record-icon mod-stop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+      <circle class="admin-record-stop-outer" cx="12" cy="12" r="10"/>
+      <rect class="admin-record-stop-inner" x="7.84" y="7.84" width="8.32" height="8.32" rx="2.08" fill="currentColor" stroke="none"/>
+    </svg>
+  </span>
+`
+
+const adminResumeIconMarkup = `
+  <svg class="admin-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+    <path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/>
+  </svg>
+`
+
+function setAdminRecordButtonState(button: HTMLButtonElement, recording: boolean) {
+  const label = recording
+    ? 'Stop recording word timings and switch to playback review'
+    : 'Record or edit word timing for the loaded aliyah'
+  button.classList.add('admin-icon-button', 'admin-record-button')
+  if (!button.querySelector('.admin-record-icon-stack')) {
+    button.innerHTML = adminRecordIconMarkup
+  }
+  const caption =
+    button.closest<HTMLElement>('.admin-icon-control')?.querySelector<HTMLElement>('.admin-icon-caption')
+  if (caption) caption.textContent = recording ? 'Stop Recording' : 'Record/Edit Timing'
+  button.setAttribute('aria-label', label)
+  button.title = label
+  button.classList.toggle('is-recording', recording)
+}
+
+function hasAdminLocalCueChanges() {
+  return (
+    adminState.cues.length > 0 &&
+    !areCueDraftsEquivalent(adminState.cues, adminState.sourceCues)
+  )
+}
+
 function mountAdminEditorUi() {
   const panel = document.querySelector<HTMLElement>('[data-target-id="admin-panel"]')
   if (!panel || panel.querySelector('[data-target-id="admin-draft-status"]')) return
@@ -4669,23 +4711,25 @@ function mountAdminEditorUi() {
         Drafts autosave locally per recording.
       </div>
       <div class="admin-panel-actions mod-secondary" data-target-id="admin-resume-wrap" hidden>
-        <button type="button" class="toolbar-button" data-target-id="admin-resume-draft">Resume Draft</button>
+        <span class="admin-icon-control">
+          <button type="button" class="toolbar-button admin-icon-button" data-target-id="admin-resume-draft" aria-label="Resume the incomplete timing draft from the next unsaved word" title="Resume the incomplete timing draft from the next unsaved word">${adminResumeIconMarkup}</button>
+          <span class="admin-icon-caption" aria-hidden="true">Resume Draft</span>
+        </span>
       </div>
       <div class="admin-panel-draft" data-target-id="admin-sync-note" hidden>
         To visualize synced autoplay highlighting, press 'Stop Recording'.
       </div>
       <div class="admin-panel-actions mod-secondary">
-        <button type="button" class="toolbar-button" data-target-id="admin-prev-saved">Prev Saved</button>
-        <button type="button" class="toolbar-button" data-target-id="admin-play-current">Play Current</button>
-        <button type="button" class="toolbar-button" data-target-id="admin-next-saved">Next Saved</button>
-        <button type="button" class="toolbar-button" data-target-id="admin-mark-issue">Mark Issue</button>
-        <button type="button" class="toolbar-button" data-target-id="admin-trim-here">Trim From Here</button>
+        <button type="button" class="toolbar-button" data-target-id="admin-prev-saved" aria-label="Select the previous saved word timing" title="Select the previous saved word timing">Prev Saved</button>
+        <button type="button" class="toolbar-button" data-target-id="admin-play-current" aria-label="Play audio from the selected word timing" title="Play audio from the selected word timing">Play Current</button>
+        <button type="button" class="toolbar-button" data-target-id="admin-next-saved" aria-label="Select the next saved word timing" title="Select the next saved word timing">Next Saved</button>
+        <button type="button" class="toolbar-button" data-target-id="admin-trim-here" aria-label="Delete saved timings after the selected word" title="Delete saved timings after the selected word">Trim From Here</button>
       </div>
       <div class="admin-panel-actions mod-secondary mod-timing">
-        <button type="button" class="toolbar-button" data-admin-nudge="-0.25" title="Move selected cue back 250ms" aria-label="Move selected cue back 250ms">-250</button>
-        <button type="button" class="toolbar-button" data-admin-nudge="-0.05" title="Move selected cue back 50ms" aria-label="Move selected cue back 50ms">-50</button>
-        <button type="button" class="toolbar-button" data-admin-nudge="0.05" title="Move selected cue forward 50ms" aria-label="Move selected cue forward 50ms">+50</button>
-        <button type="button" class="toolbar-button" data-admin-nudge="0.25" title="Move selected cue forward 250ms" aria-label="Move selected cue forward 250ms">+250</button>
+        <button type="button" class="toolbar-button" data-admin-nudge="-0.25" title="Move the selected word timing 250 milliseconds earlier" aria-label="Move the selected word timing 250 milliseconds earlier">-250</button>
+        <button type="button" class="toolbar-button" data-admin-nudge="-0.05" title="Move the selected word timing 50 milliseconds earlier" aria-label="Move the selected word timing 50 milliseconds earlier">-50</button>
+        <button type="button" class="toolbar-button" data-admin-nudge="0.05" title="Move the selected word timing 50 milliseconds later" aria-label="Move the selected word timing 50 milliseconds later">+50</button>
+        <button type="button" class="toolbar-button" data-admin-nudge="0.25" title="Move the selected word timing 250 milliseconds later" aria-label="Move the selected word timing 250 milliseconds later">+250</button>
       </div>
       <div class="admin-cue-list" data-target-id="admin-cue-list"></div>
       <div class="admin-progress-list" data-target-id="admin-progress">
@@ -4694,9 +4738,11 @@ function mountAdminEditorUi() {
             <span class="floating-player-progress-label">Word Progress</span>
             <span class="floating-player-progress-value" data-target-id="admin-meta-cues">0 / 0</span>
           </div>
+          <!--
           <div class="floating-player-progress-track">
             <div class="floating-player-progress-fill mod-cues"></div>
           </div>
+          -->
         </div>
         <div class="floating-player-progress-item">
           <div class="floating-player-progress-head">
@@ -5027,7 +5073,9 @@ function renderAdminCueList(audioController?: AudioController | null) {
       row.append(noteEl)
     }
 
-    row.title = `${getAdminTokenLabel(index)} at ${formatCueTimestamp(cue.timeStart)}`
+    const rowLabel = `Select saved timing for ${getAdminTokenLabel(index)} at ${formatCueTimestamp(cue.timeStart)}${noteText ? `. ${noteText}` : ''}`
+    row.title = rowLabel
+    row.setAttribute('aria-label', rowLabel)
     list.appendChild(row)
     if (cue) previousCue = cue
   })
@@ -5045,7 +5093,7 @@ function syncAdminRecordButton() {
   const button = document.querySelector<HTMLButtonElement>(
     '[data-target-id="admin-record"]'
   )!
-  button.textContent = adminState.recording ? 'Stop Recording' : 'Record/Edit Timing'
+  setAdminRecordButtonState(button, adminState.recording)
 }
 
 async function resumeAdminDraft(
@@ -5161,12 +5209,25 @@ function syncAdminPanelState(audioController?: AudioController | null) {
   undoButton.disabled = !hasCues
   resetButton.disabled = !hasCues && !adminState.recording && adminState.tokenPointer < 0
   exportButton.disabled = !hasSession || !hasCues
+  const hasLocalCueChanges = hasAdminLocalCueChanges()
+  exportButton.classList.add('admin-export-button')
+  exportButton.classList.toggle('has-local-cue-diff', hasLocalCueChanges)
+  const exportLabel = hasLocalCueChanges
+    ? 'Export local cue changes that differ from published cue data'
+    : 'Export the current timing draft as cue data'
+  exportButton.setAttribute('aria-label', exportLabel)
+  exportButton.title = exportLabel
   if (resumeDraftWrap) resumeDraftWrap.hidden = !canResumeDraft
   if (resumeDraftButton) {
     resumeDraftButton.disabled = !canResumeDraft
-    resumeDraftButton.textContent = canResumeDraft
-      ? `Resume Draft from Word ${adminState.cues.length}`
-      : 'Resume Draft'
+    if (!resumeDraftButton.querySelector('.admin-action-icon')) {
+      resumeDraftButton.innerHTML = adminResumeIconMarkup
+    }
+    const resumeDraftLabel = canResumeDraft
+      ? `Resume timing draft from Word ${adminState.cues.length + 1}`
+      : 'Resume the incomplete timing draft from the next unsaved word'
+    resumeDraftButton.setAttribute('aria-label', resumeDraftLabel)
+    resumeDraftButton.title = resumeDraftLabel
   }
   if (prevSavedButton) prevSavedButton.disabled = !hasPreviousSavedCue
   if (playCurrentButton) playCurrentButton.disabled = !hasSelectedCue
