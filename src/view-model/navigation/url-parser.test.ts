@@ -216,10 +216,14 @@ test('Esther page URL starts directly at the requested page', async () => {
 })
 
 test('Page URLs reject unknown scrolls and out of range pages', () => {
-  expect(parseUrl(generator, '/torah/page/0')).toBeFalsy()
-  expect(parseUrl(generator, '/torah/page/246')).toBeFalsy()
-  expect(parseUrl(generator, '/esther/page/18')).toBeFalsy()
+  expect(parseUrl(generator, '/torah/page/0')?.view).toBe('not-found')
+  expect(parseUrl(generator, '/torah/page/246')?.view).toBe('not-found')
+  expect(parseUrl(generator, '/esther/page/18')?.view).toBe('not-found')
   expect(parseUrl(generator, '/page/not-a-scroll/12')).toBeFalsy()
+})
+
+test('Nonexistent Torah references render the not-found route', () => {
+  expect(parseUrl(generator, '/r/4-46-9')).toEqual({ view: 'not-found' })
 })
 
 test('Old parsha and page URL families are not parsed', () => {

@@ -26,6 +26,16 @@ interface PageMountRecord {
   mountPromise: Promise<HTMLElement | null> | null
 }
 
+interface ScrollPreservationAnchor {
+  pageNumber: number
+  lineIndex: number
+  viewportOffset: number
+}
+
+type EdgeLoadDirection = 'previous' | 'next'
+
+const EDGE_LOAD_THRESHOLD_RATIO = 0.5
+
 /**
  * Renders pages of a ScrollViewModel into a root element.
  * This is used by index.ts to render the main UI, and by
@@ -33,9 +43,9 @@ interface PageMountRecord {
  */
 export class ScrollDisplay {
   /** Renders an entry (from the view model) to the top of the scroll. */
-  readonly renderPrevious = this.generateRender('afterbegin')
+  private readonly renderPrevious = this.generateRender('afterbegin')
   /** Renders an entry (from the view model) to the bottom of the scroll. */
-  readonly renderNext = this.generateRender('beforeend')
+  private readonly renderNext = this.generateRender('beforeend')
 
   /** Resolves to the starting line after all initial pages have been rendered on the root. */
   readonly rendered: Promise<HTMLElement>
@@ -45,14 +55,17 @@ export class ScrollDisplay {
   private readonly pageMounts = new Map<number, PageMountRecord>()
   private disposed = false
   private accessCounter = 0
+  private edgeLoadingReady = false
+  private edgeLoadPromise: Promise<void> | null = null
 
   constructor(readonly viewModel: ScrollViewModel, readonly root: HTMLElement) {
     root.scrollTop = 0
     purgeNode(root)
+    root.addEventListener('scroll', this.handleEdgeScroll, { passive: true })
 
     this.rendered = viewModel.startingLocation.then(
       async ({ page, lineNumber }) => {
-        const pageNode = await this.renderNext(page)
+        const pageNode = this.renderNext(page, { preserveViewport: false })
         const lines = [...pageNode.querySelectorAll<HTMLElement>('.line')]
         const lineIndex = lineNumber - 1
 
@@ -60,10 +73,14 @@ export class ScrollDisplay {
         // so that we can scroll down to center the target.
         if (lineIndex < lines.length / 2) {
           const previousPage = await viewModel.fetchPreviousPage()
-          if (previousPage) await this.renderPrevious(previousPage)
+          if (previousPage) {
+            this.renderPrevious(previousPage, { preserveViewport: false })
+          }
         } else {
           const nextPage = await viewModel.fetchNextPage()
-          if (nextPage) await this.renderNext(nextPage)
+          if (nextPage) {
+            this.renderNext(nextPage, { preserveViewport: false })
+          }
         }
 
         return lines[lineIndex]
@@ -75,11 +92,14 @@ export class ScrollDisplay {
       await waitForDocumentFonts()
       await new Promise(requestAnimationFrame)
       this.scrollTo({ element: line })
+      this.edgeLoadingReady = true
     })
   }
 
   destroy() {
     this.disposed = true
+    this.edgeLoadingReady = false
+    this.root.removeEventListener('scroll', this.handleEdgeScroll)
   }
 
   private scrollTo({ element }: { element: HTMLElement }) {
@@ -91,28 +111,116 @@ export class ScrollDisplay {
   }
 
   private generateRender(insertPosition: InsertPosition) {
-    return (entry: RenderedEntry) => {
-      let node: Element
-      if (entry.type === 'message') {
-        node = renderMessageNode(entry)
-      } else {
-        node = this.mountPageEntry(entry, insertPosition)
+    return (
+      entry: RenderedEntry,
+      { preserveViewport = true }: { preserveViewport?: boolean } = {}
+    ) => {
+      const wasEvicted =
+        entry.type === 'page' &&
+        this.pageMounts.get(entry.pageNumber)?.state === 'evicted'
+      const render = () => {
+        let renderedNode: Element
+        if (entry.type === 'message') {
+          renderedNode = renderMessageNode(entry)
+        } else {
+          renderedNode = this.mountPageEntry(entry, insertPosition)
+        }
+        if (!this.disposed && entry.type === 'message') {
+          this.root.insertAdjacentElement(insertPosition, renderedNode)
+        }
+        return renderedNode
       }
+      const node = preserveViewport
+        ? this.mutatePreservingViewport(
+            entry.type === 'page' ? entry.pageNumber : null,
+            render
+          )
+        : render()
       if (this.disposed) return node
-      if (entry.type === 'message') {
-        this.root.insertAdjacentElement(insertPosition, node)
+      if (entry.type === 'page' && wasEvicted) {
+        this.dispatchPageRemounted(entry.pageNumber, node)
       }
-      this.root.dispatchEvent(
-        new CustomEvent('page-rendered', {
-          detail: {
-            entry,
-            node,
-          },
-        })
-      )
-
+      this.dispatchPageRendered(entry, node)
       return node
     }
+  }
+
+  private readonly handleEdgeScroll = () => {
+    if (this.disposed || !this.edgeLoadingReady || this.edgeLoadPromise) return
+    const direction = this.getEdgeLoadDirection()
+    if (!direction) return
+
+    const request = this.loadAdjacentPage(direction)
+    this.edgeLoadPromise = request
+    void request
+      .catch((error) => {
+        console.error(`Failed to load ${direction} reader page`, error)
+      })
+      .finally(() => {
+        if (this.edgeLoadPromise === request) this.edgeLoadPromise = null
+      })
+  }
+
+  private getEdgeLoadDirection(): EdgeLoadDirection | null {
+    const visibleHeight = this.root.clientHeight
+    if (this.root.scrollTop < EDGE_LOAD_THRESHOLD_RATIO * visibleHeight) {
+      return 'previous'
+    }
+
+    const hiddenBelowHeight =
+      this.root.scrollHeight - (visibleHeight + this.root.scrollTop)
+    return hiddenBelowHeight < EDGE_LOAD_THRESHOLD_RATIO * visibleHeight
+      ? 'next'
+      : null
+  }
+
+  private async loadAdjacentPage(direction: EdgeLoadDirection) {
+    const entry =
+      direction === 'previous'
+        ? await this.viewModel.fetchPreviousPage()
+        : await this.viewModel.fetchNextPage()
+    if (!entry || this.disposed) return
+
+    if (direction === 'previous') this.renderPrevious(entry)
+    else this.renderNext(entry)
+  }
+
+  private dispatchPageRendered(entry: RenderedEntry, node: Element) {
+    this.root.dispatchEvent(
+      new CustomEvent('page-rendered', {
+        detail: {
+          entry,
+          node,
+        },
+      })
+    )
+  }
+
+  private dispatchPageRemounted(pageNumber: number, node: Element) {
+    this.root.dispatchEvent(
+      new CustomEvent('page-remounted', {
+        detail: {
+          pageNumber,
+          node,
+        },
+      })
+    )
+  }
+
+  private mutatePreservingViewport<T>(
+    affectedPageNumber: number | null,
+    mutation: () => T
+  ) {
+    const anchor = getScrollPreservationAnchor(this.root)
+    const previousScrollHeight = this.root.scrollHeight
+    const previousScrollTop = this.root.scrollTop
+    const result = mutation()
+    restoreScrollPreservationAnchor(this.root, anchor, {
+      affectedPageNumber,
+      previousScrollHeight,
+      previousScrollTop,
+    })
+    return result
   }
 
   getPageNode(pageNumber: number) {
@@ -206,39 +314,32 @@ export class ScrollDisplay {
         this.setPageRecord(pageNumber, 'missing')
         return null
       }
-
-      if (wasEvicted && record.placeholderNode) {
-        return this.mountEvictedPage(entry, record)
-      } else {
-        this.mountPageInOrder(entry)
+      if (record.state === 'mounted' && record.node?.isConnected) {
+        return record.node
       }
 
-      return this.getMountedPageNode(pageNumber)
-    })()
+      const node = this.mutatePreservingViewport(pageNumber, () =>
+        wasEvicted && record.placeholderNode
+          ? this.mountEvictedPage(entry, record)
+          : this.mountPageInOrder(entry)
+      )
+      if (wasEvicted) this.dispatchPageRemounted(pageNumber, node)
+      this.dispatchPageRendered(entry, node)
+      return node
+    })().catch((error) => {
+      if (record.state === 'mounted' && record.node?.isConnected) {
+        return record.node
+      }
+      if (wasEvicted) {
+        record.state = 'evicted'
+        record.mountPromise = null
+      } else {
+        this.pageMounts.delete(pageNumber)
+      }
+      throw error
+    })
     record.mountPromise = mountPromise
     return mountPromise
-  }
-
-  async ensurePageRendered(pageNumber: number) {
-    return this.ensurePageMounted(pageNumber)
-  }
-
-  async ensurePageRenderedPreservingScroll(pageNumber: number) {
-    if (this.isPageMounted(pageNumber)) return this.getMountedPageNode(pageNumber)
-
-    const rendered = this.getMountedPageNumbers()
-    const firstPage = rendered[0]
-    const preserveScroll = firstPage !== undefined && pageNumber < firstPage
-    const previousScrollHeight = this.root.scrollHeight
-    const previousScrollTop = this.root.scrollTop
-    const node = await this.ensurePageMounted(pageNumber)
-
-    if (node && preserveScroll) {
-      this.root.scrollTop =
-        previousScrollTop + (this.root.scrollHeight - previousScrollHeight)
-    }
-
-    return node
   }
 
   evictPage(pageNumber: number) {
@@ -251,6 +352,16 @@ export class ScrollDisplay {
     const measuredHeight = measurePageHeight(node) ?? record.measuredHeight ?? 0
     const placeholder = renderPagePlaceholder(pageNumber, measuredHeight)
 
+    this.mutatePreservingViewport(pageNumber, () => {
+      node.replaceWith(placeholder)
+      this.renderedPages.delete(pageNumber)
+      record.state = 'evicted'
+      record.node = null
+      record.placeholderNode = placeholder
+      record.measuredHeight = measuredHeight
+      record.mountPromise = null
+      this.touchPageRecord(record)
+    })
     this.root.dispatchEvent(
       new CustomEvent('page-evicted', {
         detail: {
@@ -259,15 +370,6 @@ export class ScrollDisplay {
         },
       })
     )
-
-    node.replaceWith(placeholder)
-    this.renderedPages.delete(pageNumber)
-    record.state = 'evicted'
-    record.node = null
-    record.placeholderNode = placeholder
-    record.measuredHeight = measuredHeight
-    record.mountPromise = null
-    this.touchPageRecord(record)
     return true
   }
 
@@ -397,14 +499,6 @@ export class ScrollDisplay {
     this.insertPageNodeInOrder(page.pageNumber, node)
     this.renderedPages.set(page.pageNumber, node)
     this.markPageMounted(page.pageNumber, node)
-    this.root.dispatchEvent(
-      new CustomEvent('page-rendered', {
-        detail: {
-          entry: page,
-          node,
-        },
-      })
-    )
     return node
   }
 
@@ -452,22 +546,6 @@ export class ScrollDisplay {
     record.placeholderNode?.replaceWith(node)
     this.renderedPages.set(page.pageNumber, node)
     this.markPageMounted(page.pageNumber, node)
-    this.root.dispatchEvent(
-      new CustomEvent('page-remounted', {
-        detail: {
-          pageNumber: page.pageNumber,
-          node,
-        },
-      })
-    )
-    this.root.dispatchEvent(
-      new CustomEvent('page-rendered', {
-        detail: {
-          entry: page,
-          node,
-        },
-      })
-    )
     return node
   }
 }
@@ -509,6 +587,71 @@ function getFirstVisibleWord(line: HTMLElement) {
     const rect = word.getBoundingClientRect()
     return rect.width > 0 && rect.height > 0
   }) ?? null
+}
+
+function getScrollPreservationAnchor(
+  root: HTMLElement
+): ScrollPreservationAnchor | null {
+  const rootRect = root.getBoundingClientRect()
+  const focalY = rootRect.top + root.clientHeight / 2
+  let closestLine: HTMLElement | null = null
+  let closestDistance = Number.POSITIVE_INFINITY
+
+  for (const line of root.querySelectorAll<HTMLElement>('[data-line-index]')) {
+    const rect = line.getBoundingClientRect()
+    const distance = Math.abs((rect.top + rect.bottom) / 2 - focalY)
+    if (distance >= closestDistance) continue
+    closestLine = line
+    closestDistance = distance
+  }
+
+  if (!closestLine) return null
+  const pageNumber = Number(closestLine.dataset.pageNumber)
+  const lineIndex = Number(closestLine.dataset.lineIndex)
+  if (!Number.isInteger(pageNumber) || !Number.isInteger(lineIndex)) return null
+
+  return {
+    pageNumber,
+    lineIndex,
+    viewportOffset: closestLine.getBoundingClientRect().top - rootRect.top,
+  }
+}
+
+function restoreScrollPreservationAnchor(
+  root: HTMLElement,
+  anchor: ScrollPreservationAnchor | null,
+  {
+    affectedPageNumber,
+    previousScrollHeight,
+    previousScrollTop,
+  }: {
+    affectedPageNumber: number | null
+    previousScrollHeight: number
+    previousScrollTop: number
+  }
+) {
+  if (!anchor) return
+  const line = root.querySelector<HTMLElement>(
+    `[data-page-number="${anchor.pageNumber}"][data-line-index="${anchor.lineIndex}"]`
+  )
+  if (line) {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const rootRect = root.getBoundingClientRect()
+      const currentOffset = line.getBoundingClientRect().top - rootRect.top
+      const correction = currentOffset - anchor.viewportOffset
+      if (Math.abs(correction) <= 0.5) break
+      root.scrollTop += correction
+    }
+    return
+  }
+
+  if (
+    affectedPageNumber !== null &&
+    affectedPageNumber < anchor.pageNumber
+  ) {
+    root.scrollTop =
+      previousScrollTop + (root.scrollHeight - previousScrollHeight)
+  }
 }
 
 async function waitForDocumentFonts() {

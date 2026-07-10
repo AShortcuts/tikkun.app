@@ -18,6 +18,30 @@ const testSettings: UserSettings = {
 
 const generator = new LeiningGenerator(testSettings)
 
+test('deduplicates concurrent page-data fetches', async () => {
+  const model = ScrollViewModel.forId(generator, '2026-10-17:shacharis,main', {
+    scroll: 'torah',
+    b: 1,
+    c: 9,
+    v: 18,
+  })
+  if (!model) throw new Error('Noach model not found')
+  const resolver = await model.resolver
+  const target = resolver.physicalLocationFromRef({
+    scroll: 'torah',
+    b: 1,
+    c: 8,
+    v: 15,
+  })
+
+  const [first, second] = await Promise.all([
+    model.fetchPageByPageNumber(target.pageNumber),
+    model.fetchPageByPageNumber(target.pageNumber),
+  ])
+
+  expect(first).toBe(second)
+})
+
 // Note: We cover the runs included in HolidayViewModel in aliyah-labeller.test.ts
 // This also includes fetchPreviousPage() and fetchNextPage()
 

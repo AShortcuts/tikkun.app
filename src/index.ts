@@ -1,4 +1,3 @@
-import InfiniteScroller from './infinite-scroller.ts'
 import { HDate } from '@hebcal/hdate'
 import ParshaPicker from './components/ParshaPicker.ts'
 import utils from './components/utils.ts'
@@ -50,6 +49,7 @@ import {
   resolveParshaRun,
 } from './view-model/navigation/parsha-routes.ts'
 import AboutPage from './components/AboutPage.ts'
+import PageNotFoundPage from './components/PageNotFoundPage.ts'
 import CueAnalyticsPage, { mountCueAnalyticsPage } from './components/CueAnalyticsPage.ts'
 import { iconMarkup, type IconName } from './components/icons.ts'
 import {
@@ -298,7 +298,6 @@ declare global {
         aliyahTargetLocations: number | null
         aliyahMarkerElements: number
         renderedLines: number
-        preloadedAudio: number
       }
     }
     tikkunReaderVirtualization?: {
@@ -456,7 +455,9 @@ const app = {
       hideParshaPicker()
       refreshReaderChrome()
       if (audioControllerGlobal && highlightControllerGlobal)
-        syncCurrentSessionHighlight(audioControllerGlobal, highlightControllerGlobal)
+        syncCurrentSessionHighlight(audioControllerGlobal, highlightControllerGlobal, {
+          scroll: false,
+        })
       const debugActiveToken = getDebugActiveTokenKey()
       if (debugActiveToken && highlightControllerGlobal) {
         void highlightControllerGlobal.activateTokenKey(debugActiveToken, {
@@ -2099,6 +2100,7 @@ function renderAliyahRail(range: ViewportRange | null = latestViewportRange) {
   rail.classList.toggle('u-hidden', !available)
   if (!available) {
     aliyahRailRenderedSignature = null
+    clearCurrentAliyahAudioPreload()
     hideAliyahRail()
     return
   }
@@ -2114,13 +2116,15 @@ function renderAliyahRail(range: ViewportRange | null = latestViewportRange) {
 
   if (!currentRun) {
     aliyahRailRenderedSignature = null
+    clearCurrentAliyahAudioPreload()
     rail.replaceChildren()
     return
   }
 
   const railItems = getAliyahRailItemsForRun(currentRun)
   const signature = `${readerPreferences.narratorId}:${aliyahRailItemsSignature(railItems)}`
-  scheduleAliyahRailPrewarm(railItems, signature)
+  syncCurrentAliyahAudioPreload(currentRun, activeAliyahIndex)
+  scheduleAliyahResourcePrewarm(railItems, signature)
   if (signature === aliyahRailRenderedSignature) {
     setAliyahRailActiveButton(rail, activeRunId, activeAliyahIndex)
     return
@@ -2834,7 +2838,6 @@ async function playNetworkRecording(
   retry?: () => Promise<void>
 ) {
   if (audioController.audio.paused && !canPlayNetworkRecording(retry)) return false
-  cancelAliyahRailPrewarm()
   if (audioController.audio.error && audioController.session) audioController.audio.load()
   await audioController.play()
   return true
@@ -2937,10 +2940,10 @@ const aliyahMarkerElementsByKey = new Map<string, HTMLElement>()
 const renderedLinesByLocationKey = new Map<string, HTMLElement>()
 const railScrollAction = new LatestAction()
 const playbackAction = new LatestAction()
-let aliyahRailPrewarmTimer = 0
-let aliyahRailPrewarmSignature: string | null = null
+let aliyahResourcePrewarmTimer = 0
+let aliyahResourcePrewarmSignature: string | null = null
+let currentAliyahAudioPreload: HTMLLinkElement | null = null
 let playbackIdleFinalizationTimer = 0
-const preloadedAudioLinks = new Map<string, HTMLLinkElement>()
 const PLAYBACK_IDLE_BACKGROUND_DELAY_MS = 900
 const pageVirtualizationSettings = createPageVirtualizationSettings({
   search: location.search,
@@ -2985,11 +2988,12 @@ function resetAliyahDomCaches() {
   railScrollAction.cancel()
   playbackAction.cancel()
   cancelPlaybackIdleFinalization()
-  if (aliyahRailPrewarmTimer) {
-    cancelIdleTask(aliyahRailPrewarmTimer)
-    aliyahRailPrewarmTimer = 0
+  if (aliyahResourcePrewarmTimer) {
+    cancelIdleTask(aliyahResourcePrewarmTimer)
+    aliyahResourcePrewarmTimer = 0
   }
-  aliyahRailPrewarmSignature = null
+  aliyahResourcePrewarmSignature = null
+  clearCurrentAliyahAudioPreload()
   latestRailTargetPageNumber = null
   latestPageVirtualizationApplication = {
     enabled: pageVirtualizationSettings.state().enabled,
@@ -2998,7 +3002,6 @@ function resetAliyahDomCaches() {
   pageVirtualizationMetrics.reset()
   pageVirtualizationReadyForDisplay = null
   cancelViewportPlaceholderRemount()
-  clearAudioPreloads()
 }
 
 function getReaderDiagnosticsSnapshot() {
@@ -3013,7 +3016,6 @@ function getReaderDiagnosticsSnapshot() {
       aliyahTargetLocations: aliyahTargetLocationCache.size,
       aliyahMarkerElements: aliyahMarkerElementsByKey.size,
       renderedLines: renderedLinesByLocationKey.size,
-      preloadedAudio: preloadedAudioLinks.size,
     },
   }
 }
@@ -3203,10 +3205,42 @@ function isPlaybackActive(audioController = audioControllerGlobal) {
   return Boolean(audio && !audio.paused && !audio.ended)
 }
 
-function cancelAliyahRailPrewarm() {
-  if (!aliyahRailPrewarmTimer) return
-  cancelIdleTask(aliyahRailPrewarmTimer)
-  aliyahRailPrewarmTimer = 0
+function cancelAliyahResourcePrewarm() {
+  if (!aliyahResourcePrewarmTimer) return
+  cancelIdleTask(aliyahResourcePrewarmTimer)
+  aliyahResourcePrewarmTimer = 0
+}
+
+function clearCurrentAliyahAudioPreload() {
+  currentAliyahAudioPreload?.remove()
+  currentAliyahAudioPreload = null
+}
+
+function syncCurrentAliyahAudioPreload(
+  run: LeiningRun,
+  aliyahIndex: PlaybackAliyahIndex | null
+) {
+  const recording = aliyahIndex
+    ? findRecordingForRun({
+        narratorId: readerPreferences.narratorId,
+        run,
+        aliyahIndex,
+      })
+    : null
+  const src = recording?.playSrc ?? null
+  const absoluteSrc = src ? new URL(src, location.href).href : null
+  if (currentAliyahAudioPreload?.href === absoluteSrc) return
+
+  clearCurrentAliyahAudioPreload()
+  if (!src) return
+
+  const link = document.createElement('link')
+  link.rel = 'preload'
+  link.as = 'audio'
+  link.href = src
+  link.dataset.tikkunCurrentAliyahAudio = 'true'
+  document.head.appendChild(link)
+  currentAliyahAudioPreload = link
 }
 
 function cancelPlaybackIdleFinalization() {
@@ -3273,20 +3307,30 @@ function cancelIdleTask(handle: number) {
   window.clearTimeout(handle)
 }
 
-function scheduleAliyahRailPrewarm(
+function scheduleAliyahResourcePrewarm(
   railItems: ReturnType<typeof getAliyahRailItemsForRun>,
   signature: string
 ) {
-  if (signature === aliyahRailPrewarmSignature) return
-  aliyahRailPrewarmSignature = signature
-  cancelAliyahRailPrewarm()
+  const displayToPrewarm = display
+  if (!displayToPrewarm) return
+  if (signature === aliyahResourcePrewarmSignature) return
+  aliyahResourcePrewarmSignature = signature
+  cancelAliyahResourcePrewarm()
 
   let index = 0
+  const prefetchedPages = new Set<number>()
   const prewarmNext = () => {
-    aliyahRailPrewarmTimer = 0
+    aliyahResourcePrewarmTimer = 0
+
+    if (
+      display !== displayToPrewarm ||
+      signature !== aliyahResourcePrewarmSignature
+    ) {
+      return
+    }
 
     if (isPlaybackActive()) {
-      aliyahRailPrewarmTimer = window.setTimeout(
+      aliyahResourcePrewarmTimer = window.setTimeout(
         prewarmNext,
         PLAYBACK_IDLE_BACKGROUND_DELAY_MS
       )
@@ -3297,14 +3341,21 @@ function scheduleAliyahRailPrewarm(
     if (!item) return
     index += 1
 
-    void (async () => {
+    const prewarmPromise = (async () => {
       const { run, aliyah } = item
       if (!aliyah.index) return
       const location = await getAliyahStartLocationForRun(run.id, aliyah.index)
-      if (location && !isPlaybackActive()) {
-        await display.ensurePageRenderedPreservingScroll(location.pageNumber)
+      if (
+        location &&
+        !prefetchedPages.has(location.pageNumber) &&
+        display === displayToPrewarm
+      ) {
+        prefetchedPages.add(location.pageNumber)
+        await displayToPrewarm.viewModel.fetchPageByPageNumber(
+          location.pageNumber
+        )
       }
-      if (isPlaybackActive()) return
+      if (display !== displayToPrewarm) return
 
       const recording = findRecordingForRun({
         narratorId: readerPreferences.narratorId,
@@ -3313,32 +3364,32 @@ function scheduleAliyahRailPrewarm(
       })
       if (recording) {
         await getCuesForRecording(recording)
-        preloadAudioSource(recording.playSrc)
       }
-    })().finally(() => {
-      if (index < railItems.length) {
-        aliyahRailPrewarmTimer = scheduleIdleTask(prewarmNext)
-      }
-    })
+    })()
+    void prewarmPromise
+      .catch((error) => {
+        console.error('Failed to prewarm aliyah resources', error)
+      })
+      .finally(() => {
+        if (
+          index < railItems.length &&
+          display === displayToPrewarm &&
+          signature === aliyahResourcePrewarmSignature
+        ) {
+          aliyahResourcePrewarmTimer = scheduleIdleTask(prewarmNext)
+        }
+      })
   }
 
-  aliyahRailPrewarmTimer = scheduleIdleTask(prewarmNext)
-}
-
-function preloadAudioSource(src: string) {
-  if (!src || preloadedAudioLinks.has(src)) return
-
-  const link = document.createElement('link')
-  link.rel = 'preload'
-  link.as = 'audio'
-  link.href = src
-  document.head.appendChild(link)
-  preloadedAudioLinks.set(src, link)
-}
-
-function clearAudioPreloads() {
-  preloadedAudioLinks.forEach((link) => link.remove())
-  preloadedAudioLinks.clear()
+  void displayToPrewarm.scrolled.then(() => {
+    if (
+      display !== displayToPrewarm ||
+      signature !== aliyahResourcePrewarmSignature
+    ) {
+      return
+    }
+    aliyahResourcePrewarmTimer = scheduleIdleTask(prewarmNext)
+  })
 }
 
 function setControlIcon(element: HTMLElement | null, icon: IconName) {
@@ -4462,11 +4513,13 @@ async function startPlaybackForToolbarCurrentAliyah(
 
 async function syncCurrentSessionHighlight(
   audioController?: AudioController,
-  highlightController?: HighlightController
+  highlightController?: HighlightController,
+  options: { scroll?: boolean } = {}
 ) {
   if (!audioController || !highlightController) return
   const session = audioController.session
   if (!session) return
+  const scroll = options.scroll ?? readerPreferences.autoScrollWithPlayback
 
   if (session.cues.length) {
     const cueIndex = highlightController.getCueIndex(
@@ -4476,7 +4529,7 @@ async function syncCurrentSessionHighlight(
     if (cueIndex >= 0) {
       cueNavigationIndex = cueIndex
       await highlightController.activateCue(session.cues[cueIndex], {
-        scroll: readerPreferences.autoScrollWithPlayback,
+        scroll,
       })
     }
     return
@@ -4485,7 +4538,7 @@ async function syncCurrentSessionHighlight(
   const current = highlightController.getActiveTokenKey()
   if (!current && session.tokenKeys[0]) {
     await highlightController.activateTokenKey(session.tokenKeys[0], {
-      scroll: readerPreferences.autoScrollWithPlayback,
+      scroll,
     })
   }
 }
@@ -5741,6 +5794,29 @@ function renderRoute(route: AppRoute, audioController: AudioController) {
   const aboutView = document.querySelector<HTMLElement>('[data-target-id="about-view"]')!
   const titleEl = getTitleEl()
 
+  if (route.view === 'not-found') {
+    audioController.pause()
+    display?.destroy()
+    resetAliyahDomCaches()
+    setAdminPanelVisible(false, audioController)
+    hideLastReadingPrompt()
+    hideParshaPicker()
+    readerShell.classList.add('u-hidden')
+    aboutView.classList.remove('u-hidden')
+    aboutView.innerHTML = PageNotFoundPage()
+    aboutView
+      .querySelector<HTMLButtonElement>('[data-target-id="open-reading-index"]')!
+      .addEventListener('click', () => {
+        aboutView.classList.add('u-hidden')
+        readerShell.classList.remove('u-hidden')
+        showParshaPicker()
+      })
+    titleEl.textContent = 'תיקון קוראים'
+    syncReaderProgressVisibility()
+    syncReaderSideNavigationVisibility()
+    return
+  }
+
   if (route.view === 'about' || route.view === 'cue-analytics') {
     audioController.pause()
     setAdminPanelVisible(false, audioController)
@@ -5898,18 +5974,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateReaderProgress(range)
   })
 
-  InfiniteScroller.new({
-    container: book,
-    fetchPreviousContent: {
-      fetch: () => display.viewModel.fetchPreviousPage(),
-      render: (entry) => display.renderPrevious(entry),
-    },
-    fetchNextContent: {
-      fetch: () => display.viewModel.fetchNextPage(),
-      render: (entry) => display.renderNext(entry),
-    },
-  }).attach()
-
   const saveLastReadingDebounced = debounce(() => saveCurrentLastReading(), 1000)
 
   const markUserScrolledReaderForLastReading: (_event?: Event) => void = () => {
@@ -5977,7 +6041,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (isPlaybackActive(audioController)) return
     refreshReaderChrome(audioController)
     scheduleDeferredProgressRefresh()
-    syncCurrentSessionHighlight(audioController, highlightController)
+    syncCurrentSessionHighlight(audioController, highlightController, {
+      scroll: false,
+    })
   })
 
   book.addEventListener('page-evicted', (event) => {

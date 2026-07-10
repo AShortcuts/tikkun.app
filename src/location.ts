@@ -14,6 +14,15 @@ const scrollTOCs: Record<ScrollName, TOC> = {
   esther: estherTOC as TOC,
 }
 
+export function isIndexedReference({
+  b: book,
+  c: chapter,
+  v: verse,
+  scroll,
+}: RefWithScroll) {
+  return Boolean(scrollTOCs[scroll]?.[book]?.[chapter]?.[verse])
+}
+
 export async function loadScroll(name: ScrollName) {
   return new ScrollResolver(name, scrollTOCs[name])
 }
@@ -38,8 +47,11 @@ export class ScrollResolver {
       throw new Error(
         `Cannot read scroll ${scroll} from resolver for ${this.scroll}`
       )
-    if (!this.toc[book]) throw new Error(`Unknown book ${scroll} #${book}`)
-    const { p: pageNumber, l: lineNumber } = this.toc[book][chapter][verse]
+    const indexedLocation = this.toc[book]?.[chapter]?.[verse]
+    if (!indexedLocation) {
+      throw new Error(`Unknown reference ${scroll} ${book}:${chapter}:${verse}`)
+    }
+    const { p: pageNumber, l: lineNumber } = indexedLocation
     return { pageNumber, lineNumber }
   }
 }

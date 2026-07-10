@@ -1,6 +1,7 @@
 import { LeiningGenerator } from '../../calendar-model/generator.ts'
 import type { LeiningRun } from '../../calendar-model/model-types.ts'
 import type { RefWithScroll, ScrollName } from '../../ref.ts'
+import { isIndexedReference } from '../../location.ts'
 import { ScrollViewModel } from '../scroll-view-model.ts'
 import { generateParshaUrl, resolveParshaRun } from './parsha-routes.ts'
 
@@ -15,6 +16,9 @@ export type AppRoute =
     }
   | {
       view: 'cue-analytics'
+    }
+  | {
+      view: 'not-found'
     }
 
 export type ParseUrlOptions = {
@@ -55,25 +59,19 @@ const pathHandlers: Record<
     const run = generator.parseId(runId)
     if (!run) return null
     const initialRef = refFromPath(ref, run.scroll)
-    if (ref && !initialRef) return null
+    if (ref && !initialRef) return missingReferenceRoute(ref)
     const model = ScrollViewModel.forId(generator, run.id, initialRef ?? undefined)
     return model ? { view: 'reader', model } : null
   },
   /** Legacy URL: Specifies a ref in חומש. */
   r(generator, [ref]) {
     if (!ref) return null
-    const [, book, chapter, verse] = ref.match(/^(\d+)-(\d+)-(\d+)$/) ?? []
-
-    if (!book || !chapter || !verse) return null
+    const initialRef = refFromPath(ref, 'torah')
+    if (!initialRef) return missingReferenceRoute(ref)
 
     return {
       view: 'reader',
-      model: ScrollViewModel.forRef(generator, {
-        scroll: 'torah',
-        b: Number(book),
-        c: Number(chapter),
-        v: Number(verse),
-      }),
+      model: ScrollViewModel.forRef(generator, initialRef),
     }
   },
   /** Legacy URL: The next leining. */
@@ -116,7 +114,7 @@ function parseTorahRoute(
     if (resolved.run.scroll !== 'torah') return null
 
     const initialRef = refFromPath(ref, resolved.run.scroll)
-    if (ref && !initialRef) return null
+    if (ref && !initialRef) return missingReferenceRoute(ref)
 
     const model = ScrollViewModel.forId(
       generator,
@@ -160,7 +158,7 @@ function parseEstherRoute(
   if (!resolved || resolved.run.scroll !== 'esther') return null
 
   const initialRef = refFromPath(ref, resolved.run.scroll)
-  if (ref && !initialRef) return null
+  if (ref && !initialRef) return missingReferenceRoute(ref)
 
   const model = ScrollViewModel.forId(
     generator,
@@ -186,9 +184,10 @@ function parsePageRoute(
   [page]: string[],
   options?: ParseUrlOptions
 ): AppRoute | null {
+  if (!page || !/^\d+$/.test(page)) return null
   const pageNumber = Number(page)
   if (!Number.isInteger(pageNumber) || !isValidPageNumber(scroll, pageNumber)) {
-    return null
+    return { view: 'not-found' }
   }
 
   const slug = scroll === 'torah' ? 'beresheet' : 'megillah-esther'
@@ -219,18 +218,23 @@ function isValidPageNumber(scroll: ScrollName, page: number) {
   return page >= 1 && page <= pageCount
 }
 
+function missingReferenceRoute(ref: string): AppRoute | null {
+  return /^\d+-\d+-\d+$/.test(ref) ? { view: 'not-found' } : null
+}
+
 function refFromPath(ref: string | undefined, scroll: RefWithScroll['scroll']) {
   if (!ref) return null
   const [, book, chapter, verse] = ref.match(/^(\d+)-(\d+)-(\d+)$/) ?? []
 
   if (!book || !chapter || !verse) return null
 
-  return {
+  const parsedRef = {
     scroll,
     b: Number(book),
     c: Number(chapter),
     v: Number(verse),
   }
+  return isIndexedReference(parsedRef) ? parsedRef : null
 }
 
 /** Parses a URL path (without #) into the ScrollViewModel to display. */

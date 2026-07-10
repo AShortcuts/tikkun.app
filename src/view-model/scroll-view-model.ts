@@ -101,6 +101,10 @@ export abstract class ScrollViewModel {
   private readonly currentContentIndex: Promise<
     ReturnType<typeof IntegerIterator.new>
   >
+  private readonly pageEntryPromises = new Map<
+    number,
+    Promise<RenderedEntry | null>
+  >()
   readonly startingLocation: Promise<{
     page: RenderedEntry
     lineNumber: number
@@ -235,6 +239,20 @@ export abstract class ScrollViewModel {
   ): Promise<number>
 
   private async fetchPage(contentIndex: number): Promise<RenderedEntry | null> {
+    const existing = this.pageEntryPromises.get(contentIndex)
+    if (existing) return existing
+
+    const promise = this.loadPage(contentIndex)
+    this.pageEntryPromises.set(contentIndex, promise)
+    void promise.catch(() => {
+      if (this.pageEntryPromises.get(contentIndex) === promise) {
+        this.pageEntryPromises.delete(contentIndex)
+      }
+    })
+    return promise
+  }
+
+  private async loadPage(contentIndex: number): Promise<RenderedEntry | null> {
     const pageNumberEntry = await this.pageNumberFromContentIndex(contentIndex)
     if (typeof pageNumberEntry === 'object') return pageNumberEntry
     if (!pageNumberEntry || pageNumberEntry <= 0) return null

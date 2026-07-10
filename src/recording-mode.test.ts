@@ -50,6 +50,7 @@ test('recording mode locks playback and visual preferences', () => {
     narratorId: 'custom-narrator',
     playbackRate: 1,
     autoScrollWithPlayback: true,
+    focalPointMode: 'reader',
     disableShiftNekudotHide: false,
     themeMode: 'light',
   })

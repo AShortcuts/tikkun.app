@@ -76,6 +76,7 @@ export function applyRecordingModePreferences(
     ...preferences,
     playbackRate: 1,
     autoScrollWithPlayback: true,
+    focalPointMode: 'reader',
     disableShiftNekudotHide: false,
     themeMode: 'light',
   }

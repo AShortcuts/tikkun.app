@@ -1184,6 +1184,64 @@
   min-height: 0;
 }
 
+.page-not-found {
+  min-height: 100%;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.8rem;
+  padding: 2rem 1.25rem;
+  text-align: center;
+  color: var(--text-color);
+}
+
+.page-not-found-eyebrow,
+.page-not-found h1,
+.page-not-found p {
+  margin: 0;
+}
+
+.page-not-found-eyebrow {
+  color: var(--light-text-color);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.page-not-found h1 {
+  color: var(--page-ink-color);
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.page-not-found > p:not(.page-not-found-eyebrow) {
+  max-width: 34rem;
+  line-height: 1.55;
+}
+
+.page-not-found-action {
+  margin-top: 0.45rem;
+  border: 1px solid var(--page-ink-color);
+  border-radius: 6px;
+  padding: 0.72rem 1rem;
+  background: var(--page-ink-color);
+  color: var(--paper-color);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.page-not-found-action:hover {
+  opacity: 0.86;
+}
+
+.page-not-found-action:focus-visible {
+  outline: 3px solid var(--focus-ring-color, currentColor);
+  outline-offset: 3px;
+}
+
 .about-view {
   max-width: 960px;
   margin: 0 auto;

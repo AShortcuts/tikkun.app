@@ -1,12 +1,15 @@
 import { LeiningGenerator } from '../calendar-model/generator'
 import type { UserSettings } from '../calendar-model/user-settings'
 import { last } from '../calendar-model/utils'
-import { ScrollViewModel } from '../view-model/scroll-view-model'
+import {
+  type RenderedEntry,
+  ScrollViewModel,
+} from '../view-model/scroll-view-model'
 import { ScrollDisplay } from './ScrollDisplay'
 import { getCenteredElementScrollTop } from '../reader-scroll'
 import '/css/master.css'
 
-import { afterEach, beforeEach, expect, test } from 'vitest'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
 const testSettings: UserSettings = {
   ashkenazi: true,
@@ -76,15 +79,20 @@ for (const testCase of [
 test('renders the next page', async () => {
   // פרשת ויקהל is near the bottom of the page, so we
   // will fetch the previous page, not the next page.
-  const sd = await renderRun('2025-03-22:shacharis,main')
+  await renderRun('2025-03-22:shacharis,main')
 
   expect(textFromLine(last(root.querySelectorAll('tr')))).toBe(
     'אשר נשא לבן אתנה בחכמה טוו את העזים'
   )
-  await sd.renderNext(await vm.fetchNextPage())
-  expect(textFromLine(last(root.querySelectorAll('tr')))).toBe(
-    'השנית חמשים ללאת עשה ביריעה האחת'
-  )
+  root.scrollTop = root.scrollHeight
+  const beforeAnchor = getViewportAnchorSnapshot()
+  root.dispatchEvent(new Event('scroll'))
+  await vi.waitFor(() => {
+    expect(textFromLine(last(root.querySelectorAll('tr')))).toBe(
+      'השנית חמשים ללאת עשה ביריעה האחת'
+    )
+  })
+  expectSameViewportAnchor(getViewportAnchorSnapshot(), beforeAnchor)
 })
 
 test('renders absolute page numbers inside the page table decoration', async () => {
@@ -120,15 +128,20 @@ test('centers the first token for the starting line', async () => {
 test('renders the previous page', async () => {
   // פרשת תצוה is near the bottom of the page, so we
   // will fetch the next page, not the previous page.
-  const sd = await renderRun('2025-03-08:shacharis,main')
+  await renderRun('2025-03-08:shacharis,main')
 
   expect(textFromLine(root.querySelector('tr'))).toBe(
     'ובין קדש הקדשים ונתת את הכפרת על ארון'
   )
-  await sd.renderPrevious(await vm.fetchPreviousPage())
-  expect(textFromLine(root.querySelector('tr'))).toBe(
-    'ואת שש היריעת לבד וכפלת את היריעה'
-  )
+  root.scrollTop = 0
+  const beforeAnchor = getViewportAnchorSnapshot()
+  root.dispatchEvent(new Event('scroll'))
+  await vi.waitFor(() => {
+    expect(textFromLine(root.querySelector('tr'))).toBe(
+      'ואת שש היריעת לבד וכפלת את היריעה'
+    )
+  })
+  expectSameViewportAnchor(getViewportAnchorSnapshot(), beforeAnchor)
 })
 
 test('renders earlier aliyah markers when started later in Noach', async () => {
@@ -149,7 +162,7 @@ test('renders earlier aliyah markers when started later in Noach', async () => {
     c: 8,
     v: 15,
   })
-  await sd.ensurePageRendered(target.pageNumber)
+  await sd.ensurePageMounted(target.pageNumber)
 
   expect(
     root.querySelector(
@@ -193,35 +206,28 @@ test('reuses an already mounted page without rendering a duplicate node', async 
   expect(root.querySelectorAll('.tikkun-page').length).toBe(renderedPageCount)
 })
 
-test('does not duplicate a page when sequential rendering reaches an absolute pre-mount', async () => {
+test('prefetches page data without mounting or moving the reader', async () => {
   const sd = await renderNoachFromLaterPage()
-  const previousEntry = await vm.fetchPreviousPage()
-  if (previousEntry?.type !== 'page') throw new Error('Expected previous page')
+  const resolver = await vm.resolver
+  const target = resolver.physicalLocationFromRef({
+    scroll: 'torah',
+    b: 1,
+    c: 6,
+    v: 9,
+  })
+  const beforePages = sd.getMountedPageNumbers()
+  const beforeScrollTop = root.scrollTop
+  const beforeAnchor = getViewportAnchorSnapshot()
 
-  const mounted = await sd.ensurePageMounted(previousEntry.pageNumber)
-  const beforePages = pageNumbersInDom()
-  const rendered = sd.renderPrevious(previousEntry)
+  const [first, second] = await Promise.all([
+    vm.fetchPageByPageNumber(target.pageNumber),
+    vm.fetchPageByPageNumber(target.pageNumber),
+  ])
 
-  expect(rendered).toBe(mounted)
-  expect(pageNumbersInDom()).toEqual(beforePages)
-  expect(
-    root.querySelectorAll(
-      `.tikkun-page table[data-page-number="${previousEntry.pageNumber}"]`
-    )
-  ).toHaveLength(1)
-})
-
-test('inserts sequentially rendered pages before higher absolute pre-mounts', async () => {
-  const sd = await renderNoachFromLaterPage()
-  const nextEntry = await vm.fetchNextPage()
-  if (nextEntry?.type !== 'page') throw new Error('Expected next page')
-  await sd.ensurePageMounted(nextEntry.pageNumber + 1)
-
-  sd.renderNext(nextEntry)
-
-  expect(pageNumbersInDom()).toEqual(sd.getMountedPageNumbers())
-  expect(pageNumbersInDom()).toContain(nextEntry.pageNumber)
-  expect(pageNumbersInDom()).toContain(nextEntry.pageNumber + 1)
+  expect(first).toBe(second)
+  expect(sd.getMountedPageNumbers()).toEqual(beforePages)
+  expect(root.scrollTop).toBe(beforeScrollTop)
+  expectSameViewportAnchor(getViewportAnchorSnapshot(), beforeAnchor)
 })
 
 test('mounts a future page by absolute number without filling intermediate pages', async () => {
@@ -287,7 +293,7 @@ test('mounts pages before the next higher placeholder when one exists', async ()
   )
 })
 
-test('pre-renders earlier pages while preserving scroll position', async () => {
+test('mounts earlier pages while preserving scroll position', async () => {
   const sd = await renderNoachFromLaterPage()
   root.scrollTop = 100
 
@@ -299,13 +305,177 @@ test('pre-renders earlier pages while preserving scroll position', async () => {
     v: 9,
   })
   const beforePages = sd.getRenderedPageNumbers()
-  await sd.ensurePageRenderedPreservingScroll(target.pageNumber)
+  await sd.ensurePageMounted(target.pageNumber)
 
   expect(sd.getRenderedPageNumbers()).toContain(target.pageNumber)
   expect(sd.getRenderedPageNumbers()).toEqual(
     [...new Set([...beforePages, target.pageNumber])].sort((a, b) => a - b)
   )
   expect(root.scrollTop).toBeGreaterThanOrEqual(100)
+})
+
+test('mounting an earlier page keeps the same viewport anchor page', async () => {
+  const sd = await renderNoachFromLaterPage()
+  const beforeAnchorPage = sd.getViewportAnchorPageNumber()
+  if (!beforeAnchorPage) throw new Error('Expected viewport anchor page')
+
+  const resolver = await vm.resolver
+  const target = resolver.physicalLocationFromRef({
+    scroll: 'torah',
+    b: 1,
+    c: 6,
+    v: 9,
+  })
+  await sd.ensurePageMounted(target.pageNumber)
+
+  expect(sd.getViewportAnchorPageNumber()).toBe(beforeAnchorPage)
+})
+
+test('mounting multiple earlier pages preserves the anchor in insertion order', async () => {
+  const sd = await renderNoachFromLaterPage()
+  const beforeAnchor = getViewportAnchorSnapshot()
+
+  const resolver = await vm.resolver
+  const earlierTarget = resolver.physicalLocationFromRef({
+    scroll: 'torah',
+    b: 1,
+    c: 6,
+    v: 9,
+  })
+  const middleTarget = resolver.physicalLocationFromRef({
+    scroll: 'torah',
+    b: 1,
+    c: 8,
+    v: 15,
+  })
+
+  await sd.ensurePageMounted(earlierTarget.pageNumber)
+  await sd.ensurePageMounted(middleTarget.pageNumber)
+
+  expectSameViewportAnchor(getViewportAnchorSnapshot(), beforeAnchor)
+})
+
+test('page-rendered fires after viewport restoration', async () => {
+  const sd = await renderNoachFromLaterPage()
+  const beforeAnchor = getViewportAnchorSnapshot()
+  const resolver = await vm.resolver
+  const target = resolver.physicalLocationFromRef({
+    scroll: 'torah',
+    b: 1,
+    c: 6,
+    v: 9,
+  })
+  let eventAnchor: ReturnType<typeof getViewportAnchorSnapshot> = null
+  root.addEventListener('page-rendered', (event) => {
+    const pageNumber =
+      event instanceof CustomEvent ? event.detail?.entry?.pageNumber : null
+    if (pageNumber === target.pageNumber) {
+      eventAnchor = getViewportAnchorSnapshot()
+    }
+  })
+
+  await sd.ensurePageMounted(target.pageNumber)
+
+  expectSameViewportAnchor(eventAnchor, beforeAnchor)
+})
+
+test('a user scroll during page fetch becomes the preserved anchor', async () => {
+  const sd = await renderNoachFromLaterPage()
+  const resolver = await vm.resolver
+  const target = resolver.physicalLocationFromRef({
+    scroll: 'torah',
+    b: 1,
+    c: 6,
+    v: 9,
+  })
+  const entry = await vm.fetchPageByPageNumber(target.pageNumber)
+  if (!entry) throw new Error('Expected prefetched page')
+  let resolveFetch: (entry: RenderedEntry | null) => void = () => {}
+  const deferredFetch = new Promise<RenderedEntry | null>((resolve) => {
+    resolveFetch = resolve
+  })
+  vi.spyOn(vm, 'fetchPageByPageNumber').mockReturnValueOnce(deferredFetch)
+
+  const mounting = sd.ensurePageMounted(target.pageNumber)
+  root.scrollTop += 120
+  const userAnchor = getViewportAnchorSnapshot()
+  resolveFetch(entry)
+  await mounting
+
+  expectSameViewportAnchor(getViewportAnchorSnapshot(), userAnchor)
+})
+
+test('destroying a display prevents a late page insertion', async () => {
+  const sd = await renderNoachFromLaterPage()
+  const resolver = await vm.resolver
+  const target = resolver.physicalLocationFromRef({
+    scroll: 'torah',
+    b: 1,
+    c: 6,
+    v: 9,
+  })
+  const entry = await vm.fetchPageByPageNumber(target.pageNumber)
+  if (!entry) throw new Error('Expected prefetched page')
+  let resolveFetch: (entry: RenderedEntry | null) => void = () => {}
+  const deferredFetch = new Promise<RenderedEntry | null>((resolve) => {
+    resolveFetch = resolve
+  })
+  vi.spyOn(vm, 'fetchPageByPageNumber').mockReturnValueOnce(deferredFetch)
+
+  const mounting = sd.ensurePageMounted(target.pageNumber)
+  sd.destroy()
+  resolveFetch(entry)
+
+  expect(await mounting).toBeNull()
+  expect(sd.isPageMounted(target.pageNumber)).toBe(false)
+})
+
+test('edge loading unlocks and retries after a rejected fetch', async () => {
+  const sd = await renderNoachFromLaterPage()
+  const mountedPages = sd.getMountedPageNumbers()
+  const lastPage = mountedPages[mountedPages.length - 1]
+  if (!lastPage) throw new Error('Expected mounted pages')
+  const nextEntry = await vm.fetchPageByPageNumber(lastPage + 1)
+  if (!nextEntry) throw new Error('Expected next page')
+  vi.spyOn(vm, 'fetchNextPage')
+    .mockRejectedValueOnce(new Error('temporary page failure'))
+    .mockResolvedValueOnce(nextEntry)
+  const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+  scrollToReaderEdge('next')
+  await vi.waitFor(() => expect(consoleError).toHaveBeenCalledOnce())
+  root.dispatchEvent(new Event('scroll'))
+  await vi.waitFor(() => expect(sd.isPageMounted(lastPage + 1)).toBe(true))
+
+  consoleError.mockRestore()
+})
+
+test('concurrent edge and direct mounting render a page only once', async () => {
+  const sd = await renderNoachFromLaterPage()
+  const mountedPages = sd.getMountedPageNumbers()
+  const lastPage = mountedPages[mountedPages.length - 1]
+  if (!lastPage) throw new Error('Expected mounted pages')
+  const pageNumber = lastPage + 1
+  const entry = await vm.fetchPageByPageNumber(pageNumber)
+  if (!entry) throw new Error('Expected next page')
+  let resolveDirectFetch: (entry: RenderedEntry | null) => void = () => {}
+  const directFetch = new Promise<RenderedEntry | null>((resolve) => {
+    resolveDirectFetch = resolve
+  })
+  vi.spyOn(vm, 'fetchPageByPageNumber').mockReturnValueOnce(directFetch)
+  vi.spyOn(vm, 'fetchNextPage').mockResolvedValueOnce(entry)
+
+  const directMount = sd.ensurePageMounted(pageNumber)
+  scrollToReaderEdge('next')
+  await vi.waitFor(() => expect(sd.isPageMounted(pageNumber)).toBe(true))
+  resolveDirectFetch(entry)
+  await directMount
+
+  expect(
+    root.querySelectorAll(
+      `.tikkun-page table[data-page-number="${pageNumber}"]`
+    )
+  ).toHaveLength(1)
 })
 
 test('reports a sorted page lifecycle snapshot for mounted pages', async () => {
@@ -485,13 +655,15 @@ test('remounts evicted placeholder pages near the viewport', async () => {
 
 test('renders message entries', async () => {
   // ראש חודש חנוכה has a page, then a message, then one more page.
-  const sd = await renderRun('2025-01-01:shacharis,main')
+  await renderRun('2025-01-01:shacharis,main')
 
   expect(getAliyahLabel(root.firstElementChild.querySelector('tr'))).toBe(
     'חנוכה יום ז׳ (ראש חודש)'
   )
-  await sd.renderNext(await vm.fetchNextPage())
-  expect(root.lastElementChild?.textContent).toBe('✃ -29 עמודים ✁')
+  scrollToReaderEdge('next')
+  await vi.waitFor(() => {
+    expect(root.lastElementChild?.textContent).toBe('✃ -29 עמודים ✁')
+  })
 })
 
 test('renders just one page', async () => {
@@ -551,4 +723,48 @@ function pageNumbersAndPlaceholdersInDom() {
       return Number.isInteger(placeholderPage) ? placeholderPage : null
     })
     .filter((pageNumber): pageNumber is number => Number.isInteger(pageNumber))
+}
+
+function scrollToReaderEdge(direction: 'previous' | 'next') {
+  root.scrollTop = direction === 'previous' ? 0 : root.scrollHeight
+  root.dispatchEvent(new Event('scroll'))
+}
+
+function getViewportAnchorSnapshot() {
+  const rootRect = root.getBoundingClientRect()
+  const focalY = rootRect.top + root.clientHeight / 2
+  let closestLine: HTMLElement | null = null
+  let closestDistance = Number.POSITIVE_INFINITY
+
+  for (const line of root.querySelectorAll<HTMLElement>('[data-line-index]')) {
+    const rect = line.getBoundingClientRect()
+    const distance = Math.abs((rect.top + rect.bottom) / 2 - focalY)
+    if (distance >= closestDistance) continue
+    closestLine = line
+    closestDistance = distance
+  }
+  if (!closestLine) return null
+
+  return {
+    pageNumber: Number(closestLine.dataset.pageNumber),
+    lineIndex: Number(closestLine.dataset.lineIndex),
+    viewportOffset: closestLine.getBoundingClientRect().top - rootRect.top,
+  }
+}
+
+function expectSameViewportAnchor(
+  actual: ReturnType<typeof getViewportAnchorSnapshot>,
+  expected: ReturnType<typeof getViewportAnchorSnapshot>
+) {
+  expect(actual).not.toBeNull()
+  expect(expected).not.toBeNull()
+  expect(actual?.pageNumber).toBe(expected?.pageNumber)
+  expect(actual?.lineIndex).toBe(expected?.lineIndex)
+  const offsetDifference = Math.abs(
+    (actual?.viewportOffset ?? 0) - (expected?.viewportOffset ?? 0)
+  )
+  expect(
+    offsetDifference,
+    `Anchor offsets differ: ${JSON.stringify({ actual, expected })}`
+  ).toBeLessThanOrEqual(5)
 }

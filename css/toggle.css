@@ -8,6 +8,7 @@
 .toggle {
   --annotations-toggle-active-color: white;
   --annotations-toggle-inactive-color: oklch(100% 0 0 / 0.6);
+  --annotations-toggle-hover-color: oklch(82% 0.18 190deg);
   text-align: middle;
   display: flex;
   align-items: center;
@@ -19,6 +20,7 @@
   html[data-reader-theme='automatic'] .toggle {
     --annotations-toggle-active-color: black;
     --annotations-toggle-inactive-color: oklch(0% 0 0 / 0.5);
+    --annotations-toggle-hover-color: oklch(50% 0.24 260deg);
   }
 
   html[data-reader-theme='automatic'] .shadowed-circle {
@@ -30,6 +32,7 @@
 html[data-reader-theme='dark'] .toggle {
   --annotations-toggle-active-color: black;
   --annotations-toggle-inactive-color: oklch(0% 0 0 / 0.5);
+  --annotations-toggle-hover-color: oklch(50% 0.24 260deg);
 }
 
 .toggle [type='checkbox'] {
@@ -38,7 +41,7 @@ html[data-reader-theme='dark'] .toggle {
 
 .toggle-state {
   color: var(--annotations-toggle-inactive-color);
-  transition: all 0.1s;
+  transition: color 180ms ease;
   position: relative;
   right: 3px; /* <fb0f10> To give the appearance of the toggle-state being centered within the circle, shift things over a bit to the right when the toggle is checked. See comment `1adb87` for corresponding "unchecked" state. */
 }
@@ -52,6 +55,17 @@ html[data-reader-theme='dark'] .toggle {
 .toggle [type='checkbox']:not(:checked) ~ .toggle-state.mod-off {
   transform: scale(1.5);
   color: var(--annotations-toggle-active-color);
+}
+
+.annotations-toggle:hover
+  .toggle
+  [type='checkbox']:checked
+  ~ .toggle-state.mod-off,
+.annotations-toggle:hover
+  .toggle
+  [type='checkbox']:not(:checked)
+  ~ .toggle-state.mod-on {
+  color: var(--annotations-toggle-hover-color);
 }
 
 .toggle [type='checkbox']:not(:checked) ~ .toggle-state.mod-on,
@@ -71,11 +85,6 @@ html[data-reader-theme='dark'] .toggle {
   border-radius: 50%;
   background: black;
   color: white;
-  transition: 0.15s transform;
-}
-
-.shadowed-circle:hover {
-  transform: scale(1.1);
 }
 
 html[data-reader-theme='dark'] .shadowed-circle {
