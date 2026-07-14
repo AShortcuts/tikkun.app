@@ -278,19 +278,33 @@
   font-weight: bolder;
 }
 
-.parsha:hover {
+.parsha:hover,
+.parsha:focus-visible,
+.parsha[aria-expanded='true'] {
   background-color: var(--medium-accent-color);
+  outline: none;
 }
 
 .parsha:active {
   background-color: var(--heavy-accent-color);
 }
 
+.aliyah-selection-stack {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+}
+
 .aliyah-selection-popup {
   position: fixed;
-  z-index: 20;
-  min-width: 13rem;
+  z-index: 0;
+  min-width: 9.75rem;
   max-width: min(18rem, calc(100vw - 1.5rem));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  isolation: isolate;
   padding: 0.35rem;
   border: 1px solid var(--medium-accent-color);
   border-radius: var(--button-border-radius);
@@ -300,6 +314,17 @@
   animation: aliyah-popup-in 0.14s ease-out;
 }
 
+.aliyah-selection-popup.mod-submenu {
+  z-index: 1;
+  animation-name: aliyah-submenu-in;
+}
+
+@media screen and (max-width: 715px) {
+  .aliyah-selection-popup {
+    min-width: 13rem;
+  }
+}
+
 .aliyah-selection-heading {
   padding: 0.45rem 0.85rem 0.35rem;
   color: var(--light-text-color);
@@ -307,6 +332,49 @@
   line-height: 1.2;
   text-align: left;
   white-space: nowrap;
+}
+
+.aliyah-selection-subview-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0.2rem 0.35rem;
+  border-bottom: 1px solid var(--medium-accent-color);
+  margin-bottom: 0.2rem;
+}
+
+.aliyah-selection-subview-header .aliyah-selection-heading {
+  padding: 0.4rem 0;
+  color: var(--text-color);
+  font-weight: 600;
+}
+
+.aliyah-selection-back {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 0.18rem;
+  padding: 0.4rem 0.5rem 0.4rem 0.35rem;
+  border: none;
+  border-radius: calc(var(--button-border-radius) * 0.7);
+  background: transparent;
+  color: var(--light-text-color);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.aliyah-selection-back .ui-icon {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.aliyah-selection-back:hover,
+.aliyah-selection-back:focus-visible {
+  background-color: var(--light-accent-color);
+  color: var(--text-color);
+  outline: none;
 }
 
 .aliyah-selection-option {
@@ -327,6 +395,10 @@
 .aliyah-selection-option.mod-group {
   width: 100%;
   cursor: pointer;
+}
+
+.aliyah-selection-option.mod-group[aria-expanded='true'] {
+  background-color: var(--light-accent-color);
 }
 
 .aliyah-selection-option.mod-group::after {
@@ -354,6 +426,18 @@
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes aliyah-submenu-in {
+  from {
+    opacity: 0;
+    transform: translateX(-0.2rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 

@@ -24,6 +24,7 @@ import {
   listTorahVerses,
 } from './torah-reference.ts'
 import { semanticParshaUrlForLeining } from '../view-model/navigation/parsha-routes.ts'
+import { iconMarkup } from './icons.ts'
 
 const { htmlToElement, whenKey } = utils
 
@@ -48,6 +49,16 @@ export type ParshaAliyahChoice = {
 export type ParshaAliyahChoiceGroup = {
   label: string
   choices: ParshaAliyahChoice[]
+}
+
+type AliyahMenuState = {
+  stack: HTMLElement
+  popup: HTMLElement
+  submenu: HTMLElement | null
+  trigger: HTMLElement
+  groups: ParshaAliyahChoiceGroup[]
+  abortController: AbortController
+  activeGroupIndex: number | null
 }
 
 export type CalendarSettings = {
@@ -86,33 +97,88 @@ type ViewportRect = {
   height: number
 }
 
+const POPUP_VIEWPORT_MARGIN = 12
+const POPUP_ANCHOR_GAP = 6
+const PARSHA_CHOICE_SOURCE_LOOKBACK_YEARS = 3
+const PARSHA_CHOICE_SOURCE_WINDOW_YEARS = 20
+
+export function calculateAnchoredPopupMaxHeight(
+  triggerRect: AnchorRect,
+  viewport: ViewportRect
+) {
+  const availableAbove =
+    triggerRect.top - POPUP_VIEWPORT_MARGIN - POPUP_ANCHOR_GAP
+  const availableBelow =
+    viewport.height -
+    triggerRect.bottom -
+    POPUP_VIEWPORT_MARGIN -
+    POPUP_ANCHOR_GAP
+  return Math.max(0, availableAbove, availableBelow)
+}
+
 export function calculateAnchoredPopupPosition({
-  anchorX,
   triggerRect,
   popupRect,
   viewport,
 }: {
-  anchorX: number
   triggerRect: AnchorRect
   popupRect: PopupRect
   viewport: ViewportRect
 }) {
-  const margin = 12
-  const gap = 8
+  const margin = POPUP_VIEWPORT_MARGIN
+  const gap = POPUP_ANCHOR_GAP
   const fitsBelow = triggerRect.bottom + gap + popupRect.height <= viewport.height - margin
   const preferredTop = fitsBelow
     ? triggerRect.bottom + gap
     : triggerRect.top - popupRect.height - gap
+  const centeredLeft =
+    triggerRect.left +
+    (triggerRect.right - triggerRect.left - popupRect.width) / 2
 
   return {
     left: Math.min(
-      Math.max(anchorX, margin),
+      Math.max(centeredLeft, margin),
       viewport.width - popupRect.width - margin
     ),
     top: Math.min(
       Math.max(preferredTop, margin),
       viewport.height - popupRect.height - margin
     ),
+  }
+}
+
+export function calculateFlyoutPopupPosition({
+  anchorRect,
+  verticalAnchorRect = anchorRect,
+  popupRect,
+  viewport,
+}: {
+  anchorRect: AnchorRect
+  verticalAnchorRect?: AnchorRect
+  popupRect: PopupRect
+  viewport: ViewportRect
+}) {
+  const margin = POPUP_VIEWPORT_MARGIN
+  const gap = 4
+  const fitsRight =
+    anchorRect.right + gap + popupRect.width <= viewport.width - margin
+  const fitsLeft = anchorRect.left - gap - popupRect.width >= margin
+  const side = fitsRight || !fitsLeft ? 'right' : 'left'
+  const preferredLeft =
+    side === 'right'
+      ? anchorRect.right + gap
+      : anchorRect.left - popupRect.width - gap
+
+  return {
+    left: Math.min(
+      Math.max(preferredLeft, margin),
+      viewport.width - popupRect.width - margin
+    ),
+    top: Math.min(
+      Math.max(verticalAnchorRect.top, margin),
+      viewport.height - popupRect.height - margin
+    ),
+    side,
   }
 }
 
@@ -186,7 +252,7 @@ const renderAliyahGroups = (groups: ParshaAliyahChoiceGroup[]) =>
   groups
     .map(
       (group, index) => `
-          <button class="aliyah-selection-option mod-group" type="button" role="menuitem" data-choice-group-index="${index}">
+          <button class="aliyah-selection-option mod-group" type="button" role="menuitem" data-choice-group-index="${index}" aria-haspopup="menu" aria-expanded="false">
             ${group.label}
           </button>
         `
@@ -203,14 +269,33 @@ export function renderAliyahPopupContent(groups: ParshaAliyahChoiceGroup[]) {
   `
 }
 
-function collectParshaChoiceSourceLeinings(
+const renderAliyahSubviewContent = (group: ParshaAliyahChoiceGroup) => `
+  <div class="aliyah-selection-subview-header">
+    <button
+      class="aliyah-selection-back"
+      type="button"
+      data-aliyah-subview-back
+      aria-label="Back to parsha choices"
+    >
+      ${iconMarkup('chevronLeft')}
+      <span>Back</span>
+    </button>
+    <div class="aliyah-selection-heading">${group.label}</div>
+    <span aria-hidden="true"></span>
+  </div>
+  ${renderAliyahChoices(group.choices)}
+`
+
+export function collectParshaChoiceSourceLeinings(
   generator: LeiningGenerator,
-  baseLeinings: LeiningInstance[]
+  baseLeinings: LeiningInstance[],
+  currentYear = new HDate().getFullYear()
 ) {
-  const currentYear = new HDate().getFullYear()
+  const firstYear = currentYear - PARSHA_CHOICE_SOURCE_LOOKBACK_YEARS
+  const lastYearExclusive = firstYear + PARSHA_CHOICE_SOURCE_WINDOW_YEARS
   const extraLeinings = []
 
-  for (let year = currentYear - 3; year <= currentYear + 8; year += 1) {
+  for (let year = firstYear; year < lastYearExclusive; year += 1) {
     extraLeinings.push(
       ...generator
         .forHebrewYear(year)
@@ -230,6 +315,7 @@ const Parsha = (
     class="parsha"
     href="${navigationHrefForLeining(leining)}"
     ${options.aliyahChoiceId ? `data-aliyah-choice-id="${options.aliyahChoiceId}"` : ''}
+    ${options.aliyahChoiceId ? `aria-haspopup="menu" aria-expanded="false" aria-controls="${options.aliyahChoiceId}-menu"` : ''}
   >
     ${options.title ?? renderLeiningTitle(leining)}
   </a></li>
@@ -618,32 +704,83 @@ export default (
     location.hash = nextHash
   })
 
-  let aliyahPopup: HTMLElement | null = null
-  let aliyahPopupAbortController: AbortController | null = null
+  let aliyahMenuState: AliyahMenuState | null = null
+  const supportsHoverFlyout = () =>
+    window.matchMedia('(hover: hover) and (pointer: fine)').matches &&
+    window.matchMedia('(min-width: 716px)').matches
+
+  const hideAliyahSubmenu = (state: AliyahMenuState) => {
+    state.popup
+      ?.querySelectorAll<HTMLElement>('[data-choice-group-index]')
+      .forEach((option) => option.setAttribute('aria-expanded', 'false'))
+    state.submenu?.remove()
+    state.submenu = null
+    state.activeGroupIndex = null
+  }
 
   const hideAliyahPopup = () => {
-    aliyahPopupAbortController?.abort()
-    aliyahPopupAbortController = null
-    aliyahPopup?.remove()
-    aliyahPopup = null
+    const state = aliyahMenuState
+    if (!state) return
+
+    aliyahMenuState = null
+    state.trigger.setAttribute('aria-expanded', 'false')
+    state.abortController.abort()
+    hideAliyahSubmenu(state)
+    state.stack.remove()
   }
 
   const positionAliyahPopup = (
     popup: HTMLElement,
-    trigger: HTMLElement,
-    anchorX: number
+    trigger: HTMLElement
   ) => {
     const triggerRect = trigger.getBoundingClientRect()
+    const viewport = { width: window.innerWidth, height: window.innerHeight }
+    if (supportsHoverFlyout()) {
+      popup.style.maxHeight = `${Math.max(
+        0,
+        viewport.height - POPUP_VIEWPORT_MARGIN * 2
+      )}px`
+      const { left, top, side } = calculateFlyoutPopupPosition({
+        anchorRect: triggerRect,
+        popupRect: popup.getBoundingClientRect(),
+        viewport,
+      })
+      popup.dataset.flyoutSide = side
+      popup.style.left = `${left}px`
+      popup.style.top = `${top}px`
+      return
+    }
+
+    delete popup.dataset.flyoutSide
+    popup.style.maxHeight = `${calculateAnchoredPopupMaxHeight(
+      triggerRect,
+      viewport
+    )}px`
     const rect = popup.getBoundingClientRect()
     const { left, top } = calculateAnchoredPopupPosition({
-      anchorX,
       triggerRect,
       popupRect: rect,
-      viewport: { width: window.innerWidth, height: window.innerHeight },
+      viewport,
     })
 
     popup.style.left = `${left}px`
     popup.style.top = `${top}px`
+  }
+
+  const positionAliyahSubmenu = (
+    submenu: HTMLElement,
+    trigger: HTMLElement,
+    popup: HTMLElement
+  ) => {
+    const { left, top, side } = calculateFlyoutPopupPosition({
+      anchorRect: popup.getBoundingClientRect(),
+      verticalAnchorRect: trigger.getBoundingClientRect(),
+      popupRect: submenu.getBoundingClientRect(),
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+    })
+    submenu.dataset.flyoutSide = side
+    submenu.style.left = `${left}px`
+    submenu.style.top = `${top}px`
   }
 
   const setAliyahPopupContent = (
@@ -653,24 +790,140 @@ export default (
     popup.innerHTML = renderAliyahPopupContent(groups)
   }
 
+  const handleAliyahLinkClick = (event: MouseEvent) => {
+    const target = event.target as HTMLElement
+    const link = target.closest<HTMLAnchorElement>('a[href^="#/"]')
+    if (!link) return false
+
+    if (
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.shiftKey &&
+      !event.altKey &&
+      link.getAttribute('href') === location.hash
+    ) {
+      event.preventDefault()
+      hideAliyahPopup()
+      window.dispatchEvent(new Event('hashchange'))
+      return true
+    }
+
+    hideAliyahPopup()
+    return true
+  }
+
   const showAliyahPopup = (
     trigger: HTMLElement,
-    groups: ParshaAliyahChoiceGroup[],
-    event: MouseEvent
+    groups: ParshaAliyahChoiceGroup[]
   ) => {
+    if (aliyahMenuState?.trigger === trigger) return aliyahMenuState.popup
     hideAliyahPopup()
 
+    const popupId = `${trigger.dataset.aliyahChoiceId}-menu`
+    const stack = htmlToElement(`
+      <div class="aliyah-selection-stack"></div>
+    `) as HTMLElement
     const popup = htmlToElement(`
-      <div class="aliyah-selection-popup" role="menu" aria-label="Select aliyah">
+      <div class="aliyah-selection-popup" id="${popupId}" role="menu" aria-label="Select aliyah">
       </div>
     `) as HTMLElement
     setAliyahPopupContent(popup, groups)
-    aliyahPopup = popup
-    document.body.appendChild(popup)
-    aliyahPopupAbortController = new AbortController()
+    stack.appendChild(popup)
+    document.body.appendChild(stack)
 
-    const rect = trigger.getBoundingClientRect()
-    positionAliyahPopup(popup, trigger, event.clientX || rect.left)
+    const state: AliyahMenuState = {
+      stack,
+      popup,
+      submenu: null,
+      trigger,
+      groups,
+      abortController: new AbortController(),
+      activeGroupIndex: null,
+    }
+    aliyahMenuState = state
+    trigger.setAttribute('aria-expanded', 'true')
+
+    positionAliyahPopup(popup, trigger)
+    const signal = state.abortController.signal
+
+    const showGroupList = (focusGroupIndex?: number) => {
+      state.activeGroupIndex = null
+      setAliyahPopupContent(popup, state.groups)
+      positionAliyahPopup(popup, trigger)
+      if (focusGroupIndex !== undefined) {
+        popup
+          .querySelector<HTMLElement>(
+            `[data-choice-group-index="${focusGroupIndex}"]`
+          )
+          ?.focus()
+      }
+    }
+
+    const showGroupChoices = (
+      groupOption: HTMLElement,
+      group: ParshaAliyahChoiceGroup,
+      groupIndex: number,
+      focusFirstChoice = false
+    ) => {
+      if (!supportsHoverFlyout()) {
+        state.activeGroupIndex = groupIndex
+        popup.innerHTML = renderAliyahSubviewContent(group)
+        positionAliyahPopup(popup, trigger)
+        popup.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
+        return
+      }
+
+      if (
+        state.activeGroupIndex === groupIndex &&
+        state.submenu?.isConnected
+      ) {
+        if (focusFirstChoice) {
+          state.submenu
+            .querySelector<HTMLElement>('[role="menuitem"]')
+            ?.focus()
+        }
+        return
+      }
+
+      hideAliyahSubmenu(state)
+      state.activeGroupIndex = groupIndex
+      const submenu = htmlToElement(`
+        <div class="aliyah-selection-popup mod-submenu" role="menu" aria-label="Select aliyah from ${group.label}">
+          ${renderAliyahPopupContent([group])}
+        </div>
+      `) as HTMLElement
+      state.submenu = submenu
+      stack.appendChild(submenu)
+      groupOption.setAttribute('aria-haspopup', 'menu')
+      groupOption.setAttribute('aria-expanded', 'true')
+      positionAliyahSubmenu(submenu, groupOption, popup)
+      submenu.addEventListener(
+        'click',
+        (event) => {
+          event.stopPropagation()
+          handleAliyahLinkClick(event as MouseEvent)
+        },
+        { signal }
+      )
+      if (focusFirstChoice) {
+        submenu.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
+      }
+    }
+
+    popup.addEventListener(
+      'pointerover',
+      (event) => {
+        if (!supportsHoverFlyout()) return
+        const groupOption = (event.target as HTMLElement).closest<HTMLElement>(
+          '[data-choice-group-index]'
+        )
+        if (!groupOption || groupOption.contains(event.relatedTarget as Node)) return
+        const groupIndex = Number(groupOption.dataset.choiceGroupIndex)
+        const group = state.groups[groupIndex]
+        if (group) showGroupChoices(groupOption, group, groupIndex)
+      },
+      { signal }
+    )
 
     popup.addEventListener(
       'click',
@@ -678,62 +931,112 @@ export default (
         event.stopPropagation()
         const mouseEvent = event as MouseEvent
         const target = event.target as HTMLElement
+        const backButton = target.closest<HTMLButtonElement>(
+          '[data-aliyah-subview-back]'
+        )
+        if (backButton) {
+          const groupIndex = state.activeGroupIndex
+          if (groupIndex !== null) showGroupList(groupIndex)
+          return
+        }
         const groupOption = target.closest<HTMLButtonElement>(
           '[data-choice-group-index]'
         )
         if (groupOption) {
-          const group = groups[Number(groupOption.dataset.choiceGroupIndex)]
+          const groupIndex = Number(groupOption.dataset.choiceGroupIndex)
+          const group = state.groups[groupIndex]
           if (!group) return
-          setAliyahPopupContent(popup, [group])
-          positionAliyahPopup(popup, trigger, mouseEvent.clientX || rect.left)
+          showGroupChoices(
+            groupOption,
+            group,
+            groupIndex,
+            mouseEvent.detail === 0
+          )
           return
         }
 
-        const link = target.closest<HTMLAnchorElement>('a[href^="#/"]')
-        if (
-          link &&
-          !mouseEvent.metaKey &&
-          !mouseEvent.ctrlKey &&
-          !mouseEvent.shiftKey &&
-          !mouseEvent.altKey &&
-          link.getAttribute('href') === location.hash
-        ) {
-          event.preventDefault()
-          hideAliyahPopup()
-          window.dispatchEvent(new Event('hashchange'))
-          return
-        }
-
-        if (target.closest('.aliyah-selection-option')) {
-          hideAliyahPopup()
-        }
+        handleAliyahLinkClick(mouseEvent)
       },
-      { signal: aliyahPopupAbortController.signal }
+      { signal }
     )
 
-    const popupController = aliyahPopupAbortController
-    window.setTimeout(() => {
-      if (!popupController || popupController.signal.aborted) return
-      document.addEventListener(
-        'click',
-        (event) => {
-          if (event.composedPath().includes(popup)) return
-          hideAliyahPopup()
-        },
-        { signal: popupController.signal }
-      )
-    }, 0)
+    document.addEventListener(
+      'pointerdown',
+      (event) => {
+        const path = event.composedPath()
+        if (path.includes(stack) || path.includes(trigger)) return
+        hideAliyahPopup()
+      },
+      { capture: true, signal }
+    )
+
+    document.addEventListener(
+      'keydown',
+      (event) => {
+        if (event.key !== 'Escape') return
+        event.preventDefault()
+        if (state.activeGroupIndex !== null) {
+          const groupIndex = state.activeGroupIndex
+          if (state.submenu) {
+            const groupOption = popup.querySelector<HTMLElement>(
+              `[data-choice-group-index="${groupIndex}"]`
+            )
+            hideAliyahSubmenu(state)
+            groupOption?.focus()
+          } else {
+            showGroupList(groupIndex)
+          }
+          return
+        }
+        hideAliyahPopup()
+        trigger.focus()
+      },
+      { signal }
+    )
+
+    window.addEventListener(
+      'resize',
+      () => {
+        if (aliyahMenuState !== state) return
+        positionAliyahPopup(popup, trigger)
+        const groupOption = popup.querySelector<HTMLElement>(
+          '[data-choice-group-index][aria-expanded="true"]'
+        )
+        if (state.submenu && groupOption) {
+          positionAliyahSubmenu(state.submenu, groupOption, popup)
+        }
+      },
+      { signal }
+    )
+
+    return popup
   }
+
+  self.addEventListener('pointerover', (event: PointerEvent) => {
+    if (!supportsHoverFlyout()) return
+    const trigger = (event.target as HTMLElement).closest<HTMLAnchorElement>(
+      '[data-aliyah-choice-id]'
+    )
+    if (!trigger || trigger.contains(event.relatedTarget as Node)) return
+    const groups = aliyahChoicesById.get(trigger.dataset.aliyahChoiceId ?? '')
+    if (groups) showAliyahPopup(trigger, groups)
+  })
+
+  self.addEventListener('focusin', (event) => {
+    const trigger = (event.target as HTMLElement).closest<HTMLAnchorElement>(
+      '[data-aliyah-choice-id]'
+    )
+    if (!trigger) return
+    const groups = aliyahChoicesById.get(trigger.dataset.aliyahChoiceId ?? '')
+    if (groups) showAliyahPopup(trigger, groups)
+  })
 
   self.addEventListener('click', (event) => {
     const mouseEvent = event as MouseEvent
     const target = event.target as HTMLElement
     const trigger = target.closest<HTMLAnchorElement>('[data-aliyah-choice-id]')
 
-    if (!trigger) {
-      hideAliyahPopup()
-      return
-    }
+    if (!trigger) return
 
     if (
       mouseEvent.metaKey ||
@@ -748,15 +1051,31 @@ export default (
     if (!groups) return
 
     event.preventDefault()
-    showAliyahPopup(trigger, groups, mouseEvent)
+    showAliyahPopup(trigger, groups)
   })
 
   self.addEventListener('scroll', hideAliyahPopup)
   self.addEventListener(
     'keydown',
-    whenKey('Escape', () => {
-      hideAliyahPopup()
-    })
+    (event: KeyboardEvent) => {
+      if (event.key === 'ArrowDown') {
+        const trigger = (event.target as HTMLElement).closest<HTMLAnchorElement>(
+          '[data-aliyah-choice-id]'
+        )
+        if (!trigger) return
+        const groups = aliyahChoicesById.get(
+          trigger.dataset.aliyahChoiceId ?? ''
+        )
+        if (!groups) return
+        event.preventDefault()
+        showAliyahPopup(trigger, groups)
+          .querySelector<HTMLElement>('[role="menuitem"]')
+          ?.focus()
+        return
+      }
+
+      whenKey('Escape', hideAliyahPopup)(event)
+    }
   )
 
   return {

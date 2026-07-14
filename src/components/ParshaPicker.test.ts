@@ -5,7 +5,10 @@ import type { UserSettings } from '../calendar-model/user-settings.ts'
 import {
   buildParshaAliyahChoiceGroups,
   buildParshaAliyahChoices,
+  calculateAnchoredPopupMaxHeight,
   calculateAnchoredPopupPosition,
+  calculateFlyoutPopupPosition,
+  collectParshaChoiceSourceLeinings,
   parshaListTitleForLeining,
   renderAliyahPopupContent,
   renderCalendarSettings,
@@ -95,6 +98,28 @@ test('builds submenu choices for a double parsha', () => {
     ])
 })
 
+test('finds standalone Matot and Masei within the 20-year source window', () => {
+  const baseLeinings = generator
+    .forEntireChumash(new HDate())
+    .flatMap((date) => date.leinings)
+  const sourceLeinings = collectParshaChoiceSourceLeinings(
+    generator,
+    baseLeinings,
+    5786
+  )
+  const matotMasei = findParsha('Matot-Masei', sourceLeinings)
+
+  expect(
+    buildParshaAliyahChoiceGroups(matotMasei, sourceLeinings).map(
+      ({ label, choices }) => ({ label, choiceCount: choices.length })
+    )
+  ).toEqual([
+    { label: 'מטות־מסעי', choiceCount: 8 },
+    { label: 'מטות', choiceCount: 8 },
+    { label: 'מסעי', choiceCount: 8 },
+  ])
+})
+
 test('renders a parsha header above aliyah choices', () => {
   const bereshit = findParsha('Bereshit')
   const [group] = buildParshaAliyahChoiceGroups(bereshit, [bereshit])
@@ -123,11 +148,34 @@ test('labels Vezos Haberacha as a parsha in the parsha list', () => {
 
 test('positions bottom-edge aliyah popup directly above the selected parsha', () => {
   expect(calculateAnchoredPopupPosition({
-      anchorX: 950,
       triggerRect: { left: 900, top: 650, right: 1100, bottom: 690 },
       popupRect: { width: 220, height: 320 },
       viewport: { width: 1280, height: 720 },
-    })).toEqual({ left: 950, top: 322 })
+    })).toEqual({ left: 890, top: 324 })
+})
+
+test('limits an aliyah popup to the larger side of its trigger', () => {
+  expect(calculateAnchoredPopupMaxHeight(
+      { left: 900, top: 350, right: 1100, bottom: 415 },
+      { width: 1280, height: 720 }
+    )).toBe(332)
+})
+
+test('positions a desktop aliyah menu to the right of its parsha', () => {
+  expect(calculateFlyoutPopupPosition({
+      anchorRect: { left: 900, top: 350, right: 1100, bottom: 415 },
+      popupRect: { width: 156, height: 320 },
+      viewport: { width: 1280, height: 720 },
+    })).toEqual({ left: 1104, top: 350, side: 'right' })
+})
+
+test('positions an aliyah submenu beside its parent without overflowing', () => {
+  expect(calculateFlyoutPopupPosition({
+      anchorRect: { left: 1030, top: 360, right: 1270, bottom: 600 },
+      verticalAnchorRect: { left: 1040, top: 400, right: 1260, bottom: 440 },
+      popupRect: { width: 220, height: 320 },
+      viewport: { width: 1280, height: 720 },
+    })).toEqual({ left: 806, top: 388, side: 'left' })
 })
 
 test('renders the Israel calendar toggle unchecked by default', () => {
