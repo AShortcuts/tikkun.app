@@ -3,6 +3,7 @@ import {
   adjustEndingLineTokens,
   adjustStartingLineTokens,
   collectStartingLineTokenKeys,
+  collectTokenKeysForExactAliyahRange,
   collectTokenKeysForAliyahRange,
 } from './aliyah-token-sequence.ts'
 
@@ -208,4 +209,62 @@ test('collects starting line token keys without walking the final aliyah range',
       startLine: lines[1],
     })
   ).toEqual(['0:1:0:2', '0:1:0:3'])
+})
+
+test('collects exact inclusive ranges while retaining shared Rosh Chodesh tokens', () => {
+  const book = document.createElement('div')
+  book.innerHTML = `
+    <div data-class="line"><span class="fragment mod-annotations-on"><span class="word" data-token-key="1:0:0:0">א</span><span class="word" data-token-key="1:0:0:1">א׃</span></span></div>
+    <div data-class="line"><span class="fragment mod-annotations-on"><span class="word" data-token-key="1:1:0:0">ב</span><span class="word" data-token-key="1:1:0:1">ב׃</span></span></div>
+    <div data-class="line"><span class="fragment mod-annotations-on"><span class="word" data-token-key="1:2:0:0">ג</span><span class="word" data-token-key="1:2:0:1">ג׃</span></span></div>
+    <div data-class="line"><span class="fragment mod-annotations-on"><span class="word" data-token-key="1:3:0:0">ד</span><span class="word" data-token-key="1:3:0:1">ד׃</span></span></div>
+    <div data-class="line"><span class="fragment mod-annotations-on"><span class="word" data-token-key="1:4:0:0">ה</span><span class="word" data-token-key="1:4:0:1">ה׃</span></span></div>
+  `
+  const lines = [...book.querySelectorAll<HTMLElement>('[data-class="line"]')]
+  const first = collectTokenKeysForExactAliyahRange({
+    book,
+    startLine: lines[0]!,
+    startVerseOrdinal: 0,
+    endLine: lines[2]!,
+    endVerseOrdinal: 0,
+  })
+  const second = collectTokenKeysForExactAliyahRange({
+    book,
+    startLine: lines[2]!,
+    startVerseOrdinal: 0,
+    endLine: lines[4]!,
+    endVerseOrdinal: 0,
+  })
+
+  expect(first).toEqual([
+    '1:0:0:0', '1:0:0:1',
+    '1:1:0:0', '1:1:0:1',
+    '1:2:0:0', '1:2:0:1',
+  ])
+  expect(second).toEqual([
+    '1:2:0:0', '1:2:0:1',
+    '1:3:0:0', '1:3:0:1',
+    '1:4:0:0', '1:4:0:1',
+  ])
+  expect(first.filter((key) => second.includes(key))).toEqual([
+    '1:2:0:0', '1:2:0:1',
+  ])
+})
+
+test('collects seventh and Maftir independently when they share the same range', () => {
+  const book = document.createElement('div')
+  book.innerHTML = `
+    <div data-class="line"><span class="fragment mod-annotations-on"><span class="word" data-token-key="2:0:0:0">שביעי</span><span class="word" data-token-key="2:0:0:1">משותף׃</span></span></div>
+  `
+  const line = book.querySelector<HTMLElement>('[data-class="line"]')!
+  const exactRange = () => collectTokenKeysForExactAliyahRange({
+    book,
+    startLine: line,
+    startVerseOrdinal: 0,
+    endLine: line,
+    endVerseOrdinal: 0,
+  })
+
+  expect(exactRange()).toEqual(['2:0:0:0', '2:0:0:1'])
+  expect(exactRange()).toEqual(['2:0:0:0', '2:0:0:1'])
 })

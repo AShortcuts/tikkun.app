@@ -5,9 +5,9 @@ import { EventEmitter } from '../event-emitter.ts'
 const { htmlToElement: html, whenKey, purgeNode } = utils
 
 export type SearchEmitter = {
-  selection: Element
+  selection: HTMLElement
   search: string
-  clear: never
+  clear: undefined
 }
 
 const Search = ({
@@ -17,7 +17,7 @@ const Search = ({
   search: (query: string) => Element[]
   emitter: EventEmitter<SearchEmitter>
 }) => {
-  let list: Element
+  let list: HTMLElement | null = null
 
   const self = html(`
     <div class="search">
@@ -33,7 +33,9 @@ const Search = ({
   self.addEventListener(
     'keydown',
     whenKey('Enter', () => {
-      emitter.emit('selection', getSelected(list))
+      if (!list) return
+      const selected = getSelected(list)
+      if (selected) emitter.emit('selection', selected)
     }),
   )
 
@@ -54,6 +56,7 @@ const Search = ({
     self.addEventListener(
       'keydown',
       whenKey(key, (e) => {
+        if (!list) return
         e.preventDefault()
         setSelected(list, adjustment)
       }),
@@ -61,7 +64,10 @@ const Search = ({
   )
 
   const searchInput = self.querySelector<HTMLInputElement>('.search-input')
-  const searchResults = self.querySelector('.search-results')
+  const searchResults = self.querySelector<HTMLElement>('.search-results')
+  if (!searchInput || !searchResults) {
+    throw new Error('Search failed to render its required input and results elements')
+  }
 
   searchInput.addEventListener('input', (e) => {
     const query = (e.target as HTMLInputElement).value
@@ -76,7 +82,8 @@ const Search = ({
       searchResults.appendChild(list)
       searchResults.classList.remove('u-hidden')
     } else {
-      emitter.emit('clear')
+      list = null
+      emitter.emit('clear', undefined)
       searchResults.classList.add('u-hidden')
     }
   })

@@ -16,7 +16,9 @@ test('canonicalizes the hashless initial reader route before syncing chrome', ()
 })
 
 test('briefly reveals absolute page numbers for page routes only', () => {
-  expect(indexSource).toMatch(/void rendered\.then\(\(\) => revealPageNumberForRoute\(nextReaderHash\)\)/)
+  expect(indexSource).toMatch(
+    /void rendered\s*\.then\(\(\) => \{\s*if \(isCurrentRoute\(\)\) revealPageNumberForRoute\(nextReaderHash\)/
+  )
   expect(indexSource).toMatch(/function pageNumberFromPageRouteHash\(hash: string \| null\)[\s\S]*\^#\\\/\(\?:torah\|esther\)\\\/page\\\/\(\\d\+\)\$/)
   expect(indexSource).toMatch(/marker\.classList\.add\('mod-route-reveal'\)/)
   expect(indexSource).toMatch(/marker\.classList\.remove\('mod-route-reveal'\)/)

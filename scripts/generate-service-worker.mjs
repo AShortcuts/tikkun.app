@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto'
-import { readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import process from 'node:process'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const repoRoot = path.resolve(fileURLToPath(new URL('..', import.meta.url)))
 const distRoot = path.join(repoRoot, 'dist')
@@ -28,7 +29,7 @@ function toUrlPath(filePath) {
   return `/${filePath.split(path.sep).map(encodeURIComponent).join('/')}`
 }
 
-function shouldPrecache(relativePath) {
+export function shouldPrecache(relativePath) {
   const normalized = relativePath.split(path.sep).join('/')
   if (normalized === 'service-worker.js') return false
   if (excludedPathPrefixes.some((prefix) => normalized.startsWith(prefix))) {
@@ -50,24 +51,8 @@ async function walk(directory) {
   return files.flat()
 }
 
-const allFiles = await walk(distRoot)
-const precacheFiles = allFiles
-  .map((filePath) => path.relative(distRoot, filePath))
-  .filter(shouldPrecache)
-  .sort()
-
-const hash = createHash('sha256')
-for (const relativePath of precacheFiles) {
-  hash.update(relativePath)
-  hash.update(await readFile(path.join(distRoot, relativePath)))
-}
-
-const buildHash = hash.digest('hex').slice(0, 16)
-const precacheUrls = ['/', ...precacheFiles.map(toUrlPath)]
-const distStats = await stat(distRoot)
-const generatedAt = new Date(distStats.mtimeMs).toISOString()
-
-const serviceWorkerSource = `const CACHE_NAME = 'tikkun-${buildHash}'
+export function renderServiceWorkerSource({ buildHash, precacheUrls }) {
+  return `const CACHE_NAME = 'tikkun-${buildHash}'
 const PRECACHE_URLS = ${JSON.stringify(precacheUrls, null, 2)}
 const MEDIA_PATH_RE = /^\\/(?:audio)\\//
 const MEDIA_EXTENSION_RE = /\\.(?:aac|aiff|flac|m4a|m4v|mov|mp3|mp4|ogg|opus|wav|webm)$/i
@@ -128,22 +113,63 @@ async function cacheFirst(request) {
 }
 
 async function networkFirst(request, fallbackUrl) {
+  let networkResponse
+  let networkError
   try {
     const response = await fetch(request)
     if (response.ok) {
       const cache = await caches.open(CACHE_NAME)
       await cache.put(request, response.clone())
+      return response
     }
-    return response
-  } catch {
-    const cached = await caches.match(request)
-    return cached ?? caches.match(fallbackUrl)
+    if (response.status < 500) return response
+    networkResponse = response
+  } catch (error) {
+    networkError = error
   }
+
+  const cached = await caches.match(request)
+  const fallback = cached ?? (await caches.match(fallbackUrl))
+  if (fallback) return fallback
+  if (networkResponse) return networkResponse
+  throw networkError
 }
 `
+}
 
-await writeFile(path.join(distRoot, 'service-worker.js'), serviceWorkerSource)
+export async function generateServiceWorker(root = distRoot) {
+  const allFiles = await walk(root)
+  const precacheFiles = allFiles
+    .map((filePath) => path.relative(root, filePath))
+    .filter(shouldPrecache)
+    .sort()
 
-console.log(
-  `Generated service-worker.js with ${precacheUrls.length} precached URLs (${buildHash}, ${generatedAt})`
-)
+  const hash = createHash('sha256')
+  for (const relativePath of precacheFiles) {
+    hash.update(relativePath)
+    hash.update(await readFile(path.join(root, relativePath)))
+  }
+
+  const buildHash = hash.digest('hex').slice(0, 16)
+  const precacheUrls = ['/', ...precacheFiles.map(toUrlPath)]
+  const distStats = await stat(root)
+  const generatedAt = new Date(distStats.mtimeMs).toISOString()
+  const serviceWorkerSource = renderServiceWorkerSource({ buildHash, precacheUrls })
+
+  const targetFile = path.join(root, 'service-worker.js')
+  const stagedFile = `${targetFile}.stage-${process.pid}-${Date.now()}`
+  try {
+    await writeFile(stagedFile, serviceWorkerSource)
+    await rename(stagedFile, targetFile)
+  } finally {
+    await rm(stagedFile, { force: true })
+  }
+
+  console.log(
+    `Generated service-worker.js with ${precacheUrls.length} precached URLs (${buildHash}, ${generatedAt})`
+  )
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await generateServiceWorker()
+}

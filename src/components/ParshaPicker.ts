@@ -13,6 +13,7 @@ import {
 import type {
   LeiningAliyah,
   LeiningInstance,
+  LeiningRun,
 } from '../calendar-model/model-types.ts'
 import { generateUrl } from '../view-model/navigation/url-parser.ts'
 import { isVezosHabracha } from '../view-model/scroll-view-model.ts'
@@ -102,6 +103,25 @@ const POPUP_ANCHOR_GAP = 6
 const PARSHA_CHOICE_SOURCE_LOOKBACK_YEARS = 3
 const PARSHA_CHOICE_SOURCE_WINDOW_YEARS = 20
 
+function firstRunOf(leining: LeiningInstance): LeiningRun {
+  const run = leining.runs[0]
+  if (!run) {
+    throw new Error(
+      `Leining ${leining.date.title.en || leining.id} has no reading runs`,
+    )
+  }
+  return run
+}
+
+function requiredDescendant<T extends Element>(
+  root: ParentNode,
+  selector: string,
+): T {
+  const element = root.querySelector<T>(selector)
+  if (!element) throw new Error(`Parsha picker failed to render ${selector}`)
+  return element
+}
+
 export function calculateAnchoredPopupMaxHeight(
   triggerRect: AnchorRect,
   viewport: ViewportRect
@@ -183,14 +203,14 @@ export function calculateFlyoutPopupPosition({
 }
 
 const navigationHrefForLeining = (leining: LeiningInstance) =>
-  semanticParshaUrlForLeining(leining) ?? generateUrl(leining.runs[0])
+  semanticParshaUrlForLeining(leining) ?? generateUrl(firstRunOf(leining))
 
 function parshaTitle(leining: LeiningInstance) {
   return renderLeiningTitle(leining)
 }
 
 export function parshaListTitleForLeining(leining: LeiningInstance) {
-  if (isVezosHabracha(leining.runs[0])) return 'וזאת הברכה'
+  if (isVezosHabracha(firstRunOf(leining))) return 'וזאת הברכה'
   return renderLeiningTitle(leining)
 }
 
@@ -425,7 +445,7 @@ const groupHolidays = (leinings: LeiningInstance[]) => {
   for (const leining of leinings) {
     if (leining.isParsha) continue
     if (leining.id === LeiningInstanceId.Megillah) continue
-    if (leining.runs[0].scroll !== 'torah') continue
+    if (firstRunOf(leining).scroll !== 'torah') continue
     // Only include the first ראש חודש
     if (
       leining.date.title.he.startsWith('ראש חודש') &&
@@ -451,12 +471,19 @@ const Browse = (
     <h2 class="section-heading">פרשת השבוע</h2>
     <ol class="parsha-books mod-emphasize-first-in-group">
       ${leinings
-        .filter((o) => o.isParsha || isVezosHabracha(o.runs[0]))
-        .reduce((books, leining, idx) => {
+        .filter((o) => o.isParsha || isVezosHabracha(firstRunOf(o)))
+        .reduce<LeiningInstance[][]>((books, leining) => {
           // TODO: Change to groupBy()
-          const book = leining.runs[0].aliyot[0].start.b
-          books[book] = books[book] || []
-          books[book].push({ ...leining, idx })
+          const firstAliyah = firstRunOf(leining).aliyot[0]
+          if (!firstAliyah) {
+            throw new Error(
+              `Leining ${leining.date.title.en || leining.id} has no aliyot`,
+            )
+          }
+          const book = firstAliyah.start.b
+          const entries = books[book] ?? []
+          entries.push(leining)
+          books[book] = entries
           return books
         }, [])
         .map((book) => Book(book, aliyahChoiceIdFor))
@@ -496,8 +523,12 @@ const top = (n: number) => (_: unknown, i: number) => i < n
 
 const TorahReferencePicker = () => {
   const [firstBook] = listTorahBooks()
+  if (!firstBook) throw new Error('Torah reference index has no books')
   const chapters = listTorahChapters(firstBook.number)
   const firstChapter = chapters[0]
+  if (firstChapter === undefined) {
+    throw new Error(`Torah reference index has no chapters for book ${firstBook.number}`)
+  }
   const verses = listTorahVerses(firstBook.number, firstChapter)
 
   return `
@@ -571,7 +602,7 @@ export default (
   const leinings = generator
     .forEntireChumash(new HDate())
     .flatMap((ld) => ld.leinings)
-    .filter((leining) => AVAILABLE_SCROLLS.has(leining.runs[0].scroll))
+    .filter((leining) => AVAILABLE_SCROLLS.has(firstRunOf(leining).scroll))
 
   const searchEmitter = EventEmitter.new<SearchEmitter>()
   const s = Search({
@@ -584,7 +615,7 @@ export default (
   )
   const aliyahChoicesById = new Map<string, ParshaAliyahChoiceGroup[]>()
   const aliyahChoiceIdFor = (leining: LeiningInstance) => {
-    if (!leining.isParsha && !isVezosHabracha(leining.runs[0])) return null
+    if (!leining.isParsha && !isVezosHabracha(firstRunOf(leining))) return null
 
     const groups = buildParshaAliyahChoiceGroups(
       leining,
@@ -615,44 +646,50 @@ export default (
     </div>
   `)
 
+  const browse = requiredDescendant<HTMLElement>(self, '.browse')
+  const comingUp = requiredDescendant<HTMLElement>(self, '#coming-up')
+  const searchMount = requiredDescendant<HTMLElement>(self, '#search')
+
   searchEmitter.on('search', () => {
-    self.querySelector('.browse').classList.add('u-hidden')
-    self.querySelector('#coming-up').classList.add('u-hidden')
+    browse.classList.add('u-hidden')
+    comingUp.classList.add('u-hidden')
   })
 
   searchEmitter.on('clear', () => {
-    self.querySelector('.browse').classList.remove('u-hidden')
-    self.querySelector('#coming-up').classList.remove('u-hidden')
+    browse.classList.remove('u-hidden')
+    comingUp.classList.remove('u-hidden')
   })
 
-  self
-    .querySelector('#search')
-    .parentNode.replaceChild(s.node, self.querySelector('#search'))
+  searchMount.replaceWith(s.node)
 
-  const torahReferenceForm = self.querySelector<HTMLFormElement>(
+  const torahReferenceForm = requiredDescendant<HTMLFormElement>(
+    self,
     '[data-target-id="torah-reference-form"]'
   )
-  const bookSelect = self.querySelector<HTMLSelectElement>(
+  const bookSelect = requiredDescendant<HTMLSelectElement>(
+    self,
     '[data-target-id="torah-book-select"]'
   )
-  const chapterSelect = self.querySelector<HTMLSelectElement>(
+  const chapterSelect = requiredDescendant<HTMLSelectElement>(
+    self,
     '[data-target-id="torah-chapter-select"]'
   )
-  const verseSelect = self.querySelector<HTMLSelectElement>(
+  const verseSelect = requiredDescendant<HTMLSelectElement>(
+    self,
     '[data-target-id="torah-verse-select"]'
   )
 
-  if (!torahReferenceForm || !bookSelect || !chapterSelect || !verseSelect) {
-    throw new Error('Torah reference picker failed to mount.')
-  }
-
-  self
-    .querySelector<HTMLInputElement>('[data-target-id="calendar-israel-toggle"]')
-    ?.addEventListener('change', (event) => {
-      options.onCalendarSettingsChange({
-        israel: (event.currentTarget as HTMLInputElement).checked,
-      })
+  requiredDescendant<HTMLInputElement>(
+    self,
+    '[data-target-id="calendar-israel-toggle"]',
+  ).addEventListener('change', (event) => {
+    if (!(event.currentTarget instanceof HTMLInputElement)) {
+      throw new Error('Calendar setting change came from an invalid element')
+    }
+    options.onCalendarSettingsChange({
+      israel: event.currentTarget.checked,
     })
+  })
 
   const setNumericOptions = (
     select: HTMLSelectElement,
@@ -665,8 +702,9 @@ export default (
 
     if (!values.length) return
 
-    const nextValue = values.includes(selectedValue ?? Number.NaN)
-      ? selectedValue!
+    const nextValue =
+      selectedValue !== undefined && values.includes(selectedValue)
+      ? selectedValue
       : values[0]
     select.value = String(nextValue)
   }
@@ -1078,10 +1116,20 @@ export default (
     }
   )
 
+  let mountFocusTimer = 0
   return {
     node: self,
     onMount: () => {
-      setTimeout(() => s.focus(), 0)
+      mountFocusTimer = window.setTimeout(() => {
+        mountFocusTimer = 0
+        if (self.isConnected) s.focus()
+      }, 0)
+    },
+    destroy: () => {
+      if (mountFocusTimer) window.clearTimeout(mountFocusTimer)
+      mountFocusTimer = 0
+      hideAliyahPopup()
+      self.remove()
     },
   }
 }

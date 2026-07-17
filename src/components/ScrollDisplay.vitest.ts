@@ -30,7 +30,6 @@ beforeEach(() => {
 })
 afterEach(() => {
   document.body.removeChild(root)
-  vm = null
 })
 
 for (const testCase of [
@@ -70,7 +69,7 @@ for (const testCase of [
         ...(testCase.expectedCoordinates ??
           ([root.clientWidth / 2, root.clientHeight / 2] as const))
       )
-      .closest('tr')
+      ?.closest<HTMLTableRowElement>('tr') ?? null
 
     expect(getAliyahLabel(elementAtCenter)).toBe(testCase.label)
   })
@@ -145,13 +144,14 @@ test('renders the previous page', async () => {
 })
 
 test('renders earlier aliyah markers when started later in Noach', async () => {
-  vm = ScrollViewModel.forId(generator, '2026-10-17:shacharis,main', {
+  const model = ScrollViewModel.forId(generator, '2026-10-17:shacharis,main', {
     scroll: 'torah',
     b: 1,
     c: 9,
     v: 18,
   })
-  if (!vm) throw new Error('Noach model not found')
+  if (!model) throw new Error('Noach model not found')
+  vm = model
   const sd = new ScrollDisplay(vm, root)
   await sd.scrolled
 
@@ -657,19 +657,118 @@ test('renders message entries', async () => {
   // ראש חודש חנוכה has a page, then a message, then one more page.
   await renderRun('2025-01-01:shacharis,main')
 
-  expect(getAliyahLabel(root.firstElementChild.querySelector('tr'))).toBe(
+  expect(
+    getAliyahLabel(
+      root.firstElementChild?.querySelector<HTMLTableRowElement>('tr') ?? null
+    )
+  ).toBe(
     'חנוכה יום ז׳ (ראש חודש)'
   )
-  scrollToReaderEdge('next')
+  if (!root.querySelector('.tikkun-message')) scrollToReaderEdge('next')
   await vi.waitFor(() => {
-    expect(root.lastElementChild?.textContent).toBe('✃ -29 עמודים ✁')
+    expect(root.querySelector('.tikkun-message')?.textContent).toBe(
+      '✃ 28 עמודים ✁'
+    )
   })
+  if (root.querySelectorAll('.tikkun-page').length < 2) {
+    scrollToReaderEdge('next')
+  }
+  await vi.waitFor(() => {
+    expect(root.querySelectorAll('.tikkun-page')).toHaveLength(2)
+  })
+  expect(
+    [...root.children].map((child) =>
+      child.tikkunPage ? child.tikkunPage.pageNumber : 'message'
+    )
+  ).toEqual([189, 'message', 160])
+})
+
+test('preserves logical order and identity for non-linear repeated pages', async () => {
+  const sourceModel = ScrollViewModel.forId(
+    generator,
+    '2026-10-17:shacharis,main'
+  )
+  if (!sourceModel) throw new Error('Noach model not found')
+  const sourcePage = (await sourceModel.startingLocation).page
+  if (sourcePage.type !== 'page') throw new Error('Noach page not found')
+
+  const entries: RenderedEntry[] = [
+    { ...sourcePage, contentIndex: 0, pageNumber: 20, runId: 'first-run' },
+    { type: 'message', contentIndex: 1, text: 'logical skip' },
+    { ...sourcePage, contentIndex: 2, pageNumber: 3 },
+    { ...sourcePage, contentIndex: 3, pageNumber: 20, runId: 'second-run' },
+  ]
+  const pendingEntries = entries.slice(1)
+  const fakeViewModel = {
+    startingLocation: Promise.resolve({ page: entries[0], lineNumber: 1 }),
+    fetchPreviousPage: async (): Promise<RenderedEntry | null> => null,
+    fetchNextPage: async (): Promise<RenderedEntry | null> =>
+      pendingEntries.shift() ?? null,
+    fetchPageByPageNumber: async (
+      pageNumber: number,
+      hint?: { runId: string }
+    ) =>
+      entries.find(
+        (entry) =>
+          entry.type === 'page' &&
+          entry.pageNumber === pageNumber &&
+          (!hint || entry.runId === hint.runId)
+      ) ?? null,
+    fetchPageByContentIndex: async (contentIndex: number) =>
+      entries.find((entry) => entry.contentIndex === contentIndex) ?? null,
+  } as unknown as ScrollViewModel
+  vm = fakeViewModel
+  const sd = new ScrollDisplay(vm, root)
+  await sd.scrolled
+
+  while (root.children.length < entries.length) {
+    const previousChildCount = root.children.length
+    scrollToReaderEdge('next')
+    await vi.waitFor(() => {
+      expect(root.children.length).toBeGreaterThan(previousChildCount)
+    })
+  }
+
+  expect(logicalEntriesInDom()).toEqual([
+    'page:20:0',
+    'message:logical skip:1',
+    'page:3:2',
+    'page:20:3',
+  ])
+  expect(sd.getMountedPageNumbers()).toEqual([20, 3, 20])
+  expect(sd.getMountedPageNode(20)?.dataset.contentIndex).toBe('3')
+  expect(
+    (await sd.ensurePageMounted(20, { runId: 'first-run' }))?.dataset.contentIndex
+  ).toBe('0')
+  expect(
+    (await sd.ensurePageMounted(20, { runId: 'second-run' }))?.dataset.contentIndex
+  ).toBe('3')
+
+  expect(sd.evictPage(20)).toBe(true)
+  expect(root.querySelectorAll('[data-page-placeholder="20"]')).toHaveLength(2)
+  expect(sd.getMountedPageNumbers()).toEqual([3])
+
+  expect(
+    await sd.ensureEvictedPagesMountedNearViewport({
+      marginPx: Number.POSITIVE_INFINITY,
+    })
+  ).toEqual([20, 20])
+  expect(logicalEntriesInDom()).toEqual([
+    'page:20:0',
+    'message:logical skip:1',
+    'page:3:2',
+    'page:20:3',
+  ])
 })
 
 test('renders just one page', async () => {
   await renderRun('2024-11-01:shacharis,main')
 
-  expect(getAliyahLabel(root.firstElementChild.querySelector('tr'))).toBe(
+  expect(
+    getAliyahLabel(
+      root.firstElementChild?.querySelector<HTMLTableRowElement>('tr') ?? null
+    )
+  ).toBe(
     'ראש חודש חשון'
   )
   expect(textFromLine(last(root.querySelectorAll('tr')))).toBe(
@@ -678,31 +777,35 @@ test('renders just one page', async () => {
 })
 
 async function renderRun(runId: string) {
-  vm = ScrollViewModel.forId(generator, runId)
-  if (!vm) throw new Error(`ID ${runId} not found`)
+  const model = ScrollViewModel.forId(generator, runId)
+  if (!model) throw new Error(`ID ${runId} not found`)
+  vm = model
   const sd = new ScrollDisplay(vm, root)
   await sd.scrolled
   return sd
 }
 
 async function renderNoachFromLaterPage() {
-  vm = ScrollViewModel.forId(generator, '2026-10-17:shacharis,main', {
+  const model = ScrollViewModel.forId(generator, '2026-10-17:shacharis,main', {
     scroll: 'torah',
     b: 1,
     c: 9,
     v: 18,
   })
-  if (!vm) throw new Error('Noach model not found')
+  if (!model) throw new Error('Noach model not found')
+  vm = model
   const sd = new ScrollDisplay(vm, root)
   await sd.scrolled
   return sd
 }
 
-function getAliyahLabel(lineEl: HTMLTableRowElement) {
+function getAliyahLabel(lineEl: HTMLTableRowElement | null) {
+  if (!lineEl) throw new Error('Expected a rendered line')
   return lineEl.querySelector('.aliyah-label-text')?.textContent
 }
 
-function textFromLine(lineEl: HTMLTableRowElement) {
+function textFromLine(lineEl: HTMLTableRowElement | null) {
+  if (!lineEl) throw new Error('Expected a rendered line')
   return [...lineEl.querySelectorAll('.mod-annotations-off')]
     .map((e) => e.textContent)
     .join('\t')
@@ -723,6 +826,17 @@ function pageNumbersAndPlaceholdersInDom() {
       return Number.isInteger(placeholderPage) ? placeholderPage : null
     })
     .filter((pageNumber): pageNumber is number => Number.isInteger(pageNumber))
+}
+
+function logicalEntriesInDom() {
+  return [...root.children].map((child) => {
+    if (!(child instanceof HTMLElement)) return 'unknown'
+    const contentIndex = child.dataset.contentIndex
+    if (child.tikkunPage) {
+      return `page:${child.tikkunPage.pageNumber}:${contentIndex}`
+    }
+    return `message:${child.textContent}:${contentIndex}`
+  })
 }
 
 function scrollToReaderEdge(direction: 'previous' | 'next') {

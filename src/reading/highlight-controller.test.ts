@@ -212,6 +212,25 @@ test('tracks the active token key as highlights move', async () => {
   expect(controller.getActiveTokenKey()).toBe('12:8:0:0')
 })
 
+test('notifies listeners only when the active token changes or clears', async () => {
+  const book = createBookWithTokens(['12:7:0:2', '12:8:0:0'])
+  const controller = new HighlightController(book)
+  const activeTokens: Array<string | null> = []
+  const stopListening = controller.onActiveTokenChanged((tokenKey) => {
+    activeTokens.push(tokenKey)
+  })
+
+  await controller.activateTokenKey('12:7:0:2', { scroll: false })
+  await controller.activateTokenKey('12:7:0:2', { scroll: false })
+  await controller.activateTokenKey('12:8:0:0', { scroll: false })
+  controller.clear()
+  controller.clear()
+  stopListening()
+  await controller.activateTokenKey('12:7:0:2', { scroll: false })
+
+  expect(activeTokens).toEqual(['12:7:0:2', '12:8:0:0', null])
+})
+
 test('scrolls whenever the highlighted token changes', async () => {
   const book = createBookWithTokens(['12:7:0:2', '12:7:0:3', '12:8:0:0']) as HTMLElement & {
     scrollCalls: unknown[]
@@ -405,6 +424,71 @@ test('mounts the cue page before activating a cue token', async () => {
   )
 
   expect(calls).toEqual([12])
+})
+
+test('keeps the latest cue active when an older page mount resolves later', async () => {
+  const firstKey = '12:7:0:2'
+  const secondKey = '13:1:0:0'
+  const book = createBookWithTokens([firstKey, secondKey])
+  const controller = new HighlightController(book)
+  let resolveFirstMount: () => void = () => {
+    throw new Error('First page mount was not started')
+  }
+  controller.setDisplay({
+    ensurePageMounted(pageNumber: number) {
+      if (pageNumber !== 12) return Promise.resolve()
+      return new Promise<void>((resolve) => {
+        resolveFirstMount = resolve
+      })
+    },
+  } as never)
+
+  const first = controller.activateCue({
+    timeStart: 0,
+    pageNumber: 12,
+    lineIndex: 7,
+    fragmentIndex: 0,
+    wordIndex: 2,
+  }, { scroll: false })
+  await controller.activateCue({
+    timeStart: 1,
+    pageNumber: 13,
+    lineIndex: 1,
+    fragmentIndex: 0,
+    wordIndex: 0,
+  }, { scroll: false })
+  resolveFirstMount()
+
+  await expect(first).resolves.toBeNull()
+  expect(controller.getActiveTokenKey()).toBe(secondKey)
+})
+
+test('invalidates a pending cue activation when the display changes', async () => {
+  const tokenKey = '12:7:0:2'
+  const controller = new HighlightController(createBookWithTokens([tokenKey]))
+  let resolveMount: () => void = () => {
+    throw new Error('Page mount was not started')
+  }
+  controller.setDisplay({
+    ensurePageMounted() {
+      return new Promise<void>((resolve) => {
+        resolveMount = resolve
+      })
+    },
+  } as never)
+
+  const pending = controller.activateCue({
+    timeStart: 0,
+    pageNumber: 12,
+    lineIndex: 7,
+    fragmentIndex: 0,
+    wordIndex: 2,
+  }, { scroll: false })
+  controller.setDisplay({ ensurePageMounted: async (): Promise<void> => {} } as never)
+  resolveMount()
+
+  await expect(pending).resolves.toBeNull()
+  expect(controller.getActiveTokenKey()).toBeNull()
 })
 
 test('evicts old token element cache entries instead of retaining every highlighted word', async () => {

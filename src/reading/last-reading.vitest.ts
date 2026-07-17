@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 
 import {
   LAST_READING_MAX_AGE_MS,
@@ -90,7 +90,8 @@ test('ignores invalid stored routes', () => {
   )
 
   expect(loadEligibleLastReading(storage, now)).toBeNull()
-  expect(storage.length).toBe(0)
+  expect(storage.getItem('tikkun.last-reading.v1')).toBeNull()
+  expect(storage.getItem('tikkun.last-reading.v1:quarantine')).not.toBeNull()
 })
 
 test('ignores the moving calendar default route', () => {
@@ -120,4 +121,24 @@ test('prefers semantic parsha urls with verse refs for last reading links', () =
   expect(createLastReadingHash(run, run.aliyot[0].start)).toBe(
     '#/torah/parsha/beresheet/1-1-1'
   )
+})
+
+test('contains denied checkpoint reads and surfaces denied writes', () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  const storage = {
+    ...createStorage(),
+    getItem: () => {
+      throw new DOMException('denied', 'SecurityError')
+    },
+    setItem: () => {
+      throw new DOMException('denied', 'SecurityError')
+    },
+  } as Storage
+
+  expect(loadEligibleLastReading(storage, now)).toBeNull()
+  expect(() => saveLastReading(storage, {
+    hash: '#/torah/parsha/noach',
+    parshaName: 'Noach',
+  }, now)).toThrow('Failed to save the last-reading checkpoint')
+  log.mockRestore()
 })

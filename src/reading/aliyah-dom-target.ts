@@ -78,3 +78,17 @@ export class AliyahTargetLocationCache {
 export function lineIndexFromLocation(location: Pick<AliyahPhysicalLocation, 'lineNumber'>) {
   return Math.max(0, location.lineNumber - 1)
 }
+
+export function getRenderedLineElements(root: ParentNode) {
+  return [
+    ...root.querySelectorAll<HTMLElement>(
+      '[data-class="line"][data-page-number][data-line-index]'
+    ),
+  ]
+}
+
+export function findRenderedLineElement(root: ParentNode, lineIndex: number) {
+  return root.querySelector<HTMLElement>(
+    `[data-class="line"][data-line-index="${lineIndex}"]`
+  )
+}

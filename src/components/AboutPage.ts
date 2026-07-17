@@ -3,6 +3,7 @@ import {
   recordingProgressRows,
 } from '../data/about-progress.ts'
 import { listRecordings, listNarrators } from '../audio/library.ts'
+import { isParshaAudioRecording } from '../audio/types.ts'
 import { generateCueAnalyticsUrl } from '../view-model/navigation/url-parser.ts'
 
 const statusClass = (status: string) =>
@@ -22,7 +23,7 @@ export default function AboutPage() {
     }
   >()
 
-  for (const recording of listRecordings()) {
+  for (const recording of listRecordings().filter(isParshaAudioRecording)) {
     const existing = recordingsByParsha.get(recording.parshaSlug) ?? {
       narratorId: recording.narratorId,
       parshaName: recording.parshaName,

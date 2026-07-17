@@ -4,13 +4,23 @@ import {
   findVideoForRecording,
   getCompleteCueEligibleRecordings,
   mergeVideoLinks,
+  parseVideoLinkRegistry,
+  parseVideoRenderMetadataList,
+  videoMetadataMatchesProvenance,
 } from './library.ts'
-import type { AudioRecording } from '../audio/types.ts'
+import type { ParshaAudioRecording } from '../audio/types.ts'
 import type { VideoLinkRegistry, VideoRenderMetadata } from './types.ts'
 
-const recording = (overrides: Partial<AudioRecording> = {}): AudioRecording => ({
+const audioHash = 'a'.repeat(64)
+const cueHash = 'b'.repeat(64)
+const appBuildHash = 'c'.repeat(40)
+
+const recording = (
+  overrides: Partial<ParshaAudioRecording> = {}
+): ParshaAudioRecording => ({
   id: 'bereshit-1',
   narratorId: 'yoni-davidov',
+  reading: { kind: 'parsha', id: 'bereshit', name: 'Bereshit', order: 1 },
   parshaSlug: 'bereshit',
   parshaName: 'Bereshit',
   parshaNumber: 1,
@@ -50,9 +60,9 @@ const metadata = (
   },
   generatedAt: '2026-05-03T12:00:00.000Z',
   generatedFrom: {
-    audioHash: 'audio-hash',
-    cueHash: 'cue-hash',
-    appBuildHash: 'app-hash',
+    audioHash,
+    cueHash,
+    appBuildHash,
   },
   validation: {
     passed: true,
@@ -130,7 +140,7 @@ test('video links merge only validated metadata with registered Koofr links', ()
 test('generated manifest preserves audio metadata and excludes recordings without links', () => {
   const manifest = createAliyahVideoManifest({
     recordings: [recording(), recording({ id: 'bereshit-2', aliyah: 2 })],
-    metadata: [metadata(), metadata({ audioId: 'bereshit-2' })],
+    metadata: [metadata(), metadata({ audioId: 'bereshit-2', aliyah: 2 })],
     links: {
       'bereshit-1': {
         videoSrc: 'https://koofr.eu/links/video',
@@ -148,6 +158,91 @@ test('generated manifest preserves audio metadata and excludes recordings withou
     aliyah: 1,
     title: 'Bereshit Aliyah 1',
   })
+})
+
+test('generated manifest excludes videos whose current provenance changed', () => {
+  const currentProvenanceByAudioId = new Map([
+    [
+      'bereshit-1',
+      {
+        audioHash: 'd'.repeat(64),
+        cueHash,
+        appBuildHash,
+      },
+    ],
+  ])
+  const manifest = createAliyahVideoManifest({
+    recordings: [recording()],
+    metadata: [metadata()],
+    links: {
+      'bereshit-1': {
+        videoSrc: 'https://koofr.eu/links/video',
+        downloadSrc: 'https://koofr.eu/links/download',
+      },
+    },
+    currentProvenanceByAudioId,
+  })
+
+  expect(manifest).toEqual([])
+  expect(
+    videoMetadataMatchesProvenance(metadata(), {
+      audioHash,
+    })
+  ).toBe(true)
+})
+
+test('generated manifest rejects duplicate or mismatched identities', () => {
+  const links: VideoLinkRegistry = {
+    'bereshit-1': {
+      videoSrc: 'https://koofr.eu/links/video',
+      downloadSrc: 'https://koofr.eu/links/download',
+    },
+  }
+
+  expect(() =>
+    createAliyahVideoManifest({
+      recordings: [recording(), recording()],
+      metadata: [metadata()],
+      links,
+    })
+  ).toThrow(/Duplicate audio recording id/)
+  expect(() =>
+    createAliyahVideoManifest({
+      recordings: [recording()],
+      metadata: [metadata(), metadata()],
+      links,
+    })
+  ).toThrow(/Duplicate video metadata audio id/)
+  expect(() =>
+    createAliyahVideoManifest({
+      recordings: [recording()],
+      metadata: [metadata({ narratorId: 'another-reader' })],
+      links,
+    })
+  ).toThrow(/does not match recording/)
+})
+
+test('local video registries are parsed before publication', () => {
+  expect(parseVideoRenderMetadataList([metadata()])).toEqual([metadata()])
+  expect(() =>
+    parseVideoRenderMetadataList([metadata({ durationSeconds: Number.NaN })])
+  ).toThrow(/Invalid video render metadata/)
+  expect(
+    parseVideoLinkRegistry({
+      'bereshit-1': {
+        videoSrc: 'https://koofr.eu/links/video',
+        downloadSrc: 'https://koofr.eu/links/download',
+      },
+    })
+  ).toHaveProperty('bereshit-1')
+  expect(() =>
+    parseVideoLinkRegistry({
+      'bereshit-1': {
+        videoSrc: 'javascript:alert(1)',
+        downloadSrc: 'https://koofr.eu/links/download',
+      },
+    })
+  ).toThrow(/Invalid video link registry entry/)
 })
 
 test('findVideoForRecording returns null when a recording has no manifest entry', () => {

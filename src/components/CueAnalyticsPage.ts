@@ -5,7 +5,7 @@ import {
   listCueAnalyticsRecords,
   type CueAnalyticsAliyahSummary,
   type CueAnalyticsParshaSummary,
-  type CueAnalyticsRecord,
+  type CueAnalyticsParshaRecord,
   type CueIntervalSample,
 } from '../audio/cue-analytics.ts'
 import {
@@ -13,7 +13,7 @@ import {
   listRecordings,
 } from '../audio/library.ts'
 import { loadAdminDraft, readAdminDraftSummary } from '../admin/draft-storage.ts'
-import type { WordCue } from '../audio/types.ts'
+import { isParshaAudioRecording, type WordCue } from '../audio/types.ts'
 import { LeiningGenerator } from '../calendar-model/generator.ts'
 import hebrewNumeral from '../hebrew-numeral.ts'
 import {
@@ -93,7 +93,7 @@ function getPointDatasetValue(point: Element, key: string) {
   return value ?? ''
 }
 
-function getSourceLabel(record: CueAnalyticsRecord) {
+function getSourceLabel(record: CueAnalyticsParshaRecord) {
   return record.cueSource === 'draft' ? 'Local draft' : 'Published timing'
 }
 
@@ -365,7 +365,7 @@ function renderLoadingState(copy: string) {
   `
 }
 
-function renderOverview(records: CueAnalyticsRecord[], selectionLabel: string) {
+function renderOverview(records: CueAnalyticsParshaRecord[], selectionLabel: string) {
   const overview = getCueAnalyticsOverview(records)
 
   if (!records.length) {
@@ -557,7 +557,7 @@ function renderCoverage(
   `
 }
 
-function renderTransitionReview(records: CueAnalyticsRecord[], selectionLabel: string) {
+function renderTransitionReview(records: CueAnalyticsParshaRecord[], selectionLabel: string) {
   const outliers = records
     .flatMap((record) =>
       record.intervalSamples
@@ -607,7 +607,7 @@ function renderTransitionReview(records: CueAnalyticsRecord[], selectionLabel: s
   `
 }
 
-function renderRecordModule(record: CueAnalyticsRecord) {
+function renderRecordModule(record: CueAnalyticsParshaRecord) {
   return `
     <article class="about-card analytics-module stack small">
       <div class="analytics-module-header">
@@ -714,9 +714,13 @@ export default function CueAnalyticsPage() {
   `
 }
 
-export async function mountCueAnalyticsPage(container: HTMLElement) {
+export async function mountCueAnalyticsPage(
+  container: HTMLElement,
+  { signal }: { signal?: AbortSignal } = {}
+) {
   const root = container.querySelector<HTMLElement>('[data-analytics-root="true"]')
   if (!root) return
+  const isCurrent = () => !signal?.aborted && root.isConnected
 
   const parshaSelect = root.querySelector<HTMLSelectElement>('[data-analytics-filter="parsha"]')
   const aliyahSelect = root.querySelector<HTMLSelectElement>('[data-analytics-filter="aliyah"]')
@@ -740,7 +744,9 @@ export async function mountCueAnalyticsPage(container: HTMLElement) {
     return
   }
 
-  const availableRecordings = listRecordings().filter((entry) => entry.status === 'available')
+  const availableRecordings = listRecordings()
+    .filter(isParshaAudioRecording)
+    .filter((entry) => entry.status === 'available')
   const cueOverrides = new Map<string, WordCue[]>()
   const cueSourceByAudioId = new Map<string, 'published' | 'draft'>()
   const cueUpdatedAtByAudioId = new Map<string, number | null>()
@@ -748,8 +754,10 @@ export async function mountCueAnalyticsPage(container: HTMLElement) {
   const completeAliyotByParsha = new Map<string, number[]>()
 
   for (const recording of availableRecordings) {
+    if (!isCurrent()) return
     const draftSummary = readAdminDraftSummary(recording.id)
     const cueProgress = await getCueProgressForRecording(recording)
+    if (!isCurrent()) return
 
     if (draftSummary?.cueCount) {
       const draft = loadAdminDraft(recording.id, draftSummary.tokenCount)
@@ -785,6 +793,7 @@ export async function mountCueAnalyticsPage(container: HTMLElement) {
     cueSourceByAudioId,
     cueUpdatedAtByAudioId,
   })
+  if (!isCurrent()) return
   const parshaSummaries = getCueAnalyticsParshaSummaries(allRecords)
 
   parshaSelect.innerHTML = `
@@ -800,6 +809,7 @@ export async function mountCueAnalyticsPage(container: HTMLElement) {
   parshaSelect.disabled = false
 
   const render = () => {
+    if (!isCurrent()) return
     const selectedParsha = parshaSelect.value
     const selectedAliyah = Number(aliyahSelect.value) || 0
     const selectedParshaName =

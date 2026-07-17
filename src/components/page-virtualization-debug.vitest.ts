@@ -79,6 +79,21 @@ describe('createPageVirtualizationSettings', () => {
     })
     expect(localStorage.getItem('tikkun.pageVirtualization.enabled')).toBe('true')
   })
+
+  test('keeps a session-only setting when browser storage is unavailable', () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const settings = createPageVirtualizationSettings({
+      search: '',
+      storage: null,
+    })
+
+    expect(settings.setEnabled(true)).toMatchObject({
+      enabled: true,
+      source: 'memory',
+    })
+    expect(settings.state()).toMatchObject({ enabled: true, source: 'memory' })
+    log.mockRestore()
+  })
 })
 
 describe('createPageVirtualizationMetrics', () => {

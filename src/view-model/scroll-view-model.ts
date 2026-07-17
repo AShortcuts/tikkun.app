@@ -9,7 +9,6 @@ import {
   LeiningInstanceId,
   LeiningRunType,
 } from '../calendar-model/model-types.ts'
-import IntegerIterator from '../integer-iterator.ts'
 import { HDate } from '@hebcal/hdate'
 import { compareRefs, containsRef } from '../calendar-model/ref-utils.ts'
 import {
@@ -41,18 +40,41 @@ const pageLoaders: Record<string, PageLoader> | null = isNodeRuntime
 /** Information to render a single page from a scroll. */
 export interface RenderedPageInfo {
   type: 'page'
+  /** Stable position in this view, distinct from the physical page number. */
+  contentIndex: number
   pageNumber: number
+  /** Identifies the run that owns this logical occurrence, when applicable. */
+  runId?: string
   lines: RenderedLineInfo[]
+}
+
+export interface PageOccurrenceHint {
+  runId: string
 }
 
 /** Information to render a message between `RenderedPageInfo`s. */
 export interface RenderedMessageInfo {
   type: 'message'
+  /** Stable position in this view, distinct from the surrounding page numbers. */
+  contentIndex: number
   text: string
 }
 
 /** A single entry rendered as the user scrolls. */
 export type RenderedEntry = RenderedPageInfo | RenderedMessageInfo
+
+/** A logical entry before its page data has been loaded and rendered. */
+export type ScrollContentSource =
+  | {
+      type: 'page'
+      pageNumber: number
+      /** Identifies the Holiday run that owns this occurrence of a physical page. */
+      runId?: string
+    }
+  | {
+      type: 'message'
+      text: string
+    }
 
 /**
  * Information to render a single line in the UI.
@@ -67,6 +89,8 @@ export interface RenderedLineInfo {
   text: string[][]
   /** The פסוקים that begin in this line, if any. */
   verses: Ref[]
+  /** The verse at the beginning of this line, used for exact focal membership. */
+  focalRef?: Ref
   /** True if this line should not be justified. */
   isPetucha: boolean
   /**
@@ -98,9 +122,7 @@ export interface RenderedLineInfo {
 
 /** Tracks scrolling through a single "view" of a scroll, associated with one or more LeiningRuns. */
 export abstract class ScrollViewModel {
-  private readonly currentContentIndex: Promise<
-    ReturnType<typeof IntegerIterator.new>
-  >
+  private readonly contentCursor: Promise<ContentCursor>
   private readonly pageEntryPromises = new Map<
     number,
     Promise<RenderedEntry | null>
@@ -116,12 +138,13 @@ export abstract class ScrollViewModel {
     /** The "view" (set of runs and contained עליות) that the user can scroll through. */
     readonly relevantRuns: LeiningRun[],
     initialRef: StartLocation,
-    private readonly displayTitleByRunId: Record<string, string> = {}
+    private readonly displayTitleByRunId: Record<string, string> = {},
+    initialRunId?: string
   ) {
     this.resolver = loadScroll(initialRef.scroll)
-    const startingInfo = this.loadAndConsumeScroll(initialRef)
-    this.currentContentIndex = startingInfo.then(
-      ({ currentIndex }) => currentIndex
+    const startingInfo = this.loadAndConsumeScroll(initialRef, initialRunId)
+    this.contentCursor = startingInfo.then(
+      ({ contentIndex }) => new ContentCursor(contentIndex)
     )
     this.startingLocation = startingInfo.then(({ location }) => location)
   }
@@ -129,7 +152,10 @@ export abstract class ScrollViewModel {
   displayTitleForRun(run: LeiningRun) {
     return this.displayTitleByRunId[run.id] ?? run.leining.date.title.he
   }
-  private async loadAndConsumeScroll(initialRef: StartLocation) {
+  private async loadAndConsumeScroll(
+    initialRef: StartLocation,
+    initialRunId?: string
+  ) {
     const scrollResolver = await this.resolver
     const { pageNumber, lineNumber } =
       'pageNumber' in initialRef
@@ -140,7 +166,8 @@ export abstract class ScrollViewModel {
         : await scrollResolver.physicalLocationFromRef(initialRef)
 
     const startingContentIndex = await this.contentIndexFromPageNumber(
-      pageNumber
+      pageNumber,
+      initialRunId ? { runId: initialRunId } : undefined
     )
     const page = await this.fetchPage(startingContentIndex)
     if (!page) throw new Error(`First page ${startingContentIndex} must exist`)
@@ -149,9 +176,7 @@ export abstract class ScrollViewModel {
         page,
         lineNumber,
       },
-      currentIndex: IntegerIterator.new({
-        startingAt: startingContentIndex,
-      }),
+      contentIndex: startingContentIndex,
     }
   }
 
@@ -209,33 +234,47 @@ export abstract class ScrollViewModel {
   }
 
   async fetchPreviousPage(): Promise<RenderedEntry | null> {
-    return this.fetchPage((await this.currentContentIndex).previous())
+    return (await this.contentCursor).previous((contentIndex) =>
+      this.fetchPage(contentIndex)
+    )
   }
 
   async fetchNextPage(): Promise<RenderedEntry | null> {
-    return this.fetchPage((await this.currentContentIndex).next())
+    return (await this.contentCursor).next((contentIndex) =>
+      this.fetchPage(contentIndex)
+    )
   }
 
-  async fetchPageByPageNumber(pageNumber: number): Promise<RenderedEntry | null> {
-    const contentIndex = await this.contentIndexFromPageNumber(pageNumber)
+  async fetchPageByPageNumber(
+    pageNumber: number,
+    hint?: PageOccurrenceHint
+  ): Promise<RenderedEntry | null> {
+    const contentIndex = await this.contentIndexFromPageNumber(pageNumber, hint)
     if (contentIndex < 0) return null
     return this.fetchPage(contentIndex)
   }
 
+  /** Fetches an exact logical occurrence, including repeated physical pages. */
+  async fetchPageByContentIndex(
+    contentIndex: number
+  ): Promise<RenderedEntry | null> {
+    return this.fetchPage(contentIndex)
+  }
+
   /**
-   * Calculates the page number (within the scroll) to fetch, or
-   * a fixed string, to render for the given (contiguous) index.
+   * Returns the page or message source for a contiguous logical index.
    *
    * This is overridden to render only a subset of pages.
    *
    * See the Readme for more background.
    */
-  protected abstract pageNumberFromContentIndex(
+  protected abstract contentSourceFromIndex(
     contentIndex: number
-  ): Promise<ContentPageEntry>
+  ): Promise<ScrollContentSource | null>
   /** Returns the (contiguous) index at which the given page is rendered. */
   protected abstract contentIndexFromPageNumber(
-    pageNumber: number
+    pageNumber: number,
+    hint?: { runId: string }
   ): Promise<number>
 
   private async fetchPage(contentIndex: number): Promise<RenderedEntry | null> {
@@ -253,42 +292,36 @@ export abstract class ScrollViewModel {
   }
 
   private async loadPage(contentIndex: number): Promise<RenderedEntry | null> {
-    const pageNumberEntry = await this.pageNumberFromContentIndex(contentIndex)
-    if (typeof pageNumberEntry === 'object') return pageNumberEntry
-    if (!pageNumberEntry || pageNumberEntry <= 0) return null
+    const source = await this.contentSourceFromIndex(contentIndex)
+    if (!source) return null
+    if (source.type === 'message') return { ...source, contentIndex }
+    if (source.pageNumber <= 0) return null
 
-    const pageLoader =
-      pageLoaders?.[
-        `../data/pages/${this.relevantRuns[0].scroll}/${pageNumberEntry}.json`
-      ]
+    const pageNumber = source.pageNumber
 
-    let pageLines: LineType[]
-    if (pageLoader) {
-      pageLines = await pageLoader()
-    } else if (import.meta.env?.MODE) {
-      // Vite dynamic imports doesn't support the second parameter
-      const page = await import(
-        /* @vite-ignore */
-        `../data/pages/${this.relevantRuns[0].scroll}/${pageNumberEntry}.json`
-      )
-      pageLines = page.default
-    } else {
-      const page = await import(
-        /* @vite-ignore */
-        `../data/pages/${this.relevantRuns[0].scroll}/${pageNumberEntry}.json`,
-        // Node.js requires the second parameter.
-        { with: { type: 'json' } }
-      )
-      pageLines = page.default
-    }
+    const pageLines = await this.loadPageLines(pageNumber)
 
+    const preferredRun = source.runId
+      ? this.relevantRuns.find((candidate) => candidate.id === source.runId)
+      : undefined
     let run: LeiningRun | undefined
     let aliyot: LeiningAliyah[] = []
+    let mostRecentlyStartedRef: Ref | undefined
     const labeller = new AliyahLabeller((run) => this.displayTitleForRun(run))
     const lines: RenderedLineInfo[] = pageLines.map((rawLine) => {
       const verses = rawLine.verses.map(toRef)
+      const focalRef = mostRecentlyStartedRef ?? verses[0]
 
-      if (verses.length) [run, aliyot] = this.findContainingAliyot(verses, run)
+      if (verses.length) {
+        const [containingRun, containingAliyot] = this.findContainingAliyot(
+          verses,
+          run,
+          preferredRun
+        )
+        run = containingRun
+        aliyot = containingAliyot
+        mostRecentlyStartedRef = verses[verses.length - 1]
+      }
       const aliyahStarts =
         run?.aliyot.filter(
           (aliyah) =>
@@ -299,25 +332,63 @@ export abstract class ScrollViewModel {
       return {
         ...rawLine,
         verses,
+        focalRef,
         run,
         aliyot,
         aliyahStarts,
         labels: labeller.getLabelsForLine(run, verses),
       }
     })
-    return { type: 'page', pageNumber: pageNumberEntry, lines }
+    return {
+      type: 'page',
+      contentIndex,
+      pageNumber,
+      ...(source.runId ? { runId: source.runId } : {}),
+      lines,
+    }
+  }
+
+  protected async loadPageLines(pageNumber: number): Promise<LineType[]> {
+    const pageLoader =
+      pageLoaders?.[
+        `../data/pages/${this.relevantRuns[0].scroll}/${pageNumber}.json`
+      ]
+
+    if (pageLoader) {
+      return pageLoader()
+    } else if (import.meta.env?.MODE) {
+      // Vite dynamic imports doesn't support the second parameter
+      const page = await import(
+        /* @vite-ignore */
+        `../data/pages/${this.relevantRuns[0].scroll}/${pageNumber}.json`
+      )
+      return page.default
+    } else {
+      const page = await import(
+        /* @vite-ignore */
+        `../data/pages/${this.relevantRuns[0].scroll}/${pageNumber}.json`,
+        // Node.js requires the second parameter.
+        { with: { type: 'json' } }
+      )
+      return page.default
+    }
   }
 
   private findContainingAliyot(
     verses: Ref[],
-    candidateRun?: LeiningRun
+    candidateRun?: LeiningRun,
+    preferredRun?: LeiningRun
   ): [LeiningRun | undefined, LeiningAliyah[]] {
+    if (preferredRun && preferredRun !== candidateRun) {
+      const aliyot = preferredRun.aliyot.filter((a) => containsRef(a, verses))
+      if (aliyot.length) return [preferredRun, aliyot]
+    }
     if (candidateRun) {
       const aliyot = candidateRun.aliyot.filter((a) => containsRef(a, verses))
       if (aliyot.length) return [candidateRun, aliyot]
     }
-    // TODO(later): Try the next run first?
     for (const run of this.relevantRuns) {
+      if (run === candidateRun || run === preferredRun) continue
       const aliyot = run.aliyot.filter((a) => containsRef(a, verses))
       if (aliyot.length) return [run, aliyot]
     }
@@ -338,17 +409,18 @@ class FullScrollViewModel extends ScrollViewModel {
       generator,
       FullScrollViewModel.calculateRuns(generator, run),
       initialRef,
-      displayTitleByRunId
+      displayTitleByRunId,
+      run.id
     )
     this.pageCount = this.resolver.then((r) => r.getPageCount())
   }
 
-  protected override async pageNumberFromContentIndex(
+  protected override async contentSourceFromIndex(
     contentIndex: number
-  ): Promise<ContentPageEntry> {
-    if (contentIndex + 1 > (await this.pageCount)) return -1
+  ): Promise<ScrollContentSource | null> {
+    if (contentIndex < 0 || contentIndex + 1 > (await this.pageCount)) return null
     // Page numbers in the JSON are 1-based
-    return contentIndex + 1
+    return { type: 'page', pageNumber: contentIndex + 1 }
   }
   /** Returns the (contiguous) index at which the given page is rendered. */
   protected override async contentIndexFromPageNumber(
@@ -386,12 +458,9 @@ export function isVezosHabracha(r: LeiningRun): boolean {
   )
 }
 
-/** The type passed from derived classes to `fetchPage()`. */
-type ContentPageEntry = number | RenderedMessageInfo
-
 /** A view that only renders pages containing the actual leinings.  Used for יום טוב. */
 class HolidayViewModel extends ScrollViewModel {
-  private readonly pages: Promise<ContentPageEntry[]>
+  private readonly pages: Promise<ScrollContentSource[]>
 
   constructor(
     generator: LeiningGenerator,
@@ -404,41 +473,122 @@ class HolidayViewModel extends ScrollViewModel {
       generator,
       run.leining.runs.filter((r) => r.scroll === run.scroll),
       initialRef,
-      displayTitleByRunId
+      displayTitleByRunId,
+      run.id
     )
     this.pages = this.fetchPages()
   }
 
-  private async fetchPages(): Promise<ContentPageEntry[]> {
+  private async fetchPages(): Promise<ScrollContentSource[]> {
     let lastEndPage = 0
     const resolver = await this.resolver
     return this.relevantRuns.flatMap((r) => {
       const start = resolver.physicalLocationFromRef(r.aliyot[0].start)
       const end = resolver.physicalLocationFromRef(last(r.aliyot).end)
 
-      const extraEntries: ContentPageEntry[] = []
+      const extraEntries: ScrollContentSource[] = []
       if (lastEndPage) {
-        const skipCount = start.pageNumber - lastEndPage
-        extraEntries.push({
-          type: 'message',
-          text: `✃ ${skipCount} ${skipCount === 1 ? 'עמוד' : 'עמודים'} ✁`,
-        })
+        const skipCount = Math.max(
+          0,
+          Math.abs(start.pageNumber - lastEndPage) - 1
+        )
+        if (skipCount > 0) {
+          extraEntries.push({
+            type: 'message',
+            text: `✃ ${skipCount} ${skipCount === 1 ? 'עמוד' : 'עמודים'} ✁`,
+          })
+        }
       }
       lastEndPage = end.pageNumber
 
-      return extraEntries.concat(range(start.pageNumber, end.pageNumber))
+      return extraEntries.concat(
+        range(start.pageNumber, end.pageNumber).map((pageNumber) => ({
+          type: 'page' as const,
+          pageNumber,
+          runId: r.id,
+        }))
+      )
     })
   }
 
-  protected override async pageNumberFromContentIndex(
+  protected override async contentSourceFromIndex(
     index: number
-  ): Promise<ContentPageEntry> {
-    return (await this.pages)[index]
+  ): Promise<ScrollContentSource | null> {
+    return (await this.pages)[index] ?? null
   }
   protected override async contentIndexFromPageNumber(
-    pageNumber: number
+    pageNumber: number,
+    hint?: { runId: string }
   ): Promise<number> {
-    return (await this.pages).indexOf(pageNumber)
+    const pages = await this.pages
+    if (hint) {
+      const matchingRunIndex = pages.findIndex(
+        (entry) =>
+          entry.type === 'page' &&
+          entry.pageNumber === pageNumber &&
+          entry.runId === hint.runId
+      )
+      if (matchingRunIndex >= 0) return matchingRunIndex
+    }
+    return pages.findIndex(
+      (entry) => entry.type === 'page' && entry.pageNumber === pageNumber
+    )
+  }
+}
+
+type ContentLoader = (contentIndex: number) => Promise<RenderedEntry | null>
+
+/**
+ * Advances only after a successful load. Requests in the same direction are
+ * serialized so a transient failure cannot skip a logical entry.
+ */
+class ContentCursor {
+  private previousIndex: number
+  private nextIndex: number
+  private previousEnded = false
+  private nextEnded = false
+  private previousQueue: Promise<void> = Promise.resolve()
+  private nextQueue: Promise<void> = Promise.resolve()
+
+  constructor(startingAt: number) {
+    this.previousIndex = startingAt - 1
+    this.nextIndex = startingAt + 1
+  }
+
+  previous(loader: ContentLoader) {
+    const request = this.previousQueue.then(async () => {
+      if (this.previousEnded) return null
+      const entry = await loader(this.previousIndex)
+      if (!entry) {
+        this.previousEnded = true
+        return null
+      }
+      this.previousIndex -= 1
+      return entry
+    })
+    this.previousQueue = request.then(
+      (): void => {},
+      (): void => {}
+    )
+    return request
+  }
+
+  next(loader: ContentLoader) {
+    const request = this.nextQueue.then(async () => {
+      if (this.nextEnded) return null
+      const entry = await loader(this.nextIndex)
+      if (!entry) {
+        this.nextEnded = true
+        return null
+      }
+      this.nextIndex += 1
+      return entry
+    })
+    this.nextQueue = request.then(
+      (): void => {},
+      (): void => {}
+    )
+    return request
   }
 }
 

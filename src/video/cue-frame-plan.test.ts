@@ -237,3 +237,56 @@ test('concat file repeats final frame and escapes single quotes', () => {
 
   expect(source).toBe("file 'frame-'\\''0'\\''.png'\nduration 0.500000\nfile 'frame-1.png'\nduration 0.100000\nfile 'frame-1.png'\n")
 })
+
+test('cue frame planning rejects invalid timing inputs explicitly', () => {
+  expect(() =>
+    buildCueFramePlan({
+      cues: [cue(0.5), cue(0.4)],
+      durationSeconds: 1,
+      fps: 30,
+      burstPreEndMs: 100,
+      burstMaxMs: 100,
+    })
+  ).toThrow(/strictly increasing/)
+  expect(() =>
+    buildCueFramePlan({
+      cues: [cue(0.5, Number.NaN)],
+      durationSeconds: 1,
+      fps: 30,
+      burstPreEndMs: 100,
+      burstMaxMs: 100,
+    })
+  ).toThrow(/Cue end times/)
+  expect(() =>
+    buildCueFramePlan({
+      cues: [],
+      durationSeconds: 1,
+      fps: 0,
+      burstPreEndMs: 100,
+      burstMaxMs: 100,
+    })
+  ).toThrow(/fps must be a positive finite number/)
+})
+
+test('concat planning rejects empty and out-of-order frame plans', () => {
+  expect(() =>
+    createCueConcatEntries({
+      plan: { frameCount: 1, entries: [] },
+      fps: 30,
+      frameName: (index) => `frame-${index}.png`,
+    })
+  ).toThrow(/at least one entry/)
+  expect(() =>
+    createCueConcatEntries({
+      plan: {
+        frameCount: 10,
+        entries: [
+          { frameIndex: 5, seconds: 0.5 },
+          { frameIndex: 4, seconds: 0.4 },
+        ],
+      },
+      fps: 10,
+      frameName: (index) => `frame-${index}.png`,
+    })
+  ).toThrow(/not strictly increasing/)
+})

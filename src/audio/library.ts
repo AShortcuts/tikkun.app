@@ -1,8 +1,8 @@
 import { loadCuePayloadForRecording } from '../data/audio-cues/index.ts'
 import {
   audioNarrators,
-  audioRecordings,
 } from '../data/audio-manifest.generated.ts'
+import { audioRecordings } from '../data/audio-catalog.ts'
 import type { AudioNarrator, AudioRecording, WordCue } from './types.ts'
 import { normalizeFirstCueStart } from './normalize-first-cue.ts'
 import { filterRecordingIssues } from './recording-issues.ts'

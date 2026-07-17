@@ -5,6 +5,7 @@ import type { AudioRecording, WordCue } from './types.ts'
 const recording: AudioRecording = {
   id: 'bereshit-1-test',
   narratorId: 'yd',
+  reading: { kind: 'parsha', id: 'bereshit', name: 'Bereshit', order: 1 },
   parshaSlug: 'bereshit',
   parshaName: 'Bereshit',
   parshaNumber: 1,

@@ -1,4 +1,9 @@
 import { isValidTokenKey } from './checkpoints.ts'
+import {
+  quarantineStorageItem,
+  readStorageItem,
+  writeStorageItem,
+} from '../persistence/persisted-state.ts'
 
 export const BOOKMARKS_STORAGE_KEY = 'tikkun.bookmarks.v1'
 
@@ -60,24 +65,85 @@ function isReaderBookmark(value: unknown): value is ReaderBookmark {
   )
 }
 
-export function loadBookmarks(storage: Storage) {
-  const raw = storage.getItem(BOOKMARKS_STORAGE_KEY)
+export function loadBookmarks(storage: Storage | null) {
+  let raw: string | null
+  try {
+    raw = readStorageItem(storage, BOOKMARKS_STORAGE_KEY)
+  } catch (error) {
+    console.error('Failed to read reader bookmarks', error)
+    return []
+  }
   if (!raw) return []
   try {
     const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed
+    if (!Array.isArray(parsed)) {
+      quarantineStorageItem({
+        storage,
+        key: BOOKMARKS_STORAGE_KEY,
+        rawValue: raw,
+        reason: 'bookmark payload is not an array',
+      })
+      return []
+    }
+    const bookmarks = parsed
       .filter(isReaderBookmark)
       .sort((a, b) => b.createdAt - a.createdAt)
-  } catch {
-    storage.removeItem(BOOKMARKS_STORAGE_KEY)
+    if (bookmarks.length !== parsed.length) {
+      quarantineStorageItem({
+        storage,
+        key: BOOKMARKS_STORAGE_KEY,
+        rawValue: raw,
+        reason: 'bookmark payload contains invalid entries',
+        ...(bookmarks.length
+          ? { replacementValue: JSON.stringify(bookmarks) }
+          : {}),
+      })
+    }
+    return bookmarks
+  } catch (error) {
+    console.error('Failed to parse reader bookmarks', error)
+    quarantineStorageItem({
+      storage,
+      key: BOOKMARKS_STORAGE_KEY,
+      rawValue: raw,
+      reason: 'bookmark payload is not valid JSON',
+    })
     return []
   }
 }
 
-export function saveBookmarks(storage: Storage, bookmarks: ReaderBookmark[]) {
-  storage.setItem(
-    BOOKMARKS_STORAGE_KEY,
-    JSON.stringify([...bookmarks].sort((a, b) => b.createdAt - a.createdAt))
-  )
+export function saveBookmarks(storage: Storage | null, bookmarks: ReaderBookmark[]) {
+  const bookmarkIds = new Set<string>()
+  const tokenKeys = new Set<string>()
+  if (bookmarks.some((bookmark) => {
+    if (
+      !isReaderBookmark(bookmark) ||
+      bookmarkIds.has(bookmark.id) ||
+      tokenKeys.has(bookmark.tokenKey)
+    ) return true
+    bookmarkIds.add(bookmark.id)
+    tokenKeys.add(bookmark.tokenKey)
+    return false
+  })) {
+    throw new TypeError('Cannot persist invalid or duplicate reader bookmarks')
+  }
+  try {
+    writeStorageItem(
+      storage,
+      BOOKMARKS_STORAGE_KEY,
+      JSON.stringify([...bookmarks].sort((a, b) => b.createdAt - a.createdAt))
+    )
+  } catch (error) {
+    throw new BookmarkStorageError(error)
+  }
+}
+
+export class BookmarkStorageError extends Error {
+  readonly cause: unknown
+
+  constructor(cause?: unknown) {
+    super('Failed to save reader bookmarks')
+    this.name = 'BookmarkStorageError'
+    this.cause = cause
+  }
 }

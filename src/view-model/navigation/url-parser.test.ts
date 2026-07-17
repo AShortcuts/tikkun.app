@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest'
 import {
+  canonicalReaderUrl,
   generateAboutUrl,
   generateCueAnalyticsUrl,
   generatePageUrl,
@@ -72,6 +73,38 @@ test('Parsha slug resolves Bereshit', async () => {
   expect(await renderStartingLineForRoute(route)).toBe(await renderStartingLineForRoute(
       toReaderRoute(parseUrl(generator, '/run/2024-10-26:shacharis,main'))
     ))
+})
+
+test('hash-route search parameters do not change route parsing', async () => {
+  const route = toReaderRoute(
+    parseUrl(generator, '/torah/parsha/lech-lecha/1-13-5?aliyah=3', {
+      now: new Date('2024-10-01'),
+    })
+  )
+
+  expect(route?.canonicalHash).toBe('#/torah/parsha/lech-lecha/1-13-5')
+  expect(await renderStartingLineForRoute(route)).toBe(
+    await renderStartingLineForRoute(
+      toReaderRoute(
+        parseUrl(generator, '/torah/parsha/lech-lecha/1-13-5', {
+          now: new Date('2024-10-01'),
+        })
+      )
+    )
+  )
+})
+
+test('canonical reader URLs remove legacy aliyah state and preserve other options', () => {
+  const url = canonicalReaderUrl(
+    new URL(
+      'http://localhost:5173/?debug=1&aliyah=4&aliyahRun=legacy#/torah/parsha/noach/1-9-8?aliyah=5&aliyahRun=current'
+    ),
+    '#/torah/parsha/noach/1-9-8'
+  )
+
+  expect(url.href).toBe(
+    'http://localhost:5173/?debug=1#/torah/parsha/noach/1-9-8'
+  )
 })
 
 test('Parsha alias canonicalizes Bereshit', async () => {

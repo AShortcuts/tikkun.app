@@ -23,3 +23,19 @@ _Avoid_: Automatic sync
 **Startup Splash**:
 The brief branded transition shown only while the app shell hydrates and the first reader route renders.
 _Avoid_: Loading screen
+
+**Reader Runtime**:
+The active reader route and display lifetime that owns asynchronous reader work and invalidates work from older routes.
+_Avoid_: Global reader state, page component
+
+**Playback Timeline**:
+The logical clock a reader sees while one or more physical recordings supply an aliyah.
+_Avoid_: Audio duration, stitched duration
+
+**Cue Data**:
+Validated word timing and token-position data loaded from a published cue file.
+_Avoid_: Raw cue JSON
+
+**Cue Draft**:
+Validated local authoring state for Cue Data that has not yet been published.
+_Avoid_: Published cues, raw localStorage data

@@ -2,6 +2,12 @@ import type { LeiningRun } from '../calendar-model/model-types.ts'
 import type { RefWithScroll } from '../ref.ts'
 import { semanticParshaUrlForLeining } from '../view-model/navigation/parsha-routes.ts'
 import { generateUrl } from '../view-model/navigation/url-parser.ts'
+import {
+  quarantineStorageItem,
+  readStorageItem,
+  removeStorageItem,
+  writeStorageItem,
+} from '../persistence/persisted-state.ts'
 
 export const LAST_READING_STORAGE_KEY = 'tikkun.last-reading.v1'
 export const LAST_READING_MAX_AGE_MS = 48 * 60 * 60 * 1000
@@ -43,7 +49,7 @@ function isReaderHash(hash: string) {
 }
 
 export function saveLastReading(
-  storage: Storage,
+  storage: Storage | null,
   input: LastReadingInput,
   savedAt = Date.now()
 ) {
@@ -57,28 +63,71 @@ export function saveLastReading(
     aliyahLabel: input.aliyahLabel?.trim() || undefined,
     savedAt,
   }
-  storage.setItem(LAST_READING_STORAGE_KEY, JSON.stringify(payload))
+  try {
+    writeStorageItem(storage, LAST_READING_STORAGE_KEY, JSON.stringify(payload))
+  } catch (error) {
+    throw new LastReadingStorageError(error)
+  }
 }
 
 export function loadEligibleLastReading(
-  storage: Storage,
+  storage: Storage | null,
   now = Date.now()
 ): LastReading | null {
-  const raw = storage.getItem(LAST_READING_STORAGE_KEY)
+  let raw: string | null
+  try {
+    raw = readStorageItem(storage, LAST_READING_STORAGE_KEY)
+  } catch (error) {
+    console.error('Failed to read the last-reading checkpoint', error)
+    return null
+  }
   if (!raw) return null
 
   let parsed: unknown
   try {
     parsed = JSON.parse(raw)
-  } catch {
-    storage.removeItem(LAST_READING_STORAGE_KEY)
+  } catch (error) {
+    console.error('Failed to parse the last-reading checkpoint', error)
+    quarantineStorageItem({
+      storage,
+      key: LAST_READING_STORAGE_KEY,
+      rawValue: raw,
+      reason: 'last-reading checkpoint is not valid JSON',
+    })
     return null
   }
 
-  if (!isValidLastReading(parsed) || now - parsed.savedAt > LAST_READING_MAX_AGE_MS) {
-    storage.removeItem(LAST_READING_STORAGE_KEY)
+  if (!isValidLastReading(parsed)) {
+    quarantineStorageItem({
+      storage,
+      key: LAST_READING_STORAGE_KEY,
+      rawValue: raw,
+      reason: 'last-reading checkpoint has an invalid shape',
+    })
+    return null
+  }
+  if (now - parsed.savedAt > LAST_READING_MAX_AGE_MS) {
+    discardExpiredLastReading(storage)
     return null
   }
 
   return parsed
+}
+
+function discardExpiredLastReading(storage: Storage | null) {
+  try {
+    removeStorageItem(storage, LAST_READING_STORAGE_KEY)
+  } catch (error) {
+    console.error('Failed to remove an invalid last-reading checkpoint', error)
+  }
+}
+
+export class LastReadingStorageError extends Error {
+  readonly cause: unknown
+
+  constructor(cause?: unknown) {
+    super('Failed to save the last-reading checkpoint')
+    this.name = 'LastReadingStorageError'
+    this.cause = cause
+  }
 }

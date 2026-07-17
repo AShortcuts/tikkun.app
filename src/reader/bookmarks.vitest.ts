@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import {
   BOOKMARKS_STORAGE_KEY,
   createBookmark,
@@ -37,17 +37,20 @@ test('creates a token-anchored bookmark without requiring audio', () => {
 })
 
 test('loads only valid bookmarks from storage', () => {
+  const validBookmark = createBookmark({
+    hash: '#/torah/parsha/noach',
+    label: 'Keep',
+    tokenKey: '1:0:0:0',
+    createdAt: 1,
+  })
   const storage = createStorage(JSON.stringify([
-    createBookmark({
-      hash: '#/torah/parsha/noach',
-      label: 'Keep',
-      tokenKey: '1:0:0:0',
-      createdAt: 1,
-    }),
+    validBookmark,
     { id: 'bad', hash: '#/about' },
   ]))
 
-  expect(loadBookmarks(storage).length).toBe(1)
+  expect(loadBookmarks(storage)).toEqual([validBookmark])
+  expect(loadBookmarks(storage)).toEqual([validBookmark])
+  expect(storage.getItem(`${BOOKMARKS_STORAGE_KEY}:quarantine`)).not.toBeNull()
 })
 
 test('saves bookmarks newest first', () => {
@@ -58,4 +61,32 @@ test('saves bookmarks newest first', () => {
   ])
 
   expect(loadBookmarks(storage)[0]?.label).toBe('new')
+})
+
+test('contains denied storage access and rejects invalid writes', () => {
+  const readError = vi.spyOn(console, 'error').mockImplementation(() => {})
+  const deniedStorage = {
+    ...createStorage(),
+    getItem: () => {
+      throw new DOMException('denied', 'SecurityError')
+    },
+    setItem: () => {
+      throw new DOMException('denied', 'SecurityError')
+    },
+  } as Storage
+  const bookmark = createBookmark({
+    hash: '#/torah/parsha/noach',
+    label: 'Keep',
+    tokenKey: '1:0:0:0',
+    createdAt: 1,
+  })
+
+  expect(loadBookmarks(deniedStorage)).toEqual([])
+  expect(() => saveBookmarks(deniedStorage, [bookmark])).toThrow(
+    'Failed to save reader bookmarks'
+  )
+  expect(() => saveBookmarks(createStorage(), [bookmark, bookmark])).toThrow(
+    'invalid or duplicate'
+  )
+  readError.mockRestore()
 })

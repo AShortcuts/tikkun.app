@@ -308,6 +308,11 @@
   text-align: center;
 }
 
+[data-target-id="persistence-toast"] {
+  bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+  border-color: color-mix(in srgb, #9a6700 42%, transparent);
+}
+
 .recording-issue-card {
   padding: 1rem;
 }
@@ -457,7 +462,6 @@ html.mod-theme-transition .parsha-title {
 [data-recording-mode='true'] [data-target-id='aliyah-rail'],
 [data-recording-mode='true'] [data-target-id='command-palette'],
 [data-recording-mode='true'] [data-target-id='recording-issue-modal'],
-[data-recording-mode='true'] [data-target-id='reader-issue-toast'],
 [data-recording-mode='true'] .reader-side,
 [data-recording-mode='true'] .reader-corner-controls {
   display: none !important;

@@ -32,6 +32,56 @@ export interface ShortcutCommandInput {
   run: () => void
 }
 
+export interface ShiftHoldEvent {
+  key: string
+  repeat: boolean
+  metaKey: boolean
+  ctrlKey: boolean
+  altKey: boolean
+}
+
+export function createTemporaryShiftToggle({
+  getValue,
+  setValue,
+  isDisabled,
+}: {
+  getValue: () => boolean
+  setValue: (value: boolean) => void
+  isDisabled: () => boolean
+}) {
+  let restoreValue: boolean | null = null
+
+  const release = () => {
+    if (restoreValue === null) return
+    const value = restoreValue
+    restoreValue = null
+    setValue(value)
+  }
+
+  return {
+    handleKeyDown(event: ShiftHoldEvent) {
+      if (
+        event.key !== 'Shift' ||
+        event.repeat ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        isDisabled() ||
+        restoreValue !== null
+      ) {
+        return
+      }
+
+      restoreValue = getValue()
+      setValue(!restoreValue)
+    },
+    handleKeyUp(event: ShiftHoldEvent) {
+      if (event.key === 'Shift') release()
+    },
+    release,
+  }
+}
+
 export function createShortcutCommand(input: ShortcutCommandInput): ShortcutCommand {
   return {
     metaOrCtrl: false,

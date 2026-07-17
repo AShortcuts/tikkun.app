@@ -4,7 +4,11 @@ import {
   listNarrators,
   listRecordings,
 } from './library.ts'
-import type { WordCue } from './types.ts'
+import {
+  isParshaAudioRecording,
+  type ParshaAudioRecording,
+  type WordCue,
+} from './types.ts'
 import {
   createCueAnalyticsRecord,
   getCueAnalyticsAliyahSummaries,
@@ -47,6 +51,8 @@ export interface CueAnalyticsParshaSummary {
   structuralPauseCount: number
 }
 
+export type CueAnalyticsParshaRecord = CueAnalyticsRecord<ParshaAudioRecording>
+
 function sum(values: number[]) {
   return values.reduce((total, value) => total + value, 0)
 }
@@ -75,6 +81,7 @@ export async function listCueAnalyticsRecords(options?: {
 
   const records = await Promise.all(
     listRecordings()
+      .filter(isParshaAudioRecording)
       .filter((recording) => recording.status === 'available')
       .map(async (recording) => {
         const cues = options?.cueOverrides?.has(recording.id)
@@ -104,11 +111,13 @@ export async function listCueAnalyticsRecords(options?: {
     )
 }
 
-export function getCueAnalyticsParshaSummaries(records: CueAnalyticsRecord[]) {
+export function getCueAnalyticsParshaSummaries(records: CueAnalyticsParshaRecord[]) {
   const recordsById = new Map(records.map((record) => [record.recording.id, record]))
   const parshaMap = new Map<string, CueAnalyticsParshaSummary>()
 
-  for (const recording of listRecordings().filter((entry) => entry.status === 'available')) {
+  for (const recording of listRecordings()
+    .filter(isParshaAudioRecording)
+    .filter((entry) => entry.status === 'available')) {
     const existing = parshaMap.get(recording.parshaSlug) ?? {
       parshaSlug: recording.parshaSlug,
       parshaName: recording.parshaName,

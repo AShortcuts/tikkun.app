@@ -24,8 +24,8 @@ export interface CueIntervalSample {
   thresholdDirection: 'above' | 'below' | null
 }
 
-export interface CueAnalyticsRecord {
-  recording: AudioRecording
+export interface CueAnalyticsRecord<Recording extends AudioRecording = AudioRecording> {
+  recording: Recording
   narratorName: string
   cueCount: number
   intervalCount: number
@@ -203,14 +203,14 @@ function createIntervalSamples(
   })
 }
 
-export function createCueAnalyticsRecord({
+export function createCueAnalyticsRecord<Recording extends AudioRecording>({
   recording,
   narratorName,
   cues,
   cueSource = 'published',
   cueUpdatedAt = null,
 }: {
-  recording: AudioRecording
+  recording: Recording
   narratorName: string
   cues: WordCue[]
   cueSource?: 'published' | 'draft'
@@ -252,7 +252,7 @@ export function createCueAnalyticsRecord({
     upperOutlierThreshold: thresholds.upper,
     cueSource,
     cueUpdatedAt,
-  } satisfies CueAnalyticsRecord
+  } satisfies CueAnalyticsRecord<Recording>
 }
 
 export function getCueAnalyticsOverview(records: CueAnalyticsRecord[]) {

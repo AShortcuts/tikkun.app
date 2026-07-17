@@ -12,6 +12,7 @@ import {
   createCueConcatEntries,
   renderCueConcatFile,
 } from '../src/video/cue-frame-plan.ts'
+import { currentAppBuildHash } from './video-provenance.mjs'
 
 const repoRoot = fileURLToPath(new URL('../', import.meta.url))
 const defaultOutputRoot = '/Users/adambh/Koofr/Tikkun Videos'
@@ -21,6 +22,7 @@ const reportPath = path.join(repoRoot, 'video-render-reports.local.json')
 const staticRoot = path.join(repoRoot, 'static')
 const cueRoot = path.join(repoRoot, 'src/data/audio-cues')
 let cuePayloadsByAudioId = null
+let appBuildHashPromise = null
 
 const defaults = {
   width: 1920,
@@ -147,15 +149,9 @@ function sha256Json(value) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex')
 }
 
-async function appBuildHash() {
-  try {
-    return (await execFileText('git', ['rev-parse', 'HEAD'], { cwd: repoRoot })).trim()
-  } catch {
-    const hash = createHash('sha256')
-    hash.update(await readFile(path.join(repoRoot, 'src/index.ts')))
-    hash.update(await readFile(path.join(repoRoot, 'css/app-layout.css')))
-    return hash.digest('hex')
-  }
+function appBuildHash() {
+  appBuildHashPromise ??= currentAppBuildHash(repoRoot)
+  return appBuildHashPromise
 }
 
 function execFileText(command, args, options = {}) {
@@ -1011,6 +1007,7 @@ function selectedRecordings(options) {
   const selectedIds = new Set(options.ids)
   return audioRecordings.filter(
     (recording) =>
+      recording.reading.kind === 'parsha' &&
       recording.status === 'available' &&
       (!selectedIds.size || selectedIds.has(recording.id))
   )

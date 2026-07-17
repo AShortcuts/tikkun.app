@@ -142,12 +142,16 @@
             <div class="floating-player-details" data-target-id="floating-player-details">
               <div class="floating-player-meta" data-target-id="floating-player-meta">
                 <span class="floating-player-meta-item">
-                  <span class="floating-player-meta-label">Parsha</span>
+                  <span class="floating-player-meta-label">Reading</span>
                   <span class="floating-player-meta-value" data-target-id="floating-meta-parsha">—</span>
                 </span>
                 <span class="floating-player-meta-item">
                   <span class="floating-player-meta-label">Aliyah</span>
                   <span class="floating-player-meta-value" data-target-id="floating-meta-aliyah">—</span>
+                </span>
+                <span class="floating-player-meta-item u-hidden" data-target-id="floating-meta-status-wrap">
+                  <span class="floating-player-meta-label">Playback</span>
+                  <span class="floating-player-meta-value" data-target-id="floating-meta-status"></span>
                 </span>
               </div>
               <div class="floating-player-progress-list">
@@ -206,8 +210,8 @@
               </div>
               <button class="floating-player-button mod-expand" data-target-id="floating-expand-toggle" type="button"
                 title="Show player progress" aria-label="Show player progress" aria-expanded="false"></button>
-              <a class="floating-player-button mod-download u-hidden" data-target-id="floating-download" href="#"
-                download title="Download current recording" aria-label="Download current recording"></a>
+              <!-- <a class="floating-player-button mod-download u-hidden" data-target-id="floating-download" href="#"
+                download title="Download current recording" aria-label="Download current recording"></a> -->
               <a class="floating-player-button mod-download u-hidden" data-target-id="floating-video-download" href="#"
                 download title="Download aliyah video" aria-label="Download aliyah video"></a>
             </div>
@@ -384,7 +388,7 @@
             <input data-target-id="settings-disable-shift-hide" type="checkbox" />
             <span class="settings-field-copy">
               <span class="settings-field-label">Disable Shift key for Nekudot hiding</span>
-              <span class="settings-field-helper">Prevents Shift from hiding nekudot and ta'amim.</span>
+              <span class="settings-field-helper">Hold Shift to temporarily switch between nikkud and plain text.</span>
             </span>
           </label>
           <div class="settings-field">
@@ -539,6 +543,7 @@
       </div>
     </div>
     <div class="reader-issue-toast u-hidden" data-target-id="reader-issue-toast" role="status" aria-live="polite"></div>
+    <div class="reader-issue-toast u-hidden" data-target-id="persistence-toast" role="status" aria-live="polite"></div>
     <div class="export-modal u-hidden" data-target-id="export-modal">
       <div class="export-card stack small">
         <div class="settings-pane-header">
@@ -636,7 +641,8 @@
               cache: 'no-store',
               method: 'HEAD',
             })
-            if (!response.ok) return
+            const contentType = response.headers.get('content-type') ?? ''
+            if (!response.ok || !/(?:java|ecma)script/i.test(contentType)) return
 
             const registration = await navigator.serviceWorker.register('/service-worker.js')
             if (registration.waiting) showUpdatePrompt(registration.waiting)

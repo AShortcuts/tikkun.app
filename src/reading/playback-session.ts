@@ -16,7 +16,7 @@ type PhysicalLocation = {
 }
 
 type PlaybackTarget = {
-  recordingId: string
+  recordingId?: string
   runId: string
   aliyahIndex: PlaybackSessionAliyahIndex
 }
@@ -32,7 +32,7 @@ export function playbackTargetKey({
   runId,
   aliyahIndex,
 }: PlaybackTarget) {
-  return `${recordingId}:${runId}:${aliyahIndex}`
+  return `${recordingId ?? '*'}:${runId}:${aliyahIndex}`
 }
 
 export function playbackTokenRangeAliyahIndex(
@@ -89,5 +89,10 @@ export function isActivePlaybackTarget(
   session: ActivePlaybackSession | null | undefined,
   target: PlaybackTarget
 ) {
-  return Boolean(session && activePlaybackSessionKey(session) === playbackTargetKey(target))
+  return Boolean(
+    session &&
+      session.runId === target.runId &&
+      session.aliyahIndex === target.aliyahIndex &&
+      (!target.recordingId || session.recording.id === target.recordingId)
+  )
 }

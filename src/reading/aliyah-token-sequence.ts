@@ -3,6 +3,33 @@ function endsWithSofPasuk(words: HTMLElement[]) {
   return lastWord?.textContent?.trim().endsWith('׃') ?? false
 }
 
+function firstWordAfterSofPasuk(words: HTMLElement[], startingAt = 0) {
+  const sofPasukIndex = words.findIndex(
+    (word, index) => index >= startingAt && word.textContent?.includes('׃')
+  )
+  return sofPasukIndex < 0 ? words.length : sofPasukIndex + 1
+}
+
+export function verseStartWordIndex({
+  currentLineWords,
+  previousLineWords,
+  verseOrdinal,
+}: {
+  currentLineWords: HTMLElement[]
+  previousLineWords: HTMLElement[]
+  verseOrdinal: number
+}) {
+  let startIndex =
+    previousLineWords.length && !endsWithSofPasuk(previousLineWords)
+      ? firstWordAfterSofPasuk(currentLineWords)
+      : 0
+
+  for (let ordinal = 0; ordinal < verseOrdinal; ordinal++) {
+    startIndex = firstWordAfterSofPasuk(currentLineWords, startIndex)
+  }
+  return startIndex
+}
+
 const annotatedWordsIn = (node: ParentNode) =>
   [...node.querySelectorAll<HTMLElement>('.fragment.mod-annotations-on .word')]
 
@@ -94,6 +121,63 @@ export function collectTokenKeysForAliyahRange({
 
   return tokenWords
     .concat(startIndex === endIndex ? [] : sharedEndLineWords)
+    .map((word) => word.dataset.tokenKey)
+    .filter((key): key is string => Boolean(key))
+}
+
+export function collectTokenKeysForExactAliyahRange({
+  book,
+  startLine,
+  startVerseOrdinal,
+  endLine,
+  endVerseOrdinal,
+}: {
+  book: ParentNode
+  startLine: HTMLElement
+  startVerseOrdinal: number
+  endLine: HTMLElement
+  endVerseOrdinal: number
+}) {
+  const lines = [...book.querySelectorAll<HTMLElement>('[data-class="line"]')]
+  const startLineIndex = lines.indexOf(startLine)
+  const endLineIndex = lines.indexOf(endLine)
+  if (
+    startLineIndex < 0 ||
+    endLineIndex < startLineIndex ||
+    startVerseOrdinal < 0 ||
+    endVerseOrdinal < 0
+  ) {
+    return []
+  }
+
+  const wordsByLine = lines.map(annotatedWordsIn)
+  const startWords = wordsByLine[startLineIndex]
+  const endWords = wordsByLine[endLineIndex]
+  const startWordIndex = verseStartWordIndex({
+    currentLineWords: startWords,
+    previousLineWords: wordsByLine[startLineIndex - 1] ?? [],
+    verseOrdinal: startVerseOrdinal,
+  })
+  const endVerseStartIndex = verseStartWordIndex({
+    currentLineWords: endWords,
+    previousLineWords: wordsByLine[endLineIndex - 1] ?? [],
+    verseOrdinal: endVerseOrdinal,
+  })
+
+  const flattenedWords = wordsByLine.flat()
+  const lineOffsets = wordsByLine.reduce<number[]>((offsets, words, index) => {
+    offsets[index] = index ? offsets[index - 1] + wordsByLine[index - 1].length : 0
+    return offsets
+  }, [])
+  const startOffset = lineOffsets[startLineIndex] + startWordIndex
+  const endVerseOffset = lineOffsets[endLineIndex] + endVerseStartIndex
+  const endOffset = flattenedWords.findIndex(
+    (word, index) => index >= endVerseOffset && word.textContent?.includes('׃')
+  )
+  const inclusiveEndOffset = endOffset < 0 ? flattenedWords.length : endOffset + 1
+
+  return flattenedWords
+    .slice(startOffset, inclusiveEndOffset)
     .map((word) => word.dataset.tokenKey)
     .filter((key): key is string => Boolean(key))
 }

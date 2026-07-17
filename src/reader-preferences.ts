@@ -1,4 +1,10 @@
 import { setReaderFocalPointMode, type ReaderFocalPointMode } from './reader-scroll.ts'
+import {
+  getBrowserStorage,
+  quarantineStorageItem,
+  readStorageItem,
+  writeStorageItem,
+} from './persistence/persisted-state.ts'
 
 const STORAGE_KEY = 'tikkun.reader-preferences.v3'
 
@@ -6,6 +12,15 @@ export const TOKENIZATION_VERSION = 'v2'
 
 export const themeModes = ['automatic', 'light', 'sepia', 'dark'] as const
 export const readerFocalPointModes = ['browser', 'reader'] as const
+
+const preferenceRanges = {
+  playbackRate: { min: 0.5, max: 3 },
+  highlightOpacity: { min: 0.05, max: 0.45 },
+  outlineWidth: { min: 1, max: 6 },
+  outlineOffset: { min: 0, max: 10 },
+  radius: { min: 0, max: 16 },
+  glow: { min: 0, max: 8 },
+} as const
 
 export type ThemeMode = (typeof themeModes)[number]
 
@@ -115,46 +130,156 @@ export function isReaderFocalPointMode(
   )
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function normalizedNumber(
+  value: unknown,
+  fallback: number,
+  { min, max }: { min: number; max: number }
+) {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(min, Math.min(max, value))
+    : fallback
+}
+
+function normalizedColor(value: unknown, fallback: string) {
+  return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value)
+    ? value
+    : fallback
+}
+
+function normalizeReaderPreferences(
+  value: unknown,
+  defaults: ReaderPreferences
+): ReaderPreferences {
+  const candidate = isRecord(value) ? value : {}
+  return {
+    narratorId:
+      typeof candidate.narratorId === 'string' && candidate.narratorId.trim()
+        ? candidate.narratorId.trim()
+        : defaults.narratorId,
+    playbackRate: normalizedNumber(
+      candidate.playbackRate,
+      defaults.playbackRate,
+      preferenceRanges.playbackRate
+    ),
+    highlightFill: normalizedColor(candidate.highlightFill, defaults.highlightFill),
+    highlightOpacity: normalizedNumber(
+      candidate.highlightOpacity,
+      defaults.highlightOpacity,
+      preferenceRanges.highlightOpacity
+    ),
+    outlineColor: normalizedColor(candidate.outlineColor, defaults.outlineColor),
+    outlineWidth: normalizedNumber(
+      candidate.outlineWidth,
+      defaults.outlineWidth,
+      preferenceRanges.outlineWidth
+    ),
+    outlineOffset: normalizedNumber(
+      candidate.outlineOffset,
+      defaults.outlineOffset,
+      preferenceRanges.outlineOffset
+    ),
+    radius: normalizedNumber(candidate.radius, defaults.radius, preferenceRanges.radius),
+    glow: normalizedNumber(candidate.glow, defaults.glow, preferenceRanges.glow),
+    autoScrollWithPlayback:
+      typeof candidate.autoScrollWithPlayback === 'boolean'
+        ? candidate.autoScrollWithPlayback
+        : defaults.autoScrollWithPlayback,
+    focalPointMode: isReaderFocalPointMode(candidate.focalPointMode)
+      ? candidate.focalPointMode
+      : defaults.focalPointMode,
+    disableShiftNekudotHide:
+      typeof candidate.disableShiftNekudotHide === 'boolean'
+        ? candidate.disableShiftNekudotHide
+        : defaults.disableShiftNekudotHide,
+    themeMode: isThemeMode(candidate.themeMode)
+      ? candidate.themeMode
+      : defaults.themeMode,
+  }
+}
+
 export function loadReaderPreferences(): ReaderPreferences {
   const defaults = getDefaultReaderPreferences()
+  const storage = getBrowserStorage('local')
+  let raw: string | null
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { ...defaults }
-    const parsed = JSON.parse(raw) as Partial<ReaderPreferences>
-    return {
-      ...defaults,
-      ...parsed,
-      playbackRate: defaults.playbackRate,
-      focalPointMode: isReaderFocalPointMode(parsed.focalPointMode)
-        ? parsed.focalPointMode
-        : defaults.focalPointMode,
-      themeMode: isThemeMode(parsed.themeMode)
-        ? parsed.themeMode
-        : defaults.themeMode,
-    }
-  } catch {
+    raw = readStorageItem(storage, STORAGE_KEY)
+  } catch (error) {
+    console.error('Failed to read reader preferences', error)
     return { ...defaults }
+  }
+  if (!raw) return { ...defaults }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw) as unknown
+  } catch (error) {
+    console.error('Failed to parse reader preferences', error)
+    quarantineStorageItem({
+      storage,
+      key: STORAGE_KEY,
+      rawValue: raw,
+      reason: 'reader preferences are not valid JSON',
+    })
+    return { ...defaults }
+  }
+
+  if (!isRecord(parsed)) {
+    quarantineStorageItem({
+      storage,
+      key: STORAGE_KEY,
+      rawValue: raw,
+      reason: 'reader preferences have an invalid shape',
+    })
+    return { ...defaults }
+  }
+
+  return {
+    ...normalizeReaderPreferences(parsed, defaults),
+    playbackRate: defaults.playbackRate,
   }
 }
 
 export function saveReaderPreferences(preferences: ReaderPreferences) {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      ...preferences,
-      playbackRate: defaultReaderPreferences.playbackRate,
-    })
+  const normalized = normalizeReaderPreferences(
+    preferences,
+    getDefaultReaderPreferences()
   )
+  try {
+    writeStorageItem(
+      getBrowserStorage('local'),
+      STORAGE_KEY,
+      JSON.stringify({
+        ...normalized,
+        playbackRate: defaultReaderPreferences.playbackRate,
+      })
+    )
+  } catch (error) {
+    throw new ReaderPreferencesStorageError(error)
+  }
+}
+
+export class ReaderPreferencesStorageError extends Error {
+  readonly cause: unknown
+
+  constructor(cause: unknown) {
+    super('Failed to save reader preferences')
+    this.name = 'ReaderPreferencesStorageError'
+    this.cause = cause
+  }
 }
 
 export function mergeReaderPreferences(
   previous: ReaderPreferences,
   updates: Partial<ReaderPreferences>
 ) {
-  return {
+  return normalizeReaderPreferences({
     ...previous,
     ...updates,
-  }
+  }, previous)
 }
 
 export function applyReaderPreferences(preferences: ReaderPreferences) {

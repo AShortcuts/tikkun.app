@@ -32,6 +32,22 @@ const frameAtOrBefore = (seconds: number, fps: number) =>
 const cueStartSettleMs = 100
 const lineScrollTransitionMs = 240
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
+function requirePositiveFinite(name: string, value: number) {
+  if (!isFiniteNumber(value) || value <= 0) {
+    throw new RangeError(`${name} must be a positive finite number`)
+  }
+}
+
+function requireNonNegativeFinite(name: string, value: number) {
+  if (!isFiniteNumber(value) || value < 0) {
+    throw new RangeError(`${name} must be a non-negative finite number`)
+  }
+}
+
 const isSameRenderedLine = (left: WordCue, right: WordCue) =>
   left.pageNumber === right.pageNumber && left.lineIndex === right.lineIndex
 
@@ -48,6 +64,30 @@ export function buildCueFramePlan({
   burstPreEndMs: number
   burstMaxMs: number
 }): CueFramePlan {
+  requirePositiveFinite('durationSeconds', durationSeconds)
+  requirePositiveFinite('fps', fps)
+  requireNonNegativeFinite('burstPreEndMs', burstPreEndMs)
+  requireNonNegativeFinite('burstMaxMs', burstMaxMs)
+  let previousCueStart = -1
+  for (const cue of cues) {
+    if (!isFiniteNumber(cue.timeStart) || cue.timeStart < 0) {
+      throw new RangeError('Cue start times must be non-negative finite numbers')
+    }
+    if (cue.timeStart <= previousCueStart) {
+      throw new RangeError('Cue start times must be strictly increasing')
+    }
+    if (cue.timeStart > durationSeconds) {
+      throw new RangeError('Cue start times cannot exceed the media duration')
+    }
+    if (
+      cue.timeEnd !== undefined &&
+      (!isFiniteNumber(cue.timeEnd) || cue.timeEnd < cue.timeStart)
+    ) {
+      throw new RangeError('Cue end times must be finite and not precede their start')
+    }
+    previousCueStart = cue.timeStart
+  }
+
   const frameCount = Math.max(1, Math.ceil(durationSeconds * fps))
   const maxFrame = frameCount - 1
   const frameIndexes = new Set<number>([maxFrame])
@@ -116,11 +156,11 @@ export function buildCueFramePlan({
     const nextCue = cues[cueIndex + 1]
     const cueFrame = cueFrames[cueIndex]
     const nextCueStart = nextCue?.timeStart ?? durationSeconds
-    const cueEnd = Number.isFinite(cue.timeEnd) ? cue.timeEnd : nextCue?.timeStart
+    const cueEnd = isFiniteNumber(cue.timeEnd) ? cue.timeEnd : nextCue?.timeStart
     const startsNewLine = Boolean(previousCue && !isSameRenderedLine(previousCue, cue))
     const targetTransitionEnd =
       cue.timeStart + (startsNewLine ? lineScrollTransitionMs : cueStartSettleMs) / 1000
-    const burstProtectedTransitionEnd = Number.isFinite(cueEnd)
+    const burstProtectedTransitionEnd = isFiniteNumber(cueEnd)
       ? Math.max(cue.timeStart + cueStartSettleMs / 1000, cueEnd - burstPreEndMs / 1000)
       : targetTransitionEnd
     const nextCueFrame = cueFrames[cueIndex + 1] ?? maxFrame + 1
@@ -157,7 +197,7 @@ export function buildCueFramePlan({
       })
     }
 
-    if (!Number.isFinite(cueEnd)) continue
+    if (!isFiniteNumber(cueEnd)) continue
 
     const burstStartSeconds = Math.max(cue.timeStart, cueEnd - burstPreEndMs / 1000)
     const burstEndSeconds = Math.min(
@@ -234,14 +274,34 @@ export function createCueConcatEntries({
   fps: number
   frameName: (captureIndex: number) => string
 }): CueConcatEntry[] {
+  requirePositiveFinite('fps', fps)
+  if (!Number.isSafeInteger(plan.frameCount) || plan.frameCount <= 0) {
+    throw new RangeError('Cue frame count must be a positive safe integer')
+  }
+  if (!plan.entries.length) {
+    throw new Error('Cue frame plan must contain at least one entry')
+  }
+
   return plan.entries.map((entry, index) => {
     const next = plan.entries[index + 1]
+    if (
+      !Number.isSafeInteger(entry.frameIndex) ||
+      entry.frameIndex < 0 ||
+      entry.frameIndex >= plan.frameCount
+    ) {
+      throw new RangeError(`Invalid cue frame index at entry ${index}`)
+    }
     const heldFrames = next
       ? next.frameIndex - entry.frameIndex
       : plan.frameCount - entry.frameIndex
+    if (!Number.isSafeInteger(heldFrames) || heldFrames <= 0) {
+      throw new RangeError(`Cue frame entries are not strictly increasing at entry ${index}`)
+    }
+    const file = frameName(index)
+    if (!file) throw new Error(`Cue frame ${index} has no output filename`)
 
     return {
-      file: frameName(index),
+      file,
       durationSeconds: Number((heldFrames / fps).toFixed(6)),
     }
   })
@@ -255,6 +315,8 @@ export function renderCueConcatFile(entries: CueConcatEntry[]) {
   const lines: string[] = []
 
   for (const entry of entries) {
+    if (!entry.file) throw new Error('Cue concat entries require a file path')
+    requirePositiveFinite('Cue concat duration', entry.durationSeconds)
     lines.push(`file '${escapeConcatFilePath(entry.file)}'`)
     lines.push(`duration ${entry.durationSeconds.toFixed(6)}`)
   }

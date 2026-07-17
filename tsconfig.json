@@ -9,6 +9,7 @@
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "noImplicitAny": true,
+    "strictNullChecks": true,
     "sourceMap": true,
     "allowImportingTsExtensions": true
   },

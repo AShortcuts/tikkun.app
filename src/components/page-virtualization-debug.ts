@@ -2,8 +2,16 @@ import type {
   PageVirtualizationApplication,
   PageWindowPolicyResult,
 } from './page-window-policy.ts'
+import {
+  readStorageItem,
+  writeStorageItem,
+} from '../persistence/persisted-state.ts'
 
-export type PageVirtualizationSource = 'query-param' | 'local-storage' | 'default'
+export type PageVirtualizationSource =
+  | 'query-param'
+  | 'local-storage'
+  | 'memory'
+  | 'default'
 
 export interface PageVirtualizationSettingsState {
   enabled: boolean
@@ -82,11 +90,12 @@ export function createPageVirtualizationSettings({
   storageKey = DEFAULT_STORAGE_KEY,
 }: {
   search: string
-  storage: Storage
+  storage: Storage | null
   storageKey?: string
 }): PageVirtualizationSettings {
   const queryValue = new URLSearchParams(search).get('virtualizePages')
   const queryOverride = queryValue === '1' || queryValue === '0'
+  let memoryOverride: boolean | null = null
 
   function state(): PageVirtualizationSettingsState {
     if (queryValue === '1') {
@@ -106,7 +115,21 @@ export function createPageVirtualizationSettings({
       }
     }
 
-    const stored = storage.getItem(storageKey)
+    if (memoryOverride !== null) {
+      return {
+        enabled: memoryOverride,
+        source: 'memory',
+        queryOverride,
+        storageKey,
+      }
+    }
+
+    let stored: string | null = null
+    try {
+      stored = readStorageItem(storage, storageKey)
+    } catch (error) {
+      console.error('Failed to read page-virtualization settings', error)
+    }
     if (stored === 'true' || stored === 'false') {
       return {
         enabled: stored === 'true',
@@ -127,7 +150,13 @@ export function createPageVirtualizationSettings({
   return {
     state,
     setEnabled(enabled: boolean) {
-      storage.setItem(storageKey, enabled ? 'true' : 'false')
+      try {
+        writeStorageItem(storage, storageKey, enabled ? 'true' : 'false')
+        memoryOverride = null
+      } catch (error) {
+        console.error('Failed to save page-virtualization settings', error)
+        memoryOverride = enabled
+      }
       return state()
     },
   }

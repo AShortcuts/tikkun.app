@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import type { LeiningRun } from '../calendar-model/model-types.ts'
 import {
   AliyahTargetLocationCache,
+  findRenderedLineElement,
+  getRenderedLineElements,
   getAliyahStartLocation,
   getAliyahStartLocationFromViewModel,
   lineIndexFromLocation,
@@ -31,6 +33,19 @@ describe('aliyah DOM target helpers', () => {
 
   it('converts one-based physical line numbers into rendered line indexes', () => {
     expect(lineIndexFromLocation({ lineNumber: 7 })).toBe(6)
+  })
+
+  it('selects line rows instead of descendant word spans with the same indexes', () => {
+    const page = document.createElement('div')
+    page.innerHTML = `
+      <div data-class="line" data-page-number="1" data-line-index="0">
+        <span data-page-number="1" data-line-index="0" data-token-key="1:0:0:0">word</span>
+      </div>
+    `
+
+    const line = page.firstElementChild
+    expect(findRenderedLineElement(page, 0)).toBe(line)
+    expect(getRenderedLineElements(page)).toEqual([line])
   })
 
   it('resolves start locations through a view model resolver', async () => {

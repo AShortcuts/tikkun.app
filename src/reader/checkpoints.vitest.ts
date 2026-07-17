@@ -3,8 +3,41 @@ import {
   checkpointFromCue,
   checkpointFromIssue,
   compareCheckpoints,
+  formatTokenKey,
+  isValidTokenKey,
+  parseTokenKey,
 } from './checkpoints.ts'
 import type { RecordingIssue } from '../audio/recording-issues.ts'
+
+test('parses and formats only canonical token positions', () => {
+  expect(parseTokenKey('12:1:0:4')).toEqual({
+    pageNumber: 12,
+    lineIndex: 1,
+    fragmentIndex: 0,
+    wordIndex: 4,
+  })
+  expect(formatTokenKey({
+    pageNumber: 12,
+    lineIndex: 1,
+    fragmentIndex: 0,
+    wordIndex: 4,
+  })).toBe('12:1:0:4')
+
+  expect(isValidTokenKey('1::0:2')).toBe(false)
+  expect(isValidTokenKey('-1:0:0:0')).toBe(false)
+  expect(isValidTokenKey('01:0:0:0')).toBe(false)
+  expect(isValidTokenKey('1:0:0:1.5')).toBe(false)
+  expect(isValidTokenKey('1:0:0:9007199254740992')).toBe(false)
+})
+
+test('refuses to construct checkpoints with malformed token identity', () => {
+  expect(() => checkpointFromCue({
+    audioId: 'a',
+    label: 'Invalid',
+    tokenKey: '1::0:0',
+    timeStart: 0,
+  })).toThrow('Invalid checkpoint token key')
+})
 
 test('creates a cue checkpoint anchored by token key and audio time', () => {
   const checkpoint = checkpointFromCue({

@@ -1,12 +1,10 @@
 import type { WordCue } from '../audio/types.ts'
 import type { ScrollDisplay } from '../components/ScrollDisplay.ts'
+import { formatTokenKey } from '../reader/token-position.ts'
 import { centerElementInScrollRoot } from '../reader-scroll.ts'
 
 const ACTIVE_CLASS = 'is-active-word'
 const MAX_TOKEN_ELEMENT_CACHE_KEYS = 400
-
-const cueToTokenKey = (cue: WordCue) =>
-  `${cue.pageNumber}:${cue.lineIndex}:${cue.fragmentIndex}:${cue.wordIndex}`
 
 export class HighlightController {
   private activeTokenKey: string | null = null
@@ -14,10 +12,12 @@ export class HighlightController {
   private activeElements: HTMLElement[] = []
   private pendingActivation: Promise<HTMLElement | null> | null = null
   private pendingTokenKey: string | null = null
+  private activationGeneration = 0
   private sequence: string[] = []
   private sequenceIndexByTokenKey = new Map<string, number>()
   private display: ScrollDisplay | null = null
   private tokenElementsByKey = new Map<string, HTMLElement[]>()
+  private activeTokenListeners = new Set<(tokenKey: string | null) => void>()
 
   constructor(private readonly book: HTMLElement) {}
 
@@ -49,17 +49,25 @@ export class HighlightController {
     return this.activeSequenceIndex
   }
 
+  onActiveTokenChanged(listener: (tokenKey: string | null) => void) {
+    this.activeTokenListeners.add(listener)
+    return () => this.activeTokenListeners.delete(listener)
+  }
+
   clear() {
+    this.activationGeneration += 1
+    const hadActiveToken = this.activeTokenKey !== null
     this.activeElements.forEach((element) => element.classList.remove(ACTIVE_CLASS))
     this.activeElements = []
     this.activeTokenKey = null
     this.activeSequenceIndex = -1
     this.pendingActivation = null
     this.pendingTokenKey = null
+    if (hadActiveToken) this.emitActiveTokenChanged(null)
   }
 
   async activateCue(cue: WordCue, options?: { scroll?: boolean }) {
-    const tokenKey = cueToTokenKey(cue)
+    const tokenKey = formatTokenKey(cue)
     if (this.activeTokenKey === tokenKey) {
       return this.getVisibleTokenElement(tokenKey) ?? this.getPrimaryTokenElement(tokenKey)
     }
@@ -68,16 +76,21 @@ export class HighlightController {
       return this.pendingActivation
     }
 
+    const generation = ++this.activationGeneration
+    const display = this.display
     const activation = (async () => {
-      await this.display?.ensurePageMounted(cue.pageNumber)
-      return this.activateTokenKey(tokenKey, options)
+      await display?.ensurePageMounted(cue.pageNumber)
+      if (generation !== this.activationGeneration || display !== this.display) {
+        return null
+      }
+      return this.applyTokenKey(tokenKey, options, generation)
     })()
 
     this.pendingTokenKey = tokenKey
     this.pendingActivation = activation
 
     return activation.finally(() => {
-      if (this.pendingTokenKey === tokenKey) {
+      if (this.pendingActivation === activation) {
         this.pendingTokenKey = null
         this.pendingActivation = null
       }
@@ -88,6 +101,16 @@ export class HighlightController {
     tokenKey: string,
     { scroll = true }: { scroll?: boolean } = {}
   ) {
+    const generation = ++this.activationGeneration
+    return this.applyTokenKey(tokenKey, { scroll }, generation)
+  }
+
+  private applyTokenKey(
+    tokenKey: string,
+    { scroll = true }: { scroll?: boolean } = {},
+    generation = this.activationGeneration
+  ) {
+    if (generation !== this.activationGeneration) return null
     if (this.activeTokenKey === tokenKey) {
       return this.getPrimaryTokenElement(tokenKey)
     }
@@ -99,6 +122,7 @@ export class HighlightController {
     this.activeElements = elements
     this.activeTokenKey = tokenKey
     this.activeSequenceIndex = this.sequenceIndexByTokenKey.get(tokenKey) ?? -1
+    this.emitActiveTokenChanged(tokenKey)
 
     const target =
       scroll
@@ -193,8 +217,12 @@ export class HighlightController {
       this.tokenElementsByKey.delete(oldestKey)
     }
   }
+
+  private emitActiveTokenChanged(tokenKey: string | null) {
+    for (const listener of this.activeTokenListeners) listener(tokenKey)
+  }
 }
 
 export function cueKey(cue: WordCue) {
-  return cueToTokenKey(cue)
+  return formatTokenKey(cue)
 }

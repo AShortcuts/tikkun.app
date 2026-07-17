@@ -313,7 +313,7 @@ function getLine(text: string): RenderedLineInfo {
   const results = pages.flatMap((p) =>
     p.type === 'message'
       ? []
-      : p.lines.filter((line) => renderLine(line).includes(text))
+      : p.lines.filter((line) => (renderLine(line) ?? '').includes(text))
   )
 
   if (results.length !== 1)

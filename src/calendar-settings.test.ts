@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 
 import {
   DEFAULT_CALENDAR_SETTINGS,
@@ -46,10 +46,35 @@ test('loads persisted calendar settings', () => {
 })
 
 test('falls back to default calendar settings when storage is invalid', () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
   const storage = createMemoryStorage()
   storage.setItem(CALENDAR_SETTINGS_STORAGE_KEY, '{')
 
   expect(loadCalendarSettings(storage)).toEqual(DEFAULT_CALENDAR_SETTINGS)
+  expect(storage.getItem(CALENDAR_SETTINGS_STORAGE_KEY)).toBeNull()
+  expect(
+    storage.getItem(`${CALENDAR_SETTINGS_STORAGE_KEY}:quarantine`)
+  ).not.toBeNull()
+  log.mockRestore()
+})
+
+test('contains denied reads and surfaces denied writes', () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  const storage = {
+    ...createMemoryStorage(),
+    getItem: () => {
+      throw new DOMException('denied', 'SecurityError')
+    },
+    setItem: () => {
+      throw new DOMException('denied', 'SecurityError')
+    },
+  } as Storage
+
+  expect(loadCalendarSettings(storage)).toEqual(DEFAULT_CALENDAR_SETTINGS)
+  expect(() => saveCalendarSettings({ israel: true }, storage)).toThrow(
+    'Failed to save calendar settings'
+  )
+  log.mockRestore()
 })
 
 test('saves calendar settings and adapts them to user settings', () => {

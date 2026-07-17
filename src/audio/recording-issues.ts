@@ -1,4 +1,9 @@
-import { isValidTokenKey } from '../reader/checkpoints.ts'
+import { isValidTokenKey } from '../reader/token-position.ts'
+import {
+  quarantineStorageItem,
+  readStorageItem,
+  writeStorageItem,
+} from '../persistence/persisted-state.ts'
 
 export type RecordingIssueKind =
   | 'repeated-word'
@@ -60,10 +65,14 @@ function storageKey(audioId: string) {
 export function createRecordingIssue(
   input: Omit<RecordingIssue, 'id'>
 ): RecordingIssue {
-  return {
+  const issue = {
     ...input,
     id: `issue:${input.audioId}:${input.tokenKey}:${input.createdAt}`,
   }
+  if (!parseRecordingIssue(issue, input.audioId, input.tokenizationVersion)) {
+    throw new TypeError('Cannot create an invalid recording issue')
+  }
+  return issue
 }
 
 export function recordingIssueReaderLabel(issue: Pick<RecordingIssue, 'kind'>) {
@@ -74,21 +83,61 @@ export function getReaderVisibleIssues(issues: RecordingIssue[]) {
   return issues.filter((issue) => issue.visibility === 'readerVisible')
 }
 
-function isRecordingIssue(value: unknown, audioId: string, tokenizationVersion: string): value is RecordingIssue {
-  if (!value || typeof value !== 'object') return false
+export function parseRecordingIssue(
+  value: unknown,
+  audioId: string,
+  tokenizationVersion: string
+): RecordingIssue | null {
+  if (!value || typeof value !== 'object') return null
   const candidate = value as Partial<RecordingIssue>
-  return (
+  const isValid = (
     typeof candidate.id === 'string' &&
+    candidate.id.length > 0 &&
     candidate.audioId === audioId &&
+    candidate.audioId.length > 0 &&
     typeof candidate.tokenKey === 'string' &&
     isValidTokenKey(candidate.tokenKey) &&
     recordingIssueKinds.includes(candidate.kind as RecordingIssueKind) &&
     ['authoringOnly', 'readerVisible', 'alignmentHint'].includes(candidate.visibility ?? '') &&
     ['low', 'medium', 'high'].includes(candidate.severity ?? '') &&
     typeof candidate.createdAt === 'number' &&
-    Number.isFinite(candidate.createdAt) &&
-    candidate.tokenizationVersion === tokenizationVersion
+    Number.isSafeInteger(candidate.createdAt) &&
+    candidate.createdAt >= 0 &&
+    (candidate.note === undefined || typeof candidate.note === 'string') &&
+    isOptionalNonNegativeTime(candidate.timeStart) &&
+    isOptionalNonNegativeTime(candidate.timeEnd) &&
+    (candidate.timeEnd === undefined || candidate.timeStart !== undefined) &&
+    (candidate.timeStart === undefined ||
+      candidate.timeEnd === undefined ||
+      candidate.timeEnd >= candidate.timeStart) &&
+    candidate.tokenizationVersion === tokenizationVersion &&
+    candidate.tokenizationVersion.length > 0
   )
+  return isValid ? (candidate as RecordingIssue) : null
+}
+
+function isOptionalNonNegativeTime(value: unknown) {
+  return (
+    value === undefined ||
+    (typeof value === 'number' && Number.isFinite(value) && value >= 0)
+  )
+}
+
+export function parseRecordingIssues(
+  issues: unknown,
+  audioId: string,
+  tokenizationVersion: string
+): RecordingIssue[] | null {
+  if (!Array.isArray(issues)) return null
+  const parsed: RecordingIssue[] = []
+  const issueIds = new Set<string>()
+  for (const value of issues) {
+    const issue = parseRecordingIssue(value, audioId, tokenizationVersion)
+    if (!issue || issueIds.has(issue.id)) return null
+    issueIds.add(issue.id)
+    parsed.push(issue)
+  }
+  return parsed.sort((a, b) => a.createdAt - b.createdAt)
 }
 
 export function filterRecordingIssues(
@@ -98,23 +147,63 @@ export function filterRecordingIssues(
 ) {
   if (!Array.isArray(issues)) return []
   return issues
-    .filter((issue) => isRecordingIssue(issue, audioId, tokenizationVersion))
+    .map((issue) => parseRecordingIssue(issue, audioId, tokenizationVersion))
+    .filter((issue): issue is RecordingIssue => issue !== null)
     .sort((a, b) => a.createdAt - b.createdAt)
 }
 
 export function loadRecordingIssues(
-  storage: Storage,
+  storage: Storage | null,
   audioId: string,
   tokenizationVersion: string
 ) {
-  const raw = storage.getItem(storageKey(audioId))
+  if (!storage) return []
+  const key = storageKey(audioId)
+  let raw: string | null = null
+  try {
+    raw = readStorageItem(storage, key)
+  } catch (error) {
+    console.error(`Failed to read recording issues for ${audioId}`, error)
+    return []
+  }
   if (!raw) return []
 
   try {
-    const parsed = JSON.parse(raw)
-    return filterRecordingIssues(parsed, audioId, tokenizationVersion)
-  } catch {
-    storage.removeItem(storageKey(audioId))
+    const storedIssues = JSON.parse(raw) as unknown
+    const parsed = parseRecordingIssues(
+      storedIssues,
+      audioId,
+      tokenizationVersion
+    )
+    if (parsed) return parsed
+
+    const repairedIssues = filterRecordingIssues(
+      storedIssues,
+      audioId,
+      tokenizationVersion
+    )
+    const uniqueIssues = [...new Map(
+      repairedIssues.map((issue) => [issue.id, issue])
+    ).values()]
+    console.warn(`Repairing invalid recording issues for ${audioId}`)
+    quarantineStorageItem({
+      storage,
+      key,
+      rawValue: raw,
+      reason: 'invalid recording issue schema',
+      ...(uniqueIssues.length
+        ? { replacementValue: JSON.stringify(uniqueIssues) }
+        : {}),
+    })
+    return uniqueIssues
+  } catch (error) {
+    console.error(`Failed to parse recording issues for ${audioId}`, error)
+    quarantineStorageItem({
+      storage,
+      key,
+      rawValue: raw,
+      reason: 'invalid JSON',
+    })
     return []
   }
 }
@@ -129,9 +218,39 @@ export function mergeRecordingIssues(...issueGroups: RecordingIssue[][]) {
 }
 
 export function saveRecordingIssues(
-  storage: Storage,
+  storage: Storage | null,
   audioId: string,
   issues: RecordingIssue[]
 ) {
-  storage.setItem(storageKey(audioId), JSON.stringify(issues))
+  const issueIds = new Set<string>()
+  const isValid = issues.every((issue) => {
+    const parsed = parseRecordingIssue(
+      issue,
+      audioId,
+      issue.tokenizationVersion
+    )
+    if (!parsed || issueIds.has(parsed.id)) return false
+    issueIds.add(parsed.id)
+    return true
+  })
+  if (!isValid) {
+    throw new TypeError(`Cannot persist invalid recording issues for ${audioId}`)
+  }
+
+  if (!storage) throw new RecordingIssueStorageError(audioId)
+  try {
+    writeStorageItem(storage, storageKey(audioId), JSON.stringify(issues))
+  } catch (error) {
+    throw new RecordingIssueStorageError(audioId, error)
+  }
+}
+
+export class RecordingIssueStorageError extends Error {
+  readonly cause: unknown
+
+  constructor(audioId: string, cause?: unknown) {
+    super(`Failed to save recording issues for ${audioId}`)
+    this.name = 'RecordingIssueStorageError'
+    this.cause = cause
+  }
 }

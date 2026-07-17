@@ -44,6 +44,14 @@ export function generatePageUrl(scroll: ScrollName, page: number) {
   return `#/${scroll}/page/${page}`
 }
 
+export function canonicalReaderUrl(url: URL, hash: string) {
+  const canonicalUrl = new URL(url.href)
+  canonicalUrl.hash = hash
+  canonicalUrl.searchParams.delete('aliyah')
+  canonicalUrl.searchParams.delete('aliyahRun')
+  return canonicalUrl
+}
+
 // TODO(decide): Should we support links to a specific עלייה in a run?
 
 const pathHandlers: Record<
@@ -69,10 +77,8 @@ const pathHandlers: Record<
     const initialRef = refFromPath(ref, 'torah')
     if (!initialRef) return missingReferenceRoute(ref)
 
-    return {
-      view: 'reader',
-      model: ScrollViewModel.forRef(generator, initialRef),
-    }
+    const model = ScrollViewModel.forRef(generator, initialRef)
+    return model ? { view: 'reader', model } : null
   },
   /** Legacy URL: The next leining. */
   next(generator, _pathParts, options) {
@@ -243,6 +249,7 @@ export function parseUrl(
   path: string,
   options?: ParseUrlOptions
 ): AppRoute | null {
-  const [urlType, ...pathParts] = path.split('/').filter((p) => p)
+  const routePath = path.split('?', 1)[0]
+  const [urlType, ...pathParts] = routePath.split('/').filter((p) => p)
   return pathHandlers[urlType]?.(generator, pathParts, options) ?? null
 }

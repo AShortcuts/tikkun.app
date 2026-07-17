@@ -1,72 +1,53 @@
 /// <reference types="vite/client" />
 
-import type { CueExportPayload } from '../../audio/types.ts'
+import { cueFileNameForRecording } from '../../audio/cue-file.ts'
+import {
+  cuePayloadMatchesRecording,
+  parseCueExportPayload,
+} from '../../audio/cue-validation.ts'
+import type { AudioRecording, CueExportPayload } from '../../audio/types.ts'
+import { RetryablePromiseCache } from '../retryable-promise-cache.ts'
 
-const cuePayloadLoaders = import.meta.glob<CueExportPayload>('./**/*.json', {
+const cuePayloadLoaders = import.meta.glob<unknown>('./**/*.json', {
   import: 'default',
 })
 
-const aliyahFileLabels = new Map<number, string>([
-  [1, 'א'],
-  [2, 'ב'],
-  [3, 'ג'],
-  [4, 'ד'],
-  [5, 'ה'],
-  [6, 'ו'],
-  [7, 'ז'],
-])
-
-const narratorFileSuffixes = new Map<string, string>([
-  ['yoni-davidov', 'yd'],
-])
-
-const cuePayloadPromisesByPath = new Map<string, Promise<CueExportPayload>>()
+const cuePayloadPromisesByPath = new RetryablePromiseCache<
+  string,
+  CueExportPayload
+>()
 const cuePayloadsByAudioId = new Map<string, CueExportPayload>()
 
 export function cuePayloadPathForRecording({
   narratorId,
-  parshaSlug,
+  reading,
   aliyah,
-}: {
-  narratorId: string
-  parshaSlug: string
-  aliyah: number
-}) {
-  const aliyahLabel = aliyahFileLabels.get(aliyah)
-  const narratorSuffix = narratorFileSuffixes.get(narratorId)
-  if (!aliyahLabel || !narratorSuffix) return null
-
-  return `./${parshaSlug}/${parshaSlug}-${aliyahLabel}-${narratorSuffix}.json`
+}: Pick<AudioRecording, 'narratorId' | 'reading' | 'aliyah'>) {
+  const fileName = cueFileNameForRecording({ narratorId, reading, aliyah })
+  return fileName ? `./${reading.id}/${fileName}` : null
 }
 
 export async function loadCuePayloadByPath(path: string) {
   const loader = cuePayloadLoaders[path]
   if (!loader) return null
 
-  let promise = cuePayloadPromisesByPath.get(path)
-  if (!promise) {
-    promise = loader().then((payload) => {
-      cuePayloadsByAudioId.set(payload.audioId, payload)
-      return payload
-    })
-    cuePayloadPromisesByPath.set(path, promise)
-  }
-
-  return promise
+  return cuePayloadPromisesByPath.get(path, async () => {
+    const payload = parseCueExportPayload(await loader())
+    if (!payload) throw new Error(`Invalid cue payload at ${path}`)
+    return payload
+  })
 }
 
-export async function loadCuePayloadForRecording(recording: {
-  id: string
-  narratorId: string
-  parshaSlug: string
-  aliyah: number
-}) {
+export async function loadCuePayloadForRecording(recording: AudioRecording) {
   const cached = cuePayloadsByAudioId.get(recording.id)
-  if (cached) return cached
+  if (cached && cuePayloadMatchesRecording(cached, recording)) return cached
+  if (cached) cuePayloadsByAudioId.delete(recording.id)
 
   const path = cuePayloadPathForRecording(recording)
   if (!path) return null
 
   const payload = await loadCuePayloadByPath(path)
-  return payload?.audioId === recording.id ? payload : null
+  if (!payload || !cuePayloadMatchesRecording(payload, recording)) return null
+  cuePayloadsByAudioId.set(recording.id, payload)
+  return payload
 }

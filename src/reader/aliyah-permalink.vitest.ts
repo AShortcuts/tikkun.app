@@ -64,6 +64,36 @@ test('copies the current aliyah permalink even when the reader is already on tha
   expect(button.querySelector('[data-aliyah-link-icon="check"]')?.hasAttribute('hidden')).toBe(false)
 })
 
+test('copies a clean permalink from a reader URL with legacy selection parameters', async () => {
+  window.location.hash =
+    '#/torah/parsha/noach/1-9-8?aliyah=5&aliyahRun=2026-10-17%3Ashacharis%2Cmain'
+  document.body.innerHTML = `
+    <button type="button" data-aliyah-link="true" data-aliyah-url="#/torah/parsha/noach/1-9-8">
+      <span data-aliyah-link-icon="link"></span>
+      <span data-aliyah-link-icon="check" hidden></span>
+    </button>
+  `
+  const writeText = vi.fn().mockResolvedValue(undefined)
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText },
+  })
+
+  const button = document.querySelector<HTMLButtonElement>('[data-aliyah-link="true"]')
+  if (!button) throw new Error('Expected button')
+  const event = new MouseEvent('click', { bubbles: true, cancelable: true })
+  Object.defineProperty(event, 'target', {
+    configurable: true,
+    value: button,
+  })
+
+  await handleAliyahPermalinkClick(event)
+
+  expect(writeText).toHaveBeenCalledWith(
+    `${window.location.origin}${window.location.pathname}${window.location.search}#/torah/parsha/noach/1-9-8`
+  )
+})
+
 test('does not navigate or show success when aliyah permalink copying fails', async () => {
   document.body.innerHTML = `
     <button type="button" data-aliyah-link="true" data-aliyah-url="#/torah/parsha/lech-lecha/1-12-14">

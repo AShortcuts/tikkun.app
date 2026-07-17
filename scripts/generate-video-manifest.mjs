@@ -1,23 +1,86 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
+import path from 'node:path'
+import process from 'node:process'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { audioRecordings } from '../src/data/audio-manifest.generated.ts'
-import { createAliyahVideoManifest } from '../src/video/library.ts'
+import {
+  createAliyahVideoManifest,
+  parseVideoLinkRegistry,
+  parseVideoRenderMetadataList,
+  videoMetadataMatchesProvenance,
+} from '../src/video/library.ts'
+import { currentAppBuildHash } from './video-provenance.mjs'
 
-const metadataPath = new URL('../video-render-metadata.local.json', import.meta.url)
-const linksPath = new URL('../koofr-video-links.local.json', import.meta.url)
-const targetFile = new URL('../src/data/video-manifest.generated.ts', import.meta.url)
+const repoRoot = path.resolve(fileURLToPath(new URL('..', import.meta.url)))
+const metadataPath = path.join(repoRoot, 'video-render-metadata.local.json')
+const linksPath = path.join(repoRoot, 'koofr-video-links.local.json')
+const cueRoot = path.join(repoRoot, 'src/data/audio-cues')
+const targetFile = path.join(repoRoot, 'src/data/video-manifest.generated.ts')
 
-async function readJsonFile(url, fallback) {
+async function readJsonFile(filePath, fallback) {
   try {
-    return JSON.parse(await readFile(url, 'utf8'))
+    return JSON.parse(await readFile(filePath, 'utf8'))
   } catch (error) {
-    if (error && typeof error === 'object' && error.code === 'ENOENT') {
-      return fallback
-    }
+    if (error && typeof error === 'object' && error.code === 'ENOENT') return fallback
     throw error
   }
 }
 
-const formatValue = (value, { indentLevel = 0 } = {}) => {
+async function listJsonFiles(root) {
+  const entries = await readdir(root, { withFileTypes: true })
+  const files = await Promise.all(
+    entries.map(async (entry) => {
+      const entryPath = path.join(root, entry.name)
+      if (entry.isDirectory()) return listJsonFiles(entryPath)
+      return entry.isFile() && entry.name.endsWith('.json') ? [entryPath] : []
+    })
+  )
+  return files.flat()
+}
+
+function sha256Json(value) {
+  return createHash('sha256').update(JSON.stringify(value)).digest('hex')
+}
+
+export async function readCueHashes(root = cueRoot) {
+  const cueHashes = new Map()
+  for (const filePath of await listJsonFiles(root)) {
+    const payload = await readJsonFile(filePath, null)
+    if (
+      !payload ||
+      typeof payload !== 'object' ||
+      Array.isArray(payload) ||
+      typeof payload.audioId !== 'string' ||
+      !payload.audioId ||
+      !Array.isArray(payload.cues)
+    ) {
+      throw new Error(`Invalid cue payload while hashing ${filePath}`)
+    }
+    if (cueHashes.has(payload.audioId)) {
+      throw new Error(`Duplicate cue payload for audio id ${payload.audioId}`)
+    }
+    cueHashes.set(payload.audioId, sha256Json(payload.cues))
+  }
+  return cueHashes
+}
+
+export function buildCurrentVideoProvenance({ recordings, cueHashes, appBuildHash }) {
+  return new Map(
+    recordings.map((recording) => [
+      recording.id,
+      {
+        ...(recording.mediaIdentity?.digest
+          ? { audioHash: recording.mediaIdentity.digest }
+          : {}),
+        ...(cueHashes.get(recording.id) ? { cueHash: cueHashes.get(recording.id) } : {}),
+        ...(appBuildHash ? { appBuildHash } : {}),
+      },
+    ])
+  )
+}
+
+function formatValue(value, { indentLevel = 0 } = {}) {
   const indent = '  '.repeat(indentLevel)
   const nestedIndent = '  '.repeat(indentLevel + 1)
 
@@ -29,7 +92,10 @@ const formatValue = (value, { indentLevel = 0 } = {}) => {
     if (!value.length) return '[]'
     return [
       '[',
-      ...value.map((entry) => `${nestedIndent}${formatValue(entry, { indentLevel: indentLevel + 1 })},`),
+      ...value.map(
+        (entry) =>
+          `${nestedIndent}${formatValue(entry, { indentLevel: indentLevel + 1 })},`
+      ),
       `${indent}]`,
     ].join('\n')
   }
@@ -48,15 +114,43 @@ const formatValue = (value, { indentLevel = 0 } = {}) => {
   ].join('\n')
 }
 
-const metadata = await readJsonFile(metadataPath, [])
-const links = await readJsonFile(linksPath, {})
-const videos = createAliyahVideoManifest({
-  recordings: audioRecordings,
-  metadata,
-  links,
-})
+async function writeFileAtomically(filePath, contents) {
+  const stagedFile = `${filePath}.stage-${process.pid}-${Date.now()}`
+  try {
+    await writeFile(stagedFile, contents)
+    await rename(stagedFile, filePath)
+  } finally {
+    await rm(stagedFile, { force: true })
+  }
+}
 
-const source = `import type { AliyahVideo } from '../video/types.ts'
+async function main() {
+  const metadata = parseVideoRenderMetadataList(await readJsonFile(metadataPath, []))
+  const links = parseVideoLinkRegistry(await readJsonFile(linksPath, {}))
+  const cueHashes = await readCueHashes()
+  const appBuildHash = await currentAppBuildHash(repoRoot)
+  const currentProvenanceByAudioId = buildCurrentVideoProvenance({
+    recordings: audioRecordings,
+    cueHashes,
+    appBuildHash,
+  })
+  const videos = createAliyahVideoManifest({
+    recordings: audioRecordings,
+    metadata,
+    links,
+    currentProvenanceByAudioId,
+  })
+  const staleLinkedMetadata = metadata.filter(
+    (entry) =>
+      entry.validation.passed &&
+      links[entry.audioId] &&
+      !videoMetadataMatchesProvenance(
+        entry,
+        currentProvenanceByAudioId.get(entry.audioId)
+      )
+  )
+
+  const source = `import type { AliyahVideo } from '../video/types.ts'
 
 // This file is generated by \`npm run video:manifest\`.
 // Do not edit it by hand; update the video metadata and Koofr links instead.
@@ -64,8 +158,19 @@ const source = `import type { AliyahVideo } from '../video/types.ts'
 export const aliyahVideos: AliyahVideo[] = ${formatValue(videos)}
 `
 
-await writeFile(targetFile, source)
+  await writeFileAtomically(targetFile, source)
+  console.log(
+    `Generated ${videos.length} video manifest entr${videos.length === 1 ? 'y' : 'ies'}`
+  )
+  if (staleLinkedMetadata.length) {
+    console.warn(
+      `Excluded ${staleLinkedMetadata.length} stale linked video entr${
+        staleLinkedMetadata.length === 1 ? 'y' : 'ies'
+      }: ${staleLinkedMetadata.map((entry) => entry.audioId).join(', ')}`
+    )
+  }
+}
 
-console.log(
-  `Generated ${videos.length} video manifest entr${videos.length === 1 ? 'y' : 'ies'}`
-)
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await main()
+}
