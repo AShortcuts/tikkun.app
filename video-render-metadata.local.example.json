@@ -1,12 +1,12 @@
 [
   {
-    "audioId": "bereshit-1",
+    "audioId": "beresheet-1",
     "narratorId": "baal-koreh",
     "narratorInitials": "bk",
-    "parshaSlug": "bereshit",
+    "parshaSlug": "beresheet",
     "aliyah": 1,
-    "title": "Bereshit Aliyah 1",
-    "fileName": "bereshit-1_bk_1080p30_a1b2c3d4.mp4",
+    "title": "Beresheet Aliyah 1",
+    "fileName": "beresheet-1_bk_1080p30_a1b2c3d4.mp4",
     "width": 1920,
     "height": 1080,
     "fps": 30,

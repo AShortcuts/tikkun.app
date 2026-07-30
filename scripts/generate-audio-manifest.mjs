@@ -41,6 +41,13 @@ const extensionScores = {
   mp3: 1,
 }
 
+const canonicalParshaIdentities = new Map([
+  ['bereshit', { slug: 'beresheet', name: 'Beresheet' }],
+  ['beresheet', { slug: 'beresheet', name: 'Beresheet' }],
+  ['vayetze', { slug: 'vayetzei', name: 'Vayetzei' }],
+  ['vayetzei', { slug: 'vayetzei', name: 'Vayetzei' }],
+])
+
 export const slugify = (value) =>
   value
     .replace(/[^a-zA-Z0-9\s]/g, '')
@@ -48,7 +55,7 @@ export const slugify = (value) =>
     .replace(/\s+/g, '-')
     .toLowerCase()
 
-const toPublicUrl = (narratorId, ...segments) =>
+const toSiteUrl = (narratorId, ...segments) =>
   `/audio/${[narratorId, ...segments].map(encodeURIComponent).join('/')}`
 
 export function inferAliyah(filename) {
@@ -166,7 +173,7 @@ export function validateAudioCatalog(recordings) {
   if (!recordings.length) throw new Error('No recognizable recordings were found')
 
   const ids = new Set()
-  const publicUrls = new Set()
+  const mediaUrls = new Set()
   const aliyot = new Set()
   const parshaNamesBySlug = new Map()
   const parshaSlugsByNumber = new Map()
@@ -175,10 +182,10 @@ export function validateAudioCatalog(recordings) {
     if (ids.has(recording.id)) throw new Error(`Duplicate recording id: ${recording.id}`)
     ids.add(recording.id)
 
-    if (publicUrls.has(recording.playSrc)) {
+    if (mediaUrls.has(recording.playSrc)) {
       throw new Error(`Two recordings resolve to the same media URL: ${recording.playSrc}`)
     }
-    publicUrls.add(recording.playSrc)
+    mediaUrls.add(recording.playSrc)
 
     const aliyahKey = `${recording.narratorId}:${recording.parshaSlug}:${recording.aliyah}`
     if (aliyot.has(aliyahKey)) throw new Error(`Duplicate catalog slot: ${aliyahKey}`)
@@ -238,7 +245,7 @@ export function renderAudioManifest({ recordings, narrator }) {
   AudioNarrator,
   AudioRecording,
   ParshaAudioRecording,
-} from '../audio/types.ts'
+} from '../app/audio/types.ts'
 
 type GeneratedParshaAudioRecording = Omit<ParshaAudioRecording, 'reading'>
 
@@ -357,7 +364,10 @@ export async function syncAudioCatalog({
       const [, numberText, rawName] = folder.name.match(/^(\d+)\s+(.+)$/) ?? []
       if (!numberText || !rawName) continue
       const parshaNumber = Number(numberText)
-      const parshaSlug = slugify(rawName)
+      const sourceParshaSlug = slugify(rawName)
+      const canonicalIdentity = canonicalParshaIdentities.get(sourceParshaSlug)
+      const parshaSlug = canonicalIdentity?.slug ?? sourceParshaSlug
+      const parshaName = canonicalIdentity?.name ?? rawName
       if (!parshaSlug || !Number.isSafeInteger(parshaNumber) || parshaNumber <= 0) {
         throw new Error(`Invalid parsha folder name: ${JSON.stringify(folder.name)}`)
       }
@@ -377,7 +387,7 @@ export async function syncAudioCatalog({
       const selected = selectAliyahFiles(filenames, folder.name)
       if (!selected.size) continue
 
-      const targetFolderName = `${numberText}-${parshaSlug}`
+      const targetFolderName = parshaSlug
       const stagedTargetFolder = path.join(stagedAudioRoot, targetFolderName)
       await mkdir(stagedTargetFolder, { recursive: true })
 
@@ -385,18 +395,19 @@ export async function syncAudioCatalog({
         (left, right) => left[0] - right[0]
       )) {
         const sourcePath = path.join(sourceFolderPath, match.filename)
-        const stagedMediaPath = path.join(stagedTargetFolder, match.filename)
+        const targetFileName = `${aliyah}.${match.format}`
+        const stagedMediaPath = path.join(stagedTargetFolder, targetFileName)
         await copyFile(sourcePath, stagedMediaPath)
         recordings.push({
           id: `${parshaSlug}-${aliyah}`,
           narratorId: narrator.id,
           parshaSlug,
-          parshaName: rawName,
+          parshaName,
           parshaNumber,
           aliyah,
-          title: `${rawName} Aliyah ${aliyah}`,
-          playSrc: toPublicUrl(narrator.id, targetFolderName, match.filename),
-          downloadSrc: toPublicUrl(narrator.id, targetFolderName, match.filename),
+          title: `${parshaName} Aliyah ${aliyah}`,
+          playSrc: toSiteUrl(narrator.id, targetFolderName, targetFileName),
+          downloadSrc: toSiteUrl(narrator.id, targetFolderName, targetFileName),
           format: match.format,
           status: 'available',
           mediaIdentity: await mediaIdentity(stagedMediaPath),
@@ -457,8 +468,8 @@ export function parseAudioSyncOptions(argv, env = process.env) {
 
 async function main() {
   const options = parseAudioSyncOptions(process.argv.slice(2))
-  const targetFile = path.join(repoRoot, 'src/data/audio-manifest.generated.ts')
-  const targetAudioRoot = path.join(repoRoot, 'static/audio', options.narratorId)
+  const targetFile = path.join(repoRoot, 'generated/audio-manifest.ts')
+  const targetAudioRoot = path.join(repoRoot, 'site/audio', options.narratorId)
   const recordings = await syncAudioCatalog({
     sourceRoot: options.sourceRoot,
     targetAudioRoot,

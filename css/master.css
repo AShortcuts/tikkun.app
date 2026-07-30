@@ -8,6 +8,7 @@
 @import './toggle.css';
 @import './toolbar.css';
 @import './reader-enhancements.css';
+@import './mobile-reader.css';
 
 @font-face {
   font-family: 'ShlomosemiStam';

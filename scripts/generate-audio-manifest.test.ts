@@ -32,23 +32,57 @@ afterEach(async () => {
 })
 
 test('aliyah inference rejects filenames with conflicting signals', () => {
-  expect(inferAliyah('Bereshit 1st.m4a')).toBe(1)
-  expect(inferAliyah("Bereshit ב׳.m4a")).toBe(2)
-  expect(() => inferAliyah('Bereshit 1st 2.m4a')).toThrow(/Ambiguous aliyah/)
+  expect(inferAliyah('Beresheet 1st.m4a')).toBe(1)
+  expect(inferAliyah("Beresheet ב׳.m4a")).toBe(2)
+  expect(() => inferAliyah('Beresheet 1st 2.m4a')).toThrow(/Ambiguous aliyah/)
 })
 
 test('selection rejects equally preferred files for the same aliyah', () => {
   expect(() =>
-    selectAliyahFiles(['take-a 1.m4a', 'take-b 1.m4a'], '01 Bereshit')
+    selectAliyahFiles(['take-a 1.m4a', 'take-b 1.m4a'], '01 Beresheet')
   ).toThrow(/Ambiguous source files/)
+})
+
+test('audio sync canonicalizes source-library spellings', async () => {
+  const root = await temporaryRoot()
+  const sourceRoot = path.join(root, 'source')
+  const targetAudioRoot = path.join(root, 'site/audio/yoni-davidov')
+  const targetFile = path.join(root, 'generated/audio-manifest.ts')
+  const sources = [
+    ['01 Bereshit', 'Bereshit 1.m4a'],
+    ['07 Vayetze', 'Vayetze 1.m4a'],
+  ]
+
+  for (const [folder, filename] of sources) {
+    const sourceFolder = path.join(sourceRoot, folder)
+    await mkdir(sourceFolder, { recursive: true })
+    await writeFile(path.join(sourceFolder, filename), filename)
+  }
+
+  const recordings = await syncAudioCatalog({
+    sourceRoot,
+    targetAudioRoot,
+    targetFile,
+  })
+
+  expect(recordings.map(({ id, parshaName }) => ({ id, parshaName }))).toEqual([
+    { id: 'beresheet-1', parshaName: 'Beresheet' },
+    { id: 'vayetzei-1', parshaName: 'Vayetzei' },
+  ])
+  await expect(
+    readdir(path.join(targetAudioRoot, 'beresheet'))
+  ).resolves.toEqual(['1.m4a'])
+  await expect(
+    readdir(path.join(targetAudioRoot, 'vayetzei'))
+  ).resolves.toEqual(['1.m4a'])
 })
 
 test('audio sync is configurable, copies only selected files, and emits media identity', async () => {
   const root = await temporaryRoot()
   const sourceRoot = path.join(root, 'source')
-  const parshaRoot = path.join(sourceRoot, '01 Bereshit')
-  const targetAudioRoot = path.join(root, 'static/audio/yoni-davidov')
-  const targetFile = path.join(root, 'src/data/audio-manifest.generated.ts')
+  const parshaRoot = path.join(sourceRoot, '01 Beresheet')
+  const targetAudioRoot = path.join(root, 'site/audio/yoni-davidov')
+  const targetFile = path.join(root, 'generated/audio-manifest.ts')
   await mkdir(parshaRoot, { recursive: true })
   await mkdir(targetAudioRoot, { recursive: true })
   await mkdir(path.dirname(targetFile), { recursive: true })
@@ -56,9 +90,9 @@ test('audio sync is configurable, copies only selected files, and emits media id
   await writeFile(targetFile, 'old manifest')
 
   const selectedBytes = Buffer.from('fixed m4a')
-  await writeFile(path.join(parshaRoot, 'Bereshit 1.mp3'), 'inferior mp3')
-  await writeFile(path.join(parshaRoot, 'Bereshit 1 (fixed).m4a'), selectedBytes)
-  await writeFile(path.join(parshaRoot, 'Bereshit 2.mp3'), 'second aliyah')
+  await writeFile(path.join(parshaRoot, 'Beresheet 1.mp3'), 'inferior mp3')
+  await writeFile(path.join(parshaRoot, 'Beresheet 1 (fixed).m4a'), selectedBytes)
+  await writeFile(path.join(parshaRoot, 'Beresheet 2.mp3'), 'second aliyah')
   await writeFile(path.join(parshaRoot, 'interview.m4a'), 'not an aliyah')
   await writeFile(path.join(parshaRoot, 'notes.txt'), 'not media')
 
@@ -69,12 +103,12 @@ test('audio sync is configurable, copies only selected files, and emits media id
   })
 
   expect(recordings.map((recording) => recording.id)).toEqual([
-    'bereshit-1',
-    'bereshit-2',
+    'beresheet-1',
+    'beresheet-2',
   ])
-  expect(await readdir(path.join(targetAudioRoot, '01-bereshit'))).toEqual([
-    'Bereshit 1 (fixed).m4a',
-    'Bereshit 2.mp3',
+  expect(await readdir(path.join(targetAudioRoot, 'beresheet'))).toEqual([
+    '1.m4a',
+    '2.mp3',
   ])
   await expect(readFile(path.join(targetAudioRoot, 'old-file.m4a'))).rejects.toMatchObject({
     code: 'ENOENT',
@@ -90,9 +124,9 @@ test('audio sync is configurable, copies only selected files, and emits media id
 test('failed discovery leaves the previous catalog and media untouched', async () => {
   const root = await temporaryRoot()
   const sourceRoot = path.join(root, 'source')
-  const parshaRoot = path.join(sourceRoot, '01 Bereshit')
-  const targetAudioRoot = path.join(root, 'static/audio/yoni-davidov')
-  const targetFile = path.join(root, 'src/data/audio-manifest.generated.ts')
+  const parshaRoot = path.join(sourceRoot, '01 Beresheet')
+  const targetAudioRoot = path.join(root, 'site/audio/yoni-davidov')
+  const targetFile = path.join(root, 'generated/audio-manifest.ts')
   await mkdir(parshaRoot, { recursive: true })
   await mkdir(targetAudioRoot, { recursive: true })
   await mkdir(path.dirname(targetFile), { recursive: true })

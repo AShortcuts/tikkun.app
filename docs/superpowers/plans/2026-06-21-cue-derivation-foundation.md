@@ -12,28 +12,28 @@
 
 ## Current Context
 
-Tikkun is a static browser-first app. It already has a strong runtime boundary: audio playback, highlighting, and video rendering consume cue payloads from `src/data/audio-cues/`. The future derivation system should preserve that boundary.
+Tikkun is a static browser-first app. It already has a strong runtime boundary: audio playback, highlighting, and video rendering consume cue payloads from `audio-cues/`. The future derivation system should preserve that boundary.
 
 Important existing files:
 
-- `src/audio/types.ts`: defines `WordCue`, `AudioRecording`, and `CueExportPayload`.
-- `src/audio/library.ts`: loads published cue JSON and normalizes the first cue start.
-- `src/audio/cue-file.ts`: defines cue file paths and JSON formatting.
-- `src/data/audio-cues/README.md`: documents current cue file naming and payload rules.
-- `src/data/audio-cues/index.ts`: eagerly imports cue payloads by `audioId`.
-- `src/reading/aliyah-token-sequence.ts`: collects the token sequence used for aliyah playback.
-- `src/reading/highlight-controller.ts`: maps cue coordinates to token keys.
-- `src/reading/audio-controller.ts`: owns the active audio session and playback events.
-- `src/admin/draft-storage.ts`: persists local manual timing drafts by recording.
-- `src/index.ts`: currently wires admin cue timing, draft resume, export, playback, highlighting, and UI orchestration.
-- `src/audio/cue-analytics-core.ts`: current interval-only cue analytics.
-- `src/components/CueAnalyticsPage.ts`: displays cue coverage and analytics, including local drafts.
+- `app/audio/types.ts`: defines `WordCue`, `AudioRecording`, and `CueExportPayload`.
+- `app/audio/library.ts`: loads published cue JSON and normalizes the first cue start.
+- `app/audio/cue-file.ts`: defines cue file paths and JSON formatting.
+- `audio-cues/README.md`: documents current cue file naming and payload rules.
+- `app/audio/cue-data.ts`: loads cue payloads lazily by recording identity.
+- `app/reading/aliyah-token-sequence.ts`: collects the token sequence used for aliyah playback.
+- `app/reading/highlight-controller.ts`: maps cue coordinates to token keys.
+- `app/reading/audio-controller.ts`: owns the active audio session and playback events.
+- `app/admin/draft-storage.ts`: persists local manual timing drafts by recording.
+- `app/index.ts`: currently wires admin cue timing, draft resume, export, playback, highlighting, and UI orchestration.
+- `app/audio/cue-analytics-core.ts`: current interval-only cue analytics.
+- `app/components/CueAnalyticsPage.ts`: displays cue coverage and analytics, including local drafts.
 - `scripts/generate-audio-manifest.mjs`: generates recording metadata from source audio.
 - `scripts/record-aliyah-videos.mjs`: proves the repo already supports local publishing workflows outside the production static runtime.
 
 Current cue inventory on 2026-06-21:
 
-- 63 cue JSON files exist under `src/data/audio-cues/`.
+- 63 cue JSON files exist under `audio-cues/`.
 - 10 are complete.
 - 53 are empty.
 - 0 are partial.
@@ -59,10 +59,10 @@ This layer creates the source-of-truth token stream for a recording. It must des
 
 Create:
 
-- `src/cue-generation/canonical-reading.ts`
-- `src/cue-generation/hebrew-normalization.ts`
-- `src/cue-generation/canonical-reading.test.ts`
-- `src/cue-generation/hebrew-normalization.test.ts`
+- `app/cue-generation/canonical-reading.ts`
+- `app/cue-generation/hebrew-normalization.ts`
+- `app/cue-generation/canonical-reading.test.ts`
+- `app/cue-generation/hebrew-normalization.test.ts`
 
 Core responsibilities:
 
@@ -118,9 +118,9 @@ This layer stores what a derivation engine believes happened in the audio. It is
 
 Create:
 
-- `src/cue-generation/alignment-types.ts`
-- `src/cue-generation/alignment-evidence.ts`
-- `src/cue-generation/alignment-evidence.test.ts`
+- `app/cue-generation/alignment-types.ts`
+- `app/cue-generation/alignment-evidence.ts`
+- `app/cue-generation/alignment-evidence.test.ts`
 
 Core responsibilities:
 
@@ -182,10 +182,10 @@ This layer decides whether an alignment match is trustworthy and why.
 
 Create:
 
-- `src/cue-generation/scoring.ts`
-- `src/cue-generation/scoring.test.ts`
-- `src/cue-generation/review-findings.ts`
-- `src/cue-generation/review-findings.test.ts`
+- `app/cue-generation/scoring.ts`
+- `app/cue-generation/scoring.test.ts`
+- `app/cue-generation/review-findings.ts`
+- `app/cue-generation/review-findings.test.ts`
 
 Core responsibilities:
 
@@ -247,10 +247,10 @@ This layer manages review state and correction history separately from final cue
 
 Create:
 
-- `src/admin/cue-review/review-session.ts`
-- `src/admin/cue-review/review-storage.ts`
-- `src/admin/cue-review/review-session.test.ts`
-- `src/admin/cue-review/review-storage.test.ts`
+- `app/admin/cue-review/review-session.ts`
+- `app/admin/cue-review/review-storage.ts`
+- `app/admin/cue-review/review-session.test.ts`
+- `app/admin/cue-review/review-storage.test.ts`
 
 Core responsibilities:
 
@@ -284,7 +284,7 @@ export type CueReviewOperation =
     }
 ```
 
-Do not overload `src/admin/draft-storage.ts` with this richer model. Keep manual tap-timing drafts and generated review sessions separate, then build a narrow bridge when importing generated cues into the existing admin editor.
+Do not overload `app/admin/draft-storage.ts` with this richer model. Keep manual tap-timing drafts and generated review sessions separate, then build a narrow bridge when importing generated cues into the existing admin editor.
 
 ### Layer 5: Publication and Validation
 
@@ -292,10 +292,10 @@ This layer promotes reviewed draft cues into the current `CueExportPayload` form
 
 Create:
 
-- `src/cue-generation/publication.ts`
-- `src/cue-generation/validation.ts`
-- `src/cue-generation/publication.test.ts`
-- `src/cue-generation/validation.test.ts`
+- `app/cue-generation/publication.ts`
+- `app/cue-generation/validation.ts`
+- `app/cue-generation/publication.test.ts`
+- `app/cue-generation/validation.test.ts`
 - `scripts/validate-audio-cues.mjs`
 
 Core responsibilities:
@@ -325,13 +325,13 @@ This layer runs the pipeline across recordings reproducibly.
 Create:
 
 - `scripts/derive-audio-cues.mjs`
-- `src/cue-generation/batch-plan.ts`
-- `src/cue-generation/batch-plan.test.ts`
+- `app/cue-generation/batch-plan.ts`
+- `app/cue-generation/batch-plan.test.ts`
 
 Core responsibilities:
 
 - Select recordings by `audioId`, parsha, aliyah, narrator, missing cues, or stale tokenization.
-- Produce deterministic output paths under a review/draft area, not directly into `src/data/audio-cues/`.
+- Produce deterministic output paths under a review/draft area, not directly into `audio-cues/`.
 - Summarize generated, blocked, review-required, and publishable recordings.
 - Preserve per-recording logs for future diagnosis.
 
@@ -369,10 +369,10 @@ If this repo does not want a `local/` folder, use an ignored path under `.tikkun
 
 **Files:**
 
-- Create: `src/cue-generation/canonical-reading.ts`
-- Create: `src/cue-generation/hebrew-normalization.ts`
-- Create: `src/cue-generation/canonical-reading.test.ts`
-- Create: `src/cue-generation/hebrew-normalization.test.ts`
+- Create: `app/cue-generation/canonical-reading.ts`
+- Create: `app/cue-generation/hebrew-normalization.ts`
+- Create: `app/cue-generation/canonical-reading.test.ts`
+- Create: `app/cue-generation/hebrew-normalization.test.ts`
 
 - [ ] Write tests for Hebrew normalization using tokens with nekudot, ta'amim, sof pasuk, maqaf, and punctuation.
 - [ ] Implement `normalizeHebrewTokenForCueMatching(text: string): string`.
@@ -380,71 +380,71 @@ If this repo does not want a `local/` folder, use an ignored path under `.tikkun
 - [ ] Implement `canonicalTokenFromTokenKey`.
 - [ ] Write tests for structural metadata using display text ending in sof pasuk.
 - [ ] Implement `createCanonicalToken`.
-- [ ] Run `npm test -- src/cue-generation/hebrew-normalization.test.ts src/cue-generation/canonical-reading.test.ts`.
+- [ ] Run `npm test -- app/cue-generation/hebrew-normalization.test.ts app/cue-generation/canonical-reading.test.ts`.
 - [ ] Commit with message `feat: add canonical cue reading model`.
 
 ### Task 3: Add Alignment Evidence Types
 
 **Files:**
 
-- Create: `src/cue-generation/alignment-types.ts`
-- Create: `src/cue-generation/alignment-evidence.ts`
-- Create: `src/cue-generation/alignment-evidence.test.ts`
+- Create: `app/cue-generation/alignment-types.ts`
+- Create: `app/cue-generation/alignment-evidence.ts`
+- Create: `app/cue-generation/alignment-evidence.test.ts`
 
 - [ ] Write tests that build a valid alignment run from canonical tokens and deterministic word hypotheses.
 - [ ] Implement alignment evidence types with no dependency on a specific ASR provider.
 - [ ] Implement basic validation for required fields, finite times, and known token keys.
-- [ ] Run `npm test -- src/cue-generation/alignment-evidence.test.ts`.
+- [ ] Run `npm test -- app/cue-generation/alignment-evidence.test.ts`.
 - [ ] Commit with message `feat: model cue alignment evidence`.
 
 ### Task 4: Add Domain-Aware Scoring and Review Findings
 
 **Files:**
 
-- Create: `src/cue-generation/scoring.ts`
-- Create: `src/cue-generation/scoring.test.ts`
-- Create: `src/cue-generation/review-findings.ts`
-- Create: `src/cue-generation/review-findings.test.ts`
+- Create: `app/cue-generation/scoring.ts`
+- Create: `app/cue-generation/scoring.test.ts`
+- Create: `app/cue-generation/review-findings.ts`
+- Create: `app/cue-generation/review-findings.test.ts`
 
 - [ ] Write a test where a long pause after sof pasuk produces a low-risk expected-pause finding.
 - [ ] Write a test where the same pause inside a phrase produces a high-risk unexpected-pause finding.
 - [ ] Write tests for repeated token, skipped token, low acoustic boundary, and non-monotonic time.
 - [ ] Implement `scoreAlignmentMatch`.
 - [ ] Implement `createReviewFindings`.
-- [ ] Keep the current `src/audio/cue-analytics-core.ts` unchanged in this task; the new model should prove itself independently first.
-- [ ] Run `npm test -- src/cue-generation/scoring.test.ts src/cue-generation/review-findings.test.ts`.
+- [ ] Keep the current `app/audio/cue-analytics-core.ts` unchanged in this task; the new model should prove itself independently first.
+- [ ] Run `npm test -- app/cue-generation/scoring.test.ts app/cue-generation/review-findings.test.ts`.
 - [ ] Commit with message `feat: add domain-aware cue confidence scoring`.
 
 ### Task 5: Add Review Session Storage
 
 **Files:**
 
-- Create: `src/admin/cue-review/review-session.ts`
-- Create: `src/admin/cue-review/review-storage.ts`
-- Create: `src/admin/cue-review/review-session.test.ts`
-- Create: `src/admin/cue-review/review-storage.test.ts`
+- Create: `app/admin/cue-review/review-session.ts`
+- Create: `app/admin/cue-review/review-storage.ts`
+- Create: `app/admin/cue-review/review-session.test.ts`
+- Create: `app/admin/cue-review/review-storage.test.ts`
 
 - [ ] Write tests for accepting a generated cue, retiming a cue, resolving a finding, and replaying operations.
 - [ ] Implement immutable review operation application.
-- [ ] Implement browser storage validation similar to `src/admin/draft-storage.ts`, but with a separate storage key prefix.
+- [ ] Implement browser storage validation similar to `app/admin/draft-storage.ts`, but with a separate storage key prefix.
 - [ ] Ensure invalid stored review sessions are rejected with explicit console errors and removed only when malformed or version-incompatible.
-- [ ] Run `npm test -- src/admin/cue-review/review-session.test.ts src/admin/cue-review/review-storage.test.ts`.
+- [ ] Run `npm test -- app/admin/cue-review/review-session.test.ts app/admin/cue-review/review-storage.test.ts`.
 - [ ] Commit with message `feat: add cue review session model`.
 
 ### Task 6: Add Publication Validation
 
 **Files:**
 
-- Create: `src/cue-generation/publication.ts`
-- Create: `src/cue-generation/validation.ts`
-- Create: `src/cue-generation/publication.test.ts`
-- Create: `src/cue-generation/validation.test.ts`
+- Create: `app/cue-generation/publication.ts`
+- Create: `app/cue-generation/validation.ts`
+- Create: `app/cue-generation/publication.test.ts`
+- Create: `app/cue-generation/validation.test.ts`
 
 - [ ] Write tests that reject missing cues, duplicate token keys, non-finite times, non-monotonic times, unresolved blocking findings, and tokenization mismatches.
 - [ ] Write tests that convert approved review sessions into `CueExportPayload`.
 - [ ] Implement validation errors as typed results, not broad thrown strings.
-- [ ] Implement publication conversion using `formatCueFileJson` from `src/audio/cue-file.ts`.
-- [ ] Run `npm test -- src/cue-generation/publication.test.ts src/cue-generation/validation.test.ts`.
+- [ ] Implement publication conversion using `formatCueFileJson` from `app/audio/cue-file.ts`.
+- [ ] Run `npm test -- app/cue-generation/publication.test.ts app/cue-generation/validation.test.ts`.
 - [ ] Commit with message `feat: validate cue publication payloads`.
 
 ### Task 7: Add Local Validation Script
@@ -467,25 +467,25 @@ If this repo does not want a `local/` folder, use an ignored path under `.tikkun
 **Files:**
 
 - Create: `scripts/derive-audio-cues.mjs`
-- Create: `src/cue-generation/batch-plan.ts`
-- Create: `src/cue-generation/batch-plan.test.ts`
+- Create: `app/cue-generation/batch-plan.ts`
+- Create: `app/cue-generation/batch-plan.test.ts`
 - Modify: `package.json`
 
 - [ ] Add batch selection tests for missing cues, exact audio IDs, parsha filter, and narrator filter.
 - [ ] Implement deterministic batch planning from `audioRecordings` and current cue progress.
 - [ ] Add `audio:cues:derive` script that creates draft reports, but does not write published cue files.
 - [ ] Make the first derivation engine a fixture adapter so the rest of the pipeline can be tested before integrating real forced alignment.
-- [ ] Run `npm test -- src/cue-generation/batch-plan.test.ts`.
-- [ ] Run `npm run audio:cues:derive -- --audio-id=bereshit-1 --engine=fixture`.
+- [ ] Run `npm test -- app/cue-generation/batch-plan.test.ts`.
+- [ ] Run `npm run audio:cues:derive -- --audio-id=beresheet-1 --engine=fixture`.
 - [ ] Commit with message `feat: add cue derivation batch skeleton`.
 
 ### Task 9: Bridge Generated Drafts Into Review UI
 
 **Files:**
 
-- Create: `src/admin/cue-review/import-generated-draft.ts`
-- Create: `src/admin/cue-review/import-generated-draft.test.ts`
-- Modify: `src/index.ts`
+- Create: `app/admin/cue-review/import-generated-draft.ts`
+- Create: `app/admin/cue-review/import-generated-draft.test.ts`
+- Modify: `app/index.ts`
 - Modify: `index.html`
 
 - [ ] Add tests that convert a publishable review session into admin draft cues without losing token order.
@@ -500,15 +500,15 @@ If this repo does not want a `local/` folder, use an ignored path under `.tikkun
 
 **Files:**
 
-- Modify: `src/audio/cue-analytics-core.ts`
-- Modify: `src/audio/cue-analytics.test.ts`
-- Modify: `src/components/CueAnalyticsPage.ts`
+- Modify: `app/audio/cue-analytics-core.ts`
+- Modify: `app/audio/cue-analytics.test.ts`
+- Modify: `app/components/CueAnalyticsPage.ts`
 
 - [ ] Add tests proving structural pauses are labeled separately from suspicious pauses.
 - [ ] Thread canonical token structure into analytics only after canonical reading model is stable.
 - [ ] Replace generic "Long pause outlier" review labels with reasoned labels when structure is available.
 - [ ] Keep backwards-compatible fallback labels for published cue files that do not have review artifacts.
-- [ ] Run `npm test -- src/audio/cue-analytics.test.ts`.
+- [ ] Run `npm test -- app/audio/cue-analytics.test.ts`.
 - [ ] Run `npm run check`.
 - [ ] Commit with message `feat: make cue analytics structure-aware`.
 
@@ -540,7 +540,7 @@ export interface AlignmentEngine {
 }
 ```
 
-The first real adapter should be evaluated against the fixture suite and one known complete aliyah, such as `bereshit-1`, where published cues can serve as a baseline. Measure:
+The first real adapter should be evaluated against the fixture suite and one known complete aliyah, such as `beresheet-1`, where published cues can serve as a baseline. Measure:
 
 - Median absolute cue-start error.
 - Percentage of tokens requiring review.
@@ -569,7 +569,7 @@ The foundation is strong enough for production derivation when:
 - Do not rewrite playback, highlighting, or video rendering.
 - Do not move the app off static hosting.
 - Do not turn confidence into a single opaque score.
-- Do not expand `src/index.ts` with derivation logic beyond a narrow review/import bridge.
+- Do not expand `app/index.ts` with derivation logic beyond a narrow review/import bridge.
 
 ## Execution Notes
 

@@ -10,8 +10,10 @@
     "esModuleInterop": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "sourceMap": true,
     "allowImportingTsExtensions": true
   },
-  "include": ["./src/**/*"]
+  "include": ["./app/**/*", "./generated/**/*"]
 }

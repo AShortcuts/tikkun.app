@@ -10,8 +10,11 @@ The source text is pulled from the [Sefaria API](https://github.com/Sefaria/Sefa
 
 This is a self-contained static site:
 
-- application code lives in `src/`
-- deployable static files and copied audio live in `static/`
+- application code lives in `app/`
+- protected page layouts and TOCs live in `text/`
+- published Cue Data lives in `audio-cues/`
+- generated audio and video catalogs live in `generated/`
+- files copied directly into the built site, including recordings, live in `site/`
 - Vite is only used as a thin local dev/build step for TypeScript and static bundling
 
 ### Install
@@ -41,10 +44,12 @@ Normal development and builds do not require access to any external audio folder
 Only run this when you want to refresh the source recordings on the machine that has the source library:
 
 ```sh
-npm run audio:sync
+npm run audio:sync -- --source "/path/to/source recordings"
 ```
 
-That command copies supported source audio files such as `.m4a` and `.mp3` into narrator-specific folders under `static/audio/` and regenerates `src/data/audio-manifest.generated.ts`.
+The source directory must contain the narrator's complete recording library. Its folders use names such as `01 Beresheet`; supported `.m4a` and `.mp3` filenames identify aliyot 1 through 7.
+
+The command replaces that narrator's generated media under `site/audio/`, normalizes each recording to `<narrator>/<reading>/<aliyah>.<format>`, and regenerates `generated/audio-manifest.ts`. You can set `TIKKUN_AUDIO_SOURCE_ROOT` instead of passing `--source`.
 
 The generated manifest is deterministic and grouped by parsha so diffs stay reviewable in git.
 
@@ -62,7 +67,7 @@ Prerequisites:
 Recommended first run:
 
 ```sh
-TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=bereshit-2 --concurrency=1
+TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=beresheet-2 --concurrency=1
 ```
 
 The recorder starts Vite locally, launches Chromium through Chrome DevTools Protocol, renders at a fixed high-density viewport, waits for the first highlighted word to scroll into view, captures cue-keyed frame windows at 30fps by default, holds stable sections with an FFmpeg concat file, muxes the original audio, validates the output, writes compact local metadata, and deletes temporary frames. Recording mode hides settings, about, admin controls, annotation toggles, floating UI, and scrollbars; the video is cropped around the reading table with balanced side cropping so unused side whitespace is reduced without crowding the text.
@@ -70,20 +75,20 @@ The recorder starts Vite locally, launches Chromium through Chrome DevTools Prot
 The default renderer is `cue-keyframes`. It captures a short cue-start burst for the highlight animation, holds a settled cue frame through the stable part of the cue, and captures a short 30fps burst beginning just before the cue ends so highlight and scroll transitions are preserved without full every-frame capture. If that ever needs diagnosis, force the slower every-frame renderer:
 
 ```sh
-TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=bereshit-2 --concurrency=1 --render-mode=deterministic-frames
+TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=beresheet-2 --concurrency=1 --render-mode=deterministic-frames
 ```
 
 Tune transition bursts only if the highlight or scroll transition needs more or less coverage. `--cue-burst-pre-end-ms` controls how soon before `cue.timeEnd` the burst starts; `--cue-burst-max-ms` caps how long the burst can run before falling back to a held frame:
 
 ```sh
-TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=bereshit-2 --concurrency=1 --cue-burst-pre-end-ms=120 --cue-burst-max-ms=500
+TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=beresheet-2 --concurrency=1 --cue-burst-pre-end-ms=120 --cue-burst-max-ms=500
 ```
 
 Video generation flags:
 
 | Flag | Default | Use |
 | --- | --- | --- |
-| `--ids=bereshit-1,bereshit-2` | all available recordings | Limits generation to specific `audioId` values. |
+| `--ids=beresheet-1,beresheet-2` | all available recordings | Limits generation to specific `audioId` values. |
 | `--concurrency=1` | `1` | Runs multiple recordings in parallel after calibration proves it is safe. |
 | `--render-mode=cue-keyframes` | `cue-keyframes` | Uses the fast cue-keyframe/FFmpeg concat renderer. Use `deterministic-frames` for slower every-frame capture. |
 | `--fps=30` | `30` | Sets output FPS. Use `60` only for smoother premium exports. |
@@ -107,13 +112,13 @@ Video generation flags:
 Use a custom Chrome executable if the default Chrome path is not correct:
 
 ```sh
-TIKKUN_CHROME="/Applications/Brave Browser.app/Contents/MacOS/Brave Browser" TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=bereshit-2
+TIKKUN_CHROME="/Applications/Brave Browser.app/Contents/MacOS/Brave Browser" TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=beresheet-2
 ```
 
 Record multiple aliyot:
 
 ```sh
-TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=bereshit-1,bereshit-2 --concurrency=1
+TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=beresheet-1,beresheet-2 --concurrency=1
 ```
 
 Record every available aliyah with complete cues:
@@ -125,39 +130,39 @@ TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:recor
 Calibrate safe parallelization before increasing production concurrency:
 
 ```sh
-npm run video:calibrate -- --ids=bereshit-1 --max-concurrency=3
+npm run video:calibrate -- --ids=beresheet-1 --max-concurrency=3
 ```
 
 Use the highest concurrency level that completes with zero validation failures:
 
 ```sh
-TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=bereshit-1,bereshit-2 --concurrency=2
+TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=beresheet-1,beresheet-2 --concurrency=2
 ```
 
 Use 60fps only when you want a smoother premium export and can tolerate longer render time and larger temporary frame storage:
 
 ```sh
-TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=bereshit-2 --concurrency=1 --fps=60
+TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=beresheet-2 --concurrency=1 --fps=60
 ```
 
 Disable reading-surface cropping if you need to inspect the full fixed viewport:
 
 ```sh
-TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=bereshit-2 --concurrency=1 --no-crop
+TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=beresheet-2 --concurrency=1 --no-crop
 ```
 
 If Vite is already running elsewhere, point the recorder at that server:
 
 ```sh
 npm run dev -- --host 127.0.0.1 --port 5173
-npm run video:record -- --external-server --base-url=http://127.0.0.1:5173 --ids=bereshit-2
+npm run video:record -- --external-server --base-url=http://127.0.0.1:5173 --ids=beresheet-2
 ```
 
 After Koofr syncs a validated MP4, create the Koofr share link manually and add it to `koofr-video-links.local.json` using `koofr-video-links.local.example.json` as the shape:
 
 ```json
 {
-  "bereshit-1": {
+  "beresheet-1": {
     "videoSrc": "https://koofr.eu/links/example",
     "downloadSrc": "https://koofr.eu/links/example"
   }

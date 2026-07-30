@@ -6,6 +6,10 @@
   gap: 0.4rem;
 }
 
+.reader-controls-root {
+  display: contents;
+}
+
 .toolbar-content {
   display: flex;
   padding: 0 10px;
@@ -89,6 +93,10 @@
   white-space: nowrap;
 }
 
+.toolbar-overflow-item.mod-aliyah-starts {
+  display: none;
+}
+
 .toolbar-overflow-item:hover,
 .toolbar-overflow-item:focus-visible {
   background: var(--light-accent-color);
@@ -109,6 +117,17 @@
 .toolbar-overflow-icon .ui-icon {
   width: 100%;
   height: 100%;
+}
+
+.toolbar-overflow-icon.mod-annotations {
+  align-items: center;
+  justify-content: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  overflow: visible;
+  font-family: ShlomosemiStam;
+  font-size: 1.05rem;
+  line-height: 1;
 }
 
 .toolbar-overflow-shortcut {

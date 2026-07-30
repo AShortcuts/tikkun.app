@@ -1,5 +1,5 @@
 For specific aliyot
-TIKKUN_CHROME="/Applications/Brave Browser.app/Contents/MacOS/Brave Browser" TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=bereshit-2 --concurrency=1 --scale=3 --render-mode=deterministic-frames
+TIKKUN_CHROME="/Applications/Brave Browser.app/Contents/MacOS/Brave Browser" TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --ids=beresheet-2 --concurrency=1 --scale=3 --render-mode=deterministic-frames
 
 For all
 TIKKUN_CHROME="/Applications/Brave Browser.app/Contents/MacOS/Brave Browser" TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:record -- --concurrency=1 --scale=3 --render-mode=deterministic-frames

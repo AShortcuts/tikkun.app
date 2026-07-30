@@ -98,6 +98,11 @@ test('navigation preserves non-server HTTP responses and uncached server failure
 
 test('precache excludes media and the generated service worker itself', () => {
   expect(shouldPrecache('assets/app.js')).toBe(true)
+  expect(shouldPrecache('assets/page-a1b2c3.js')).toBe(true)
+  expect(shouldPrecache('assets/cue-data-a1b2c3.js')).toBe(false)
+  expect(shouldPrecache('assets/optional-about-a1b2c3.js')).toBe(false)
+  expect(shouldPrecache('assets/optional-cue-authoring-a1b2c3.js')).toBe(false)
+  expect(shouldPrecache('assets/optional-cue-analytics-a1b2c3.js')).toBe(false)
   expect(shouldPrecache('audio/reader/aliyah.m4a')).toBe(false)
   expect(shouldPrecache('assets/movie.mp4')).toBe(false)
   expect(shouldPrecache('service-worker.js')).toBe(false)

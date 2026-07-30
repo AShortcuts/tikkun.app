@@ -104,6 +104,10 @@
   text-align: right;
 }
 
+.aliyah-start-marker {
+  display: none;
+}
+
 .tikkun-page table {
   transform: translateX(var(--pull-translation));
   transition: transform var(--pull-transform);
@@ -617,26 +621,156 @@ html[data-highlight-rendering='legacy-rectangle'] .word.is-active-word::before {
     --aliyah-gutter-gap: 0ch;
   }
 
-  tr[data-aliyah-starts] .line-content {
+  .line-content {
     position: relative;
   }
 
-  tr[data-aliyah-starts] .line-content::before {
-    content: '';
+  .aliyah-start-marker {
+    --aliyah-start-accent: hsl(206, 100%, 49%);
+    display: block;
     position: absolute;
-    top: -0.52em;
-    right: -0.18rem;
-    width: 0.72rem;
-    height: 0.72rem;
-    background-color: color-mix(in srgb, hsl(206, 100%, 49%) 76%, var(--page-ink-color));
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
-    opacity: 0.74;
+    top: var(--aliyah-start-anchor-y);
+    left: var(--aliyah-start-anchor-x);
+    z-index: 4;
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--aliyah-start-accent);
+    opacity: 0;
+    visibility: hidden;
+    transform: translate(-50%, -1.25rem);
+    transition:
+      opacity 140ms ease-out,
+      visibility 0s linear 140ms;
+    cursor: pointer;
+    pointer-events: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html[data-aliyah-rail-visibility='peek'] .aliyah-start-marker,
+  html[data-aliyah-rail-visibility='expanded'] .aliyah-start-marker {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
+    pointer-events: auto;
+  }
+
+  .aliyah-start-marker-rule,
+  .aliyah-start-marker-capsule,
+  .aliyah-start-chevron {
+    position: absolute;
     pointer-events: none;
   }
 
-  tr[data-aliyah-starts] .line-content:hover::before,
-  tr[data-aliyah-starts] .line-content:focus-within::before {
-    opacity: 0.94;
+  .aliyah-start-marker-rule {
+    inset: 0;
+  }
+
+  .aliyah-start-marker-rule::before,
+  .aliyah-start-marker-rule::after {
+    content: '';
+    position: absolute;
+    top: 0.44rem;
+    width: 2.65rem;
+    height: 1px;
+    opacity: 0.34;
+  }
+
+  .aliyah-start-marker-rule::before {
+    right: calc(50% + 1.38rem);
+    background: linear-gradient(to left, var(--aliyah-start-accent), transparent);
+  }
+
+  .aliyah-start-marker-rule::after {
+    left: calc(50% + 1.38rem);
+    background: linear-gradient(to right, var(--aliyah-start-accent), transparent);
+  }
+
+  .aliyah-start-marker-capsule {
+    top: 0;
+    left: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.38rem;
+    height: 0.88rem;
+    box-sizing: border-box;
+    border: 1px solid color-mix(in srgb, var(--aliyah-start-accent) 38%, transparent);
+    border-radius: 999px;
+    padding: 0 0.38rem;
+    background: color-mix(in srgb, var(--paper-color) 86%, transparent);
+    color: color-mix(in srgb, var(--aliyah-start-accent) 78%, var(--page-ink-color));
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 0.55rem;
+    font-weight: 650;
+    line-height: 1;
+    white-space: nowrap;
+    box-shadow: 0 1px 4px color-mix(in srgb, black 12%, transparent);
+    backdrop-filter: blur(5px) saturate(120%);
+    transform: translateX(-50%);
+    transition:
+      opacity 120ms ease-out,
+      transform 120ms ease-out,
+      border-color 120ms ease-out;
+  }
+
+  .aliyah-start-chevron {
+    top: 0.72rem;
+    left: 50%;
+    display: inline-flex;
+    width: 0.92rem;
+    height: 0.92rem;
+    filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--paper-color) 76%, transparent));
+    transform: translateX(-50%);
+    transition:
+      opacity 120ms ease-out,
+      transform 120ms ease-out;
+  }
+
+  .aliyah-start-chevron .ui-icon {
+    width: 100%;
+    height: 100%;
+    stroke-width: 3.5;
+  }
+
+  .aliyah-start-marker:hover .aliyah-start-marker-capsule,
+  .aliyah-start-marker:focus-visible .aliyah-start-marker-capsule {
+    border-color: color-mix(in srgb, var(--aliyah-start-accent) 62%, transparent);
+  }
+
+  .aliyah-start-marker:hover .aliyah-start-chevron,
+  .aliyah-start-marker:focus-visible .aliyah-start-chevron {
+    transform: translate(-50%, 1px);
+  }
+
+  .aliyah-start-marker:focus-visible {
+    outline: none;
+  }
+
+  .aliyah-start-marker:focus-visible .aliyah-start-marker-capsule {
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--paper-color) 92%, transparent),
+      0 0 0 4px color-mix(in srgb, var(--aliyah-start-accent) 58%, transparent);
+  }
+
+  .aliyah-start-marker:active .aliyah-start-marker-capsule {
+    opacity: 0.66;
+    transform: translateX(-50%) scale(0.94);
+  }
+
+  .aliyah-start-marker:active .aliyah-start-chevron {
+    opacity: 0.66;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .aliyah-start-marker,
+    .aliyah-start-marker-capsule,
+    .aliyah-start-chevron {
+      transition: none;
+    }
   }
 }

@@ -24,21 +24,21 @@ async function temporaryCueRoot() {
 
 test('cue provenance is deterministic and duplicate audio ids are rejected', async () => {
   const root = await temporaryCueRoot()
-  await mkdir(path.join(root, 'bereshit'))
+  await mkdir(path.join(root, 'beresheet'))
   const cues = [{ timeStart: 1, pageNumber: 1, lineIndex: 0, fragmentIndex: 0, wordIndex: 0 }]
   await writeFile(
-    path.join(root, 'bereshit', 'one.json'),
-    JSON.stringify({ audioId: 'bereshit-1', cues })
+    path.join(root, 'beresheet', 'one.json'),
+    JSON.stringify({ audioId: 'beresheet-1', cues })
   )
 
   const hashes = await readCueHashes(root)
-  expect(hashes.get('bereshit-1')).toBe(
+  expect(hashes.get('beresheet-1')).toBe(
     createHash('sha256').update(JSON.stringify(cues)).digest('hex')
   )
 
   await writeFile(
-    path.join(root, 'bereshit', 'duplicate.json'),
-    JSON.stringify({ audioId: 'bereshit-1', cues: [] })
+    path.join(root, 'beresheet', 'duplicate.json'),
+    JSON.stringify({ audioId: 'beresheet-1', cues: [] })
   )
   await expect(readCueHashes(root)).rejects.toThrow(/Duplicate cue payload/)
 })
@@ -47,23 +47,23 @@ test('current video provenance uses every identity that is presently available',
   const result = buildCurrentVideoProvenance({
     recordings: [
       {
-        id: 'bereshit-1',
+        id: 'beresheet-1',
         mediaIdentity: {
           algorithm: 'sha256',
           digest: 'audio-digest',
           byteLength: 10,
         },
       },
-      { id: 'bereshit-2' },
+      { id: 'beresheet-2' },
     ],
-    cueHashes: new Map([['bereshit-1', 'cue-digest']]),
+    cueHashes: new Map([['beresheet-1', 'cue-digest']]),
     appBuildHash: 'app-digest',
   })
 
-  expect(result.get('bereshit-1')).toEqual({
+  expect(result.get('beresheet-1')).toEqual({
     audioHash: 'audio-digest',
     cueHash: 'cue-digest',
     appBuildHash: 'app-digest',
   })
-  expect(result.get('bereshit-2')).toEqual({ appBuildHash: 'app-digest' })
+  expect(result.get('beresheet-2')).toEqual({ appBuildHash: 'app-digest' })
 })

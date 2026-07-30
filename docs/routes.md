@@ -33,7 +33,6 @@ Examples:
 http://localhost:5173/#/torah/parsha/noach
 http://localhost:5173/#/torah/parsha/noach/1-6-9
 http://localhost:5173/#/torah/parsha/beresheet
-http://localhost:5173/#/torah/parsha/bereshit
 http://localhost:5173/#/torah/parsha/vezos-haberacha/5-33-1
 ```
 

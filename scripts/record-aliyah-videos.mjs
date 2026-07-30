@@ -6,12 +6,12 @@ import { fileURLToPath } from 'node:url'
 import { execFile, spawn } from 'node:child_process'
 import { Buffer } from 'node:buffer'
 import process from 'node:process'
-import { audioRecordings } from '../src/data/audio-manifest.generated.ts'
+import { audioRecordings } from '../generated/audio-manifest.ts'
 import {
   buildCueFramePlan,
   createCueConcatEntries,
   renderCueConcatFile,
-} from '../src/video/cue-frame-plan.ts'
+} from '../app/video/cue-frame-plan.ts'
 import { currentAppBuildHash } from './video-provenance.mjs'
 
 const repoRoot = fileURLToPath(new URL('../', import.meta.url))
@@ -19,8 +19,8 @@ const defaultOutputRoot = '/Users/adambh/Koofr/Tikkun Videos'
 const defaultWorkRoot = '/private/tmp/tikkun-video-render'
 const metadataPath = path.join(repoRoot, 'video-render-metadata.local.json')
 const reportPath = path.join(repoRoot, 'video-render-reports.local.json')
-const staticRoot = path.join(repoRoot, 'static')
-const cueRoot = path.join(repoRoot, 'src/data/audio-cues')
+const siteRoot = path.join(repoRoot, 'site')
+const cueRoot = path.join(repoRoot, 'audio-cues')
 let cuePayloadsByAudioId = null
 let appBuildHashPromise = null
 
@@ -134,9 +134,9 @@ function narratorInitials(narratorId) {
     .toLowerCase()
 }
 
-function publicAudioPathToLocalPath(playSrc) {
+function siteAudioUrlToLocalPath(playSrc) {
   const pathname = new URL(playSrc, 'https://tikkun.local').pathname
-  return path.join(staticRoot, decodeURIComponent(pathname.replace(/^\//, '')))
+  return path.join(siteRoot, decodeURIComponent(pathname.replace(/^\//, '')))
 }
 
 async function sha256File(filePath) {
@@ -819,7 +819,7 @@ async function recordOne(recording, options) {
   let chrome
   let client
   try {
-    const audioPath = publicAudioPathToLocalPath(recording.playSrc)
+    const audioPath = siteAudioUrlToLocalPath(recording.playSrc)
     const cues = await getCuesForRecording(recording)
     if (!cues.length) throw new Error('missing cue data')
 

@@ -14,7 +14,7 @@ const rootInputs = new Set([
   'tsconfig.json',
   'vite.config.ts',
 ])
-const inputDirectories = ['css', 'src', 'static']
+const inputDirectories = ['app', 'assets', 'css', 'generated', 'site', 'text']
 
 export function isAppBuildInput(relativePath) {
   const normalized = relativePath.split(path.sep).join('/').replace(/^\.\//, '')
@@ -32,14 +32,8 @@ export function isAppBuildInput(relativePath) {
   ) {
     return false
   }
-  if (normalized === 'src/data/video-manifest.generated.ts') return false
-  if (
-    normalized.startsWith('src/data/audio-cues/') &&
-    normalized !== 'src/data/audio-cues/index.ts'
-  ) {
-    return false
-  }
-  if (normalized.startsWith('static/audio/')) return false
+  if (normalized === 'generated/video-manifest.ts') return false
+  if (normalized.startsWith('site/audio/')) return false
   return true
 }
 
