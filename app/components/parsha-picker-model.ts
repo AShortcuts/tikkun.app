@@ -1,0 +1,447 @@
+import { HDate } from '@hebcal/hdate'
+import type { LeiningGenerator } from '../calendar-model/generator.ts'
+import {
+  LeiningInstanceId,
+  LeiningRunType,
+  type LeiningAliyah,
+  type LeiningInstance,
+  type LeiningRun,
+} from '../calendar-model/model-types.ts'
+import fuzzy from '../fuzzy.ts'
+import { hasScrollData } from '../location.ts'
+import { isVezosHabracha } from '../view-model/scroll-view-model.ts'
+import { generateUrl } from '../view-model/navigation/url-parser.ts'
+import {
+  getParshaSearchTermsForLeining,
+  semanticParshaUrlForLeining,
+} from '../view-model/navigation/parsha-routes.ts'
+import renderLeiningTitle from './render-leining-title.ts'
+
+export const ALIYAH_HOVER_FLYOUT_QUERY =
+  '(hover: hover) and (pointer: fine) and (min-width: 716px)'
+export const POPUP_VIEWPORT_MARGIN = 12
+
+const POPUP_ANCHOR_GAP = 6
+const PARSHA_CHOICE_SOURCE_LOOKBACK_YEARS = 3
+const PARSHA_CHOICE_SOURCE_WINDOW_YEARS = 20
+
+const aliyahLabels = new Map<LeiningAliyah['index'], string>([
+  [1, '1st - ראשון'],
+  [2, '2nd - שני'],
+  [3, '3rd - שלישי'],
+  [4, '4th - רביעי'],
+  [5, '5th - חמישי'],
+  [6, '6th - ששי'],
+  [7, '7th - שביעי'],
+  ['Maftir', 'Maftir - מפטיר'],
+])
+
+const doubleParshaPartsByTitle = new Map<string, [string, string]>([
+  ['ויקהל־פקודי', ['ויקהל', 'פקודי']],
+  ['תזריע־מצרע', ['תזריע', 'מצרע']],
+  ['אחרי מות־קדשים', ['אחרי מות', 'קדשים']],
+  ['בהר־בחקתי', ['בהר', 'בחקתי']],
+  ['חקת־בלק', ['חקת', 'בלק']],
+  ['מטות־מסעי', ['מטות', 'מסעי']],
+  ['נצבים־וילך', ['נצבים', 'וילך']],
+])
+
+const holidayColumnOrder = [
+  'rosh-hashanah',
+  'sukkot',
+  'pesach',
+  'chanukah',
+] as const
+
+type PopupRect = {
+  width: number
+  height: number
+}
+
+type AnchorRect = {
+  left: number
+  top: number
+  right: number
+  bottom: number
+}
+
+type ViewportRect = {
+  width: number
+  height: number
+}
+
+export type ParshaAliyahChoice = {
+  label: string
+  href: string
+}
+
+export type ParshaAliyahChoiceGroup = {
+  label: string
+  choices: ParshaAliyahChoice[]
+}
+
+export type ParshaPickerEntry = {
+  id: string
+  label: string
+  href: string
+  aliyahGroups: ParshaAliyahChoiceGroup[]
+}
+
+export type ParshaPickerComingUpEntry = {
+  id: string
+  label: string
+  href: string
+  date: Date
+}
+
+export type ParshaPickerSearchResult = {
+  id: string
+  href: string
+  hebrewLabel: string
+  englishLabel: string
+  matchedField: number
+  matchedIndexes: number[]
+}
+
+export type ParshaPickerModel = {
+  parshaBooks: ParshaPickerEntry[][]
+  holidayColumns: ParshaPickerEntry[][]
+  megillot: ParshaPickerEntry[]
+  comingUp: ParshaPickerComingUpEntry[]
+  search(query: string): ParshaPickerSearchResult[]
+}
+
+function firstRunOf(leining: LeiningInstance): LeiningRun {
+  const run = leining.runs[0]
+  if (!run) {
+    throw new Error(
+      `Leining ${leining.date.title.en || leining.id} has no reading runs`
+    )
+  }
+  return run
+}
+
+function parshaTitle(leining: LeiningInstance) {
+  return renderLeiningTitle(leining)
+}
+
+function leiningKey(leining: LeiningInstance) {
+  return [
+    leining.date.date.getTime(),
+    leining.id,
+    firstRunOf(leining).id,
+  ].join(':')
+}
+
+const navigationHrefForLeining = (leining: LeiningInstance) =>
+  semanticParshaUrlForLeining(leining) ?? generateUrl(firstRunOf(leining))
+
+export function calculateAnchoredPopupMaxHeight(
+  triggerRect: AnchorRect,
+  viewport: ViewportRect
+) {
+  const availableAbove =
+    triggerRect.top - POPUP_VIEWPORT_MARGIN - POPUP_ANCHOR_GAP
+  const availableBelow =
+    viewport.height -
+    triggerRect.bottom -
+    POPUP_VIEWPORT_MARGIN -
+    POPUP_ANCHOR_GAP
+  return Math.max(0, availableAbove, availableBelow)
+}
+
+export function calculateAnchoredPopupPosition({
+  triggerRect,
+  popupRect,
+  viewport,
+}: {
+  triggerRect: AnchorRect
+  popupRect: PopupRect
+  viewport: ViewportRect
+}) {
+  const margin = POPUP_VIEWPORT_MARGIN
+  const gap = POPUP_ANCHOR_GAP
+  const fitsBelow =
+    triggerRect.bottom + gap + popupRect.height <= viewport.height - margin
+  const preferredTop = fitsBelow
+    ? triggerRect.bottom + gap
+    : triggerRect.top - popupRect.height - gap
+  const centeredLeft =
+    triggerRect.left +
+    (triggerRect.right - triggerRect.left - popupRect.width) / 2
+
+  return {
+    left: Math.min(
+      Math.max(centeredLeft, margin),
+      viewport.width - popupRect.width - margin
+    ),
+    top: Math.min(
+      Math.max(preferredTop, margin),
+      viewport.height - popupRect.height - margin
+    ),
+  }
+}
+
+export function calculateFlyoutPopupPosition({
+  anchorRect,
+  verticalAnchorRect = anchorRect,
+  popupRect,
+  viewport,
+}: {
+  anchorRect: AnchorRect
+  verticalAnchorRect?: AnchorRect
+  popupRect: PopupRect
+  viewport: ViewportRect
+}) {
+  const margin = POPUP_VIEWPORT_MARGIN
+  const gap = 4
+  const fitsRight =
+    anchorRect.right + gap + popupRect.width <= viewport.width - margin
+  const fitsLeft = anchorRect.left - gap - popupRect.width >= margin
+  const side = fitsRight || !fitsLeft ? 'right' : 'left'
+  const preferredLeft =
+    side === 'right'
+      ? anchorRect.right + gap
+      : anchorRect.left - popupRect.width - gap
+
+  return {
+    left: Math.min(
+      Math.max(preferredLeft, margin),
+      viewport.width - popupRect.width - margin
+    ),
+    top: Math.min(
+      Math.max(verticalAnchorRect.top, margin),
+      viewport.height - popupRect.height - margin
+    ),
+    side,
+  }
+}
+
+export function parshaListTitleForLeining(leining: LeiningInstance) {
+  if (isVezosHabracha(firstRunOf(leining))) return 'וזאת הברכה'
+  return renderLeiningTitle(leining)
+}
+
+export function buildParshaAliyahChoices(
+  leining: LeiningInstance
+): ParshaAliyahChoice[] {
+  return leining.runs
+    .filter(
+      (run) =>
+        run.scroll === 'torah' &&
+        (run.type === LeiningRunType.Main ||
+          run.type === LeiningRunType.Maftir)
+    )
+    .flatMap((run) =>
+      run.aliyot
+        .filter((aliyah) => aliyah.index)
+        .map((aliyah) => ({
+          label: aliyahLabels.get(aliyah.index) ?? String(aliyah.index),
+          href:
+            semanticParshaUrlForLeining(leining, aliyah.start) ??
+            generateUrl(run, aliyah.start),
+        }))
+    )
+}
+
+export function buildParshaAliyahChoiceGroups(
+  leining: LeiningInstance,
+  sourceLeinings: LeiningInstance[]
+): ParshaAliyahChoiceGroup[] {
+  const label = parshaTitle(leining)
+  const choices = buildParshaAliyahChoices(leining)
+  const doubleParts = doubleParshaPartsByTitle.get(label)
+
+  if (!doubleParts) return [{ label, choices }]
+
+  const singleParshaGroups = doubleParts.flatMap((part) => {
+    const match = sourceLeinings.find(
+      (candidate) => candidate !== leining && parshaTitle(candidate) === part
+    )
+    if (!match) return []
+
+    return [{ label: part, choices: buildParshaAliyahChoices(match) }]
+  })
+
+  return [{ label, choices }, ...singleParshaGroups]
+}
+
+export function collectParshaChoiceSourceLeinings(
+  generator: LeiningGenerator,
+  baseLeinings: LeiningInstance[],
+  currentYear = new HDate().getFullYear()
+) {
+  const firstYear = currentYear - PARSHA_CHOICE_SOURCE_LOOKBACK_YEARS
+  const lastYearExclusive = firstYear + PARSHA_CHOICE_SOURCE_WINDOW_YEARS
+  const extraLeinings = []
+
+  for (let year = firstYear; year < lastYearExclusive; year += 1) {
+    extraLeinings.push(
+      ...generator
+        .forHebrewYear(year)
+        .flatMap((date) => date.leinings)
+        .filter((leining) => leining.isParsha)
+    )
+  }
+
+  return [...baseLeinings, ...extraLeinings]
+}
+
+function holidayColumnFor(leining: LeiningInstance) {
+  const title = leining.date.title.he
+
+  if (
+    title.startsWith('סוכות') ||
+    title.startsWith('הושענא רבה') ||
+    title.startsWith('שמיני עצרת') ||
+    title.startsWith('שמחת תורה')
+  ) {
+    return 'sukkot'
+  }
+
+  if (
+    title.startsWith('פסח') ||
+    title.startsWith('שביעי של פסח') ||
+    title.startsWith('פורים') ||
+    title.startsWith('שושן פורים') ||
+    title.startsWith('שבועות') ||
+    title.startsWith('עשרה בטבת') ||
+    title.startsWith('שבעה עשר בתמוז') ||
+    title.startsWith('צום תמוז') ||
+    title.startsWith('תשעה באב')
+  ) {
+    return 'pesach'
+  }
+
+  if (title.startsWith('חנוכה') || title.startsWith('ראש חודש')) {
+    return 'chanukah'
+  }
+
+  return 'rosh-hashanah'
+}
+
+function groupHolidays(leinings: LeiningInstance[]) {
+  const groups = Object.fromEntries(
+    holidayColumnOrder.map((key) => [key, [] as LeiningInstance[]])
+  ) as Record<(typeof holidayColumnOrder)[number], LeiningInstance[]>
+
+  for (const leining of leinings) {
+    if (leining.isParsha) continue
+    if (leining.id === LeiningInstanceId.Megillah) continue
+    if (firstRunOf(leining).scroll !== 'torah') continue
+    if (
+      leining.date.title.he.startsWith('ראש חודש') &&
+      groups.chanukah.some((existing) =>
+        existing.date.title.he.startsWith('ראש חודש')
+      )
+    ) {
+      continue
+    }
+    if (leining.date.title.he.startsWith('תענית אסתר')) continue
+
+    groups[holidayColumnFor(leining)].push(leining)
+  }
+
+  return holidayColumnOrder
+    .map((column) => groups[column])
+    .filter((group) => group.length)
+}
+
+export function buildParshaPickerModel(
+  generator: LeiningGenerator,
+  now = new HDate(),
+  today = new Date()
+): ParshaPickerModel {
+  const leinings = generator
+    .forEntireChumash(now)
+    .flatMap((date) => date.leinings)
+    .filter((leining) => hasScrollData(firstRunOf(leining).scroll))
+  const choiceSources = collectParshaChoiceSourceLeinings(
+    generator,
+    leinings,
+    now.getFullYear()
+  )
+  let choiceId = 0
+
+  const entryFor = (
+    leining: LeiningInstance,
+    {
+      label = renderLeiningTitle(leining),
+      includeAliyot = false,
+    }: { label?: string; includeAliyot?: boolean } = {}
+  ): ParshaPickerEntry => {
+    const aliyahGroups = includeAliyot
+      ? buildParshaAliyahChoiceGroups(leining, choiceSources).filter(
+          (group) => group.choices.length
+        )
+      : []
+    return {
+      id: aliyahGroups.length
+        ? `parsha-aliyot-${choiceId++}`
+        : leiningKey(leining),
+      label,
+      href: navigationHrefForLeining(leining),
+      aliyahGroups,
+    }
+  }
+
+  const parshaBooks: ParshaPickerEntry[][] = []
+  for (const leining of leinings.filter(
+    (candidate) =>
+      candidate.isParsha || isVezosHabracha(firstRunOf(candidate))
+  )) {
+    const firstAliyah = firstRunOf(leining).aliyot[0]
+    if (!firstAliyah) {
+      throw new Error(
+        `Leining ${leining.date.title.en || leining.id} has no aliyot`
+      )
+    }
+    const book = firstAliyah.start.b
+    const entries = parshaBooks[book] ?? []
+    entries.push(
+      entryFor(leining, {
+        label: parshaListTitleForLeining(leining),
+        includeAliyot: true,
+      })
+    )
+    parshaBooks[book] = entries
+  }
+
+  const comingUp = leinings
+    .filter((leining) => leining.date.date > today)
+    .slice(0, 3)
+    .map((leining, index) => ({
+      id: leiningKey(leining),
+      label: renderLeiningTitle(leining, { forCalendar: true }),
+      href: index === 0 ? '#/next' : navigationHrefForLeining(leining),
+      date: leining.date.date,
+    }))
+    .reverse()
+
+  return {
+    parshaBooks: parshaBooks.filter(Boolean),
+    holidayColumns: groupHolidays(leinings).map((group) =>
+      group.map((leining) => entryFor(leining))
+    ),
+    megillot: leinings
+      .filter((leining) => leining.id === LeiningInstanceId.Megillah)
+      .map((leining) => entryFor(leining)),
+    comingUp,
+    search(query) {
+      return fuzzy(leinings, query, (leining) => [
+        leining.date.title.he,
+        leining.date.title.en,
+        ...getParshaSearchTermsForLeining(leining),
+      ])
+        .slice(0, 5)
+        .map(({ item, match }) => ({
+          id: leiningKey(item),
+          href: navigationHrefForLeining(item),
+          hebrewLabel: `${renderLeiningTitle(item)}: ${item.id}`,
+          englishLabel: item.date.title.en,
+          matchedField: match.index === 0 ? 0 : 1,
+          matchedIndexes: match.index < 2 ? match.indexes : [],
+        }))
+    },
+  }
+}

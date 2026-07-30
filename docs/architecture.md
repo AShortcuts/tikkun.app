@@ -10,16 +10,18 @@ The app uses TypeScript modules and DOM APIs for its domain and browser logic, w
 
 ## Runtime Architecture
 
-- `index.html` owns the static shell, persistent DOM targets, app metadata, PWA manifest link, and a small early theme bootstrap.
+- `index.html` owns the static shell, explicit component mount targets, app metadata, PWA manifest link, and a small early theme bootstrap.
 - `app/index.ts` is the composition root. It wires routing, page rendering, preference policy, recording mode, feature adapters, and service-worker registration without owning each feature's internal transaction.
 - `app/reading/recording-session.ts` owns the Recording Session: narrator-aware recording lookup, page-token caching, Cue Data loading, playback-plan installation, cancellation, and transitions into and out of authoring.
-- `app/reading/playback-timeline.ts` owns the mounted Playback Timeline: floating-player DOM state, playback controls, seeking, speed, cue progress, highlight synchronization, responsive player interactions, and their cleanup.
+- `app/reading/playback-timeline.ts` owns Playback Timeline behavior: playback commands, seeking, speed, cue progress, highlight synchronization, responsive interactions, and cleanup. It mounts `app/reading/FloatingPlayer.svelte`, which owns the player markup and icon presentation.
 - `app/reader/reader-settings.ts` is the narrow mount bridge for `app/reader/ReaderSettings.svelte`, which owns the Reader Settings presentation, dialog state, focus return, theme-transition timing, preference events, and playback-rate handoff.
 - `app/reader/reader-controls.ts` is the narrow mount bridge for `app/reader/ReaderControls.svelte`, which owns the wide bookmark and command buttons plus the compact Reader Controls menu. Both presentations use the same state and action callbacks while CSS decides which controls are visible.
-- `app/navigation/command-palette.ts`, `app/reader/last-reading-prompt.ts`, and `app/reader/offline-recording-prompt.ts` own their focused reader tools and browser effects.
+- `app/navigation/command-palette.ts` is the narrow mount bridge for `app/navigation/CommandPalette.svelte`. The component owns query and selection state, keyboard interaction, focus, rendering, and dismissal while the bridge supplies navigation actions.
+- `app/components/parsha-picker-model.ts` prepares calendar, search, route, and aliyah-choice data without rendering. `app/components/ParshaPicker.svelte` owns the Parsha Picker page and popup interaction behind the small adapter in `app/components/ParshaPicker.ts`.
+- `app/reader/last-reading-prompt.ts` and `app/reader/offline-recording-prompt.ts` own their focused reader tools and browser effects.
 - `app/admin/cue-authoring-loader.ts` and `app/components/cue-analytics-route.ts` keep Optional Features outside the core reader bundle until they are requested.
 - `app/admin/cue-authoring.ts` owns the Cue Authoring lifetime: access state, Cue Drafts, timing controls, microphone capture, issue editing, waveform review, and export.
-- Existing UI rendering remains mostly imperative DOM work through small component functions/classes in `app/components/`. Svelte is used only where a component removes real state-and-lifecycle complexity.
+- Remaining imperative UI uses focused components and controllers. Svelte is introduced feature by feature where it gives one clear owner to markup, local interaction state, or browser lifetime.
 - `app/components/icons.ts` is the canonical icon implementation. `app/components/UiIcon.svelte` is only the typed Svelte adapter and must not duplicate SVG paths.
 - State is kept close to the feature that owns it. There is no global store; shared behavior is exposed through narrow controllers and view models.
 - Browser storage is used for user-facing local state such as reader preferences and admin cue drafts.
@@ -30,8 +32,10 @@ The app uses TypeScript modules and DOM APIs for its domain and browser logic, w
 - Reader Runtime is one replaceable mount created by the composition root. It owns the reader controllers, Recording Session, nested feature mounts, global adapters, DOM and media listeners, timers, frames, and cancellation for pending route work.
 - Cue Authoring is mounted through this seam. Its DOM listeners, audio-controller subscriptions, resize listeners, animation frame, waveform loads, object URLs, and microphone capture are released together.
 - Playback Timeline is mounted through the same seam. Its media subscriptions, pointer and keyboard interactions, responsive expansion state, drag state, observers, and scheduled focus are released as one lifetime.
+- Floating Player is mounted and unmounted inside the Playback Timeline lifetime, so a replacement runtime cannot retain old player markup or listeners.
 - Reader Settings is mounted through the same seam. Its form and document listeners, delayed focus, theme-transition timer, dialog state, and focus target are released together.
 - Reader Controls is mounted through the same seam. Its menu state, outside-dismiss listener, keyboard handling, and framework instance are released together.
+- Command Palette and Parsha Picker component cleanup releases their document listeners, focus work, popup state, and framework instances with their owning feature lifetime.
 - Mounting a replacement destroys the previous implementation first. Destroy functions are tied to their specific mount, so stale framework cleanup cannot tear down a newer remount.
 - DOM listeners should use the mount signal. Typed event subscriptions, timers, animation frames, controllers, and nested feature mounts should transfer their teardown to `scope.own(...)`.
 - Feature setup is synchronous. Async work may start inside a mount, but it must observe the signal before applying a result.
@@ -52,9 +56,9 @@ The app uses TypeScript modules and DOM APIs for its domain and browser logic, w
 
 ### Framework and Native Migration Boundary
 
-- Svelte is a presentation layer, currently used by Reader Settings and Reader Controls. Domain rules, preference persistence, playback, routing, and browser capabilities remain in TypeScript modules behind narrow interfaces.
+- Svelte is the incremental presentation layer for Reader Settings, Reader Controls, Command Palette, Parsha Picker, and Floating Player. Domain rules, preference persistence, playback, routing, and browser capabilities remain in TypeScript modules behind narrow interfaces.
 - A Svelte component owns only the descendants of its explicit mount target. Its TypeScript bridge mounts and unmounts it through the existing lifetime scope so Svelte and imperative controllers never compete for the same DOM.
-- Add Svelte feature by feature rather than rewriting the shell. Pass focused state and actions into a component; do not introduce a global store simply to connect old and new UI.
+- Add Svelte feature by feature rather than rewriting the shell. Prefer a pure model plus a small mount adapter when the feature has meaningful domain preparation, as Parsha Picker does. Do not introduce a global store simply to connect old and new UI.
 - SvelteKit is not currently part of the app. If it later solves a concrete routing or delivery need, components should keep browser APIs inside their mounted lifetime and keep domain models safe to import outside the browser.
 - A future Capacitor entry should compose Platform Capability adapters at the application boundary. Use native-platform or plugin-availability checks only to choose implementations such as native filesystem versus web download.
 - Reader Viewport remains responsible for compact versus wide layout in browsers, PWAs, and Capacitor WebViews. Platform Capability must never become a responsive breakpoint.
@@ -166,6 +170,8 @@ The project uses Vitest in two complementary workspaces.
 - `*.vitest.ts` files run in a headless Chromium browser through `vitest.workspace.ts`.
 - Prefer focused tests around pure model/view-model logic, parsing, generated-data helpers, cue/highlight behavior, and DOM rendering boundaries.
 - Playback Timeline browser tests cover replacement mounts, timed and untimed controls, compact expansion, speed synchronization, and teardown ownership.
+- Parsha Picker unit and browser tests cover model rules, canonical search, Torah references, calendar settings, nested aliyah choices, compact subviews, and cleanup.
+- Command Palette browser tests cover filtering, keyboard selection, action refresh, focus, dismissal, replacement mounts, and cleanup.
 - Reader Settings browser tests cover replacement mounts, focus return, outside dismissal, form synchronization, playback-rate handoff, and scheduled-effect cleanup.
 - Reader Controls browser tests cover shared wide and compact actions, synchronized labels, disabled states, dismissal, focus return, replacement mounts, and teardown ownership.
 - Recording Session browser tests cover loading, cancellation boundaries, initial highlight ordering, overlap lookup, token caching, and route-safe authoring restoration.

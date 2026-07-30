@@ -1,3 +1,4 @@
+import { flushSync, mount, unmount } from 'svelte'
 import type { AudioRecording } from '../audio/types.ts'
 import { getCueProgress, getWordProgress } from '../audio/progress.ts'
 import { iconMarkup, type IconName } from '../components/icons.ts'
@@ -10,6 +11,7 @@ import {
   type ActiveAudioSession,
   AudioController,
 } from './audio-controller.ts'
+import FloatingPlayerView from './FloatingPlayer.svelte'
 import { HighlightController } from './highlight-controller.ts'
 
 const PLAYBACK_RATE_MIN = 0.5
@@ -76,16 +78,13 @@ type PlayerElements = {
   play: HTMLButtonElement
   next: HTMLButtonElement
   replay: HTMLButtonElement
-  replayIcon: HTMLElement
   dragHandle: HTMLButtonElement
   expand: HTMLButtonElement
   mobileExpand: HTMLButtonElement
   mobileClose: HTMLButtonElement
   backdrop: HTMLButtonElement
   download: HTMLAnchorElement
-  downloadIcon: HTMLElement
   videoDownload: HTMLAnchorElement
-  videoDownloadIcon: HTMLElement
   desktopTitle: HTMLElement
   mobileTitle: HTMLElement
   subtitle: HTMLElement
@@ -100,7 +99,6 @@ type PlayerElements = {
   currentTime: HTMLElement
   duration: HTMLElement
   speedToggle: HTMLButtonElement
-  speedIcon: HTMLElement
   speedLabel: HTMLElement
   speedCompactLabel: HTMLElement
   speedPopover: HTMLElement
@@ -127,6 +125,7 @@ export function createPlaybackTimeline(
   options: PlaybackTimelineOptions
 ): PlaybackTimeline {
   const { audioController, highlightController, document, view } = options
+  mountFloatingPlayer(scope, document)
   const elements = getPlayerElements(document)
   let cueNavigationIndex: number | null = null
   let expanded = false
@@ -1051,15 +1050,6 @@ export function createPlaybackTimeline(
     )
   }
 
-  setControlIcon(elements.replayIcon, 'replay')
-  setControlIcon(elements.speedIcon, 'gauge')
-  setControlIcon(elements.dragHandle, 'grip')
-  setControlIcon(elements.expand, 'expand')
-  setControlIcon(elements.mobileExpand, 'chevronUp')
-  setControlIcon(elements.mobileClose, 'x')
-  setControlIcon(elements.downloadIcon, 'download')
-  setControlIcon(elements.videoDownloadIcon, 'download')
-
   setupDragging()
   setupViewportInteractions()
   setupControls()
@@ -1189,6 +1179,28 @@ export function createPlaybackTimeline(
   }
 }
 
+function mountFloatingPlayer(scope: MountScope, document: Document) {
+  const target = document.querySelector<HTMLElement>(
+    '[data-target-id="floating-player-root"]'
+  )
+  if (!target) {
+    throw new Error(
+      'Missing Playback Timeline target: [data-target-id="floating-player-root"]'
+    )
+  }
+  if (target.childNodes.length) {
+    throw new Error('Playback Timeline requires an empty player root')
+  }
+
+  const component = mount(FloatingPlayerView, { target })
+  flushSync()
+  scope.own(() => {
+    void unmount(component).catch((error: unknown) => {
+      console.error('Failed to unmount Floating Player', error)
+    })
+  })
+}
+
 function getPlayerElements(document: Document): PlayerElements {
   const required = <ElementType extends Element>(selector: string) => {
     const element = document.querySelector<ElementType>(selector)
@@ -1205,18 +1217,13 @@ function getPlayerElements(document: Document): PlayerElements {
     play: required('[data-target-id="floating-play"]'),
     next: required('[data-target-id="floating-next"]'),
     replay: required('[data-target-id="floating-replay"]'),
-    replayIcon: required('[data-target-id="floating-replay-icon"]'),
     dragHandle: required('[data-target-id="floating-drag-handle"]'),
     expand: required('[data-target-id="floating-expand-toggle"]'),
     mobileExpand: required('[data-target-id="floating-mobile-expand"]'),
     mobileClose: required('[data-target-id="floating-mobile-close"]'),
     backdrop: required('[data-target-id="floating-player-backdrop"]'),
     download: required('[data-target-id="floating-download"]'),
-    downloadIcon: required('[data-target-id="floating-download-icon"]'),
     videoDownload: required('[data-target-id="floating-video-download"]'),
-    videoDownloadIcon: required(
-      '[data-target-id="floating-video-download-icon"]'
-    ),
     desktopTitle: required(
       '[data-target-id="floating-player-title-desktop"]'
     ),
@@ -1239,7 +1246,6 @@ function getPlayerElements(document: Document): PlayerElements {
     currentTime: required('[data-target-id="mobile-player-current-time"]'),
     duration: required('[data-target-id="mobile-player-duration"]'),
     speedToggle: required('[data-target-id="floating-speed-toggle"]'),
-    speedIcon: required('[data-target-id="floating-speed-icon"]'),
     speedLabel: required('[data-target-id="floating-speed-label"]'),
     speedCompactLabel: required(
       '[data-target-id="floating-speed-compact-label"]'

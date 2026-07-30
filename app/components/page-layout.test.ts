@@ -21,6 +21,10 @@ const playbackTimelineSource = readFileSync(
   new URL('../reading/playback-timeline.ts', import.meta.url),
   'utf8'
 )
+const floatingPlayerComponentSource = readFileSync(
+  new URL('../reading/FloatingPlayer.svelte', import.meta.url),
+  'utf8'
+)
 const readerSettingsSource = readFileSync(
   new URL('../reader/reader-settings.ts', import.meta.url),
   'utf8'
@@ -314,7 +318,9 @@ test('preserves focus when overflow actions open and close reader overlays', () 
 })
 
 test('shows mobile word progress without changing the centered playback controls', () => {
-  expect(indexHtml).toContain('data-target-id="mobile-player-word-progress"')
+  expect(floatingPlayerComponentSource).toContain(
+    'data-target-id="mobile-player-word-progress"'
+  )
   expect(playbackTimelineSource).toMatch(
     /mobileWordProgress\.textContent\s*=\s*`Word \$\{wordProgress\.current\} of \$\{wordProgress\.total\}`/
   )
@@ -324,27 +330,45 @@ test('shows mobile word progress without changing the centered playback controls
 })
 
 test('uses a symmetric five-control row and a layout-independent mobile player sheet', () => {
-  const replayIndex = indexHtml.indexOf('data-target-id="floating-replay"')
-  const previousIndex = indexHtml.indexOf('data-target-id="floating-prev"')
-  const playIndex = indexHtml.indexOf('data-target-id="floating-play"')
-  const nextIndex = indexHtml.indexOf('data-target-id="floating-next"')
-  const speedIndex = indexHtml.indexOf('data-target-id="floating-speed-toggle"')
+  const replayIndex = floatingPlayerComponentSource.indexOf(
+    'data-target-id="floating-replay"'
+  )
+  const previousIndex = floatingPlayerComponentSource.indexOf(
+    'data-target-id="floating-prev"'
+  )
+  const playIndex = floatingPlayerComponentSource.indexOf(
+    'data-target-id="floating-play"'
+  )
+  const nextIndex = floatingPlayerComponentSource.indexOf(
+    'data-target-id="floating-next"'
+  )
+  const speedIndex = floatingPlayerComponentSource.indexOf(
+    'data-target-id="floating-speed-toggle"'
+  )
 
   expect(replayIndex).toBeGreaterThan(-1)
   expect(replayIndex).toBeLessThan(previousIndex)
   expect(previousIndex).toBeLessThan(playIndex)
   expect(playIndex).toBeLessThan(nextIndex)
   expect(nextIndex).toBeLessThan(speedIndex)
-  expect(indexHtml).toContain('data-target-id="floating-mobile-expand"')
-  expect(indexHtml).toContain('data-target-id="floating-mobile-close"')
-  expect(indexHtml).toContain('data-target-id="floating-player-backdrop"')
+  expect(indexHtml).toContain('data-target-id="floating-player-root"')
+  expect(playbackTimelineSource).toContain('mount(FloatingPlayerView')
+  expect(floatingPlayerComponentSource).toContain(
+    'data-target-id="floating-mobile-expand"'
+  )
+  expect(floatingPlayerComponentSource).toContain(
+    'data-target-id="floating-mobile-close"'
+  )
+  expect(floatingPlayerComponentSource).toContain(
+    'data-target-id="floating-player-backdrop"'
+  )
   expect(mobileReaderCss).toMatch(/\.floating-player\s*{[\s\S]*?position:\s*fixed;/)
   expect(mobileReaderCss).toMatch(/\.floating-player\.is-expanded\s*{[\s\S]*?left:\s*0;[\s\S]*?right:\s*0;[\s\S]*?bottom:\s*0;/)
   expect(mobileReaderCss).toMatch(/\.floating-player-backdrop\s*{[\s\S]*?position:\s*fixed;[\s\S]*?inset:\s*0;/)
   expect(mobileReaderCss).toMatch(/\.floating-player\.is-expanded \.mobile-player-seek\s*{[\s\S]*?grid-column:\s*1 \/ 4;[\s\S]*?grid-row:\s*3;/)
   expect(mobileReaderCss).toMatch(/\.floating-player\.is-expanded \.floating-player-controls\s*{[\s\S]*?grid-template-columns:\s*2\.75rem 2\.75rem 3\.5rem 2\.75rem 2\.75rem;/)
-  expect(playbackTimelineSource).toContain(
-    "setControlIcon(elements.mobileExpand, 'chevronUp')"
+  expect(floatingPlayerComponentSource).toContain(
+    '<UiIcon name="chevronUp" />'
   )
   expect(playbackTimelineSource).toContain(
     'setExpanded(true, { returnFocus: elements.mobileExpand })'
@@ -373,14 +397,18 @@ test('restores the legacy desktop player sidebar and expands into the current ca
   expect(readerEnhancementsCss).toMatch(
     /\.floating-player\.is-expanded \.floating-player-details,\s*\.floating-player\.mod-untimed\.is-expanded \.floating-player-details\s*{\s*display:\s*none;/
   )
-  expect(indexHtml).toContain('title="Expand player" aria-label="Expand player"')
+  expect(floatingPlayerComponentSource).toMatch(
+    /title="Expand player"[\s\S]*?aria-label="Expand player"/
+  )
   expect(playbackTimelineSource).toContain(
     "const expandLabel = nextExpanded ? 'Collapse player' : 'Expand player'"
   )
   expect(playbackTimelineSource).toContain(
     'resetPlayerPosition?.()'
   )
-  expect(indexHtml).toContain('data-target-id="floating-player-cue-progress"')
+  expect(floatingPlayerComponentSource).toContain(
+    'data-target-id="floating-player-cue-progress"'
+  )
   expect(playbackTimelineSource).toContain('cueCount: session?.cues.length ?? 0')
   expect(playbackTimelineSource).toContain(
     'elements.cueProgress.textContent = cueProgress.label'

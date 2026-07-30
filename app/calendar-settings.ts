@@ -1,5 +1,4 @@
 import type { UserSettings } from './calendar-model/user-settings.ts'
-import type { CalendarSettings } from './components/ParshaPicker.ts'
 import {
   getBrowserStorage,
   quarantineStorageItem,
@@ -7,7 +6,9 @@ import {
   writeStorageItem,
 } from './persistence/persisted-state.ts'
 
-export type { CalendarSettings }
+export type CalendarSettings = {
+  israel: boolean
+}
 
 export const CALENDAR_SETTINGS_STORAGE_KEY = 'tikkun.calendar-settings.v1'
 

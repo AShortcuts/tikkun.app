@@ -5,14 +5,13 @@ import type { UserSettings } from '../calendar-model/user-settings.ts'
 import {
   buildParshaAliyahChoiceGroups,
   buildParshaAliyahChoices,
+  buildParshaPickerModel,
   calculateAnchoredPopupMaxHeight,
   calculateAnchoredPopupPosition,
   calculateFlyoutPopupPosition,
   collectParshaChoiceSourceLeinings,
   parshaListTitleForLeining,
-  renderAliyahPopupContent,
-  renderCalendarSettings,
-} from './ParshaPicker.ts'
+} from './parsha-picker-model.ts'
 
 const testSettings: UserSettings = {
   ashkenazi: true,
@@ -120,13 +119,6 @@ test('finds standalone Matot and Masei within the 20-year source window', () => 
   ])
 })
 
-test('renders a parsha header above aliyah choices', () => {
-  const beresheet = findParsha('Bereshit')
-  const [group] = buildParshaAliyahChoiceGroups(beresheet, [beresheet])
-
-  expect(renderAliyahPopupContent([group])).toMatch(/<div class="aliyah-selection-heading">בראשית<\/div>/)
-})
-
 test('does not treat single parshiyot with a maqaf as double parshiyot', () => {
   const lechLecha = findParsha('Lech-Lecha')
 
@@ -144,6 +136,13 @@ test('labels Vezos Haberacha as a parsha in the parsha list', () => {
   if (!simchatTorah) throw new Error('Missing Simchat Torah')
 
   expect(parshaListTitleForLeining(simchatTorah)).toBe('וזאת הברכה')
+})
+
+test('finds Beresheet by its canonical route spelling', () => {
+  const result = buildParshaPickerModel(generator).search('beresheet')[0]
+
+  expect(result?.href).toBe('#/torah/parsha/beresheet')
+  expect(result?.englishLabel).toContain('Bereshit')
 })
 
 test('positions bottom-edge aliyah popup directly above the selected parsha', () => {
@@ -176,15 +175,6 @@ test('positions an aliyah submenu beside its parent without overflowing', () => 
       popupRect: { width: 220, height: 320 },
       viewport: { width: 1280, height: 720 },
     })).toEqual({ left: 806, top: 388, side: 'left' })
-})
-
-test('renders the Israel calendar toggle unchecked by default', () => {
-  expect(renderCalendarSettings({ israel: false })).toMatch(/<input[^>]+data-target-id="calendar-israel-toggle"[^>]+type="checkbox"/)
-  expect(renderCalendarSettings({ israel: false })).not.toMatch(/checked/)
-})
-
-test('renders the Israel calendar toggle checked when enabled', () => {
-  expect(renderCalendarSettings({ israel: true })).toMatch(/checked/)
 })
 
 function parshiyotForYears(startYear: number, endYear: number) {

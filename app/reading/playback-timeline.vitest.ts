@@ -59,7 +59,10 @@ test('replacement mounts own one set of playback listeners and release them', as
     )
   })
 
-  required<HTMLButtonElement>('[data-target-id="floating-play"]').click()
+  const activePlayButton = required<HTMLButtonElement>(
+    '[data-target-id="floating-play"]'
+  )
+  activePlayButton.click()
   await flushPromises()
 
   expect(firstPlay).not.toHaveBeenCalled()
@@ -68,7 +71,8 @@ test('replacement mounts own one set of playback listeners and release them', as
 
   destroy()
   destroy = null
-  required<HTMLButtonElement>('[data-target-id="floating-play"]').click()
+  expect(activePlayButton.isConnected).toBe(false)
+  activePlayButton.click()
   await flushPromises()
 
   expect(secondPlay).toHaveBeenCalledTimes(1)
@@ -185,65 +189,7 @@ function createFixture() {
       <span class="word" data-token-key="${tokenKeys[0]}">First</span>
       <span class="word" data-token-key="${tokenKeys[1]}">Second</span>
     </main>
-    <aside class="floating-player u-hidden" data-target-id="floating-player">
-      <button data-target-id="floating-drag-handle"></button>
-      <button data-target-id="floating-expand-toggle"></button>
-      <button data-target-id="floating-mobile-expand"></button>
-      <button data-target-id="floating-mobile-close"></button>
-      <button data-target-id="floating-replay">
-        <span data-target-id="floating-replay-icon"></span>
-      </button>
-      <button data-target-id="floating-prev"></button>
-      <button data-target-id="floating-play"></button>
-      <button data-target-id="floating-next"></button>
-      <a data-target-id="floating-download">
-        <span data-target-id="floating-download-icon"></span>
-      </a>
-      <a data-target-id="floating-video-download">
-        <span data-target-id="floating-video-download-icon"></span>
-      </a>
-      <span data-target-id="floating-player-title-desktop"></span>
-      <span data-target-id="floating-player-title-mobile"></span>
-      <span data-target-id="floating-player-subtitle"></span>
-      <span data-target-id="floating-player-parsha"></span>
-      <span data-target-id="floating-player-mode"></span>
-      <span data-target-id="floating-player-cue-progress"></span>
-      <span data-target-id="floating-meta-cues"></span>
-      <span data-target-id="mobile-player-word-progress"></span>
-      <span data-target-id="floating-meta-status-wrap">
-        <span data-target-id="floating-meta-status"></span>
-      </span>
-      <input
-        type="range"
-        min="0"
-        max="1000"
-        value="0"
-        data-target-id="mobile-player-seek"
-      />
-      <span data-target-id="mobile-player-current-time"></span>
-      <span data-target-id="mobile-player-duration"></span>
-      <div class="floating-speed-control">
-        <button data-target-id="floating-speed-toggle" aria-expanded="false">
-          <span data-target-id="floating-speed-icon"></span>
-          <span data-target-id="floating-speed-label"></span>
-          <span data-target-id="floating-speed-compact-label"></span>
-        </button>
-        <div class="u-hidden" data-target-id="floating-speed-popover">
-          <input
-            type="range"
-            min="0.5"
-            max="3"
-            step="0.01"
-            value="1"
-            data-target-id="floating-speed-slider"
-          />
-        </div>
-      </div>
-    </aside>
-    <button
-      data-target-id="floating-player-backdrop"
-      aria-hidden="true"
-    ></button>
+    <div data-target-id="floating-player-root"></div>
     <audio data-target-id="reader-audio"></audio>
   `
   document.body.appendChild(fixture)

@@ -8,10 +8,7 @@ let fixture: HTMLElement
 beforeEach(() => {
   fixture = document.createElement('section')
   fixture.innerHTML = `
-    <div class="u-hidden" data-target-id="command-palette">
-      <input data-target-id="command-palette-input" />
-      <div data-target-id="command-palette-results"></div>
-    </div>
+    <div data-target-id="command-palette-root"></div>
   `
   document.body.appendChild(fixture)
 })
@@ -49,7 +46,7 @@ test('filters actions and runs the selected result', () => {
   )!
 
   input.value = 'settings'
-  input.dispatchEvent(new Event('input'))
+  input.dispatchEvent(new Event('input', { bubbles: true }))
   expect(
     fixture.querySelectorAll('[data-target-id="command-palette-results"] button')
   ).toHaveLength(1)
@@ -63,15 +60,11 @@ test('filters actions and runs the selected result', () => {
   destroy()
 })
 
-test('replacement mounts remove the previous input listener', () => {
+test('replacement mounts remove the previous Svelte instance', () => {
   const mount = createMount()
   const firstActions = vi.fn(() => [])
   const secondActions = vi.fn(() => [])
   let currentPalette: ReturnType<typeof createCommandPalette> | null = null
-  const results = fixture.querySelector<HTMLElement>(
-    '[data-target-id="command-palette-results"]'
-  )!
-  const replaceChildren = vi.spyOn(results, 'replaceChildren')
   const options = {
     document,
     restoreFocus: vi.fn(),
@@ -92,17 +85,14 @@ test('replacement mounts remove the previous input listener', () => {
   const input = fixture.querySelector<HTMLInputElement>(
     '[data-target-id="command-palette-input"]'
   )!
-  const rendersBeforeInput = replaceChildren.mock.calls.length
   input.value = 'reader'
-  input.dispatchEvent(new Event('input'))
+  input.dispatchEvent(new Event('input', { bubbles: true }))
 
   expect(firstActions).not.toHaveBeenCalled()
   expect(secondActions).toHaveBeenCalledOnce()
-  expect(replaceChildren).toHaveBeenCalledTimes(rendersBeforeInput + 1)
 
   destroy()
-  const rendersAfterDestroy = replaceChildren.mock.calls.length
-  input.dispatchEvent(new Event('input'))
+  expect(input.isConnected).toBe(false)
+  input.dispatchEvent(new Event('input', { bubbles: true }))
   expect(secondActions).toHaveBeenCalledOnce()
-  expect(replaceChildren).toHaveBeenCalledTimes(rendersAfterDestroy)
 })

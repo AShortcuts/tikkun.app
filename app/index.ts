@@ -597,24 +597,24 @@ const showParshaPicker = () => {
   const jumper = ParshaPicker(createCalendarGenerator(), {
     calendarSettings,
     onCalendarSettingsChange: updateCalendarSettings,
+    navigate: (hash) => {
+      requestLastReadingSaveAfterRouteRender()
+      if (hash !== location.hash) {
+        location.hash = hash
+        return
+      }
+      if (!audioControllerGlobal) {
+        window.dispatchEvent(new Event('hashchange'))
+        return
+      }
+      const route = parseUrl(
+        createCalendarGenerator(),
+        hash.replace(/^#/, '')
+      )
+      if (route) renderRoute(route, audioControllerGlobal)
+    },
   })
   activeParshaPicker = jumper
-  jumper.node.addEventListener('click', (event) => {
-    const target = event.target as HTMLElement
-    const link = target.closest<HTMLAnchorElement>('a[href^="#/"]')
-    if (!link) return
-
-    requestLastReadingSaveAfterRouteRender()
-    if (link.hash !== location.hash || !audioControllerGlobal) return
-
-    const route = parseUrl(createCalendarGenerator(), link.hash.replace(/^#/, ''))
-    if (!route) return
-    event.preventDefault()
-    renderRoute(route, audioControllerGlobal)
-  })
-  jumper.node.addEventListener('submit', () => {
-    requestLastReadingSaveAfterRouteRender()
-  })
 
   document.querySelector('[data-target-id="reader-shell"]')!.appendChild(jumper.node)
 

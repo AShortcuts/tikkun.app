@@ -56,6 +56,18 @@ _Avoid_: Toolbar state, global settings
 The Svelte-rendered wide reader buttons and compact overflow menu that present the same reader state and actions behind a small TypeScript mount interface.
 _Avoid_: Mobile toolbar logic, desktop toolbar state
 
+**Command Palette**:
+The Svelte-rendered navigation overlay that owns its query, result selection, focus, and dismissal while receiving the available actions from a narrow TypeScript mount bridge.
+_Avoid_: Global search state, route controller
+
+**Parsha Picker**:
+The Svelte-rendered reading selection page for search, Torah references, upcoming readings, holidays, and aliyah choices. Calendar and routing rules are prepared by its TypeScript model.
+_Avoid_: Calendar model, page renderer
+
+**Floating Player**:
+The Svelte-rendered audio control surface mounted by Playback Timeline. Playback Timeline still owns audio commands, timing, cue progress, highlighting, seeking, and responsive interaction policy.
+_Avoid_: Playback Timeline, audio controller
+
 **Cue Data**:
 Validated word timing and token-position data loaded from a published cue file.
 _Avoid_: Raw cue JSON
