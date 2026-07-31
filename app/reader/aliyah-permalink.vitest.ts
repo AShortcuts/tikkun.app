@@ -31,6 +31,54 @@ test('copies an aliyah permalink and marks the link as copied after a successful
   expect(link.querySelector('[data-aliyah-link-icon="check"]')?.hasAttribute('hidden')).toBe(false)
 })
 
+test('resets the copied state and icon together', async () => {
+  vi.useFakeTimers()
+  try {
+    document.body.innerHTML = `
+      <button type="button" data-aliyah-link="true" data-aliyah-url="#/torah/parsha/lech-lecha/1-12-14">
+        <span data-aliyah-link-icon="link"></span>
+        <span data-aliyah-link-icon="check" hidden></span>
+      </button>
+    `
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
+    })
+
+    const link = document.querySelector<HTMLButtonElement>(
+      '[data-aliyah-link="true"]'
+    )
+    if (!link) throw new Error('Expected link')
+    const event = new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+    })
+    Object.defineProperty(event, 'target', {
+      configurable: true,
+      value: link,
+    })
+
+    await handleAliyahPermalinkClick(event)
+    expect(link.dataset.copyState).toBe('copied')
+
+    vi.runOnlyPendingTimers()
+
+    expect(link.dataset.copyState).toBeUndefined()
+    expect(
+      link
+        .querySelector('[data-aliyah-link-icon="link"]')
+        ?.hasAttribute('hidden')
+    ).toBe(false)
+    expect(
+      link
+        .querySelector('[data-aliyah-link-icon="check"]')
+        ?.hasAttribute('hidden')
+    ).toBe(true)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
 test('copies the current aliyah permalink even when the reader is already on that URL', async () => {
   window.location.hash = '#/torah/parsha/lech-lecha/1-12-14'
   document.body.innerHTML = `

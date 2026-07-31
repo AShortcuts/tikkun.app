@@ -58,7 +58,7 @@ test('replacement mounts keep one settings lifetime and preserve focus behavior'
     '[data-target-id="settings-toggle"]'
   )
   const pane = required<HTMLElement>('[data-target-id="settings-pane"]')
-  toggle.click()
+  settings!.open({ returnFocus: toggle })
   await nextAnimationFrame()
   expect(pane.classList.contains('u-hidden')).toBe(false)
   expect(toggle.getAttribute('aria-expanded')).toBe('true')
@@ -77,7 +77,7 @@ test('replacement mounts keep one settings lifetime and preserve focus behavior'
   expect(second.restoreFocus).toHaveBeenCalledTimes(1)
 
   staleDestroy()
-  toggle.click()
+  settings!.open({ returnFocus: toggle })
   expect(pane.classList.contains('u-hidden')).toBe(false)
 
   destroy()

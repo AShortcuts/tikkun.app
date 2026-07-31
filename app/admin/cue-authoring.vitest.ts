@@ -12,10 +12,13 @@ import { createCueAuthoring, type CueAuthoring } from './cue-authoring.ts'
 
 let fixture: HTMLElement | null = null
 let destroy: (() => void) | null = null
+let restoreClipboard: (() => void) | null = null
 
 afterEach(() => {
   destroy?.()
   destroy = null
+  restoreClipboard?.()
+  restoreClipboard = null
   fixture?.remove()
   fixture = null
   vi.restoreAllMocks()
@@ -119,6 +122,304 @@ test('restores access and binds a validated local Cue Draft to one authoring ses
   expect(cueAuthoring!.isRecording()).toBe(true)
 })
 
+test('keeps cue selection, seeking, focus, and timing edits behind TypeScript', async () => {
+  const { audioController, highlightController } = createFixture()
+  const onCueNavigationChange = vi.fn()
+  let cueAuthoring!: CueAuthoring
+
+  destroy = createMount()((scope) => {
+    cueAuthoring = createCueAuthoring(
+      scope,
+      createOptions(audioController, highlightController, {
+        onCueNavigationChange,
+      })
+    )
+  })
+
+  const session = createActiveAudioSession(
+    buildPlaybackPlan({
+      target: { runId: 'run', index: 1 },
+      tokenKeys,
+      current: {
+        recording: recording('current', 1),
+        cues: [cue(tokenKeys[0], 0), cue(tokenKeys[1], 3.25)],
+      },
+    })!
+  )
+  await audioController.loadSession(session)
+  highlightController.setSequence(tokenKeys)
+  await cueAuthoring.bindSession(session)
+
+  const firstRow = required<HTMLButtonElement>(
+    '[data-admin-cue-index="0"]'
+  )
+  firstRow.click()
+  await vi.waitFor(() => {
+    expect(firstRow.classList.contains('is-selected')).toBe(true)
+  })
+  expect(onCueNavigationChange).toHaveBeenLastCalledWith(0)
+  expect(highlightController.getActiveTokenKey()).toBe(tokenKeys[0])
+
+  await cueAuthoring.selectReaderToken(1, { focusRow: true })
+  const secondRow = required<HTMLButtonElement>(
+    '[data-admin-cue-index="1"]'
+  )
+  expect(document.activeElement).toBe(secondRow)
+  expect(secondRow.classList.contains('is-selected')).toBe(true)
+
+  required<HTMLButtonElement>('[data-admin-nudge="0.05"]').click()
+  expect(session.cues[1].timeStart).toBe(3.3)
+  expect(
+    required<HTMLButtonElement>('[data-admin-cue-index="1"]')
+  ).toBe(secondRow)
+  expect(secondRow.textContent).toContain('0:03.300')
+  expect(onCueNavigationChange).toHaveBeenLastCalledWith(1)
+})
+
+test('routes Cue List controls through TypeScript behavior', async () => {
+  const { audioController, highlightController } = createFixture()
+  const playNetworkRecording = vi.fn(async () => {})
+  const onCueNavigationChange = vi.fn()
+  let cueAuthoring!: CueAuthoring
+
+  destroy = createMount()((scope) => {
+    cueAuthoring = createCueAuthoring(
+      scope,
+      createOptions(audioController, highlightController, {
+        playNetworkRecording,
+        onCueNavigationChange,
+      })
+    )
+  })
+
+  const session = createActiveAudioSession(
+    buildPlaybackPlan({
+      target: { runId: 'run', index: 1 },
+      tokenKeys,
+      current: {
+        recording: recording('current', 1),
+        cues: [cue(tokenKeys[0], 0), cue(tokenKeys[1], 3.25)],
+      },
+    })!
+  )
+  await audioController.loadSession(session)
+  highlightController.setSequence(tokenKeys)
+  await cueAuthoring.bindSession(session)
+  await cueAuthoring.selectReaderToken(1)
+
+  const previous = required<HTMLButtonElement>(
+    '[data-target-id="admin-prev-saved"]'
+  )
+  const play = required<HTMLButtonElement>(
+    '[data-target-id="admin-play-current"]'
+  )
+  const next = required<HTMLButtonElement>(
+    '[data-target-id="admin-next-saved"]'
+  )
+  const trim = required<HTMLButtonElement>(
+    '[data-target-id="admin-trim-here"]'
+  )
+
+  expect(previous.disabled).toBe(false)
+  expect(next.disabled).toBe(true)
+
+  previous.click()
+  await vi.waitFor(() => {
+    expect(
+      required('[data-admin-cue-index="0"]').classList.contains(
+        'is-selected'
+      )
+    ).toBe(true)
+  })
+  expect(previous.disabled).toBe(true)
+  expect(next.disabled).toBe(false)
+
+  next.click()
+  await vi.waitFor(() => {
+    expect(
+      required('[data-admin-cue-index="1"]').classList.contains(
+        'is-selected'
+      )
+    ).toBe(true)
+  })
+  expect(next.disabled).toBe(true)
+
+  play.click()
+  await vi.waitFor(() => {
+    expect(playNetworkRecording).toHaveBeenCalledOnce()
+  })
+  expect(onCueNavigationChange).toHaveBeenLastCalledWith(1)
+
+  trim.click()
+  await vi.waitFor(() => {
+    expect(session.cues).toHaveLength(1)
+  })
+  expect(document.querySelectorAll('[data-admin-cue-index]')).toHaveLength(1)
+  expect(previous.disabled).toBe(true)
+  expect(next.disabled).toBe(true)
+  expect(
+    JSON.parse(localStorage.getItem('tikkun-admin-draft:current') ?? '{}')
+      .cues
+  ).toHaveLength(1)
+})
+
+test('exports Cue Data through the Svelte sheet and revokes replaced downloads', async () => {
+  const { audioController, highlightController } = createFixture()
+  const writeText = vi.fn().mockResolvedValue(undefined)
+  installClipboard(writeText)
+  const createObjectURL = vi
+    .spyOn(URL, 'createObjectURL')
+    .mockReturnValueOnce('blob:cues-1')
+    .mockReturnValueOnce('blob:cues-2')
+  const revokeObjectURL = vi
+    .spyOn(URL, 'revokeObjectURL')
+    .mockImplementation(() => {})
+  let cueAuthoring!: CueAuthoring
+
+  destroy = createMount()((scope) => {
+    cueAuthoring = createCueAuthoring(
+      scope,
+      createOptions(audioController, highlightController)
+    )
+  })
+
+  const session = createActiveAudioSession(
+    buildPlaybackPlan({
+      target: { runId: 'run', index: 1 },
+      tokenKeys,
+      current: {
+        recording: recording('current', 1),
+        cues: [cue(tokenKeys[0], 0), cue(tokenKeys[1], 3.25)],
+      },
+    })!
+  )
+  await audioController.loadSession(session)
+  highlightController.setSequence(tokenKeys)
+  await cueAuthoring.bindSession(session)
+
+  const exportButton = required<HTMLButtonElement>(
+    '[data-target-id="admin-export"]'
+  )
+  exportButton.click()
+  await vi.waitFor(() => expect(writeText).toHaveBeenCalledTimes(1))
+
+  const modal = required<HTMLElement>('[data-target-id="export-modal"]')
+  const textarea = required<HTMLTextAreaElement>(
+    '[data-target-id="export-text"]'
+  )
+  const cueDownload = required<HTMLAnchorElement>(
+    '[data-target-id="export-download"]'
+  )
+  const payload = JSON.parse(textarea.value)
+
+  expect(modal.classList).not.toContain('u-hidden')
+  expect(payload).toMatchObject({
+    audioId: 'current',
+    audioFormat: 'mp3',
+    narratorId: 'reader',
+    readingId: 'test',
+    aliyah: 1,
+    tokenCount: 2,
+    cueCount: 2,
+    issues: [],
+    cues: [
+      {
+        cueNumber: 1,
+        timeStart: 0,
+        pageNumber: 1,
+        lineIndex: 0,
+        fragmentIndex: 0,
+        wordIndex: 0,
+      },
+      {
+        cueNumber: 2,
+        timeStart: 3.25,
+        pageNumber: 1,
+        lineIndex: 0,
+        fragmentIndex: 0,
+        wordIndex: 1,
+      },
+    ],
+  })
+  expect(
+    required('[data-target-id="export-target-path"]').textContent
+  ).toContain('audio-cues/reader/test/1.json')
+  expect(cueDownload.href).toBe('blob:cues-1')
+  expect(cueDownload.download).toBe('1.json')
+  expect(writeText).toHaveBeenLastCalledWith(textarea.value)
+  expect(
+    required('[data-target-id="export-copy-status"]').textContent
+  ).toContain('Copied to clipboard.')
+  expect(createObjectURL).toHaveBeenCalledOnce()
+
+  exportButton.click()
+  await vi.waitFor(() => expect(writeText).toHaveBeenCalledTimes(2))
+  expect(revokeObjectURL).toHaveBeenCalledTimes(1)
+  expect(revokeObjectURL).toHaveBeenNthCalledWith(1, 'blob:cues-1')
+  expect(cueDownload.href).toBe('blob:cues-2')
+
+  required<HTMLButtonElement>('[data-target-id="export-close"]').click()
+  expect(modal.classList).toContain('u-hidden')
+  expect(revokeObjectURL).toHaveBeenCalledTimes(2)
+  expect(revokeObjectURL).toHaveBeenNthCalledWith(2, 'blob:cues-2')
+  expect(cueDownload.hasAttribute('href')).toBe(false)
+  expect(cueDownload.hasAttribute('download')).toBe(false)
+})
+
+test('keeps the export available when clipboard copying is blocked', async () => {
+  const { audioController, highlightController } = createFixture()
+  const writeText = vi.fn().mockRejectedValue(new Error('blocked'))
+  installClipboard(writeText)
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:cues')
+  const revokeObjectURL = vi
+    .spyOn(URL, 'revokeObjectURL')
+    .mockImplementation(() => {})
+  let cueAuthoring!: CueAuthoring
+
+  destroy = createMount()((scope) => {
+    cueAuthoring = createCueAuthoring(
+      scope,
+      createOptions(audioController, highlightController)
+    )
+  })
+
+  const session = createActiveAudioSession(
+    buildPlaybackPlan({
+      target: { runId: 'run', index: 1 },
+      tokenKeys,
+      current: {
+        recording: recording('current', 1),
+        cues: [cue(tokenKeys[0], 0)],
+      },
+    })!
+  )
+  await audioController.loadSession(session)
+  highlightController.setSequence(tokenKeys)
+  await cueAuthoring.bindSession(session)
+
+  required<HTMLButtonElement>('[data-target-id="admin-export"]').click()
+  await vi.waitFor(() => {
+    expect(
+      required('[data-target-id="export-copy-status"]').textContent
+    ).toContain('Automatic clipboard copy was blocked.')
+  })
+
+  expect(
+    required<HTMLElement>('[data-target-id="export-modal"]').classList
+  ).not.toContain('u-hidden')
+  expect(
+    required<HTMLAnchorElement>('[data-target-id="export-download"]')
+      .href
+  ).toBe('blob:cues')
+
+  cueAuthoring.closeOverlays()
+  expect(
+    required<HTMLElement>('[data-target-id="export-modal"]').classList
+  ).toContain('u-hidden')
+  expect(revokeObjectURL).toHaveBeenCalledOnce()
+  expect(revokeObjectURL).toHaveBeenCalledWith('blob:cues')
+})
+
 test('owns the admin shortcut, access check, and panel toggle', () => {
   const { audioController, highlightController } = createFixture()
   const prompt = vi.spyOn(window, 'prompt').mockReturnValue('admin')
@@ -153,6 +454,58 @@ test('owns the admin shortcut, access check, and panel toggle', () => {
   expect(cueAuthoring!.handleKeydown(closeEvent)).toBe(true)
   expect(cueAuthoring!.isVisible()).toBe(false)
   expect(prompt).toHaveBeenCalledTimes(1)
+})
+
+test('keeps the Svelte issue dialog open when persistence fails and retries safely', async () => {
+  const { audioController, highlightController } = createFixture()
+  const onRecordingIssuesChanged = vi.fn()
+  let cueAuthoring!: CueAuthoring
+
+  destroy = createMount()((scope) => {
+    cueAuthoring = createCueAuthoring(
+      scope,
+      createOptions(audioController, highlightController, {
+        onRecordingIssuesChanged,
+      })
+    )
+  })
+
+  const session = createActiveAudioSession(
+    buildPlaybackPlan({
+      target: { runId: 'run', index: 1 },
+      tokenKeys,
+      current: {
+        recording: recording('current', 1),
+        cues: [cue(tokenKeys[0], 0)],
+      },
+    })!
+  )
+  await audioController.loadSession(session)
+  highlightController.setSequence(tokenKeys)
+  await cueAuthoring.bindSession(session)
+  cueAuthoring.openIssue()
+
+  const modal = required<HTMLElement>(
+    '[data-target-id="recording-issue-modal"]'
+  )
+  expect(modal.getAttribute('aria-hidden')).toBe('false')
+  const firstIssue = required<HTMLButtonElement>('[data-issue-kind]')
+  expect(document.activeElement).toBe(firstIssue)
+
+  const storageFailure = vi
+    .spyOn(Storage.prototype, 'setItem')
+    .mockImplementation(() => {
+      throw new DOMException('Storage unavailable', 'QuotaExceededError')
+    })
+  firstIssue.click()
+
+  expect(modal.getAttribute('aria-hidden')).toBe('false')
+  expect(onRecordingIssuesChanged).not.toHaveBeenCalled()
+
+  storageFailure.mockRestore()
+  firstIssue.click()
+  expect(modal.getAttribute('aria-hidden')).toBe('true')
+  expect(onRecordingIssuesChanged).toHaveBeenCalledOnce()
 })
 
 function createOptions(
@@ -195,34 +548,9 @@ function createFixture() {
       <span class="word" data-token-key="${tokenKeys[0]}">First</span>
       <span class="word" data-token-key="${tokenKeys[1]}">Second</span>
     </main>
-    <aside class="admin-panel u-hidden" data-target-id="admin-panel">
-      <span data-target-id="admin-cue-count">0 Words</span>
-      <button data-target-id="admin-close"></button>
-      <div data-target-id="admin-status"></div>
-      <input type="checkbox" data-target-id="admin-capture-audio" />
-      <div data-target-id="admin-audio-capture-status"></div>
-      <button data-target-id="admin-record"></button>
-      <button data-target-id="admin-step-back"></button>
-      <button data-target-id="admin-undo"></button>
-      <button data-target-id="admin-mark-issue"></button>
-      <button data-target-id="admin-reset"></button>
-      <button data-target-id="admin-export"></button>
-    </aside>
-    <div class="u-hidden" data-target-id="recording-issue-modal">
-      <button data-target-id="recording-issue-close"></button>
-      <div data-target-id="recording-issue-options"></div>
-      <input data-target-id="recording-issue-note" />
-      <input type="checkbox" data-target-id="recording-issue-reader-visible" checked />
-    </div>
-    <div class="u-hidden" data-target-id="export-modal">
-      <button data-target-id="export-close"></button>
-      <a data-target-id="export-download"></a>
-      <a data-target-id="export-audio-download"></a>
-      <div data-target-id="export-audio-status"></div>
-      <div data-target-id="export-target-path"></div>
-      <div data-target-id="export-copy-status"></div>
-      <textarea data-target-id="export-text"></textarea>
-    </div>
+    <div data-target-id="cue-authoring-panel-root"></div>
+    <div data-target-id="recording-issue-dialog-root"></div>
+    <div data-target-id="cue-authoring-export-sheet-root"></div>
     <audio data-target-id="reader-audio"></audio>
   `
   document.body.appendChild(fixture)
@@ -239,6 +567,24 @@ function required<ElementType extends Element>(selector: string) {
   const element = document.querySelector<ElementType>(selector)
   if (!element) throw new Error(`Missing test element: ${selector}`)
   return element
+}
+
+function installClipboard(writeText: (text: string) => Promise<void>) {
+  const descriptor = Object.getOwnPropertyDescriptor(
+    navigator,
+    'clipboard'
+  )
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText },
+  })
+  restoreClipboard = () => {
+    if (descriptor) {
+      Object.defineProperty(navigator, 'clipboard', descriptor)
+    } else {
+      Reflect.deleteProperty(navigator, 'clipboard')
+    }
+  }
 }
 
 function recording(

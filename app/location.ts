@@ -1,6 +1,9 @@
 import type { RefWithScroll, ScrollName } from './ref.ts'
-import torahTOC from '../text/torah-toc.json' with { type: 'json' }
 import estherTOC from '../text/esther-toc.json' with { type: 'json' }
+import {
+  getTorahPageCount,
+  getTorahPageLine,
+} from './data/torah-index.ts'
 
 type AppleSauce = {
   p: number
@@ -9,13 +12,46 @@ type AppleSauce = {
 
 type TOC = Record<string, Record<string, Record<string, AppleSauce>>>
 
-const scrollTOCs: Record<ScrollName, TOC> = {
-  torah: torahTOC as TOC,
-  esther: estherTOC as TOC,
+type IndexedLocation = {
+  pageNumber: number
+  lineNumber: number
+}
+
+interface PageIndex {
+  getPageCount(): number
+  getLocation(book: number, chapter: number, verse: number): IndexedLocation | null
+}
+
+function createObjectPageIndex(toc: TOC): PageIndex {
+  return {
+    getPageCount: () => {
+      const book = Math.max(...Object.keys(toc).map(Number))
+      const chapter = Math.max(...Object.keys(toc[book]).map(Number))
+      const verse = Math.max(...Object.keys(toc[book][chapter]).map(Number))
+      return toc[book][chapter][verse].p
+    },
+    getLocation: (book, chapter, verse) => {
+      const location = toc[book]?.[chapter]?.[verse]
+      return location
+        ? {
+            pageNumber: location.p,
+            lineNumber: location.l,
+          }
+        : null
+    },
+  }
+}
+
+const pageIndexes: Record<ScrollName, PageIndex> = {
+  torah: {
+    getPageCount: getTorahPageCount,
+    getLocation: getTorahPageLine,
+  },
+  esther: createObjectPageIndex(estherTOC as TOC),
 }
 
 export function hasScrollData(name: string): name is ScrollName {
-  return Object.prototype.hasOwnProperty.call(scrollTOCs, name)
+  return Object.prototype.hasOwnProperty.call(pageIndexes, name)
 }
 
 export function isIndexedReference({
@@ -24,24 +60,21 @@ export function isIndexedReference({
   v: verse,
   scroll,
 }: RefWithScroll) {
-  return Boolean(scrollTOCs[scroll]?.[book]?.[chapter]?.[verse])
+  return Boolean(pageIndexes[scroll]?.getLocation(book, chapter, verse))
 }
 
 export async function loadScroll(name: ScrollName) {
   if (!hasScrollData(name)) {
     throw new Error(`Scroll data is unavailable for ${name}`)
   }
-  return new ScrollResolver(name, scrollTOCs[name])
+  return new ScrollResolver(name, pageIndexes[name])
 }
 
 export class ScrollResolver {
-  constructor(readonly scroll: string, private readonly toc: TOC) {}
+  constructor(readonly scroll: string, private readonly index: PageIndex) {}
 
   getPageCount() {
-    const b = Math.max(...Object.keys(this.toc).map(Number))
-    const c = Math.max(...Object.keys(this.toc[b]).map(Number))
-    const v = Math.max(...Object.keys(this.toc[b][c]).map(Number))
-    return this.toc[b][c][v].p
+    return this.index.getPageCount()
   }
 
   physicalLocationFromRef({
@@ -54,11 +87,10 @@ export class ScrollResolver {
       throw new Error(
         `Cannot read scroll ${scroll} from resolver for ${this.scroll}`
       )
-    const indexedLocation = this.toc[book]?.[chapter]?.[verse]
+    const indexedLocation = this.index.getLocation(book, chapter, verse)
     if (!indexedLocation) {
       throw new Error(`Unknown reference ${scroll} ${book}:${chapter}:${verse}`)
     }
-    const { p: pageNumber, l: lineNumber } = indexedLocation
-    return { pageNumber, lineNumber }
+    return indexedLocation
   }
 }

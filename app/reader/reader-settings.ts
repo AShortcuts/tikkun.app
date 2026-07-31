@@ -1,6 +1,5 @@
 import { flushSync, mount, unmount } from 'svelte'
 import type { AudioNarrator } from '../audio/types.ts'
-import { iconMarkup } from '../components/icons.ts'
 import type { MountScope } from '../lifecycle/mount.ts'
 import type { ReaderPreferences } from '../reader-preferences.ts'
 import ReaderSettingsPane from './ReaderSettings.svelte'
@@ -52,7 +51,6 @@ export function createReaderSettings(
     throw new Error('Reader Settings requires an empty settings root')
   }
 
-  toggle.innerHTML = iconMarkup('settings2')
   let settings: ReaderSettings | null = null
   const getConnectedSettings = () => settings
   const component = mount(ReaderSettingsPane, {

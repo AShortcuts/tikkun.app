@@ -544,6 +544,7 @@ html[data-highlight-rendering='legacy-rectangle'] .word.is-active-word::before {
 .aliyah-link[data-copy-state='copied'] {
   color: oklch(61% 0.17 150);
   background: color-mix(in srgb, currentColor 13%, transparent);
+  cursor: default;
   opacity: 1;
 }
 

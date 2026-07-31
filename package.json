@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "audio:sync": "node scripts/generate-audio-manifest.mjs",
+    "torah:index": "node scripts/generate-torah-index.mjs",
     "video:manifest": "node scripts/generate-video-manifest.mjs",
     "video:record": "node scripts/record-aliyah-videos.mjs",
     "video:calibrate": "node scripts/record-aliyah-videos.mjs calibrate",
@@ -14,8 +15,9 @@
     "test": "vitest run",
     "vitest": "vitest",
     "test:watch": "vitest",
+    "predev": "npm run torah:index",
     "dev": "vite",
-    "build": "vite build && node scripts/generate-service-worker.mjs",
+    "build": "npm run torah:index && vite build && node scripts/generate-service-worker.mjs",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "eslint app scripts/*.mjs vite.config.ts svelte.config.js",

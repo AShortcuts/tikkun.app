@@ -365,11 +365,11 @@ test('mounts earlier pages while preserving scroll position', async () => {
     c: 6,
     v: 9,
   })
-  const beforePages = sd.getRenderedPageNumbers()
+  const beforePages = sd.getMountedPageNumbers()
   await sd.ensurePageMounted(target.pageNumber)
 
-  expect(sd.getRenderedPageNumbers()).toContain(target.pageNumber)
-  expect(sd.getRenderedPageNumbers()).toEqual(
+  expect(sd.getMountedPageNumbers()).toContain(target.pageNumber)
+  expect(sd.getMountedPageNumbers()).toEqual(
     [...new Set([...beforePages, target.pageNumber])].sort((a, b) => a - b)
   )
   expect(root.scrollTop).toBeGreaterThanOrEqual(100)

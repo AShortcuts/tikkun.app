@@ -240,19 +240,11 @@ export class ScrollDisplay {
     return result
   }
 
-  getPageNode(pageNumber: number) {
-    return this.getMountedPageNode(pageNumber)
-  }
-
   getMountedPageNode(pageNumber: number) {
     const record = this.getNearestMountedPageRecord(pageNumber)
     if (!record?.node) return null
     this.touchPageRecord(record)
     return record.node
-  }
-
-  getRenderedPageNumbers() {
-    return this.getMountedPageNumbers()
   }
 
   getMountedPageNumbers() {

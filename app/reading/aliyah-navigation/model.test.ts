@@ -10,7 +10,6 @@ import {
   createAliyahNavigationSnapshot,
   formatAliyahLabel,
   getAliyahNavigationEntriesForRun,
-  parseAliyahNavigationTarget,
   resolveActiveTargetForRun,
   type AliyahNavigationPlayback,
   type AliyahNavigationTarget,
@@ -117,13 +116,7 @@ test('prefers active playback for the selected run, then viewport, then first it
   ).toEqual(first)
 })
 
-test('parses only complete navigation targets and formats maftir', () => {
-  expect(parseAliyahNavigationTarget('run-a', '7')).toEqual({
-    runId: 'run-a',
-    aliyahIndex: 7,
-  })
-  expect(parseAliyahNavigationTarget('', '1')).toBeNull()
-  expect(parseAliyahNavigationTarget('run-a', '8')).toBeNull()
+test('formats maftir for navigation labels', () => {
   expect(formatAliyahLabel('Maftir')).toBe('מפטיר')
 })
 

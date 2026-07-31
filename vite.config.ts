@@ -11,10 +11,42 @@ export function chunkFileName(chunk: PreRenderedChunk) {
   if (
     chunk.facadeModuleId &&
     normalizeModuleId(chunk.facadeModuleId).endsWith(
+      '/app/components/ParshaPicker.ts'
+    )
+  ) {
+    return 'assets/reader-parsha-picker-[hash].js'
+  }
+  if (
+    chunk.facadeModuleId &&
+    normalizeModuleId(chunk.facadeModuleId).endsWith(
+      '/app/navigation/command-palette.ts'
+    )
+  ) {
+    return 'assets/reader-command-palette-[hash].js'
+  }
+  if (
+    chunk.facadeModuleId &&
+    normalizeModuleId(chunk.facadeModuleId).endsWith(
+      '/app/reader/reader-settings.ts'
+    )
+  ) {
+    return 'assets/reader-settings-[hash].js'
+  }
+  if (
+    chunk.facadeModuleId &&
+    normalizeModuleId(chunk.facadeModuleId).endsWith(
       '/app/admin/cue-authoring.ts'
     )
   ) {
     return 'assets/optional-cue-authoring-[hash].js'
+  }
+  if (
+    chunk.facadeModuleId &&
+    normalizeModuleId(chunk.facadeModuleId).endsWith(
+      '/app/video/recording-harness.ts'
+    )
+  ) {
+    return 'assets/optional-recording-harness-[hash].js'
   }
   if (
     chunk.facadeModuleId &&

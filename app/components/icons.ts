@@ -30,6 +30,14 @@ export type IconName =
   | 'houseFilled'
   | 'link'
   | 'check'
+  | 'playOutline'
+  | 'undo'
+  | 'triangleAlert'
+  | 'reset'
+  | 'externalLink'
+  | 'circleX'
+  | 'fileDown'
+  | 'audioLines'
 
 // Icons are from https://lucide.dev/icons v1.0.
 // Keep every horizontal arrow alias on the shared full-stem geometry.
@@ -97,10 +105,10 @@ const iconPaths: Record<IconName, string> = {
     <path d="m21 21-7-7" />
   `,
   minimize2: `
-    <path d="M10 3v7H3" />
-    <path d="M14 21v-7h7" />
-    <path d="m3 10 7-7" />
-    <path d="m21 14-7 7" />
+    <path d="m14 10 7-7" />
+    <path d="M20 10h-6V4" />
+    <path d="m3 21 7-7" />
+    <path d="M4 14h6v6" />
   `,
   chevronDown: `
     <path d="m6 9 6 6 6-6" />
@@ -177,6 +185,48 @@ const iconPaths: Record<IconName, string> = {
   `,
   check: `
     <path d="M20 6 9 17l-5-5" />
+  `,
+  playOutline: `
+    <path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" />
+  `,
+  undo: `
+    <path d="M9 14 4 9l5-5" />
+    <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11" />
+  `,
+  triangleAlert: `
+    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />
+    <path d="M12 9v4" />
+    <path d="M12 17h.01" />
+  `,
+  reset: `
+    <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+    <path d="M3 3v5h5" />
+    <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+    <path d="M16 16h5v5" />
+  `,
+  externalLink: `
+    <path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6" />
+    <path d="m21 3-9 9" />
+    <path d="M15 3h6v6" />
+  `,
+  circleX: `
+    <circle cx="12" cy="12" r="10" />
+    <path d="m15 9-6 6" />
+    <path d="m9 9 6 6" />
+  `,
+  fileDown: `
+    <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" />
+    <path d="M14 2v5a1 1 0 0 0 1 1h5" />
+    <path d="M12 18v-6" />
+    <path d="m9 15 3 3 3-3" />
+  `,
+  audioLines: `
+    <path d="M2 10v3" />
+    <path d="M6 6v11" />
+    <path d="M10 3v18" />
+    <path d="M14 8v7" />
+    <path d="M18 5v13" />
+    <path d="M22 10v3" />
   `,
 }
 

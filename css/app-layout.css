@@ -5,6 +5,10 @@
   min-height: 0;
 }
 
+.aliyah-navigation-root {
+  display: contents;
+}
+
 .app-toolbar {
   border-bottom: 1px solid transparent;
   flex-shrink: 0;

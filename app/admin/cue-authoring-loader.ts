@@ -22,7 +22,8 @@ export interface CueAuthoringLoaderOptions {
 }
 
 export interface CueAuthoringLoader {
-  ensureLoaded(): Promise<CueAuthoring | null>
+  isUnlocked(): boolean
+  open(): void
   restoreIfOpen(): void
   handleShortcut(event: KeyboardEvent): boolean
   close(): void
@@ -82,6 +83,26 @@ export function createCueAuthoringLoader(
     authoring?.setVisible(false)
   }
 
+  const isUnlocked = () => {
+    if (authoring) return authoring.isUnlocked()
+    try {
+      return readCueAuthoringAccessState(options.sessionStorage).unlocked
+    } catch (error) {
+      options.onLoadError(error)
+      return false
+    }
+  }
+
+  const open = () => {
+    if (!isUnlocked()) return
+    forceClosed = false
+    const intent = ++intentGeneration
+    void ensureLoaded().then((feature) => {
+      if (!feature || intent !== intentGeneration || forceClosed) return
+      feature.setVisible(true)
+    })
+  }
+
   const restoreIfOpen = () => {
     try {
       if (!readCueAuthoringAccessState(options.sessionStorage).panelOpen) return
@@ -115,5 +136,11 @@ export function createCueAuthoringLoader(
     modulePromise = null
   })
 
-  return { ensureLoaded, restoreIfOpen, handleShortcut, close }
+  return {
+    isUnlocked,
+    open,
+    restoreIfOpen,
+    handleShortcut,
+    close,
+  }
 }

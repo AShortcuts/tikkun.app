@@ -1471,7 +1471,7 @@
   text-align: right;
 }
 
-.export-download-icon {
+.export-download-button .ui-icon {
   width: 1.45rem;
   height: 1.45rem;
 }
@@ -1483,7 +1483,8 @@
   white-space: nowrap;
 }
 
-.admin-export-button.has-local-cue-diff .admin-action-icon {
+.admin-export-button.has-local-cue-diff .admin-action-icon,
+.admin-export-button.has-local-cue-diff .ui-icon {
   color: oklch(78% 0.2 145);
   filter: drop-shadow(0 0 0.3rem oklch(78% 0.2 145 / 0.42));
 }

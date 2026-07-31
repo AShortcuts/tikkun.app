@@ -122,10 +122,6 @@
   const settings: ReaderSettings = { open, close, sync }
 
   onMount(() => {
-    const handleToggle = () => {
-      if (isOpen) close()
-      else open({ returnFocus: toggle })
-    }
     const handleOutsidePointer = (event: PointerEvent) => {
       const target = event.target
       if (!(target instanceof Element) || !isOpen) return
@@ -135,11 +131,9 @@
     }
 
     connect(settings)
-    toggle.addEventListener('click', handleToggle)
     ownerDocument.addEventListener('pointerdown', handleOutsidePointer)
 
     return () => {
-      toggle.removeEventListener('click', handleToggle)
       ownerDocument.removeEventListener('pointerdown', handleOutsidePointer)
       cancelScheduledFocus()
       if (themeTransitionTimer) view.clearTimeout(themeTransitionTimer)

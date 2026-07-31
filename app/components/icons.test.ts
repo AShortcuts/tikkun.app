@@ -22,3 +22,12 @@ test('renders play and pause as solid media controls', () => {
   expect(iconMarkup('pause')).toContain('x="13.25"')
   expect(iconMarkup('pause')).not.toContain('<path')
 })
+
+test('uses the Lucide minimize-2 geometry for the expanded player control', () => {
+  const markup = iconMarkup('minimize2')
+
+  expect(markup).toContain('m14 10 7-7')
+  expect(markup).toContain('M20 10h-6V4')
+  expect(markup).toContain('m3 21 7-7')
+  expect(markup).toContain('M4 14h6v6')
+})

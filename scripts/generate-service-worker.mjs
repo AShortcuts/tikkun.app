@@ -23,7 +23,7 @@ const excludedExtensions = new Set([
   '.webm',
 ])
 const deferredChunkPattern =
-  /^assets\/(?:cue-data|optional-(?:about|cue-authoring|cue-analytics))-[A-Za-z0-9_-]+\.js$/
+  /^assets\/(?:cue-data|optional-(?:about|cue-authoring|cue-analytics|recording-harness))-[A-Za-z0-9_-]+\.js$/
 
 function toUrlPath(filePath) {
   return `/${filePath.split(path.sep).map(encodeURIComponent).join('/')}`

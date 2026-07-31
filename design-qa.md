@@ -2,6 +2,37 @@
 
 final result: passed
 
+## Mobile title depth follow-up
+
+- Source visual truth: `/Users/adambh/Library/Caches/Clop/images/38626.png` (194 x 96 px, Display P3, 2x source density).
+- Implementation screenshot: `/private/tmp/tikkun-title-depth-390.png` (390 x 844 px at a 390 x 844 CSS viewport and 1x capture density).
+- Full-view regression comparison: `/private/tmp/tikkun-title-full-comparison.png`.
+- Focused comparison: `/private/tmp/tikkun-title-depth-focused-comparison.png`.
+- Density normalization: the source was reduced to 97 x 48 px and centered in a 100 x 64 px comparison cell beside 1x implementation crops.
+- State: dark Yitro reader, compact mobile header, picker closed, and no player overlay.
+
+The source is a component crop rather than a full reader mock. The focused comparison therefore owns border, radius, surface, and shadow fidelity. The full-view comparison uses the previous 390 x 844 implementation as regression evidence that the Torah surface and overall reader geometry did not change.
+
+### Fidelity surfaces
+
+- Fonts and typography: the existing app typeface and weight remain unchanged; the parsha title increases to 22.4 px on normal phones and 19.2 px at 320 px. The missing chevron is intentional and preserves the user's prior explicit direction.
+- Spacing and layout rhythm: the title measures 80.38 x 48 px at 390 and 550 px, and 65.98 x 48 px at 320 px. Its center delta is -0.004 px, -0.004 px, and 0 px respectively. No horizontal overflow or control overlap was observed.
+- Colors and visual tokens: both title and home use the same theme-aware neutral border and raised surface. Their shared shadow reproduces the reference's inner top highlight, subtle lower inset, close shadow, and soft falloff.
+- Image and icon fidelity: no raster assets were needed. The supplied image is reference-only; the existing Lucide home icon remains sharp and unchanged.
+- Copy and content: the parsha name and all Torah content remain unchanged.
+
+### Findings and comparison history
+
+- P0: none.
+- P1: none.
+- P2: none.
+- Earlier state: the parsha title had a blue border and the home control had a comparatively flat surface.
+- Fix: both controls now share the reference-derived neutral depth treatment, and the title was enlarged without changing the equal-side-column centering model.
+- Post-fix evidence: the focused comparison shows the matching raised treatment; the full comparison shows unchanged Torah layout; browser measurements confirm exact viewport centering at every tested compact breakpoint.
+- Interaction proof: opening the parsha picker focused its search field; pressing the title again returned to the Yitro reader. Browser console warnings and errors: none.
+
+final result: passed
+
 ## Visual comparison
 
 - Primary viewport: 390 x 844.
@@ -65,3 +96,29 @@ The implemented hierarchy, rounded floating surfaces, gold current-aliyah state,
 - The backdrop and close control collapse the sheet, restore focus to the expansion control, and clear the expanded document state.
 - Loop, Save, and Repeat Passage are intentionally absent, following the latest direction.
 - Console errors and warnings: none observed during the final verification pass.
+
+## Parsha trigger and touch-target follow-up
+
+- Source of visual truth: `/Users/adambh/.codex/generated_images/019f6b21-9ff3-7960-918a-73a88354ef09/exec-af8828bd-e26c-4d9c-a900-60e0b45235a4.png`.
+- Implementation screenshot: `/private/tmp/tikkun-parsha-trigger-final-390.png`.
+- Full comparison: `/private/tmp/tikkun-design-qa-comparison.png`.
+- Focused header comparison: `/private/tmp/tikkun-design-qa-header-comparison.png`.
+- Viewport and density: 390 x 844 CSS px at 1x; the 852 x 1848 source was normalized to the same comparison dimensions.
+- State: dark Yitro reader, compact header, no picker, dialog, or player overlay.
+- Scope: app-owned header controls and touch geometry. The Torah font, line breaking, spacing, alignment, and text renderer remain implementation truth and were intentionally excluded from visual restyling.
+
+At that checkpoint, the parsha name used a blue rounded pill with no chevron while the home icon used a rounded-square neutral gray border. The later Mobile title depth follow-up supersedes those border and elevation details; existing Lucide iconography and the independent aliyah capsule remain preserved.
+
+The home, parsha, aliyah, and settings controls measured at least 44 px high. All seven aliyah rail buttons measured 44 x 44 px at the narrowest 320 px viewport without horizontal overflow. The seek input measured 44 px high; restart, previous, next, and speed measured 44 x 44 px; play measured 48 x 48 px; and the compact expand control measured 64 x 44 px. Visible rail lines and the seek track retained their prior artwork dimensions.
+
+### Findings and iterations
+
+- P0: none.
+- P1: none.
+- P2: none.
+- Initial touch-target verification found a 5.68 px overlap between the enlarged seek and expand targets.
+- The player reserved additional fixed-overlay padding, leaving a measured 2 px separation while preserving independent center hit testing and avoiding Torah layout changes.
+- Parsha picker and About interactions were exercised after styling; both opened and returned to the reading surface correctly.
+- Browser console warnings and errors: none.
+
+final result: passed

@@ -1,7 +1,5 @@
-import { flushSync, mount, unmount } from 'svelte'
 import type { AudioRecording } from '../audio/types.ts'
 import { getCueProgress, getWordProgress } from '../audio/progress.ts'
-import { iconMarkup, type IconName } from '../components/icons.ts'
 import type { MountScope } from '../lifecycle/mount.ts'
 import { formatTokenKey } from '../reader/token-position.ts'
 import { findVideoForRecording } from '../video/library.ts'
@@ -11,7 +9,11 @@ import {
   type ActiveAudioSession,
   AudioController,
 } from './audio-controller.ts'
-import FloatingPlayerView from './FloatingPlayer.svelte'
+import {
+  createFloatingPlayer,
+  type FloatingPlayerAction,
+  type FloatingPlayerPosition,
+} from './floating-player.ts'
 import { HighlightController } from './highlight-controller.ts'
 
 const PLAYBACK_RATE_MIN = 0.5
@@ -21,11 +23,6 @@ const PLAYBACK_RATE_MARKS = [0.5, 1, 1.5, 2, 3] as const
 const UNTIMED_PLAYBACK_SKIP_SECONDS = 10
 const FLOATING_PLAYER_VIEWPORT_MARGIN = 8
 const FLOATING_PLAYER_SNAP_DISTANCE = 56
-
-type FloatingPlayerPosition = {
-  left: number
-  top: number
-}
 
 export type PlaybackTimelineChange =
   | { type: 'reader-chrome' }
@@ -71,40 +68,6 @@ export interface PlaybackTimeline {
   closeOverlay(): boolean
 }
 
-type PlayerElements = {
-  player: HTMLElement
-  cornerControls: HTMLElement | null
-  previous: HTMLButtonElement
-  play: HTMLButtonElement
-  next: HTMLButtonElement
-  replay: HTMLButtonElement
-  dragHandle: HTMLButtonElement
-  expand: HTMLButtonElement
-  mobileExpand: HTMLButtonElement
-  mobileClose: HTMLButtonElement
-  backdrop: HTMLButtonElement
-  download: HTMLAnchorElement
-  videoDownload: HTMLAnchorElement
-  desktopTitle: HTMLElement
-  mobileTitle: HTMLElement
-  subtitle: HTMLElement
-  mobileReading: HTMLElement
-  mode: HTMLElement
-  cueProgress: HTMLElement
-  wordProgress: HTMLElement
-  mobileWordProgress: HTMLElement
-  statusWrap: HTMLElement
-  status: HTMLElement
-  seek: HTMLInputElement
-  currentTime: HTMLElement
-  duration: HTMLElement
-  speedToggle: HTMLButtonElement
-  speedLabel: HTMLElement
-  speedCompactLabel: HTMLElement
-  speedPopover: HTMLElement
-  speedSlider: HTMLInputElement
-}
-
 export function formatPlaybackDuration(seconds: number) {
   if (!Number.isFinite(seconds)) return '--:--'
   if (seconds < 0) return '0:00'
@@ -125,8 +88,17 @@ export function createPlaybackTimeline(
   options: PlaybackTimelineOptions
 ): PlaybackTimeline {
   const { audioController, highlightController, document, view } = options
-  mountFloatingPlayer(scope, document)
-  const elements = getPlayerElements(document)
+  let handlePlayerAction: (action: FloatingPlayerAction) => void = () => {
+    throw new Error('Floating Player action arrived before playback was ready')
+  }
+  const player = createFloatingPlayer(scope, {
+    document,
+    view,
+    action: (action) => handlePlayerAction(action),
+  })
+  const cornerControls = document.querySelector<HTMLElement>(
+    '.reader-corner-controls'
+  )
   let cueNavigationIndex: number | null = null
   let expanded = false
   let expansionReturnFocus: HTMLElement | null = null
@@ -135,10 +107,6 @@ export function createPlaybackTimeline(
   let scrubPreviewTime: number | null = null
   let scrubPointerId: number | null = null
   let focusFrame = 0
-
-  const setControlIcon = (element: HTMLElement, icon: IconName) => {
-    element.innerHTML = iconMarkup(icon)
-  }
 
   const scheduleFocus = (focus: () => void) => {
     if (focusFrame) view.cancelAnimationFrame(focusFrame)
@@ -149,8 +117,7 @@ export function createPlaybackTimeline(
   }
 
   const closeSpeedPopover = () => {
-    elements.speedPopover.classList.add('u-hidden')
-    elements.speedToggle.setAttribute('aria-expanded', 'false')
+    player.closeSpeedPopover()
   }
 
   const displayTime = () =>
@@ -180,19 +147,14 @@ export function createPlaybackTimeline(
   const updateTimeline = (progress = getAudioProgress()) => {
     const currentTime = displayTime()
     const { duration } = audioController
-    elements.player.style.setProperty('--audio-progress-ratio', `${progress}`)
-
-    if (!scrubbing) {
-      elements.seek.value = `${Math.round(progress * 1000)}`
-      elements.seek.disabled =
-        !audioController.session || !Number.isFinite(duration)
-    }
-    elements.seek.setAttribute(
-      'aria-valuetext',
-      `${formatPlaybackDuration(currentTime)} of ${formatPlaybackDuration(duration)}`
-    )
-    elements.currentTime.textContent = formatPlaybackDuration(currentTime)
-    elements.duration.textContent = formatPlaybackDuration(duration)
+    player.syncProgress({
+      audioRatio: progress,
+      ...(!scrubbing ? { seekValue: Math.round(progress * 1000) } : {}),
+      seekDisabled: !audioController.session || !Number.isFinite(duration),
+      seekValueText: `${formatPlaybackDuration(currentTime)} of ${formatPlaybackDuration(duration)}`,
+      currentTime: formatPlaybackDuration(currentTime),
+      duration: formatPlaybackDuration(duration),
+    })
   }
 
   const updateCueProgress = (
@@ -211,19 +173,15 @@ export function createPlaybackTimeline(
       cueCount: session?.cues.length ?? 0,
     })
 
-    elements.player.style.setProperty(
-      '--cue-progress-ratio',
-      `${wordProgress.ratio}`
-    )
-    elements.wordProgress.textContent = wordProgress.label
-    elements.cueProgress.textContent = cueProgress.label
-    elements.cueProgress.classList.toggle('u-hidden', cueProgress.total === 0)
-    elements.mobileWordProgress.textContent =
-      `Word ${wordProgress.current} of ${wordProgress.total}`
-    elements.mobileWordProgress.classList.toggle(
-      'u-hidden',
-      !session?.cues.length || wordProgress.total === 0
-    )
+    player.syncProgress({
+      cueRatio: wordProgress.ratio,
+      wordProgress: wordProgress.label,
+      cueProgress: cueProgress.label,
+      cueProgressVisible: cueProgress.total > 0,
+      mobileWordProgress: `Word ${wordProgress.current} of ${wordProgress.total}`,
+      mobileWordProgressVisible:
+        Boolean(session?.cues.length) && wordProgress.total > 0,
+    })
   }
 
   const updateAudioProgress = () => {
@@ -242,14 +200,15 @@ export function createPlaybackTimeline(
   const updateMeta = () => {
     const session = audioController.session
     if (!session) {
-      elements.desktopTitle.textContent = '—'
-      elements.mobileTitle.textContent = '—'
-      elements.subtitle.textContent = 'Audio'
-      elements.mobileReading.textContent = '—'
-      elements.mode.textContent = 'No cues'
-      elements.wordProgress.textContent = '0 / 0'
-      elements.statusWrap.classList.add('u-hidden')
-      elements.status.textContent = ''
+      player.sync({
+        desktopTitle: '—',
+        mobileTitle: '—',
+        subtitle: 'Audio',
+        mobileReading: '—',
+        mode: 'No cues',
+        status: '',
+      })
+      player.syncProgress({ wordProgress: '0 / 0' })
       return
     }
 
@@ -272,14 +231,15 @@ export function createPlaybackTimeline(
     const readingLabel = session.recording.reading.name
     const aliyahLabel = formatAliyahLabel(session.aliyahIndex)
 
-    elements.desktopTitle.textContent = `${readingLabel} · ${aliyahLabel}`
-    elements.mobileTitle.textContent = aliyahLabel
-    elements.subtitle.textContent = 'Audio'
-    elements.mobileReading.textContent = readingLabel
-    elements.mode.textContent = session.cues.length ? 'Word cues' : 'No cues'
-    elements.statusWrap.classList.toggle('u-hidden', !statusLabel)
-    elements.status.textContent = statusLabel
-    elements.wordProgress.textContent = wordProgress.label
+    player.sync({
+      desktopTitle: `${readingLabel} · ${aliyahLabel}`,
+      mobileTitle: aliyahLabel,
+      subtitle: 'Audio',
+      mobileReading: readingLabel,
+      mode: session.cues.length ? 'Word cues' : 'No cues',
+      status: statusLabel,
+    })
+    player.syncProgress({ wordProgress: wordProgress.label })
   }
 
   const clampPlaybackRate = (rate: number) => {
@@ -303,20 +263,9 @@ export function createPlaybackTimeline(
       : clampedRate
   }
 
-  const formatPlaybackRate = (rate: number) => {
-    const rounded = Math.round(clampPlaybackRate(rate) * 100) / 100
-    return `${rounded.toFixed(2).replace(/\.?0+$/, '')}x`
-  }
-
   const syncPlaybackRateControl = () => {
     const rate = clampPlaybackRate(options.getPlaybackRate())
-    const formattedRate = formatPlaybackRate(rate)
-    elements.speedLabel.textContent = `${formattedRate} speed`
-    elements.speedCompactLabel.textContent = formattedRate
-    const buttonLabel = `Playback speed, ${formattedRate}`
-    elements.speedToggle.title = buttonLabel
-    elements.speedToggle.setAttribute('aria-label', buttonLabel)
-    elements.speedSlider.value = `${rate}`
+    player.sync({ playbackRate: rate })
     audioController.audio.playbackRate = rate
   }
 
@@ -341,8 +290,7 @@ export function createPlaybackTimeline(
   ) => {
     const isCompact = options.viewport.isCompact()
     const wasExpanded = expanded
-    const nextExpanded =
-      next && !elements.player.classList.contains('u-hidden')
+    const nextExpanded = next && Boolean(audioController.session)
 
     if (nextExpanded && isCompact && !wasExpanded) {
       const activeElement =
@@ -354,40 +302,13 @@ export function createPlaybackTimeline(
     }
     expanded = nextExpanded
 
-    elements.player.classList.toggle('is-expanded', nextExpanded)
-    elements.player.classList.toggle(
-      'mod-expandable',
-      !elements.player.classList.contains('u-hidden')
-    )
     if (!nextExpanded && wasExpanded && !isCompact) {
       resetPlayerPosition?.()
     }
-    elements.player.removeAttribute('title')
-    elements.player.setAttribute(
-      'aria-label',
-      nextExpanded && isCompact ? 'Expanded audio player' : 'Audio player'
-    )
-    document.documentElement.toggleAttribute(
-      'data-mobile-player-expanded',
-      nextExpanded && isCompact
-    )
-
-    const expandLabel = nextExpanded ? 'Collapse player' : 'Expand player'
-    setControlIcon(elements.expand, nextExpanded ? 'minimize2' : 'expand')
-    elements.expand.title = expandLabel
-    elements.expand.setAttribute('aria-label', expandLabel)
-    elements.expand.setAttribute('aria-expanded', `${nextExpanded}`)
-    elements.mobileExpand.setAttribute(
-      'aria-expanded',
-      `${nextExpanded}`
-    )
-    elements.backdrop.setAttribute(
-      'aria-hidden',
-      `${!nextExpanded || !isCompact}`
-    )
+    player.sync({ expanded: nextExpanded, compact: isCompact })
 
     if (nextExpanded && isCompact && !wasExpanded) {
-      scheduleFocus(() => elements.mobileClose.focus({ preventScroll: true }))
+      scheduleFocus(() => player.focusMobileClose())
       return
     }
 
@@ -414,86 +335,27 @@ export function createPlaybackTimeline(
     const hasTimedCues = Boolean(session?.cues.length)
     const paused = audioController.audio.paused
 
-    elements.player.classList.toggle('u-hidden', !session)
-    elements.player.classList.toggle(
-      'mod-untimed',
-      Boolean(session && !hasTimedCues)
-    )
-    elements.player.dataset.cueMode = hasTimedCues ? 'timed' : 'untimed'
     if (!session) setExpanded(false, { restoreFocus: false })
-    elements.cornerControls?.classList.toggle('mod-raised', Boolean(session))
-    elements.player.classList.toggle(
-      'is-playing',
-      Boolean(session && !paused)
-    )
-
-    setControlIcon(elements.play, paused ? 'play' : 'pause')
-    setControlIcon(
-      elements.previous,
-      hasTimedCues ? 'arrowRight' : 'rewind10'
-    )
-    setControlIcon(
-      elements.next,
-      hasTimedCues ? 'arrowLeft' : 'forward10'
-    )
-    const playLabel = paused ? 'Play' : 'Pause'
-    const previousLabel = hasTimedCues
-      ? 'Previous Word'
-      : `Back ${UNTIMED_PLAYBACK_SKIP_SECONDS} seconds`
-    const nextLabel = hasTimedCues
-      ? 'Next Word'
-      : `Forward ${UNTIMED_PLAYBACK_SKIP_SECONDS} seconds`
-
-    elements.play.title = playLabel
-    elements.play.setAttribute('aria-label', playLabel)
-    for (const [button, label] of [
-      [elements.previous, previousLabel],
-      [elements.next, nextLabel],
-      [elements.replay, 'Restart recording'],
-    ] as const) {
-      button.title = label
-      button.setAttribute('aria-label', label)
-    }
-    for (const button of [
-      elements.previous,
-      elements.play,
-      elements.next,
-      elements.replay,
-      elements.expand,
-      elements.mobileExpand,
-    ]) {
-      button.disabled = !session
-    }
-
-    elements.download.classList.toggle('u-hidden', !hasDownload)
-    elements.download.setAttribute(
-      'aria-disabled',
-      hasDownload ? 'false' : 'true'
-    )
-    elements.download.tabIndex = hasDownload ? 0 : -1
-    if (session && hasDownload) {
-      elements.download.href = session.recording.downloadSrc
-      elements.download.download =
-        `${session.recording.id}.${session.recording.format}`
-    } else {
-      elements.download.href = '#'
-      elements.download.removeAttribute('download')
-    }
-
-    elements.videoDownload.classList.toggle('u-hidden', !activeVideo)
-    elements.videoDownload.setAttribute(
-      'aria-disabled',
-      activeVideo ? 'false' : 'true'
-    )
-    elements.videoDownload.tabIndex = activeVideo ? 0 : -1
-    if (activeVideo) {
-      elements.videoDownload.href = activeVideo.downloadSrc
-      elements.videoDownload.download =
-        `${activeVideo.audioId}_${activeVideo.quality}.mp4`
-    } else {
-      elements.videoDownload.href = '#'
-      elements.videoDownload.removeAttribute('download')
-    }
+    cornerControls?.classList.toggle('mod-raised', Boolean(session))
+    player.sync({
+      visible: Boolean(session),
+      untimed: Boolean(session && !hasTimedCues),
+      playing: Boolean(session && !paused),
+      compact: options.viewport.isCompact(),
+      audioDownload:
+        session && hasDownload
+          ? {
+              href: session.recording.downloadSrc,
+              fileName: `${session.recording.id}.${session.recording.format}`,
+            }
+          : null,
+      videoDownload: activeVideo
+        ? {
+            href: activeVideo.downloadSrc,
+            fileName: `${activeVideo.audioId}_${activeVideo.quality}.mp4`,
+          }
+        : null,
+    })
 
     syncPlaybackRateControl()
     updateAudioProgress()
@@ -613,16 +475,16 @@ export function createPlaybackTimeline(
     options.focusReader()
   }
 
-  const seekTarget = () => {
+  const seekTarget = (ratio: number) => {
     const { duration } = audioController
     if (!audioController.session || !Number.isFinite(duration) || duration <= 0) {
       return null
     }
-    return (Number.parseFloat(elements.seek.value) / 1000) * duration
+    return Math.max(0, Math.min(1, ratio)) * duration
   }
 
-  const previewSeek = () => {
-    const targetTime = seekTarget()
+  const previewSeek = (ratio: number) => {
+    const targetTime = seekTarget(ratio)
     if (targetTime === null) return
     scrubPreviewTime = targetTime
     refresh('progress')
@@ -632,7 +494,8 @@ export function createPlaybackTimeline(
     })
   }
 
-  const commitSeek = (targetTime = seekTarget()) => {
+  const commitSeek = (ratio: number) => {
+    const targetTime = seekTarget(ratio)
     if (targetTime === null) return false
     audioController.seek(targetTime)
     refresh('progress')
@@ -640,31 +503,17 @@ export function createPlaybackTimeline(
     return true
   }
 
-  const seekFromPointer = (clientX: number) => {
-    const rect = elements.seek.getBoundingClientRect()
-    if (rect.width <= 0) return
-    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
-    elements.seek.value = `${Math.round(ratio * 1000)}`
-    previewSeek()
-  }
-
   const finishSeek = () => {
     if (!scrubbing) return
-    const targetTime = scrubPreviewTime ?? seekTarget()
+    const targetTime = scrubPreviewTime
     scrubbing = false
     scrubPreviewTime = null
     scrubPointerId = null
-    if (commitSeek(targetTime)) options.saveReadingPosition()
-  }
-
-  const playbackRateFromPointer = (clientX: number) => {
-    const rect = elements.speedSlider.getBoundingClientRect()
-    const ratio = (clientX - rect.left) / Math.max(rect.width, 1)
-    return (
-      PLAYBACK_RATE_MIN +
-      Math.max(0, Math.min(1, ratio)) *
-        (PLAYBACK_RATE_MAX - PLAYBACK_RATE_MIN)
-    )
+    if (targetTime === null) return
+    audioController.seek(targetTime)
+    refresh('progress')
+    void syncHighlight({ currentTime: targetTime })
+    options.saveReadingPosition()
   }
 
   const setupDragging = () => {
@@ -679,12 +528,11 @@ export function createPlaybackTimeline(
     } | null = null
 
     const clearRenderedPosition = () => {
-      elements.player.style.removeProperty('left')
-      elements.player.style.removeProperty('top')
+      player.setPosition(null)
     }
 
     const setPosition = (left: number, top: number) => {
-      const rect = elements.player.getBoundingClientRect()
+      const rect = player.measure()
       const maxLeft = Math.max(
         FLOATING_PLAYER_VIEWPORT_MARGIN,
         view.innerWidth - rect.width - FLOATING_PLAYER_VIEWPORT_MARGIN
@@ -703,8 +551,7 @@ export function createPlaybackTimeline(
           Math.min(top, maxTop)
         ),
       }
-      elements.player.style.left = `${position.left}px`
-      elements.player.style.top = `${position.top}px`
+      player.setPosition(position)
     }
 
     const syncPositionForViewport = () => {
@@ -721,140 +568,83 @@ export function createPlaybackTimeline(
     }
     resetPlayerPosition = resetPosition
 
-    elements.dragHandle.addEventListener(
-      'pointerdown',
-      (event) => {
-        if (options.viewport.isCompact() || event.button !== 0) return
-        event.preventDefault()
-        const rect = elements.player.getBoundingClientRect()
-        if (!defaultPosition && !position) {
-          defaultPosition = { left: rect.left, top: rect.top }
-        }
-        dragState = {
-          pointerId: event.pointerId,
-          pointerX: event.clientX,
-          pointerY: event.clientY,
-          playerLeft: rect.left,
-          playerTop: rect.top,
-        }
-        elements.player.classList.add('is-dragging')
-      },
-      { signal: scope.signal }
-    )
-    view.addEventListener(
-      'pointermove',
-      (event) => {
-        if (!dragState || dragState.pointerId !== event.pointerId) return
-        setPosition(
-          dragState.playerLeft + event.clientX - dragState.pointerX,
-          dragState.playerTop + event.clientY - dragState.pointerY
-        )
-      },
-      { signal: scope.signal }
-    )
-
-    const finishDrag = (event: PointerEvent) => {
-      if (!dragState || dragState.pointerId !== event.pointerId) return
-      dragState = null
-      elements.player.classList.remove('is-dragging')
-      if (!position || !defaultPosition) return
-      if (
-        Math.hypot(
-          position.left - defaultPosition.left,
-          position.top - defaultPosition.top
-        ) <= FLOATING_PLAYER_SNAP_DISTANCE
-      ) {
-        resetPosition()
-      }
-    }
-    view.addEventListener('pointerup', finishDrag, { signal: scope.signal })
-    view.addEventListener('pointercancel', finishDrag, {
-      signal: scope.signal,
-    })
-    view.addEventListener(
-      'blur',
-      () => {
-        dragState = null
-        elements.player.classList.remove('is-dragging')
-      },
-      { signal: scope.signal }
-    )
-    elements.dragHandle.addEventListener('dblclick', resetPosition, {
-      signal: scope.signal,
-    })
-    elements.dragHandle.addEventListener(
-      'keydown',
-      (event) => {
-        if (options.viewport.isCompact()) return
-        if (event.key === 'Home') {
-          event.preventDefault()
-          resetPosition()
+    const handleDragAction = (action: FloatingPlayerAction) => {
+      switch (action.type) {
+        case 'drag-start': {
+          if (options.viewport.isCompact()) return
+          const rect = action.playerRect
+          if (!defaultPosition && !position) {
+            defaultPosition = { left: rect.left, top: rect.top }
+          }
+          dragState = {
+            pointerId: action.pointerId,
+            pointerX: action.clientX,
+            pointerY: action.clientY,
+            playerLeft: rect.left,
+            playerTop: rect.top,
+          }
+          player.setDragging(true)
           return
         }
-        const direction = {
-          ArrowLeft: [-1, 0],
-          ArrowRight: [1, 0],
-          ArrowUp: [0, -1],
-          ArrowDown: [0, 1],
-        }[event.key]
-        if (!direction) return
-
-        event.preventDefault()
-        const rect = elements.player.getBoundingClientRect()
-        if (!defaultPosition && !position) {
-          defaultPosition = { left: rect.left, top: rect.top }
+        case 'drag-move':
+          if (!dragState || dragState.pointerId !== action.pointerId) return
+          setPosition(
+            dragState.playerLeft + action.clientX - dragState.pointerX,
+            dragState.playerTop + action.clientY - dragState.pointerY
+          )
+          return
+        case 'drag-finish':
+          if (!dragState || dragState.pointerId !== action.pointerId) return
+          dragState = null
+          player.setDragging(false)
+          if (
+            position &&
+            defaultPosition &&
+            Math.hypot(
+              position.left - defaultPosition.left,
+              position.top - defaultPosition.top
+            ) <= FLOATING_PLAYER_SNAP_DISTANCE
+          ) {
+            resetPosition()
+          }
+          return
+        case 'drag-cancel':
+          dragState = null
+          player.setDragging(false)
+          return
+        case 'drag-reset':
+          resetPosition()
+          return
+        case 'drag-key': {
+          if (options.viewport.isCompact()) return
+          const rect = action.playerRect
+          if (!defaultPosition && !position) {
+            defaultPosition = { left: rect.left, top: rect.top }
+          }
+          const distance = action.shiftKey ? 40 : 12
+          setPosition(
+            rect.left + action.direction[0] * distance,
+            rect.top + action.direction[1] * distance
+          )
+          return
         }
-        const distance = event.shiftKey ? 40 : 12
-        setPosition(
-          rect.left + direction[0] * distance,
-          rect.top + direction[1] * distance
-        )
-      },
-      { signal: scope.signal }
-    )
+        case 'layout':
+          syncPositionForViewport()
+      }
+    }
 
     scope.own(options.viewport.onChange(syncPositionForViewport))
-    view.addEventListener('resize', syncPositionForViewport, {
-      signal: scope.signal,
-    })
-    const resizeObserver = new ResizeObserver(syncPositionForViewport)
-    resizeObserver.observe(elements.player)
-    scope.own(() => resizeObserver.disconnect())
     scope.own(() => {
       dragState = null
-      elements.player.classList.remove('is-dragging')
+      player.setDragging(false)
       clearRenderedPosition()
       if (resetPlayerPosition === resetPosition) resetPlayerPosition = null
     })
+
+    return handleDragAction
   }
 
   const setupViewportInteractions = () => {
-    elements.expand.addEventListener(
-      'click',
-      () => {
-        if (!audioController.session || options.viewport.isCompact()) return
-        setExpanded(!expanded)
-      },
-      { signal: scope.signal }
-    )
-    elements.mobileExpand.addEventListener(
-      'click',
-      () => {
-        if (!audioController.session || !options.viewport.isCompact()) return
-        setExpanded(true, { returnFocus: elements.mobileExpand })
-      },
-      { signal: scope.signal }
-    )
-    elements.mobileClose.addEventListener(
-      'click',
-      () => setExpanded(false),
-      { signal: scope.signal }
-    )
-    elements.backdrop.addEventListener(
-      'click',
-      () => setExpanded(false),
-      { signal: scope.signal }
-    )
     scope.own(
       options.viewport.onChange(() => {
         setExpanded(false, { restoreFocus: false })
@@ -862,197 +652,69 @@ export function createPlaybackTimeline(
     )
   }
 
-  const setupControls = () => {
-    elements.play.addEventListener(
-      'click',
-      async () => {
-        await toggle(async () => {
-          await options.playNetworkRecording()
-        })
-        options.saveReadingPosition()
-        focusAfterAction()
-      },
-      { signal: scope.signal }
-    )
-    elements.previous.addEventListener(
-      'click',
-      () => {
-        step(-1)
-        options.saveReadingPosition()
-        focusAfterAction()
-      },
-      { signal: scope.signal }
-    )
-    elements.next.addEventListener(
-      'click',
-      () => {
-        step(1)
-        options.saveReadingPosition()
-        focusAfterAction()
-      },
-      { signal: scope.signal }
-    )
-    elements.replay.addEventListener(
-      'click',
-      async () => {
-        await restart()
-        options.saveReadingPosition()
-        focusAfterAction()
-      },
-      { signal: scope.signal }
-    )
-
-    elements.seek.addEventListener(
-      'input',
-      () => {
-        if (scrubbing) return
-        if (commitSeek()) options.saveReadingPosition()
-      },
-      { signal: scope.signal }
-    )
-    elements.seek.addEventListener(
-      'pointerdown',
-      (event) => {
-        if (
-          event.button !== 0 ||
-          elements.seek.disabled ||
-          scrubPointerId !== null
-        ) {
-          return
-        }
-        event.preventDefault()
-        scrubbing = true
-        scrubPointerId = event.pointerId
-        elements.seek.focus({ preventScroll: true })
-        elements.seek.setPointerCapture(event.pointerId)
-        seekFromPointer(event.clientX)
-      },
-      { signal: scope.signal }
-    )
-    elements.seek.addEventListener(
-      'pointermove',
-      (event) => {
-        if (event.pointerId !== scrubPointerId) return
-        seekFromPointer(event.clientX)
-      },
-      { signal: scope.signal }
-    )
-    elements.seek.addEventListener(
-      'pointerup',
-      (event) => {
-        if (event.pointerId !== scrubPointerId) return
-        seekFromPointer(event.clientX)
-        finishSeek()
-        if (elements.seek.hasPointerCapture(event.pointerId)) {
-          elements.seek.releasePointerCapture(event.pointerId)
-        }
-      },
-      { signal: scope.signal }
-    )
-    elements.seek.addEventListener(
-      'pointercancel',
-      (event) => {
-        if (event.pointerId !== scrubPointerId) return
-        finishSeek()
-        if (elements.seek.hasPointerCapture(event.pointerId)) {
-          elements.seek.releasePointerCapture(event.pointerId)
-        }
-      },
-      { signal: scope.signal }
-    )
-    elements.seek.addEventListener(
-      'lostpointercapture',
-      () => {
-        if (scrubbing) finishSeek()
-      },
-      { signal: scope.signal }
-    )
-    elements.seek.addEventListener(
-      'change',
-      () => {
-        if (!scrubbing) updateAudioProgress()
-      },
-      { signal: scope.signal }
-    )
-
-    elements.speedToggle.addEventListener(
-      'click',
-      () => {
-        const opening = elements.speedPopover.classList.contains('u-hidden')
-        elements.speedPopover.classList.toggle('u-hidden', !opening)
-        elements.speedToggle.setAttribute('aria-expanded', `${opening}`)
-        syncPlaybackRateControl()
-        if (opening) {
-          elements.speedSlider.focus({ preventScroll: true })
-        }
-      },
-      { signal: scope.signal }
-    )
-    document.addEventListener(
-      'pointerdown',
-      (event) => {
-        const target = event.target as HTMLElement
-        if (elements.speedPopover.classList.contains('u-hidden')) return
-        if (target.closest('.floating-speed-control')) return
-        closeSpeedPopover()
-      },
-      { signal: scope.signal }
-    )
-    elements.speedSlider.addEventListener(
-      'input',
-      () => {
-        setPlaybackRate(Number.parseFloat(elements.speedSlider.value), true)
-      },
-      { signal: scope.signal }
-    )
-    elements.speedSlider.addEventListener(
-      'pointerdown',
-      (event) => {
-        event.preventDefault()
-        elements.speedSlider.setPointerCapture(event.pointerId)
-        setPlaybackRate(playbackRateFromPointer(event.clientX), true)
-      },
-      { signal: scope.signal }
-    )
-    elements.speedSlider.addEventListener(
-      'pointermove',
-      (event) => {
-        if (!elements.speedSlider.hasPointerCapture(event.pointerId)) return
-        setPlaybackRate(playbackRateFromPointer(event.clientX), true)
-      },
-      { signal: scope.signal }
-    )
-    elements.speedSlider.addEventListener(
-      'pointerup',
-      (event) => {
-        if (elements.speedSlider.hasPointerCapture(event.pointerId)) {
-          elements.speedSlider.releasePointerCapture(event.pointerId)
-        }
-        setPlaybackRate(playbackRateFromPointer(event.clientX), true)
-      },
-      { signal: scope.signal }
-    )
-    elements.speedSlider.addEventListener(
-      'pointercancel',
-      (event) => {
-        if (elements.speedSlider.hasPointerCapture(event.pointerId)) {
-          elements.speedSlider.releasePointerCapture(event.pointerId)
-        }
-      },
-      { signal: scope.signal }
-    )
-    elements.speedSlider.addEventListener(
-      'change',
-      () => {
-        setPlaybackRate(Number.parseFloat(elements.speedSlider.value), true)
-      },
-      { signal: scope.signal }
-    )
-  }
-
-  setupDragging()
+  const handleDragAction = setupDragging()
   setupViewportInteractions()
-  setupControls()
+  handlePlayerAction = (action) => {
+    switch (action.type) {
+      case 'toggle-playback':
+        void (async () => {
+          await toggle(async () => {
+            await options.playNetworkRecording()
+          })
+          options.saveReadingPosition()
+          focusAfterAction()
+        })()
+        return
+      case 'step':
+        step(action.delta)
+        options.saveReadingPosition()
+        focusAfterAction()
+        return
+      case 'restart':
+        void (async () => {
+          await restart()
+          options.saveReadingPosition()
+          focusAfterAction()
+        })()
+        return
+      case 'seek-commit':
+        if (!scrubbing && commitSeek(action.ratio)) {
+          options.saveReadingPosition()
+        }
+        return
+      case 'seek-preview':
+        if (action.phase === 'start') {
+          if (scrubPointerId !== null) return
+          scrubbing = true
+          scrubPointerId = action.pointerId
+        }
+        if (action.pointerId !== scrubPointerId) return
+        previewSeek(action.ratio)
+        return
+      case 'seek-finish':
+        if (action.pointerId !== scrubPointerId) return
+        previewSeek(action.ratio)
+        finishSeek()
+        return
+      case 'set-rate':
+        setPlaybackRate(action.rate, action.snap)
+        return
+      case 'set-expanded':
+        if (!audioController.session && action.expanded) return
+        if (action.source === 'desktop' && options.viewport.isCompact()) return
+        if (action.source === 'mobile' && !options.viewport.isCompact()) return
+        setExpanded(action.expanded, { returnFocus: action.returnFocus })
+        return
+      case 'drag-start':
+      case 'drag-move':
+      case 'drag-finish':
+      case 'drag-cancel':
+      case 'drag-reset':
+      case 'drag-key':
+      case 'layout':
+        handleDragAction(action)
+    }
+  }
 
   scope.own(
     audioController.on('playback-updated', () => {
@@ -1143,19 +805,12 @@ export function createPlaybackTimeline(
     focusFrame = 0
     scrubbing = false
     scrubPreviewTime = null
-    if (
-      scrubPointerId !== null &&
-      elements.seek.hasPointerCapture(scrubPointerId)
-    ) {
-      elements.seek.releasePointerCapture(scrubPointerId)
-    }
     scrubPointerId = null
     expanded = false
     expansionReturnFocus = null
     closeSpeedPopover()
-    elements.player.classList.remove('is-expanded', 'is-dragging')
-    elements.player.style.removeProperty('--audio-progress-ratio')
-    elements.player.style.removeProperty('--cue-progress-ratio')
+    player.sync({ expanded: false, compact: false })
+    player.setDragging(false)
     document.documentElement.removeAttribute('data-mobile-player-expanded')
   })
 
@@ -1176,81 +831,5 @@ export function createPlaybackTimeline(
       closeSpeedPopover()
       return false
     },
-  }
-}
-
-function mountFloatingPlayer(scope: MountScope, document: Document) {
-  const target = document.querySelector<HTMLElement>(
-    '[data-target-id="floating-player-root"]'
-  )
-  if (!target) {
-    throw new Error(
-      'Missing Playback Timeline target: [data-target-id="floating-player-root"]'
-    )
-  }
-  if (target.childNodes.length) {
-    throw new Error('Playback Timeline requires an empty player root')
-  }
-
-  const component = mount(FloatingPlayerView, { target })
-  flushSync()
-  scope.own(() => {
-    void unmount(component).catch((error: unknown) => {
-      console.error('Failed to unmount Floating Player', error)
-    })
-  })
-}
-
-function getPlayerElements(document: Document): PlayerElements {
-  const required = <ElementType extends Element>(selector: string) => {
-    const element = document.querySelector<ElementType>(selector)
-    if (!element) {
-      throw new Error(`Missing Playback Timeline target: ${selector}`)
-    }
-    return element
-  }
-
-  return {
-    player: required('[data-target-id="floating-player"]'),
-    cornerControls: document.querySelector('.reader-corner-controls'),
-    previous: required('[data-target-id="floating-prev"]'),
-    play: required('[data-target-id="floating-play"]'),
-    next: required('[data-target-id="floating-next"]'),
-    replay: required('[data-target-id="floating-replay"]'),
-    dragHandle: required('[data-target-id="floating-drag-handle"]'),
-    expand: required('[data-target-id="floating-expand-toggle"]'),
-    mobileExpand: required('[data-target-id="floating-mobile-expand"]'),
-    mobileClose: required('[data-target-id="floating-mobile-close"]'),
-    backdrop: required('[data-target-id="floating-player-backdrop"]'),
-    download: required('[data-target-id="floating-download"]'),
-    videoDownload: required('[data-target-id="floating-video-download"]'),
-    desktopTitle: required(
-      '[data-target-id="floating-player-title-desktop"]'
-    ),
-    mobileTitle: required(
-      '[data-target-id="floating-player-title-mobile"]'
-    ),
-    subtitle: required('[data-target-id="floating-player-subtitle"]'),
-    mobileReading: required('[data-target-id="floating-player-parsha"]'),
-    mode: required('[data-target-id="floating-player-mode"]'),
-    cueProgress: required(
-      '[data-target-id="floating-player-cue-progress"]'
-    ),
-    wordProgress: required('[data-target-id="floating-meta-cues"]'),
-    mobileWordProgress: required(
-      '[data-target-id="mobile-player-word-progress"]'
-    ),
-    statusWrap: required('[data-target-id="floating-meta-status-wrap"]'),
-    status: required('[data-target-id="floating-meta-status"]'),
-    seek: required('[data-target-id="mobile-player-seek"]'),
-    currentTime: required('[data-target-id="mobile-player-current-time"]'),
-    duration: required('[data-target-id="mobile-player-duration"]'),
-    speedToggle: required('[data-target-id="floating-speed-toggle"]'),
-    speedLabel: required('[data-target-id="floating-speed-label"]'),
-    speedCompactLabel: required(
-      '[data-target-id="floating-speed-compact-label"]'
-    ),
-    speedPopover: required('[data-target-id="floating-speed-popover"]'),
-    speedSlider: required('[data-target-id="floating-speed-slider"]'),
   }
 }

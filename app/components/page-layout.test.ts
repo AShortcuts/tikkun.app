@@ -16,13 +16,20 @@ const uiIconSource = readFileSync(
   new URL('./UiIcon.svelte', import.meta.url),
   'utf8'
 )
-const appSource = readFileSync(new URL('../index.ts', import.meta.url), 'utf8')
+const appSource = readFileSync(
+  new URL('../reader/reader-runtime.ts', import.meta.url),
+  'utf8'
+)
 const playbackTimelineSource = readFileSync(
   new URL('../reading/playback-timeline.ts', import.meta.url),
   'utf8'
 )
 const floatingPlayerComponentSource = readFileSync(
   new URL('../reading/FloatingPlayer.svelte', import.meta.url),
+  'utf8'
+)
+const floatingPlayerSource = readFileSync(
+  new URL('../reading/floating-player.ts', import.meta.url),
   'utf8'
 )
 const readerSettingsSource = readFileSync(
@@ -41,24 +48,29 @@ const readerControlsComponentSource = readFileSync(
   new URL('../reader/ReaderControls.svelte', import.meta.url),
   'utf8'
 )
+const readerShellComponentSource = readFileSync(
+  new URL('../reader/ReaderShell.svelte', import.meta.url),
+  'utf8'
+)
 const cueAuthoringSource = readFileSync(
   new URL('../admin/cue-authoring.ts', import.meta.url),
   'utf8'
 )
-const desktopAliyahRailSource = readFileSync(
-  new URL('../reading/aliyah-navigation/desktop-rail.ts', import.meta.url),
+const aliyahNavigationSource = readFileSync(
+  new URL('../reading/aliyah-navigation/aliyah-navigation.ts', import.meta.url),
   'utf8'
 )
-const mobileAliyahPickerSource = readFileSync(
-  new URL('../reading/aliyah-navigation/mobile-picker.ts', import.meta.url),
+const aliyahNavigationLayerSource = readFileSync(
+  new URL(
+    '../reading/aliyah-navigation/AliyahNavigationLayer.svelte',
+    import.meta.url
+  ),
   'utf8'
 )
 const aliyahStartMarkerSource = readFileSync(
   new URL('../reading/aliyah-start-marker.ts', import.meta.url),
   'utf8'
 )
-const indexHtml = readFileSync(new URL('../../index.html', import.meta.url), 'utf8')
-
 test('centers line content with a structural balance rail instead of nudge offsets', () => {
   expect(pageCss.includes('--line-side-balance-width')).toBe(true)
   expect(pageCss.includes('--verse-gutter-text-gap: 1ch')).toBe(true)
@@ -112,6 +124,13 @@ test('shows absolute page numbers as hover-only page decoration', () => {
   expect(pageCss).toMatch(/\.tikkun-page-number:hover\s*{[\s\S]*?opacity:\s*1;/)
   expect(pageCss).toMatch(/\.tikkun-page-number\.mod-route-reveal\s*{[\s\S]*?animation:\s*page-number-route-reveal 1\.8s ease-out;/)
   expect(pageCss).toMatch(/@keyframes page-number-route-reveal\s*{[\s\S]*?42%\s*{[\s\S]*?opacity:\s*1;[\s\S]*?100%\s*{[\s\S]*?opacity:\s*0;/)
+})
+
+test('uses the completed cursor only while an aliyah link shows its copied state', () => {
+  expect(pageCss).toMatch(/\.aliyah-link\s*{[\s\S]*?cursor:\s*pointer;/)
+  expect(pageCss).toMatch(
+    /\.aliyah-link\[data-copy-state='copied'\]\s*{[\s\S]*?cursor:\s*default;/
+  )
 })
 
 test('keeps verse numbers offscreen for the mobile pull gutter', () => {
@@ -184,14 +203,14 @@ test('anchors the mobile aliyah overlay once without changing Torah text flow', 
 })
 
 test('shares the aliyah rail four-second reveal state with the mobile start overlay', () => {
-  expect(desktopAliyahRailSource).toContain(
-    'const ALIYAH_RAIL_AUTO_HIDE_MS = 4000'
+  expect(aliyahNavigationSource).toContain(
+    'export const ALIYAH_RAIL_AUTO_HIDE_MS = 4000'
   )
-  expect(desktopAliyahRailSource).toContain(
-    'documentRoot.dataset.aliyahRailVisibility'
+  expect(aliyahNavigationLayerSource).toContain(
+    'ownerDocument.documentElement.dataset.aliyahRailVisibility'
   )
   expect(appSource).toMatch(
-    /showAliyahStarts:\s*\(\)\s*=>\s*{[\s\S]*?revealAliyahRail\('peek'\)/
+    /showAliyahStarts:\s*\(\)\s*=>\s*{[\s\S]*?aliyahNavigationGlobal\?\.revealWide\('peek'\)/
   )
   expect(readerControlsComponentSource).toContain(
     'data-toolbar-overflow-action="aliyah-starts"'
@@ -208,15 +227,29 @@ test('keeps the mobile aliyah picker tap target while drawing a smaller capsule'
   expect(mobileReaderCss).toMatch(/\.mobile-aliyah-picker-speaker \.ui-icon,[\s\S]*?\.mobile-aliyah-picker-chevron \.ui-icon\s*{[\s\S]*?display:\s*block;/)
 })
 
+test('draws the mobile aliyah picker focus indicator around its capsule', () => {
+  expect(mobileReaderCss).toMatch(
+    /\.mobile-aliyah-picker-toggle:not\(\.u-hidden\)\s*{[\s\S]*?border-radius:\s*999px;/
+  )
+  expect(mobileReaderCss).toMatch(
+    /\.mobile-aliyah-picker-toggle:focus-visible\s*{[\s\S]*?outline:\s*none;[\s\S]*?}\s*\.mobile-aliyah-picker-toggle:focus-visible::before\s*{[\s\S]*?0 0 0 2px var\(--paper-color\),[\s\S]*?0 0 0 4px var\(--mobile-reader-blue\);/
+  )
+  expect(mobileReaderCss).toMatch(
+    /@media screen and \(max-width:\s*550px\) and \(forced-colors:\s*active\)\s*{[\s\S]*?\.mobile-aliyah-picker-toggle:focus-visible\s*{[\s\S]*?outline:\s*2px solid Highlight;/
+  )
+})
+
 test('animates the mobile aliyah picker before hiding it', () => {
   expect(mobileReaderCss).toMatch(/\.mobile-aliyah-picker\.is-closing \.mobile-aliyah-picker-backdrop\s*{[\s\S]*?mobile-aliyah-backdrop-exit 160ms/)
   expect(mobileReaderCss).toMatch(/\.mobile-aliyah-picker\.is-closing \.mobile-aliyah-sheet\s*{[\s\S]*?mobile-aliyah-sheet-exit 180ms/)
-  expect(mobileAliyahPickerSource).toContain("picker.classList.add('is-closing')")
-  expect(mobileAliyahPickerSource).toContain(
+  expect(aliyahNavigationLayerSource).toContain(
+    'pickerClosing = !reduceMotion'
+  )
+  expect(aliyahNavigationLayerSource).toContain(
     'view.setTimeout(finishClose, 180)'
   )
-  expect(mobileAliyahPickerSource).toContain(
-    "view.matchMedia('(prefers-reduced-motion: reduce)').matches"
+  expect(aliyahNavigationLayerSource).toMatch(
+    /view\.matchMedia\(\s*'\(prefers-reduced-motion: reduce\)'\s*\)\.matches/
   )
 })
 
@@ -226,7 +259,8 @@ test('orders the mobile aliyah grid from right to left without reversing card co
 })
 
 test('keeps the mobile app toolbar compact without shrinking its controls', () => {
-  expect(mobileReaderCss).toMatch(/\.toolbar-content\s*{[\s\S]*?min-height:\s*3\.75rem;/)
+  expect(mobileReaderCss).toMatch(/\.toolbar-content\s*{[\s\S]*?min-height:\s*3\.75rem;[\s\S]*?padding:\s*0 0\.375rem;/)
+  expect(mobileReaderCss).toMatch(/\.mobile-aliyah-segments:not\(\.u-hidden\)\s*{[\s\S]*?padding:\s*0\.25rem 0\.375rem;/)
   expect(mobileReaderCss).toMatch(/\.mobile-aliyah-picker-toggle:not\(\.u-hidden\)\s*{[\s\S]*?min-height:\s*2\.75rem;/)
   expect(mobileReaderCss).toMatch(/\.toolbar-button\.mod-icon-label\.toolbar-overflow-toggle\s*{[\s\S]*?min-height:\s*2\.75rem;/)
 })
@@ -237,73 +271,107 @@ test('gives the mobile settings button the desktop background treatment', () => 
 })
 
 test('uses an icon-only mobile home control that opens the About route', () => {
-  expect(mobileReaderCss).toMatch(/\.mobile-library-button\s*{[\s\S]*?width:\s*2\.75rem;[\s\S]*?min-height:\s*2\.75rem;/)
-  expect(appSource).toContain("setControlIcon(document.querySelector('[data-target-id=\"mobile-library-icon\"]'), 'houseFilled')")
-  expect(appSource).toMatch(/libraryButton\.addEventListener\('click',[\s\S]*?toggleAboutRoute\(audioController\)/)
+  expect(mobileReaderCss).toMatch(/\.mobile-library-button\s*{[\s\S]*?width:\s*2\.75rem;[\s\S]*?min-height:\s*2\.75rem;[\s\S]*?border:\s*1px solid var\(--mobile-reader-border\);[\s\S]*?border-radius:\s*0\.85rem;[\s\S]*?background:\s*var\(--mobile-reader-control-surface\);[\s\S]*?box-shadow:\s*var\(--mobile-reader-control-shadow\);/)
+  expect(readerShellComponentSource).toContain('<UiIcon name="houseFilled" />')
+  expect(appSource).toMatch(
+    /onAboutClick:\s*\(\)\s*=>\s*{[\s\S]*?aliyahNavigationGlobal\?\.closeCompact\(\)[\s\S]*?readerRouteGlobal\?\.toggleAbout\(\)/
+  )
+  expect(readerShellComponentSource).toMatch(
+    /data-target-id="mobile-library"[\s\S]*?onclick={onAboutClick}/
+  )
 })
 
-test('centers a wider mobile title between equal toolbar side columns', () => {
+test('centers a larger neutral parsha trigger between equal toolbar side columns', () => {
   expect(mobileReaderCss).toContain('--mobile-toolbar-title-width: min(9rem, calc(100vw - 15rem))')
   expect(mobileReaderCss).toMatch(/grid-template-columns:[\s\S]*?minmax\(0, 1fr\)[\s\S]*?minmax\(0, var\(--mobile-toolbar-title-width\)\)[\s\S]*?minmax\(0, 1fr\);/)
   expect(mobileReaderCss).toMatch(/\.toolbar-wrapper\.mod-center\s*{[\s\S]*?justify-self:\s*stretch;[\s\S]*?justify-content:\s*center;/)
-  expect(mobileReaderCss).toMatch(/\.parsha-title\s*{[\s\S]*?width:\s*100%;[\s\S]*?max-width:\s*none;/)
+  expect(mobileReaderCss).toMatch(/\.parsha-title\s*{[\s\S]*?width:\s*max-content;[\s\S]*?max-width:\s*100%;[\s\S]*?min-height:\s*3rem;[\s\S]*?border:\s*1px solid var\(--mobile-reader-border\);[\s\S]*?border-radius:\s*999px;[\s\S]*?box-shadow:\s*var\(--mobile-reader-control-shadow\);[\s\S]*?font-size:\s*1\.4rem;/)
+  expect(mobileReaderCss).toMatch(/@media screen and \(max-width:\s*350px\)\s*{[\s\S]*?\.parsha-title\s*{[\s\S]*?font-size:\s*1\.2rem;/)
+  expect(readerShellComponentSource).not.toMatch(
+    /class="parsha-title"(?:(?!<\/button>)[\s\S])*<UiIcon/
+  )
+})
+
+test('keeps the parsha keyboard shortcut tip desktop-only', () => {
+  expect(readerShellComponentSource).toContain(
+    `data-tooltip='Tip: Press "/" to open quickly'`
+  )
+  expect(mobileReaderCss).toMatch(
+    /\.parsha-title\[data-tooltip\]::after\s*{\s*display:\s*none;/
+  )
 })
 
 test('keeps unavailable mobile aliyot fully visible without an audio control', () => {
-  expect(mobileAliyahPickerSource).toContain(
-    "status.dataset.durationLabel = available ? 'Loading…' : 'No audio'"
+  expect(aliyahNavigationLayerSource).toContain(
+    "if (!item.audioKey) return 'No audio'"
   )
-  expect(mobileAliyahPickerSource).toContain('if (available) {')
-  expect(mobileAliyahPickerSource).toContain("setIcon(playButton, 'play')")
-  expect(mobileAliyahPickerSource).not.toContain("'playOff'")
+  expect(aliyahNavigationLayerSource).toContain('{#if item.audioKey}')
+  expect(aliyahNavigationLayerSource).toContain("? 'pause'")
+  expect(aliyahNavigationLayerSource).not.toContain("'playOff'")
   expect(mobileReaderCss).toMatch(/\.mobile-aliyah-card\.is-unavailable\s*{[^}]*grid-template-columns:\s*minmax\(0, 1fr\);/)
   expect(mobileReaderCss).not.toMatch(/\.mobile-aliyah-card\.is-unavailable\s*{[^}]*opacity:/)
 })
 
 test('centers the mobile aliyah segments when fewer than seven are rendered', () => {
   expect(mobileReaderCss).toMatch(/\.mobile-aliyah-segments:not\(\.u-hidden\)\s*{[\s\S]*?display:\s*flex;[\s\S]*?justify-content:\s*center;/)
-  expect(mobileReaderCss).toMatch(/\.mobile-aliyah-segment\s*{[\s\S]*?flex:\s*0 1 calc\(\(100% - 3rem\) \/ 7\);/)
+  expect(mobileReaderCss).toMatch(/\.mobile-aliyah-segment\s*{[\s\S]*?flex:\s*0 1 calc\(100% \/ 7\);/)
+})
+
+test('uses genuine 44px touch targets without enlarging rail or seek artwork', () => {
+  expect(mobileReaderCss).toMatch(/\.mobile-aliyah-segments:not\(\.u-hidden\)\s*{[\s\S]*?height:\s*2rem;[\s\S]*?padding:\s*0\.25rem 0\.375rem;[\s\S]*?overflow:\s*visible;/)
+  expect(mobileReaderCss).toMatch(/\.mobile-aliyah-segment\s*{[\s\S]*?height:\s*2\.75rem;/)
+  expect(mobileReaderCss).toMatch(/\.mobile-aliyah-segment::before\s*{[\s\S]*?inset:\s*50% 0\.25rem auto;[\s\S]*?height:\s*0\.26rem;/)
+  expect(mobileReaderCss).toMatch(/\.mobile-player-seek,\s*\.floating-player\.mod-untimed \.mobile-player-seek\s*{[\s\S]*?height:\s*2\.75rem;[\s\S]*?margin:\s*-0\.375rem 0;/)
+  expect(mobileReaderCss).toMatch(/\.floating-player-mobile-expand\s*{[\s\S]*?width:\s*4rem;[\s\S]*?min-height:\s*2\.75rem;/)
+  expect(mobileReaderCss).toMatch(/\.floating-player\s*{[\s\S]*?padding:\s*0\.35rem 0\.75rem 3\.25rem;/)
+  expect(mobileReaderCss).toMatch(/\.floating-player-mobile-expand\s*{[\s\S]*?bottom:\s*0;/)
 })
 
 test('shares pause-on-open behavior across both mobile aliyah picker entry points', () => {
   const openPolicy = appSource.slice(
-    appSource.indexOf('function setupAliyahNavigationChrome('),
+    appSource.indexOf('function mountAliyahNavigation('),
     appSource.indexOf('function extendPendingAliyahRailSelectionForScroll(')
   )
-  const pickerInteraction = mobileAliyahPickerSource.slice(
-    mobileAliyahPickerSource.indexOf("grid.addEventListener("),
-    mobileAliyahPickerSource.indexOf("picker.addEventListener(")
+  const pickerInteraction = aliyahNavigationLayerSource.slice(
+    aliyahNavigationLayerSource.indexOf(
+      'async function playCompactItem('
+    ),
+    aliyahNavigationLayerSource.indexOf(
+      'function handleRailPointerEnter('
+    )
   )
 
   expect(openPolicy).toContain('audioController.pause()')
-  expect(mobileAliyahPickerSource).toContain('syncPlayback(onBeforeOpen())')
-  expect(mobileAliyahPickerSource).toContain(
-    'returnFocus = requestedReturnFocus ?? activeElement ?? toggle'
+  expect(aliyahNavigationLayerSource).toContain(
+    'syncPlayback(onBeforeCompactOpen())'
+  )
+  expect(aliyahNavigationLayerSource).toMatch(
+    /returnFocus =\s*requestedReturnFocus \?\?\s*activeHtmlElement \?\?\s*getCompactToggle\(\) \?\?\s*closeButton/
   )
   expect(readerControlsComponentSource).toContain(
     'openAliyahNavigation(menuToggle)'
   )
   expect(appSource).toMatch(
-    /openAliyahNavigation: \(returnFocus\) => \{[\s\S]*?if \(isCompactReaderViewport\(\)\) \{[\s\S]*?openMobileAliyahPickerFromControl\(returnFocus\)/
+    /openAliyahNavigation: \(returnFocus\) => \{[\s\S]*?if \(isCompactReaderViewport\(\)\) \{[\s\S]*?aliyahNavigationGlobal\?\.openCompact\(returnFocus\)/
   )
   expect(openPolicy).toMatch(
-    /createMobileAliyahPicker\(scope, \{[\s\S]*?\n\s+toggle,/
+    /createAliyahNavigation\(scope, \{[\s\S]*?onBeforeCompactOpen:/
   )
   expect(pickerInteraction).toContain(
-    'close({ focusTarget: getReaderFocusTarget() })'
+    'closeCompact({ focusTarget: getReaderFocusTarget() })'
   )
   expect(
     pickerInteraction.indexOf(
-      'close({ focusTarget: getReaderFocusTarget() })'
+      'closeCompact({ focusTarget: getReaderFocusTarget() })'
     )
-  ).toBeLessThan(pickerInteraction.indexOf('await onPlay(target)'))
+  ).toBeLessThan(pickerInteraction.indexOf('await onPlayCompact(target)'))
 })
 
 test('preserves focus when overflow actions open and close reader overlays', () => {
-  expect(indexHtml).toMatch(/data-target-id="settings-toggle"[\s\S]*?aria-haspopup="dialog"[\s\S]*?aria-expanded="false"/)
-  expect(indexHtml).toContain('data-target-id="settings-root"')
+  expect(readerShellComponentSource).toMatch(/data-target-id="settings-toggle"[\s\S]*?aria-haspopup="dialog"[\s\S]*?aria-expanded="false"/)
+  expect(readerShellComponentSource).toContain('data-target-id="settings-root"')
   expect(readerSettingsComponentSource).toMatch(/data-target-id="settings-pane"[\s\S]*?role="dialog"[\s\S]*?aria-labelledby="reader-settings-title"[\s\S]*?aria-hidden=/)
-  expect(indexHtml).toContain('data-target-id="reader-controls-root"')
+  expect(readerShellComponentSource).toContain('data-target-id="reader-controls-root"')
   expect(readerControlsSource).toContain('mount(ReaderControlsView')
   expect(readerControlsComponentSource).toContain('openSettings(menuToggle)')
   expect(appSource).toContain('readerSettingsGlobal?.open({ returnFocus })')
@@ -314,15 +382,18 @@ test('preserves focus when overflow actions open and close reader overlays', () 
     'if (focusTarget) restoreFocus(focusTarget)'
   )
   expect(readerSettingsSource).toContain('mount(ReaderSettingsPane')
-  expect(appSource).toMatch(/if \(isShowingParshaPicker\(\)\)\s*{[\s\S]*?hideParshaPicker\(\)[\s\S]*?getTitleEl\(\)\.focus\(\{ preventScroll: true \}\)/)
+  expect(appSource).toMatch(/if \(readerRouteGlobal\?\.snapshot\(\)\.pickerOpen\)\s*{[\s\S]*?readerRouteGlobal\.closePicker\(\)[\s\S]*?getReaderShell\(\)\.focusTitle\(\)/)
 })
 
 test('shows mobile word progress without changing the centered playback controls', () => {
   expect(floatingPlayerComponentSource).toContain(
     'data-target-id="mobile-player-word-progress"'
   )
-  expect(playbackTimelineSource).toMatch(
-    /mobileWordProgress\.textContent\s*=\s*`Word \$\{wordProgress\.current\} of \$\{wordProgress\.total\}`/
+  expect(playbackTimelineSource).toContain(
+    'mobileWordProgress: `Word ${wordProgress.current} of ${wordProgress.total}`'
+  )
+  expect(floatingPlayerComponentSource).toContain(
+    '{progress.mobileWordProgress}'
   )
   expect(mobileReaderCss).toMatch(/\.floating-player-controls\s*{[\s\S]*?grid-template-columns:\s*2\.75rem 2\.75rem 3rem 2\.75rem 2\.75rem;[\s\S]*?justify-content:\s*center;/)
   expect(mobileReaderCss).toMatch(/\.mobile-player-word-progress\s*{[\s\S]*?grid-column:\s*1 \/ 3;[\s\S]*?grid-row:\s*1;/)
@@ -351,8 +422,14 @@ test('uses a symmetric five-control row and a layout-independent mobile player s
   expect(previousIndex).toBeLessThan(playIndex)
   expect(playIndex).toBeLessThan(nextIndex)
   expect(nextIndex).toBeLessThan(speedIndex)
-  expect(indexHtml).toContain('data-target-id="floating-player-root"')
-  expect(playbackTimelineSource).toContain('mount(FloatingPlayerView')
+  expect(readerShellComponentSource).toContain(
+    'data-target-id="floating-player-root"'
+  )
+  expect(playbackTimelineSource).toContain('createFloatingPlayer(scope')
+  expect(floatingPlayerSource).toContain('mount(FloatingPlayerView')
+  expect(playbackTimelineSource).not.toContain(
+    '[data-target-id="floating-player"]'
+  )
   expect(floatingPlayerComponentSource).toContain(
     'data-target-id="floating-mobile-expand"'
   )
@@ -370,8 +447,11 @@ test('uses a symmetric five-control row and a layout-independent mobile player s
   expect(floatingPlayerComponentSource).toContain(
     '<UiIcon name="chevronUp" />'
   )
+  expect(floatingPlayerComponentSource).toContain(
+    "setExpanded(true, 'mobile', requireElement(mobileExpand"
+  )
   expect(playbackTimelineSource).toContain(
-    'setExpanded(true, { returnFocus: elements.mobileExpand })'
+    'setExpanded(action.expanded, { returnFocus: action.returnFocus })'
   )
 })
 
@@ -397,11 +477,10 @@ test('restores the legacy desktop player sidebar and expands into the current ca
   expect(readerEnhancementsCss).toMatch(
     /\.floating-player\.is-expanded \.floating-player-details,\s*\.floating-player\.mod-untimed\.is-expanded \.floating-player-details\s*{\s*display:\s*none;/
   )
+  expect(floatingPlayerComponentSource).toContain('title={expandLabel}')
+  expect(floatingPlayerComponentSource).toContain('aria-label={expandLabel}')
   expect(floatingPlayerComponentSource).toMatch(
-    /title="Expand player"[\s\S]*?aria-label="Expand player"/
-  )
-  expect(playbackTimelineSource).toContain(
-    "const expandLabel = nextExpanded ? 'Collapse player' : 'Expand player'"
+    /snapshot\.expanded \? 'Collapse player' : 'Expand player'/
   )
   expect(playbackTimelineSource).toContain(
     'resetPlayerPosition?.()'
@@ -410,9 +489,8 @@ test('restores the legacy desktop player sidebar and expands into the current ca
     'data-target-id="floating-player-cue-progress"'
   )
   expect(playbackTimelineSource).toContain('cueCount: session?.cues.length ?? 0')
-  expect(playbackTimelineSource).toContain(
-    'elements.cueProgress.textContent = cueProgress.label'
-  )
+  expect(playbackTimelineSource).toContain('cueProgress: cueProgress.label')
+  expect(floatingPlayerComponentSource).toContain('{progress.cueProgress}')
   expect(readerEnhancementsCss).toMatch(
     /\.floating-player\.is-expanded \.floating-player-cue-progress:not\(\.u-hidden\)\s*{[\s\S]*?display:\s*block;/
   )
@@ -434,17 +512,17 @@ test('places timed playback arrows on their matching physical sides without chan
   expect(readerEnhancementsCss).toMatch(
     /\.floating-player:not\(\.mod-untimed\) \.floating-player-controls \[data-target-id='floating-prev'\]\s*{\s*order:\s*3;/
   )
-  expect(playbackTimelineSource).toMatch(
-    /setControlIcon\(\s*elements\.previous,\s*hasTimedCues \? 'arrowRight' : 'rewind10'/
+  expect(floatingPlayerComponentSource).toContain(
+    "snapshot.untimed ? 'rewind10' : 'arrowRight'"
   )
-  expect(playbackTimelineSource).toMatch(
-    /setControlIcon\(\s*elements\.next,\s*hasTimedCues \? 'arrowLeft' : 'forward10'/
+  expect(floatingPlayerComponentSource).toContain(
+    "snapshot.untimed ? 'forward10' : 'arrowLeft'"
   )
-  expect(playbackTimelineSource).toMatch(
-    /elements\.previous\.addEventListener\([\s\S]*?step\(-1\)/
+  expect(floatingPlayerComponentSource).toContain(
+    "send({ type: 'step', delta: -1 })"
   )
-  expect(playbackTimelineSource).toMatch(
-    /elements\.next\.addEventListener\([\s\S]*?step\(1\)/
+  expect(floatingPlayerComponentSource).toContain(
+    "send({ type: 'step', delta: 1 })"
   )
 })
 
@@ -505,9 +583,8 @@ test('uses a consistent pointer and hover treatment for playback controls', () =
 })
 
 test('uses requested reader control icons and theme-aware playing text', () => {
-  expect(readerSettingsSource).toContain(
-    "toggle.innerHTML = iconMarkup('settings2')"
-  )
+  expect(readerShellComponentSource).toContain('<UiIcon name="settings2" />')
+  expect(readerSettingsSource).not.toContain('toggle.innerHTML')
   expect(readerControlsComponentSource).toContain('<UiIcon name="cog" />')
   expect(uiIconSource).toContain(
     "import { iconMarkup, type IconName } from './icons.ts'"

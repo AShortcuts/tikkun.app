@@ -78,22 +78,50 @@ function mountLoader({
   }
 }
 
+async function flushLazyWork() {
+  for (let count = 0; count < 6; count += 1) {
+    await Promise.resolve()
+  }
+}
+
 test('shares one in-flight optional import and one mount', async () => {
+  sessionStorage.setItem(CUE_AUTHORING_UNLOCKED_KEY, '1')
   const load = vi.fn(async () => createModule())
   const harness = mountLoader({ load })
 
-  const [first, second] = await Promise.all([
-    harness.loader.ensureLoaded(),
-    harness.loader.ensureLoaded(),
-  ])
+  harness.loader.open()
+  harness.loader.open()
+  await flushLazyWork()
 
   expect(load).toHaveBeenCalledOnce()
-  expect(first).toBe(harness.authoring)
-  expect(second).toBe(harness.authoring)
   expect(harness.authoring.restoreAccessState).toHaveBeenCalledOnce()
+  expect(harness.authoring.setVisible).toHaveBeenLastCalledWith(true)
+})
+
+test('reports unlocked access without loading the optional implementation', () => {
+  sessionStorage.setItem(CUE_AUTHORING_UNLOCKED_KEY, '1')
+  const load = vi.fn(async () => createModule())
+  const harness = mountLoader({ load })
+
+  expect(harness.loader.isUnlocked()).toBe(true)
+  expect(load).not.toHaveBeenCalled()
+})
+
+test('opens an unlocked authoring panel after its first-use import', async () => {
+  sessionStorage.setItem(CUE_AUTHORING_UNLOCKED_KEY, '1')
+  const load = vi.fn(async () => createModule())
+  const harness = mountLoader({ load })
+
+  harness.loader.open()
+  await flushLazyWork()
+
+  expect(load).toHaveBeenCalledOnce()
+  expect(harness.authoring.restoreAccessState).toHaveBeenCalledOnce()
+  expect(harness.authoring.setVisible).toHaveBeenLastCalledWith(true)
 })
 
 test('a failed optional import reports the error and can retry', async () => {
+  sessionStorage.setItem(CUE_AUTHORING_UNLOCKED_KEY, '1')
   const failure = new Error('chunk unavailable')
   const load = vi
     .fn<() => Promise<CueAuthoringModule>>()
@@ -101,11 +129,24 @@ test('a failed optional import reports the error and can retry', async () => {
     .mockResolvedValueOnce(createModule())
   const harness = mountLoader({ load })
 
-  await expect(harness.loader.ensureLoaded()).resolves.toBeNull()
-  await expect(harness.loader.ensureLoaded()).resolves.toBe(harness.authoring)
+  harness.loader.open()
+  await flushLazyWork()
+  harness.loader.open()
+  await flushLazyWork()
 
   expect(load).toHaveBeenCalledTimes(2)
   expect(harness.onLoadError).toHaveBeenCalledWith(failure)
+})
+
+test('does not load or open when authoring access is locked', async () => {
+  const load = vi.fn(async () => createModule())
+  const harness = mountLoader({ load })
+
+  harness.loader.open()
+  await flushLazyWork()
+
+  expect(load).not.toHaveBeenCalled()
+  expect(harness.authoring.setVisible).not.toHaveBeenCalled()
 })
 
 test('closing while the shortcut import is pending prevents a late open', async () => {

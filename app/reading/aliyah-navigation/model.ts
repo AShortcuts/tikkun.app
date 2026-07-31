@@ -4,7 +4,6 @@ import {
   type LeiningRun,
 } from '../../calendar-model/model-types.ts'
 import {
-  parseAliyahIndex,
   type AliyahIndex,
 } from '../aliyah-identity.ts'
 
@@ -45,28 +44,11 @@ export type AliyahNavigationSnapshot = Readonly<{
   playback: AliyahNavigationPlayback
 }>
 
-export interface AliyahNavigationAdapter {
-  render(snapshot: AliyahNavigationSnapshot): void
-  clear(): void
-  invalidate(): void
-  setActive(target: AliyahNavigationTarget | null): void
-}
-
 export function formatAliyahLabel(aliyahIndex: AliyahIndex) {
   if (aliyahIndex === 'Maftir') return 'מפטיר'
   return ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'ששי', 'שביעי'][
     aliyahIndex - 1
   ]
-}
-
-export function parseAliyahNavigationTarget(
-  runId: string | null | undefined,
-  aliyahIndex: string | null | undefined
-): AliyahNavigationTarget | null {
-  const parsedIndex = parseAliyahIndex(aliyahIndex)
-  return runId && parsedIndex
-    ? { runId, aliyahIndex: parsedIndex }
-    : null
 }
 
 export function isSameAliyahNavigationTarget(
