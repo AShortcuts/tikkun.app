@@ -3,12 +3,23 @@ import { expect, test } from 'vitest'
 import { COMPACT_READER_QUERY } from '../adaptive/reader-viewport.ts'
 
 const pageCss = readFileSync(new URL('../../css/page.css', import.meta.url), 'utf8')
+const masterCss = readFileSync(
+  new URL('../../css/master.css', import.meta.url),
+  'utf8'
+)
+const hebrewUiFont = readFileSync(
+  new URL('../../assets/fonts/NotoSansHebrew-Variable.ttf', import.meta.url)
+)
 const readerEnhancementsCss = readFileSync(
   new URL('../../css/reader-enhancements.css', import.meta.url),
   'utf8'
 )
 const mobileReaderCss = readFileSync(
   new URL('../../css/mobile-reader.css', import.meta.url),
+  'utf8'
+)
+const toggleCss = readFileSync(
+  new URL('../../css/toggle.css', import.meta.url),
   'utf8'
 )
 const lineComponent = readFileSync(new URL('./Line.ts', import.meta.url), 'utf8')
@@ -82,12 +93,59 @@ test('centers line content with a structural balance rail instead of nudge offse
   expect(pageCss.includes('line-content-compensation-width')).toBe(false)
 })
 
+test('preserves the special Haazinu middle gap', () => {
+  expect(pageCss).toMatch(
+    /\.column:nth-child\(2\)\s*{[\s\S]*?margin-right:\s*5em;/
+  )
+})
+
+test('uses one bundled Hebrew UI face throughout the app without changing Torah text', () => {
+  expect(hebrewUiFont.byteLength).toBeGreaterThan(0)
+  expect(masterCss).toMatch(
+    /@font-face\s*{[\s\S]*?font-family:\s*'Noto Sans Hebrew UI';[\s\S]*?src:\s*url\(\/assets\/fonts\/NotoSansHebrew-Variable\.ttf\) format\('truetype'\);[\s\S]*?font-weight:\s*100 900;[\s\S]*?font-display:\s*swap;[\s\S]*?unicode-range:\s*U\+0590-05FF, U\+FB1D-FB4F;/
+  )
+  expect(masterCss).toContain(
+    "--hebrew-ui-font-family: 'Noto Sans Hebrew UI', -apple-system, sans-serif;"
+  )
+  expect(masterCss).toMatch(
+    /body,\s*input,\s*button,\s*select,\s*textarea\s*{\s*font-family:\s*var\(--hebrew-ui-font-family\);/
+  )
+  expect(masterCss).toMatch(
+    /\.parsha-title,[\s\S]*?\.toolbar-current-aliyah-label,[\s\S]*?\.aliyah-rail-button,[\s\S]*?mobile-current-aliyah[\s\S]*?\.mobile-aliyah-card-label,[\s\S]*?\.aliyah-label-text,[\s\S]*?\.aliyah-start-popup-value,[\s\S]*?\.aliyah-start-marker-capsule\s*{[\s\S]*?font-family:\s*var\(--hebrew-ui-font-family\);[\s\S]*?font-synthesis:\s*none;[\s\S]*?font-weight:\s*400;/
+  )
+  expect(pageCss).toMatch(
+    /\.tikkun-page\s*{[\s\S]*?font-family:\s*ShlomosemiStam;/
+  )
+  expect(pageCss).toMatch(
+    /\.location-indicator\s*{[\s\S]*?font-family:\s*var\(--hebrew-ui-font-family\);/
+  )
+  expect(toggleCss).toMatch(
+    /\.annotations-toggle\s*{[\s\S]*?font-family:\s*ShlomosemiStam;/
+  )
+})
+
 test('keeps the desktop reader column centered in the app body', () => {
-  expect(readerEnhancementsCss.includes('--reader-side-rail-width: 80px')).toBe(true)
-  expect(readerEnhancementsCss.includes('@media screen and (max-width: 1250px)')).toBe(true)
+  expect(readerEnhancementsCss).toContain('--reader-main-half-fit-width: 570px')
+  expect(readerEnhancementsCss).toContain('--reader-side-rail-max-width: 80px')
+  expect(readerEnhancementsCss).toMatch(
+    /--reader-side-rail-width:\s*clamp\(\s*0px,\s*calc\(50vw\s*-\s*var\(--reader-main-half-fit-width\)\),\s*var\(--reader-side-rail-max-width\)\s*\);/
+  )
   expect(readerEnhancementsCss).toMatch(/grid-template-columns:\s*var\(--reader-side-rail-width\)\s+minmax\(0,\s*1fr\)\s+var\(--reader-side-rail-width\);/)
-  expect(readerEnhancementsCss.includes('--reader-side-rail-width: 48px')).toBe(true)
-  expect(readerEnhancementsCss.includes('--reader-side-rail-width: 24px')).toBe(true)
+  expect(readerEnhancementsCss).toMatch(
+    /@media screen and \(max-width:\s*1250px\)\s*{[\s\S]*?--reader-side-rail-max-width:\s*48px;/
+  )
+  expect(readerEnhancementsCss).toMatch(
+    /@media screen and \(max-width:\s*1180px\)\s*{[\s\S]*?--reader-main-half-fit-width:\s*534px;/
+  )
+  expect(readerEnhancementsCss).toMatch(
+    /@media screen and \(max-width:\s*1120px\)\s*{[\s\S]*?--reader-main-half-fit-width:\s*434px;/
+  )
+  expect(readerEnhancementsCss).toMatch(
+    /@media screen and \(max-width:\s*920px\)\s*{[\s\S]*?--reader-side-rail-max-width:\s*24px;/
+  )
+  expect(readerEnhancementsCss).toMatch(
+    /@media screen and \(max-width:\s*870px\)\s*{[\s\S]*?--reader-main-half-fit-width:\s*352px;/
+  )
 })
 
 test('uses the intended tikkun page responsive breakpoints', () => {
@@ -117,7 +175,11 @@ test('shows absolute page numbers as hover-only page decoration', () => {
   expect(pageCss).toMatch(/\.tikkun-page-number\s*{[\s\S]*?font-weight:\s*400;/)
   expect(pageCss).toMatch(/\.tikkun-page-number\s*{[\s\S]*?opacity:\s*0;/)
   expect(pageCss).toMatch(/\.tikkun-page-number\s*{[\s\S]*?pointer-events:\s*auto;/)
+  expect(pageCss).toMatch(/\.tikkun-page-number\s*{[\s\S]*?position:\s*relative;/)
   expect(pageCss).toMatch(/\.tikkun-page-number\s*{[\s\S]*?user-select:\s*none;/)
+  expect(pageCss).toMatch(
+    /\.tikkun-page-number::before\s*{[\s\S]*?position:\s*absolute;[\s\S]*?width:\s*6rem;[\s\S]*?height:\s*6rem;[\s\S]*?transform:\s*translate\(-50%, -50%\);/
+  )
   expect(pageCss).toMatch(/\.tikkun-page:first-child \.tikkun-page-number\s*{[\s\S]*?display:\s*none;/)
   expect(pageCss).toMatch(/\.tikkun-page:first-child \.tikkun-page-number\.mod-route-reveal\s*{[\s\S]*?display:\s*table-caption;/)
   expect(pageCss).not.toMatch(/\.tikkun-page:hover \.tikkun-page-number\s*{/)

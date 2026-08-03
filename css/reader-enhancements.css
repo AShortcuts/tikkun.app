@@ -1,5 +1,12 @@
 .reader-shell {
-  --reader-side-rail-width: 80px;
+  --reader-main-half-fit-width: 570px;
+  --reader-side-rail-max-width: 80px;
+  /* Spend equal side-rail space before reducing the reader font size. */
+  --reader-side-rail-width: clamp(
+    0px,
+    calc(50vw - var(--reader-main-half-fit-width)),
+    var(--reader-side-rail-max-width)
+  );
   height: 100%;
   display: grid;
   grid-template-columns:
@@ -2581,13 +2588,31 @@
 
 @media screen and (max-width: 1250px) {
   .reader-shell {
-    --reader-side-rail-width: 48px;
+    --reader-side-rail-max-width: 48px;
+  }
+}
+
+@media screen and (max-width: 1180px) {
+  .reader-shell {
+    --reader-main-half-fit-width: 534px;
+  }
+}
+
+@media screen and (max-width: 1120px) {
+  .reader-shell {
+    --reader-main-half-fit-width: 434px;
   }
 }
 
 @media screen and (max-width: 920px) {
   .reader-shell {
-    --reader-side-rail-width: 24px;
+    --reader-side-rail-max-width: 24px;
+  }
+}
+
+@media screen and (max-width: 870px) {
+  .reader-shell {
+    --reader-main-half-fit-width: 352px;
   }
 }
 

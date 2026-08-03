@@ -125,7 +125,7 @@
   width: 1.3rem;
   height: 1.3rem;
   overflow: visible;
-  font-family: ShlomosemiStam;
+  font-family: var(--hebrew-ui-font-family);
   font-size: 1.05rem;
   line-height: 1;
 }

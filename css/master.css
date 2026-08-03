@@ -23,6 +23,15 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: 'Noto Sans Hebrew UI';
+  src: url(/assets/fonts/NotoSansHebrew-Variable.ttf) format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0590-05FF, U+FB1D-FB4F;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -31,6 +40,7 @@
 
 :root {
   height: var(--app-height, 100vh);
+  --hebrew-ui-font-family: 'Noto Sans Hebrew UI', -apple-system, sans-serif;
 }
 
 html,
@@ -41,8 +51,24 @@ body {
 }
 
 body,
-input {
-  font-family: -apple-system, sans-serif;
+input,
+button,
+select,
+textarea {
+  font-family: var(--hebrew-ui-font-family);
+}
+
+.parsha-title,
+.toolbar-current-aliyah-label,
+.aliyah-rail-button,
+.mobile-aliyah-picker-toggle [data-target-id='mobile-current-aliyah'],
+.mobile-aliyah-card-label,
+.aliyah-label-text,
+.aliyah-start-popup-value,
+.aliyah-start-marker-capsule {
+  font-family: var(--hebrew-ui-font-family);
+  font-synthesis: none;
+  font-weight: 400;
 }
 
 ol {

@@ -26,7 +26,7 @@ html[data-reader-theme='dark'] [data-tooltip] {
   font-size: 0.8em;
   white-space: nowrap;
   box-shadow: 0 0 8px -4px black;
-  font-family: sans-serif;
+  font-family: var(--hebrew-ui-font-family);
 
   top: var(--header-height);
   left: 50%;
