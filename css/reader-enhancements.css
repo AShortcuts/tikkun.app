@@ -1132,6 +1132,10 @@
   gap: 0.5rem;
 }
 
+.admin-panel-actions[hidden] {
+  display: none;
+}
+
 .admin-icon-control {
   display: inline-flex;
   flex-direction: column;

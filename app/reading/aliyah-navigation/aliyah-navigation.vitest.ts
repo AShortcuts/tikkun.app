@@ -56,13 +56,20 @@ test('renders both navigation presentations behind one typed interface', async (
     loadDurationLabel: async () => '2:05',
   })
 
-  navigation.syncContent({ desktop: snapshot, compact: snapshot })
+  navigation.syncContent({
+    desktop: snapshot,
+    compact: snapshot,
+    authoringEnabled: false,
+  })
   navigation.syncToolbar({
     current: {
       labelVisible: true,
       label: 'שני',
       target: { runId: 'run-a', aliyahIndex: 2 },
       audioAvailable: true,
+      authoringAvailable: false,
+      authoringEnabled: false,
+      cueStatus: null,
       playing: false,
     },
     compact: {
@@ -125,13 +132,20 @@ test('preserves compact pause, navigation, close-before-play, and focus behavior
     onPlayCompact: playCompact,
     onBeforeCompactOpen: beforeOpen,
   })
-  navigation.syncContent({ desktop: snapshot, compact: snapshot })
+  navigation.syncContent({
+    desktop: snapshot,
+    compact: snapshot,
+    authoringEnabled: false,
+  })
   navigation.syncToolbar({
     current: {
       labelVisible: false,
       label: '—',
       target: null,
       audioAvailable: false,
+      authoringAvailable: false,
+      authoringEnabled: false,
+      cueStatus: null,
       playing: false,
     },
     compact: {
@@ -175,11 +189,218 @@ test('preserves compact pause, navigation, close-before-play, and focus behavior
   await flushPromises()
 })
 
+test('exposes missing-audio recording targets only while authoring is active', async () => {
+  const playCompact = vi.fn(async () => idlePlayback)
+  const playCurrent = vi.fn(async () => {})
+  const navigation = mountNavigation({
+    onPlayCompact: playCompact,
+    onPlayCurrent: playCurrent,
+  })
+  navigation.syncContent({
+    desktop: snapshot,
+    compact: snapshot,
+    authoringEnabled: true,
+  })
+  navigation.syncToolbar({
+    current: {
+      labelVisible: true,
+      label: 'שני',
+      target: { runId: 'run-a', aliyahIndex: 2 },
+      audioAvailable: false,
+      authoringAvailable: true,
+      authoringEnabled: true,
+      cueStatus: null,
+      playing: false,
+    },
+    compact: {
+      visible: true,
+      target: { runId: 'run-a', aliyahIndex: 2 },
+      label: 'שני',
+      playbackState: 'default',
+    },
+  })
+
+  const missingPlay = required<HTMLButtonElement>(
+    '.mobile-aliyah-play[data-aliyah-index="2"]'
+  )
+  expect(requiredAll('.mobile-aliyah-play')).toHaveLength(2)
+  expect(missingPlay.classList).toContain('is-missing-audio')
+  expect(missingPlay.getAttribute('aria-label')).toBe(
+    'Select שני for audio and cue recording'
+  )
+
+  const toolbarPlay = required<HTMLButtonElement>(
+    '[data-target-id="toolbar-current-aliyah-audio"]'
+  )
+  expect(toolbarPlay.disabled).toBe(false)
+  expect(toolbarPlay.classList).toContain('is-missing-audio')
+  toolbarPlay.click()
+  missingPlay.click()
+  await flushPromises()
+
+  expect(playCurrent).toHaveBeenCalledWith({
+    runId: 'run-a',
+    aliyahIndex: 2,
+  })
+  expect(playCompact).toHaveBeenCalledWith({
+    runId: 'run-a',
+    aliyahIndex: 2,
+  })
+})
+
+test('distinguishes cue work from missing audio only while authoring is active', async () => {
+  let recordedCueStatus: 'none' | 'pending' | 'published' = 'none'
+  const navigation = mountNavigation({
+    loadCueStatus: async (item) =>
+      item.recordingKey ? recordedCueStatus : 'none',
+  })
+
+  navigation.syncContent({
+    desktop: snapshot,
+    compact: snapshot,
+    authoringEnabled: true,
+  })
+  navigation.syncToolbar({
+    current: {
+      labelVisible: true,
+      label: 'ראשון',
+      target: { runId: 'run-a', aliyahIndex: 1 },
+      audioAvailable: true,
+      authoringAvailable: false,
+      authoringEnabled: true,
+      cueStatus: null,
+      playing: false,
+    },
+    compact: {
+      visible: true,
+      target: { runId: 'run-a', aliyahIndex: 1 },
+      label: 'ראשון',
+      playbackState: 'default',
+    },
+  })
+  await flushPromises()
+
+  const recordedPlay = required<HTMLButtonElement>(
+    '.mobile-aliyah-play[data-aliyah-index="1"]'
+  )
+  const missingPlay = required<HTMLButtonElement>(
+    '.mobile-aliyah-play[data-aliyah-index="2"]'
+  )
+  const toolbarPlay = required<HTMLButtonElement>(
+    '[data-target-id="toolbar-current-aliyah-audio"]'
+  )
+
+  expect(recordedPlay.classList).toContain('is-cue-incomplete')
+  expect(recordedPlay.getAttribute('aria-label')).toBe(
+    'Start ראשון cue recording'
+  )
+  expect(toolbarPlay.classList).toContain('is-cue-incomplete')
+  expect(toolbarPlay.getAttribute('aria-label')).toBe(
+    'Start ראשון cue recording'
+  )
+  expect(missingPlay.classList).toContain('is-missing-audio')
+  expect(missingPlay.classList).not.toContain('is-cue-incomplete')
+
+  recordedCueStatus = 'pending'
+  navigation.invalidate()
+  await flushPromises()
+  expect(recordedPlay.classList).toContain('is-cue-incomplete')
+  expect(recordedPlay.getAttribute('aria-label')).toBe(
+    'Resume ראשון cue recording'
+  )
+  expect(toolbarPlay.getAttribute('aria-label')).toBe(
+    'Resume ראשון cue recording'
+  )
+
+  recordedCueStatus = 'published'
+  navigation.invalidate()
+  await flushPromises()
+  expect(recordedPlay.classList).not.toContain('is-cue-incomplete')
+  expect(toolbarPlay.classList).not.toContain('is-cue-incomplete')
+
+  navigation.syncContent({
+    desktop: snapshot,
+    compact: snapshot,
+    authoringEnabled: false,
+  })
+  navigation.syncToolbar({
+    current: {
+      labelVisible: true,
+      label: 'ראשון',
+      target: { runId: 'run-a', aliyahIndex: 1 },
+      audioAvailable: true,
+      authoringAvailable: false,
+      authoringEnabled: false,
+      cueStatus: 'pending',
+      playing: false,
+    },
+    compact: {
+      visible: true,
+      target: { runId: 'run-a', aliyahIndex: 1 },
+      label: 'ראשון',
+      playbackState: 'default',
+    },
+  })
+  expect(recordedPlay.classList).not.toContain('is-cue-incomplete')
+  expect(toolbarPlay.classList).not.toContain('is-cue-incomplete')
+})
+
+test('closes the compact picker from its sheet handle', () => {
+  const navigation = mountNavigation()
+  navigation.syncContent({
+    desktop: snapshot,
+    compact: snapshot,
+    authoringEnabled: false,
+  })
+  navigation.syncToolbar({
+    current: {
+      labelVisible: false,
+      label: '—',
+      target: null,
+      audioAvailable: false,
+      authoringAvailable: false,
+      authoringEnabled: false,
+      cueStatus: null,
+      playing: false,
+    },
+    compact: {
+      visible: true,
+      target: { runId: 'run-a', aliyahIndex: 2 },
+      label: 'שני',
+      playbackState: 'default',
+    },
+  })
+
+  const toggle = required<HTMLButtonElement>(
+    '[data-target-id="mobile-aliyah-picker-toggle"]'
+  )
+  toggle.click()
+
+  const handle = required<HTMLButtonElement>(
+    '[data-target-id="mobile-aliyah-sheet-handle"]'
+  )
+  expect(handle.tagName).toBe('BUTTON')
+  expect(handle.getAttribute('aria-label')).toBe('Close aliyah picker')
+  handle.click()
+
+  expect(navigation.isCompactOpen()).toBe(false)
+  expect(
+    required('[data-target-id="mobile-aliyah-picker"]').getAttribute(
+      'aria-hidden'
+    )
+  ).toBe('true')
+  expect(document.activeElement).toBe(toggle)
+})
+
 test('keeps the wide rail visible during interaction and hides it after four seconds', () => {
   vi.useFakeTimers()
   const onWideHidden = vi.fn()
   const navigation = mountNavigation({ onWideHidden })
-  navigation.syncContent({ desktop: snapshot, compact: snapshot })
+  navigation.syncContent({
+    desktop: snapshot,
+    compact: snapshot,
+    authoringEnabled: false,
+  })
 
   navigation.revealWide('peek')
   expect(document.documentElement.dataset.aliyahRailVisibility).toBe('peek')
@@ -223,6 +444,7 @@ test('ignores stale cue status and duration requests after invalidation', async 
   navigation.syncContent({
     desktop: singleItemSnapshot,
     compact: singleItemSnapshot,
+    authoringEnabled: false,
   })
   navigation.invalidate()
 
@@ -264,6 +486,9 @@ test('replacement mounts cleanly without duplicating actions', async () => {
           label: 'ראשון',
           target: { runId: 'run-a', aliyahIndex: 1 },
           audioAvailable: true,
+          authoringAvailable: false,
+          authoringEnabled: false,
+          cueStatus: null,
           playing: false,
         },
         compact: {
@@ -322,6 +547,7 @@ const snapshot: AliyahNavigationSnapshot = {
       label: 'ראשון',
       compactLabel: '1',
       audioKey: 'audio-1',
+      recordingKey: 'audio-1',
     },
     {
       key: 'run-a:2',
@@ -329,6 +555,7 @@ const snapshot: AliyahNavigationSnapshot = {
       label: 'שני',
       compactLabel: '2',
       audioKey: null,
+      recordingKey: null,
     },
   ],
 }
@@ -359,6 +586,7 @@ function createOptions(): AliyahNavigationOptions {
     getReaderFocusTarget: () =>
       required<HTMLElement>('[data-target-id="reader"]'),
     loadCueStatus: async () => 'none',
+    onCueStatusChange: vi.fn(),
     loadDurationLabel: async () => 'Available',
     onCueStatusError: vi.fn(),
     onDurationError: vi.fn(),

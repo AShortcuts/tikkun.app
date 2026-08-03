@@ -173,6 +173,7 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
   get currentTime() {
     const segment = this.activeSession?.segments[this.activeSegmentIndex]
     if (!segment) return this.audio.currentTime
+    if (segment.recording.status === 'missing') return segment.logicalStart
     return Math.min(
       segment.logicalEnd,
       segment.logicalStart + Math.max(0, this.audio.currentTime - segment.startTime)
@@ -269,6 +270,11 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
   }
 
   play(): Promise<void> {
+    if (this.activeSegment?.recording.status === 'missing') {
+      return Promise.reject(
+        new Error('No source recording is available; record microphone audio first')
+      )
+    }
     if (this.activationNeedsReload && this.activeSession) {
       this.activateSegment(
         this.activeSegmentIndex,
@@ -322,6 +328,14 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
       )
     )
     const segment = segments[segmentIndex]
+    if (segment.recording.status === 'missing') {
+      if (segmentIndex !== this.activeSegmentIndex || this.segmentTransitioning) {
+        this.activateSegment(segmentIndex, segment.logicalStart, false)
+      } else {
+        this.emit('frame-updated', { currentTime: segment.logicalStart })
+      }
+      return
+    }
     if (segmentIndex === this.activeSegmentIndex && !this.segmentTransitioning) {
       this.audio.currentTime =
         segment.startTime + Math.max(0, clampedTime - segment.logicalStart)
@@ -382,9 +396,20 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
     this.activationNeedsReload = false
     this.activeSegmentIndex = index
     this.emit('segment-updated', { index, segment })
-    const absoluteSrc = new URL(segment.recording.playSrc, window.location.href).href
-    const sourceChanged = forceReload || this.audio.src !== absoluteSrc
-    if (sourceChanged) {
+    const missingSource = segment.recording.status === 'missing'
+    const absoluteSrc = missingSource
+      ? ''
+      : new URL(segment.recording.playSrc, window.location.href).href
+    const sourceChanged = missingSource
+      ? Boolean(this.audio.src)
+      : forceReload || this.audio.src !== absoluteSrc
+    if (missingSource) {
+      this.audio.pause()
+      if (sourceChanged) {
+        this.audio.removeAttribute('src')
+        this.audio.load()
+      }
+    } else if (sourceChanged) {
       this.audio.src = segment.recording.playSrc
       this.audio.load()
     }
@@ -417,8 +442,10 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
       }
       if (result.status === 'cancelled') return
 
-      this.rememberMediaDuration(segment, this.audio)
-      this.audio.currentTime = physicalTime
+      if (!missingSource) {
+        this.rememberMediaDuration(segment, this.audio)
+        this.audio.currentTime = physicalTime
+      }
       this.emit('frame-updated', { currentTime: this.currentTime })
       if (autoplay) void this.play().catch(() => {})
     }
@@ -426,7 +453,12 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
     this.cancelPendingActivation = () => finish({ status: 'cancelled' })
     this.failPendingActivation = (error) => finish({ status: 'failed', error })
 
-    if (sourceChanged && this.audio.readyState < HTMLMediaElement.HAVE_METADATA) {
+    if (missingSource) {
+      finish({ status: 'ready' })
+    } else if (
+      sourceChanged &&
+      this.audio.readyState < HTMLMediaElement.HAVE_METADATA
+    ) {
       this.audio.addEventListener('loadedmetadata', loaded, { once: true })
       metadataTimeout = setTimeout(() => {
         finish({
@@ -442,6 +474,10 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
 
   private preloadNextSegment() {
     const next = this.activeSession?.segments[this.activeSegmentIndex + 1]
+    if (next?.recording.status === 'missing') {
+      this.clearNextSourcePreload()
+      return
+    }
     const nextKey = next ? this.sourceKey(next.recording.playSrc) : null
     if (
       next &&
@@ -494,7 +530,7 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
 
   private rememberActiveMediaDuration() {
     const segment = this.activeSession?.segments[this.activeSegmentIndex]
-    if (!segment) return
+    if (!segment || segment.recording.status === 'missing') return
 
     const mediaSource = this.audio.currentSrc || this.audio.src
     if (

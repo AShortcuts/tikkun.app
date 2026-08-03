@@ -29,6 +29,7 @@ export type AliyahNavigationItem = Readonly<{
   label: string
   compactLabel: string
   audioKey: string | null
+  recordingKey: string | null
 }>
 
 export type AliyahNavigationPlayback = Readonly<{
@@ -91,27 +92,35 @@ export function createAliyahNavigationSnapshot({
   active,
   playback,
   signaturePrefix,
-  getAudioKey,
+  getAudio,
 }: {
   entries: readonly AliyahNavigationEntry[]
   active: AliyahNavigationTarget | null
   playback: AliyahNavigationPlayback
   signaturePrefix: string
-  getAudioKey: (entry: AliyahNavigationEntry) => string | null
+  getAudio: (entry: AliyahNavigationEntry) => Readonly<{
+    playbackKey: string | null
+    recordingKey: string | null
+  }>
 }): AliyahNavigationSnapshot {
   const items = entries.map((entry): AliyahNavigationItem => {
     const { run, aliyah } = entry
     const target = { runId: run.id, aliyahIndex: aliyah.index }
+    const audio = getAudio(entry)
     return {
       key: aliyahNavigationEntryKey(entry),
       target,
       label: formatAliyahLabel(aliyah.index),
       compactLabel: aliyah.index === 'Maftir' ? 'M' : `${aliyah.index}`,
-      audioKey: getAudioKey(entry),
+      audioKey: audio.playbackKey,
+      recordingKey: audio.recordingKey,
     }
   })
   const itemSignature = items
-    .map((item) => `${item.key}:${item.audioKey ?? ''}`)
+    .map(
+      (item) =>
+        `${item.key}:${item.audioKey ?? ''}:${item.recordingKey ?? ''}`
+    )
     .join('|')
 
   return {

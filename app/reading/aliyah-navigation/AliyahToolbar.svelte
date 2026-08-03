@@ -1,11 +1,15 @@
 <script lang="ts">
   import { flushSync, onMount } from 'svelte'
   import UiIcon from '../../components/UiIcon.svelte'
-  import type {
-    AliyahToolbar,
-    AliyahToolbarComponentProps,
-    AliyahToolbarState,
+  import {
+    aliyahCueAuthoringActionLabel,
+    isAliyahCueStatusUnfinished,
+    type AliyahCueStatus,
+    type AliyahToolbar,
+    type AliyahToolbarComponentProps,
+    type AliyahToolbarState,
   } from './aliyah-navigation.ts'
+  import { isSameAliyahNavigationTarget } from './model.ts'
 
   let {
     onToggleCompact,
@@ -19,6 +23,9 @@
       label: '—',
       target: null,
       audioAvailable: false,
+      authoringAvailable: false,
+      authoringEnabled: false,
+      cueStatus: null,
       playing: false,
     },
     compact: {
@@ -46,6 +53,52 @@
     })
   }
 
+  function setCueStatus(
+    target: Parameters<AliyahToolbar['setCueStatus']>[0],
+    status: AliyahCueStatus
+  ) {
+    if (!isSameAliyahNavigationTarget(toolbarState.current.target, target)) {
+      return
+    }
+    flushSync(() => {
+      toolbarState = {
+        ...toolbarState,
+        current: { ...toolbarState.current, cueStatus: status },
+      }
+    })
+  }
+
+  function invalidateCueStatus() {
+    flushSync(() => {
+      toolbarState = {
+        ...toolbarState,
+        current: { ...toolbarState.current, cueStatus: null },
+      }
+    })
+  }
+
+  function currentCueNeedsWork() {
+    const status = toolbarState.current.cueStatus
+    return Boolean(
+      toolbarState.current.authoringEnabled &&
+        !toolbarState.current.authoringAvailable &&
+        status &&
+        isAliyahCueStatusUnfinished(status)
+    )
+  }
+
+  function currentPlayLabel() {
+    const status = toolbarState.current.cueStatus
+    if (currentCueNeedsWork() && status) {
+      return aliyahCueAuthoringActionLabel({
+        label: toolbarState.current.label,
+        status,
+        playing: toolbarState.current.playing,
+      })
+    }
+    return `${toolbarState.current.playing ? 'Pause' : 'Play'} ${toolbarState.current.label}`
+  }
+
   function toggleCompact() {
     onToggleCompact(compactToggle)
   }
@@ -53,7 +106,8 @@
   async function playCurrent() {
     if (
       !toolbarState.current.target ||
-      !toolbarState.current.audioAvailable
+      (!toolbarState.current.audioAvailable &&
+        !toolbarState.current.authoringAvailable)
     ) {
       return
     }
@@ -62,6 +116,8 @@
 
   const toolbar: AliyahToolbar = {
     sync,
+    setCueStatus,
+    invalidateCueStatus,
     setCompactOpen,
     getCompactToggle: () => compactToggle,
   }
@@ -124,21 +180,29 @@
 
 <button
   class="aliyah-audio-button toolbar-current-aliyah-audio"
-  class:u-hidden={!toolbarState.current.audioAvailable}
+  class:u-hidden={!toolbarState.current.audioAvailable &&
+    !toolbarState.current.authoringAvailable}
   class:is-active={toolbarState.current.playing}
+  class:is-missing-audio={toolbarState.current.authoringAvailable}
+  class:is-cue-incomplete={currentCueNeedsWork()}
   data-target-id="toolbar-current-aliyah-audio"
   data-run-id={toolbarState.current.target?.runId ?? ''}
   data-aliyah-index={toolbarState.current.target
     ? `${toolbarState.current.target.aliyahIndex}`
     : ''}
   type="button"
-  disabled={!toolbarState.current.audioAvailable}
-  title={toolbarState.current.audioAvailable
-    ? `${toolbarState.current.playing ? 'Pause' : 'Play'} ${toolbarState.current.label}`
-    : 'Recording unavailable'}
-  aria-label={toolbarState.current.audioAvailable
-    ? `${toolbarState.current.playing ? 'Pause' : 'Play'} ${toolbarState.current.label}`
-    : 'Recording unavailable'}
+  disabled={!toolbarState.current.audioAvailable &&
+    !toolbarState.current.authoringAvailable}
+  title={toolbarState.current.authoringAvailable
+    ? `Select ${toolbarState.current.label} for audio and cue recording`
+    : toolbarState.current.audioAvailable
+      ? currentPlayLabel()
+      : 'Recording unavailable'}
+  aria-label={toolbarState.current.authoringAvailable
+    ? `Select ${toolbarState.current.label} for audio and cue recording`
+    : toolbarState.current.audioAvailable
+      ? currentPlayLabel()
+      : 'Recording unavailable'}
   onclick={playCurrent}
 >
   <UiIcon name={toolbarState.current.playing ? 'pause' : 'play'} />

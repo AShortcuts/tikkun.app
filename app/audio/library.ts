@@ -7,6 +7,7 @@ import type { AudioNarrator, AudioRecording, WordCue } from './types.ts'
 import { normalizeFirstCueStart } from './normalize-first-cue.ts'
 import { filterRecordingIssues } from './recording-issues.ts'
 export {
+  findAuthoringRecordingForRun,
   findRecordingForRun,
   parshaSlugForRun,
 } from './recording-lookup.ts'

@@ -435,11 +435,27 @@
   }
 
   .mobile-aliyah-sheet-handle {
+    position: relative;
+    display: block;
     width: 2.4rem;
     height: 0.28rem;
     margin: 0 auto 0.65rem;
+    border: none;
     border-radius: 999px;
+    padding: 0;
     background: color-mix(in srgb, var(--text-color) 42%, transparent);
+    cursor: pointer;
+  }
+
+  .mobile-aliyah-sheet-handle::after {
+    position: absolute;
+    inset: -0.9rem -0.6rem;
+    content: '';
+  }
+
+  .mobile-aliyah-sheet-handle:focus-visible {
+    outline: 2px solid var(--mobile-reader-blue);
+    outline-offset: 0.25rem;
   }
 
   .mobile-aliyah-sheet-header {
@@ -586,6 +602,10 @@
     text-shadow: none;
   }
 
+  .mobile-aliyah-card.is-authoring-missing .mobile-aliyah-card-status {
+    color: var(--admin-missing-audio-color);
+  }
+
   .mobile-aliyah-play {
     display: inline-flex;
     align-items: center;
@@ -607,6 +627,36 @@
 
   .mobile-aliyah-play:hover {
     background: color-mix(in srgb, var(--mobile-reader-blue) 86%, white);
+  }
+
+  html[data-reader-mode='admin-authoring']
+    .mobile-aliyah-play.is-missing-audio {
+    background: var(--admin-missing-audio-color);
+    color: white;
+  }
+
+  html[data-reader-mode='admin-authoring']
+    .mobile-aliyah-play.is-missing-audio:hover {
+    background: color-mix(
+      in srgb,
+      var(--admin-missing-audio-color) 86%,
+      white
+    );
+  }
+
+  html[data-reader-mode='admin-authoring']
+    .mobile-aliyah-play.is-cue-incomplete:not(.is-missing-audio) {
+    background: var(--admin-cue-incomplete-color);
+    color: var(--admin-cue-incomplete-ink);
+  }
+
+  html[data-reader-mode='admin-authoring']
+    .mobile-aliyah-play.is-cue-incomplete:not(.is-missing-audio):hover {
+    background: color-mix(
+      in srgb,
+      var(--admin-cue-incomplete-color) 86%,
+      white
+    );
   }
 
   .tikkun-book {

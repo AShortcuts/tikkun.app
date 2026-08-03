@@ -3,6 +3,7 @@ import type { RenderedLineInfo } from '../view-model/scroll-view-model.ts'
 import displayRange from '../display-range.ts'
 import hebrewNumeralFromInteger from '../hebrew-numeral.ts'
 import { createLastReadingHash } from '../reading/last-reading.ts'
+import { createSpecialLetterRenderer } from '../special-letters.ts'
 import textFilter from '../text-filter.ts'
 import { iconMarkup } from './icons.ts'
 
@@ -44,11 +45,13 @@ const renderWords = ({
   pageNumber,
   lineIndex,
   fragmentIndex,
+  renderSpecialLetters,
 }: {
   text: string
   pageNumber: number
   lineIndex: number
   fragmentIndex: number
+  renderSpecialLetters: (text: string) => string
 }) =>
   tokenizeWords(text)
     .map((word, wordIndex) => {
@@ -60,7 +63,7 @@ const renderWords = ({
         data-line-index="${lineIndex}"
         data-fragment-index="${fragmentIndex}"
         data-word-index="${wordIndex}"
-      >${word.text}</span>`
+      >${renderSpecialLetters(word.text)}</span>`
     })
     .join(' ')
 
@@ -164,6 +167,7 @@ const Line = ({
   pageNumber,
   text,
   verses,
+  focalRef,
   isPetucha,
   labels,
   aliyahStarts,
@@ -176,6 +180,9 @@ const Line = ({
   const startLabel = aliyahStartLabel(aliyahStarts)
   const startTitle = aliyahStartTitle(run)
   const startVerse = aliyahStartVerseRange(aliyahStarts)
+  const references = [focalRef, ...verses]
+  const renderAnnotatedSpecialLetters = createSpecialLetterRenderer(references)
+  const renderUnannotatedSpecialLetters = createSpecialLetterRenderer(references)
 
   return `
   <tr
@@ -222,6 +229,7 @@ const Line = ({
                   pageNumber,
                   lineIndex,
                   fragmentIndex: columnIndex * 100 + fragmentIndex,
+                  renderSpecialLetters: renderAnnotatedSpecialLetters,
                 })}</span>
               <span class="fragment ${setumaClass(
                 column
@@ -230,6 +238,7 @@ const Line = ({
                   pageNumber,
                   lineIndex,
                   fragmentIndex: columnIndex * 100 + fragmentIndex,
+                  renderSpecialLetters: renderUnannotatedSpecialLetters,
                 })}</span>
             `
               )

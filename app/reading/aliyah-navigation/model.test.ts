@@ -61,11 +61,14 @@ test('creates presentation items and a stable signature behind one model interfa
     active: { runId: run.id, aliyahIndex: 2 },
     playback: idlePlayback,
     signaturePrefix: 'narrator-a',
-    getAudioKey: ({ aliyah }) => aliyah.index === 1 ? 'recording-1' : null,
+    getAudio: ({ aliyah }) => {
+      const key = aliyah.index === 1 ? 'recording-1' : null
+      return { playbackKey: key, recordingKey: key }
+    },
   })
 
   expect(snapshot.signature).toBe(
-    `narrator-a:${run.id}:1:recording-1|${run.id}:2:`
+    `narrator-a:${run.id}:1:recording-1:recording-1|${run.id}:2::`
   )
   expect(snapshot.items).toEqual([
     {
@@ -74,6 +77,7 @@ test('creates presentation items and a stable signature behind one model interfa
       label: 'ראשון',
       compactLabel: '1',
       audioKey: 'recording-1',
+      recordingKey: 'recording-1',
     },
     {
       key: `${run.id}:2`,
@@ -81,6 +85,7 @@ test('creates presentation items and a stable signature behind one model interfa
       label: 'שני',
       compactLabel: '2',
       audioKey: null,
+      recordingKey: null,
     },
   ])
 })

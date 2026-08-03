@@ -41,6 +41,9 @@
 :root {
   height: var(--app-height, 100vh);
   --hebrew-ui-font-family: 'Noto Sans Hebrew UI', -apple-system, sans-serif;
+  --admin-missing-audio-color: #c45f66;
+  --admin-cue-incomplete-color: #30d5c8;
+  --admin-cue-incomplete-ink: #06383a;
 }
 
 html,

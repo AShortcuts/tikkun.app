@@ -99,6 +99,18 @@ test('preserves the special Haazinu middle gap', () => {
   )
 })
 
+test('aligns half-size Hebrew letters from measured font metrics', () => {
+  const rule = pageCss.match(/\.special-letter\.mod-small\s*{([^}]*)}/)?.[1]
+  expect(rule).toMatch(/font-size:\s*50%;/)
+  expect(rule).toMatch(/line-height:\s*1;/)
+  expect(rule).toMatch(
+    /vertical-align:\s*var\(--special-letter-baseline-shift, baseline\);/
+  )
+  expect(rule).not.toMatch(/transform|text-top/)
+  expect(appSource).toContain('alignSmallSpecialLettersWhenFontsReady')
+  expect(appSource).toContain('scheduleSpecialLetterAlignment(pageRoot, scope.signal)')
+})
+
 test('uses one bundled Hebrew UI face throughout the app without changing Torah text', () => {
   expect(hebrewUiFont.byteLength).toBeGreaterThan(0)
   expect(masterCss).toMatch(
@@ -363,11 +375,30 @@ test('keeps the parsha keyboard shortcut tip desktop-only', () => {
   )
 })
 
-test('keeps unavailable mobile aliyot fully visible without an audio control', () => {
+test('keeps unavailable mobile aliyot fully visible and adds controls only for authoring', () => {
   expect(aliyahNavigationLayerSource).toContain(
     "if (!item.audioKey) return 'No audio'"
   )
-  expect(aliyahNavigationLayerSource).toContain('{#if item.audioKey}')
+  expect(aliyahNavigationLayerSource).toContain(
+    '{#if item.audioKey || authoringEnabled}'
+  )
+  expect(aliyahNavigationLayerSource).toContain(
+    'class:is-unavailable={!item.audioKey && !authoringEnabled}'
+  )
+  expect(aliyahNavigationLayerSource).toContain(
+    'class:is-missing-audio={authoringEnabled && !item.recordingKey}'
+  )
+  expect(aliyahNavigationLayerSource).toContain(
+    'class:is-cue-incomplete={itemCueNeedsWork(item)}'
+  )
+  expect(masterCss).toContain('--admin-missing-audio-color: #c45f66')
+  expect(masterCss).toContain('--admin-cue-incomplete-color: #30d5c8')
+  expect(pageCss).toContain(
+    '.aliyah-audio-button.is-cue-incomplete:not(.is-missing-audio)'
+  )
+  expect(mobileReaderCss).toContain(
+    '.mobile-aliyah-play.is-cue-incomplete:not(.is-missing-audio)'
+  )
   expect(aliyahNavigationLayerSource).toContain("? 'pause'")
   expect(aliyahNavigationLayerSource).not.toContain("'playOff'")
   expect(mobileReaderCss).toMatch(/\.mobile-aliyah-card\.is-unavailable\s*{[^}]*grid-template-columns:\s*minmax\(0, 1fr\);/)

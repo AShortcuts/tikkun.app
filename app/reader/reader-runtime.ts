@@ -9,6 +9,7 @@ import {
   type CalendarSettings,
 } from '../calendar-settings.ts'
 import { ScrollDisplay } from '../components/ScrollDisplay.ts'
+import { alignSmallSpecialLettersWhenFontsReady } from '../special-letter-layout.ts'
 import type { PageLifecycleSnapshot } from '../components/page-lifecycle.ts'
 import {
   applyPageWindowPolicyEviction,
@@ -62,6 +63,7 @@ import {
   TOKENIZATION_VERSION,
 } from '../reader-preferences.ts'
 import {
+  findAuthoringRecordingForRun,
   findRecordingForRun,
   getCuesForRecording,
   getCueProgressForRecording,
@@ -83,8 +85,10 @@ import {
   type AliyahNavigationTarget,
 } from '../reading/aliyah-navigation/model.ts'
 import {
+  aliyahCueAuthoringActionLabel,
   createAliyahNavigation,
   getMobileAliyahCapsuleState,
+  isAliyahCueStatusUnfinished,
   type AliyahCueStatus,
   type AliyahNavigation,
 } from '../reading/aliyah-navigation/aliyah-navigation.ts'
@@ -309,6 +313,7 @@ export function startReaderRuntime({
   let explicitAliyahSelectionHash: string | null = null
   let lastAliyahRailScrollTop: number | null = null
   let aliyahNavigationGlobal: AliyahNavigation | null = null
+  const resolvedAliyahCueStatuses = new Map<string, AliyahCueStatus>()
   let readerViewportGlobal: ReaderViewport | null = null
   let cueAuthoringGlobal: CueAuthoring | null = null
   let cueAuthoringLoaderGlobal: CueAuthoringLoader | null = null
@@ -326,6 +331,24 @@ export function startReaderRuntime({
   let annotationsEnabled = true
   let hasUserScrolledReaderForLastReading = false
 
+  function resolvedAliyahCueStatusKey(
+    runId: string,
+    aliyahIndex: PlaybackAliyahIndex,
+    recordingId: string
+  ) {
+    return `${runId}:${aliyahIndex}:${recordingId}`
+  }
+
+  function getResolvedAliyahCueStatus(
+    runId: string,
+    aliyahIndex: PlaybackAliyahIndex,
+    recordingId: string
+  ) {
+    return resolvedAliyahCueStatuses.get(
+      resolvedAliyahCueStatusKey(runId, aliyahIndex, recordingId)
+    ) ?? null
+  }
+
   function applyHighlightRenderingDebugMode() {
     const highlightMode = new URLSearchParams(location.search).get('highlight')
     if (highlightMode === 'legacy-rectangle') {
@@ -338,6 +361,15 @@ export function startReaderRuntime({
 
   applyHighlightRenderingDebugMode()
 
+  function scheduleSpecialLetterAlignment(
+    root: Document | Element,
+    signal: AbortSignal
+  ) {
+    void alignSmallSpecialLettersWhenFontsReady(root, signal).catch((error) => {
+      console.error('Failed to align special Hebrew letters', error)
+    })
+  }
+
   function getDebugActiveTokenKey() {
     return new URLSearchParams(location.search).get('debugActiveToken')
   }
@@ -345,6 +377,7 @@ export function startReaderRuntime({
   function renderReaderModel(target: ScrollViewModel): ReaderRouteRendering {
     display?.destroy()
     latestViewportRange = null
+    resolvedAliyahCueStatuses.clear()
     resetAliyahDomCaches()
     syncAliyahNavigationContent()
     const lifetime = readerRuntimeLifecycle.begin()
@@ -742,8 +775,15 @@ export function startReaderRuntime({
   }
 
   function syncReaderMode() {
-    currentReaderMode = getReaderMode()
+    const nextReaderMode = getReaderMode()
+    const changed = nextReaderMode !== currentReaderMode
+    currentReaderMode = nextReaderMode
     document.documentElement.dataset.readerMode = currentReaderMode
+    if (!changed) return
+
+    const audioController = readerPlaybackGlobal?.audioController
+    if (audioController) refreshReaderChrome(audioController)
+    else syncAliyahNavigationContent()
   }
 
   function getActiveTokenKey() {
@@ -1721,15 +1761,18 @@ export function startReaderRuntime({
       active,
       playback,
       signaturePrefix: readerPreferences.narratorId,
-      getAudioKey: ({ run, aliyah }) => {
+      getAudio: ({ run, aliyah }) => {
         const recording = findRecordingForRun({
           narratorId: readerPreferences.narratorId,
           run,
           aliyahIndex: aliyah.index,
         })
-        return (
-          recording ?? getPreviousOverlapRecording(run, aliyah.index)
-        )?.id ?? null
+        return {
+          playbackKey:
+            (recording ?? getPreviousOverlapRecording(run, aliyah.index))
+              ?.id ?? null,
+          recordingKey: recording?.id ?? null,
+        }
       },
     })
   }
@@ -1791,6 +1834,7 @@ export function startReaderRuntime({
     aliyahNavigationGlobal?.syncContent({
       desktop: desktopSnapshot,
       compact: mobileSnapshot,
+      authoringEnabled: cueAuthoringGlobal?.isActive() ?? false,
     })
   }
 
@@ -1850,6 +1894,18 @@ export function startReaderRuntime({
       getReaderFocusTarget: getBook,
       loadCueStatus: (item) =>
         getAliyahRailCueStatus(getAliyahNavigationRecording(item.target)),
+      onCueStatusChange: (item, status) => {
+        if (!item.recordingKey) return
+        resolvedAliyahCueStatuses.set(
+          resolvedAliyahCueStatusKey(
+            item.target.runId,
+            item.target.aliyahIndex,
+            item.recordingKey
+          ),
+          status
+        )
+        refreshInlineAudioButtons(audioController)
+      },
       loadDurationLabel: loadMobileAliyahDurationLabel,
       onCueStatusError: (error, item) => {
         console.error(`Failed to load Cue Data status for ${item.key}`, error)
@@ -2948,6 +3004,23 @@ export function startReaderRuntime({
     )) {
       const state = getSessionButtonState(button)
       const available = Boolean(state?.available)
+      const authoringEnabled = cueAuthoringGlobal?.isActive() ?? false
+      const authoringAvailable = Boolean(
+        state && authoringEnabled && !state.recording
+      )
+      const cueStatus = state?.recording
+        ? getResolvedAliyahCueStatus(
+            state.run.id,
+            state.aliyahIndex,
+            state.recording.id
+          )
+        : null
+      const cueNeedsWork = Boolean(
+        authoringEnabled &&
+          state?.recording &&
+          cueStatus &&
+          isAliyahCueStatusUnfinished(cueStatus)
+      )
       const isCurrentSession = isCurrentPlaybackTarget(audioController, {
         recording: undefined,
         runId: state?.run.id,
@@ -2957,15 +3030,26 @@ export function startReaderRuntime({
         isCurrentSession && !audioController.audio.paused
       )
 
-      button.disabled = !available
+      button.disabled = !available && !authoringAvailable
       setControlIcon(button, isPlayingCurrentSession ? 'pause' : 'play')
-      button.title = !available
-        ? 'Recording unavailable'
-        : `${isPlayingCurrentSession ? 'Pause' : 'Play'} ${
-            state!.lineInfo.labels[0] ?? 'aliyah'
-          }`
+      const label = state?.lineInfo.labels[0] ?? 'aliyah'
+      button.title = authoringAvailable
+        ? `Select ${label} for audio and cue recording`
+        : cueNeedsWork && cueStatus
+          ? aliyahCueAuthoringActionLabel({
+              label,
+              status: cueStatus,
+              playing: isPlayingCurrentSession,
+            })
+        : !available
+          ? 'Recording unavailable'
+          : `${isPlayingCurrentSession ? 'Pause' : 'Play'} ${label}`
       button.setAttribute('aria-label', button.title)
+      if (cueStatus) button.dataset.cueStatus = cueStatus
+      else delete button.dataset.cueStatus
       button.classList.toggle('is-active', isPlayingCurrentSession)
+      button.classList.toggle('is-missing-audio', authoringAvailable)
+      button.classList.toggle('is-cue-incomplete', cueNeedsWork)
     }
   }
 
@@ -2985,6 +3069,15 @@ export function startReaderRuntime({
       current?.run && current.aliyahIndex
         ? getPreviousOverlapRecording(current.run, current.aliyahIndex)
         : null
+    const authoringEnabled = cueAuthoringGlobal?.isActive() ?? false
+    const cueStatus =
+      current?.run && current.aliyahIndex && recording
+        ? getResolvedAliyahCueStatus(
+            current.run.id,
+            current.aliyahIndex,
+            recording.id
+          )
+        : null
 
     const isTableOfContentsVisible =
       readerRouteGlobal?.snapshot().pickerOpen ?? false
@@ -2992,6 +3085,13 @@ export function startReaderRuntime({
       current?.run &&
         current.aliyahIndex &&
         (recording || fallbackRecording) &&
+        !isTableOfContentsVisible
+    )
+    const authoringAvailable = Boolean(
+      current?.run &&
+        current.aliyahIndex &&
+        !recording &&
+        authoringEnabled &&
         !isTableOfContentsVisible
     )
     const isCurrentSession = isCurrentPlaybackTarget(audioController, {
@@ -3042,6 +3142,9 @@ export function startReaderRuntime({
               }
             : null,
         audioAvailable: available,
+        authoringAvailable,
+        authoringEnabled,
+        cueStatus,
         playing: isPlayingCurrentSession,
       },
       compact: {
@@ -3128,6 +3231,28 @@ export function startReaderRuntime({
       : []
   }
 
+  async function loadAliyahForAudioAuthoring(
+    { runId, aliyahIndex }: AliyahNavigationTarget,
+    actionToken: number,
+    audioController: AudioController
+  ) {
+    const readerPlayback = readerPlaybackGlobal
+    if (!readerPlayback) return
+    selectAliyah({ runId, index: aliyahIndex })
+    const session = await readerPlayback.recordingSession.load(
+      { runId, aliyahIndex },
+      { mode: 'authoring' }
+    )
+    if (!playbackAction.isCurrent(actionToken)) return
+    if (!session) {
+      console.error(
+        `Could not prepare ${runId}:${aliyahIndex} for audio authoring`
+      )
+      return
+    }
+    syncReaderPlaybackChrome(audioController)
+  }
+
   async function startPlaybackForButton(
     button: HTMLButtonElement,
     audioController: AudioController,
@@ -3136,9 +3261,18 @@ export function startReaderRuntime({
     const readerPlayback = readerPlaybackGlobal
     if (!readerPlayback) return
     const state = getSessionButtonState(button)
-    if (!state?.available) return
-    selectAliyah({ runId: state.run.id, index: state.aliyahIndex })
+    if (!state) return
     const actionToken = playbackAction.start()
+    if (cueAuthoringGlobal?.isActive() && !state.recording) {
+      await loadAliyahForAudioAuthoring(
+        { runId: state.run.id, aliyahIndex: state.aliyahIndex },
+        actionToken,
+        audioController
+      )
+      return
+    }
+    if (!state.available) return
+    selectAliyah({ runId: state.run.id, index: state.aliyahIndex })
 
     if (
       isActivePlaybackTarget(audioController.session, {
@@ -3219,7 +3353,19 @@ export function startReaderRuntime({
       createCalendarGenerator().parseId(runId)
     if (!run) return
 
-    if (!readerPlayback.recordingSession.lookup(run, aliyahIndex).available) {
+    const availability = readerPlayback.recordingSession.lookup(
+      run,
+      aliyahIndex
+    )
+    if (cueAuthoringGlobal?.isActive() && !availability.recording) {
+      await loadAliyahForAudioAuthoring(
+        { runId, aliyahIndex },
+        actionToken,
+        audioController
+      )
+      return
+    }
+    if (!availability.available) {
       return
     }
     selectAliyah({ runId, index: aliyahIndex })
@@ -3411,6 +3557,7 @@ export function startReaderRuntime({
         recenterFrame = 0
         const scrollTarget = pendingScrollTarget
         pendingScrollTarget = null
+        scheduleSpecialLetterAlignment(book, scope.signal)
         recenterReaderFocalPoint(scrollTarget)
       })
     }
@@ -3494,6 +3641,7 @@ export function startReaderRuntime({
     recording: {
       library: {
         findRecording: findRecordingForRun,
+        findAuthoringRecording: findAuthoringRecordingForRun,
         listRecordings,
         loadCues: getCuesForRecording,
       },
@@ -3582,7 +3730,7 @@ export function startReaderRuntime({
         prepareAuthoringSession: () => recordingSession.enterAuthoring(),
         restoreReaderSession: () => recordingSession.leaveAuthoring(),
         playNetworkRecording: async (retry) => {
-          await playNetworkRecording(audioController, retry)
+          return playNetworkRecording(audioController, retry)
         },
         getAutoScroll: () => readerPreferences.autoScrollWithPlayback,
         getActiveTokenKey,
@@ -3593,7 +3741,11 @@ export function startReaderRuntime({
         formatDuration,
         onChange: (change: CueAuthoringChange) => {
           if (change === 'access') commandPaletteGlobal?.refresh()
-          else if (change === 'draft') aliyahNavigationGlobal?.invalidate()
+          else if (change === 'draft') {
+            resolvedAliyahCueStatuses.clear()
+            refreshInlineAudioButtons(audioController)
+            aliyahNavigationGlobal?.invalidate()
+          }
           else if (change === 'mode') syncReaderMode()
           else if (change === 'playback') playbackTimeline.refresh()
           else if (change === 'playback-progress') {
@@ -3855,6 +4007,7 @@ export function startReaderRuntime({
     (event) => {
       const renderedPage = event instanceof CustomEvent ? event.detail?.node : null
       const pageRoot = renderedPage instanceof Element ? renderedPage : book
+      scheduleSpecialLetterAlignment(pageRoot, scope.signal)
       indexAliyahDomTargets(pageRoot)
       applyAliyahStartWordMarkers(book, pageRoot)
       applyRecordingModePageLabels(pageRoot)
@@ -4187,4 +4340,3 @@ export function startReaderRuntime({
 
   return { destroy }
 }
-

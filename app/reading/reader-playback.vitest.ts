@@ -96,6 +96,7 @@ test('owns playback implementation lifetimes and resets route state once', async
       recording: {
         library: {
           findRecording: () => null,
+          findAuthoringRecording: () => null,
           listRecordings: () => [],
           loadCues: async () => [],
         },

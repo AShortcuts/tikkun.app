@@ -122,6 +122,15 @@ const recordingWithId = (id: string): ParshaAudioRecording => ({
   downloadSrc: `/${id}.mp3`,
 })
 
+const missingRecording: ParshaAudioRecording = {
+  ...recording,
+  id: 'missing',
+  title: 'Missing',
+  playSrc: '/missing.mp3',
+  downloadSrc: '/missing.mp3',
+  status: 'missing',
+}
+
 const plan = (endTime: number | null): PlaybackPlan => ({
   target: { runId: 'run', index: 2 },
   tokenKeys: ['1:0:0:0', '1:0:0:1'],
@@ -174,6 +183,17 @@ const compositePlan = (): PlaybackPlan => ({
   ],
 })
 
+const missingPlan = (): PlaybackPlan => ({
+  ...plan(null),
+  segments: [
+    {
+      ...plan(null).segments[0],
+      recording: missingRecording,
+      cues: [],
+    },
+  ],
+})
+
 function stubMediaGlobals(preloads: FakeAudioElement[] = []) {
   vi.stubGlobal('window', { location: { href: 'https://tikkun.test/' } })
   vi.stubGlobal('HTMLMediaElement', { HAVE_METADATA: 1 })
@@ -201,6 +221,23 @@ test('uses media metadata for an open-ended current segment', async () => {
   controller.seek(612)
   expect(audio.currentTime).toBe(612)
   expect(controller.currentTime).toBe(612)
+})
+
+test('loads a missing recording as an authoring target without requesting media', async () => {
+  stubMediaGlobals()
+  const audio = new FakeAudioElement(Number.NaN, 0)
+  const controller = new AudioController(audio as unknown as HTMLAudioElement)
+
+  await controller.loadSession(createActiveAudioSession(missingPlan()))
+
+  expect(controller.session?.recording.status).toBe('missing')
+  expect(controller.currentTime).toBe(0)
+  expect(controller.duration).toBe(Number.POSITIVE_INFINITY)
+  expect(audio.src).toBe('')
+  expect(audio.loadCount).toBe(0)
+  await expect(controller.play()).rejects.toThrow(
+    'record microphone audio first'
+  )
 })
 
 test('seeks repeatedly within the current segment without reactivating its media', async () => {

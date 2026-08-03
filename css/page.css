@@ -311,6 +311,12 @@
   transition-delay: var(--recording-highlight-animation-delay, 0s);
 }
 
+.special-letter.mod-small {
+  font-size: 50%;
+  line-height: 1;
+  vertical-align: var(--special-letter-baseline-shift, baseline);
+}
+
 .word.is-active-word {
   outline: none;
   z-index: auto;
@@ -614,6 +620,44 @@ html[data-highlight-rendering='legacy-rectangle'] .word.is-active-word::before {
 
 .aliyah-audio-button:hover {
   background: color-mix(in srgb, dodgerblue 20%, transparent);
+}
+
+html[data-reader-mode='admin-authoring']
+  .aliyah-audio-button.is-missing-audio {
+  background: color-mix(
+    in srgb,
+    var(--admin-missing-audio-color) 14%,
+    transparent
+  );
+  color: var(--admin-missing-audio-color);
+}
+
+html[data-reader-mode='admin-authoring']
+  .aliyah-audio-button.is-missing-audio:hover {
+  background: color-mix(
+    in srgb,
+    var(--admin-missing-audio-color) 22%,
+    transparent
+  );
+}
+
+html[data-reader-mode='admin-authoring']
+  .aliyah-audio-button.is-cue-incomplete:not(.is-missing-audio) {
+  background: color-mix(
+    in srgb,
+    var(--admin-cue-incomplete-color) 14%,
+    transparent
+  );
+  color: var(--admin-cue-incomplete-color);
+}
+
+html[data-reader-mode='admin-authoring']
+  .aliyah-audio-button.is-cue-incomplete:not(.is-missing-audio):hover {
+  background: color-mix(
+    in srgb,
+    var(--admin-cue-incomplete-color) 22%,
+    transparent
+  );
 }
 
 .aliyah-audio-button.is-active {

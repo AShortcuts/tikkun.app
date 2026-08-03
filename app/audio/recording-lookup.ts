@@ -6,6 +6,8 @@ import { canonicalizeParshaSlug } from '../view-model/navigation/parsha-routes.t
 import slugify from '../slugify.ts'
 import type {
   AudioRecording,
+  ParshaAudioRecording,
+  RangeAudioRecording,
   RangeReadingIdentity,
 } from './types.ts'
 import { isParshaAudioRecording, isRangeAudioRecording } from './types.ts'
@@ -76,6 +78,106 @@ export function findRecordingForRun({
         recording.status === 'available'
     ) ?? null
   )
+}
+
+export function findAuthoringRecordingForRun({
+  narratorId,
+  run,
+  aliyahIndex,
+  recordings = audioRecordings,
+}: {
+  narratorId: string
+  run: LeiningRun
+  aliyahIndex: LeiningAliyah['index']
+  recordings?: AudioRecording[]
+}): AudioRecording | null {
+  if (!aliyahIndex) return null
+  const aliyah = run.aliyot.find((candidate) => candidate.index === aliyahIndex)
+  if (!aliyah) return null
+
+  const available = findRecordingForRun({
+    narratorId,
+    run,
+    aliyahIndex,
+    recordings,
+  })
+  if (available) return available
+
+  const normalizedAliyah =
+    aliyahIndex === 'Maftir' ? 7 : Math.max(1, Math.min(aliyahIndex, 7))
+  const rangeReading = rangeReadingForAliyah(run, aliyah)
+  if (rangeReading) {
+    const catalogRecording = recordings.find(
+      (recording) =>
+        isRangeAudioRecording(recording) &&
+        recording.narratorId === narratorId &&
+        recording.reading.id === rangeReading.id &&
+        sameAliyahRange(recording.range, aliyah)
+    )
+    if (catalogRecording) return catalogRecording
+
+    const mediaPath = `/audio/${narratorId}/${rangeReading.id}/${normalizedAliyah}.m4a`
+    const recording: RangeAudioRecording = {
+      id: `${rangeReading.id}-${normalizedAliyah}`,
+      narratorId,
+      reading: rangeReading,
+      range: { start: aliyah.start, end: aliyah.end },
+      aliyah: normalizedAliyah,
+      title: `${rangeReading.name} Aliyah ${normalizedAliyah}`,
+      playSrc: mediaPath,
+      downloadSrc: mediaPath,
+      format: 'm4a',
+      status: 'missing',
+    }
+    return recording
+  }
+
+  const parshaSlug = parshaSlugForRun(run)
+  if (!parshaSlug) return null
+  const catalogRecording = recordings.find(
+    (recording) =>
+      isParshaAudioRecording(recording) &&
+      recording.narratorId === narratorId &&
+      recording.parshaSlug === parshaSlug &&
+      recording.aliyah === normalizedAliyah
+  )
+  if (catalogRecording) return catalogRecording
+
+  const relatedRecording = recordings.find(
+    (recording): recording is ParshaAudioRecording =>
+      isParshaAudioRecording(recording) &&
+      recording.narratorId === narratorId &&
+      recording.parshaSlug === parshaSlug
+  )
+  const parshaName =
+    relatedRecording?.parshaName ??
+    (run.leining.date.title.en.replace(/^Parshat\s+/i, '').trim() ||
+      parshaSlug)
+  const mediaPath = `/audio/${narratorId}/${parshaSlug}/${normalizedAliyah}.m4a`
+  const recording: ParshaAudioRecording = {
+    id: `${parshaSlug}-${normalizedAliyah}`,
+    narratorId,
+    reading: {
+      kind: 'parsha',
+      id: parshaSlug,
+      name: parshaName,
+      ...(relatedRecording?.parshaNumber
+        ? { order: relatedRecording.parshaNumber }
+        : {}),
+    },
+    parshaSlug,
+    parshaName,
+    ...(relatedRecording?.parshaNumber
+      ? { parshaNumber: relatedRecording.parshaNumber }
+      : {}),
+    aliyah: normalizedAliyah,
+    title: `${parshaName} Aliyah ${normalizedAliyah}`,
+    playSrc: mediaPath,
+    downloadSrc: mediaPath,
+    format: 'm4a',
+    status: 'missing',
+  }
+  return recording
 }
 
 export function rangeReadingForAliyah(

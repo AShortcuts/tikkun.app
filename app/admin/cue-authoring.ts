@@ -87,7 +87,7 @@ export interface CueAuthoringOptions {
   sessionStorage: Storage | null
   prepareAuthoringSession: () => Promise<void>
   restoreReaderSession: () => Promise<void>
-  playNetworkRecording: (retry?: () => Promise<void>) => Promise<void>
+  playNetworkRecording: (retry?: () => Promise<void>) => Promise<boolean>
   getAutoScroll: () => boolean
   getActiveTokenKey: () => string | null
   getDisplayTime: () => number
@@ -200,6 +200,10 @@ export function createCueAuthoring(
     const session = audioController.session
     return isAuthoringSession(session) ? session : null
   }
+
+  const requiresMicrophoneCapture = (
+    session: ActiveAudioSession | null = getSession()
+  ) => session?.recording.status === 'missing'
 
   const formatCueTimestamp = (seconds: number) => {
     const milliseconds = Math.max(0, Math.round(seconds * 1000))
@@ -370,7 +374,8 @@ export function createCueAuthoring(
     microphoneCapture.state === 'recording' &&
     Boolean(session && microphoneAudioId === session.recording.id)
 
-  const isMicrophoneCaptureRequested = () => state.captureAudioRequested
+  const isMicrophoneCaptureRequested = () =>
+    state.captureAudioRequested || requiresMicrophoneCapture()
 
   const clearCapturedAudio = () => {
     capturedAudio = null
@@ -487,15 +492,15 @@ export function createCueAuthoring(
     const activation = activateCueToken(session.tokenKeys[clampedIndex])
     const playback =
       play && cue && audioController.audio.paused
-        ? options.playNetworkRecording(() =>
-            selectToken(index, {
+        ? options.playNetworkRecording(async () => {
+            await selectToken(index, {
               play,
               preservePlayback,
               seekToCue,
               focusRow,
               syncMode,
             })
-          )
+          })
         : null
 
     if (syncMode === 'step-back') {
@@ -504,12 +509,13 @@ export function createCueAuthoring(
       options.onChange('playback-progress')
     }
 
-    await Promise.all([activation, playback])
+    const [, playbackStarted] = await Promise.all([activation, playback])
     if (syncMode === 'full') {
       options.onChange('playback')
       syncPanel()
     }
     if (focusRow) focusCueRow(getEditableCueIndex())
+    return playbackStarted ?? !play
   }
 
   const getTokenLabel = (index: number) => {
@@ -701,8 +707,11 @@ export function createCueAuthoring(
       statusText = hasCues
         ? `${session.recording.title}: ${state.cues.length}/${tokenCount} ` +
           `Words saved. Resume from Word ${pointer}, or select one to refine.`
-        : `${session.recording.title}: ready to time. ` +
-          'Press Record/Edit Timing to begin.'
+        : requiresMicrophoneCapture(session)
+          ? `${session.recording.title}: no published audio. ` +
+            'Record a fresh synchronized audio and cue pass.'
+          : `${session.recording.title}: ready to time. ` +
+            'Press Record/Edit Timing to begin.'
     }
 
     let captureStatusText =
@@ -734,6 +743,9 @@ export function createCueAuthoring(
     } else if (confirmingFreshPass) {
       captureStatusText =
         'Press Record once more to replace this cue draft with a fresh synchronized audio + timing pass.'
+    } else if (requiresMicrophoneCapture(session)) {
+      captureStatusText =
+        'This aliyah has no published recording. Microphone audio and synchronized cue recording are required.'
     } else if (state.captureAudioRequested && hasCues) {
       captureStatusText =
         'Starting microphone audio creates a fresh synchronized timing pass and replaces the current cue draft.'
@@ -746,8 +758,12 @@ export function createCueAuthoring(
       draftStatusText: getDraftStatusText(),
       syncNoteVisible: state.recording,
       captureAudio: {
-        requested: state.captureAudioRequested,
-        disabled: !session || !microphoneSupported || microphoneBusy,
+        requested: isMicrophoneCaptureRequested(),
+        disabled:
+          !session ||
+          !microphoneSupported ||
+          microphoneBusy ||
+          requiresMicrophoneCapture(session),
         statusText: captureStatusText,
         tone: captureTone,
       },
@@ -786,6 +802,25 @@ export function createCueAuthoring(
     syncCueList({ follow: false })
   }
 
+  const startTimingRecording = (
+    session: ActiveAudioSession,
+    tokenPointer: number | null = null
+  ) => {
+    clearCapturedAudio()
+    state.recording = true
+    if (tokenPointer !== null) {
+      state.tokenPointer = Math.max(
+        0,
+        Math.min(tokenPointer, session.tokenKeys.length - 1)
+      )
+    } else if (state.tokenPointer < 0) {
+      const activeIndex = Math.max(highlightController.getActiveIndex(), 0)
+      state.tokenPointer = Math.min(activeIndex, state.cues.length)
+    }
+    syncPanel()
+    options.focusReader()
+  }
+
   const resumeDraft = async () => {
     const session = audioController.session
     if (!session?.tokenKeys.length || !state.cues.length) return
@@ -794,8 +829,9 @@ export function createCueAuthoring(
       0,
       Math.min(state.cues.length - 1, session.tokenKeys.length - 1)
     )
-    await selectToken(lastSavedCueIndex, { play: true })
-    options.focusReader()
+    const playbackStarted = await selectToken(lastSavedCueIndex, { play: true })
+    if (!playbackStarted || audioController.session !== session) return
+    startTimingRecording(session, state.cues.length)
   }
 
   const resetRecorder = async ({
@@ -1403,6 +1439,8 @@ export function createCueAuthoring(
       options.focusReader()
       return
     }
+    const session = getSession()
+    if (!session?.tokenKeys.length) return
     if (isMicrophoneCaptureRequested()) {
       const started = await startMicrophoneTimingPass()
       if (started) options.focusReader()
@@ -1413,14 +1451,7 @@ export function createCueAuthoring(
       await resetRecorder()
       return
     }
-    clearCapturedAudio()
-    state.recording = true
-    if (state.tokenPointer < 0) {
-      const activeIndex = Math.max(highlightController.getActiveIndex(), 0)
-      state.tokenPointer = Math.min(activeIndex, state.cues.length)
-    }
-    syncPanel()
-    options.focusReader()
+    startTimingRecording(session)
   }
 
   const resetTiming = async () => {
@@ -1612,8 +1643,9 @@ export function createCueAuthoring(
     restoreAccessState,
     bindSession,
     clearSession,
-    selectReaderToken: (index, selectOptions) =>
-      selectToken(index, selectOptions),
+    selectReaderToken: async (index, selectOptions) => {
+      await selectToken(index, selectOptions)
+    },
     handleKeydown,
     closeOverlays: () => {
       hideExport()

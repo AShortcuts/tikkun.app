@@ -4,7 +4,9 @@
   import UiIcon from '../../components/UiIcon.svelte'
   import {
     ALIYAH_RAIL_AUTO_HIDE_MS,
+    aliyahCueAuthoringActionLabel,
     aliyahCueStatusLabel,
+    isAliyahCueStatusUnfinished,
     type AliyahCueStatus,
     type AliyahNavigationLayer,
     type AliyahNavigationLayerComponentProps,
@@ -31,6 +33,7 @@
     restoreFocus,
     getReaderFocusTarget,
     loadCueStatus,
+    onCueStatusChange,
     loadDurationLabel,
     onCueStatusError,
     onDurationError,
@@ -60,6 +63,7 @@
   let compactSnapshot = $state<AliyahNavigationSnapshot | null>(null)
   let railVisibility = $state<AliyahRailVisibility>('hidden')
   let compactAvailable = $state(false)
+  let authoringEnabled = $state(false)
   let pickerOpen = $state(false)
   let pickerClosing = $state(false)
   let revision = $state(0)
@@ -93,7 +97,7 @@
   }
 
   function requestKey(item: AliyahNavigationItem, requestRevision = revision) {
-    return `${requestRevision}:${item.key}:${item.audioKey ?? ''}`
+    return `${requestRevision}:${item.key}:${item.audioKey ?? ''}:${item.recordingKey ?? ''}`
   }
 
   function isCurrentItem(
@@ -106,7 +110,8 @@
       snapshot?.items.some(
         (candidate) =>
           candidate.key === item.key &&
-          candidate.audioKey === item.audioKey
+          candidate.audioKey === item.audioKey &&
+          candidate.recordingKey === item.recordingKey
       )
     )
   }
@@ -127,22 +132,20 @@
           if (
             destroyed ||
             signal.aborted ||
-            !isCurrentItem(desktopSnapshot, item, requestRevision)
+            !isCurrentItem(snapshot, item, requestRevision)
           ) {
             return
           }
           flushSync(() => {
             cueStatuses = { ...cueStatuses, [key]: status }
           })
+          onCueStatusChange(item, status)
         })
         .catch((error) => {
           pendingCueStatuses.delete(key)
           if (destroyed || signal.aborted) return
           onCueStatusError(error, item)
-          if (!isCurrentItem(desktopSnapshot, item, requestRevision)) return
-          flushSync(() => {
-            cueStatuses = { ...cueStatuses, [key]: 'none' }
-          })
+          if (!isCurrentItem(snapshot, item, requestRevision)) return
         })
     }
   }
@@ -245,6 +248,7 @@
     flushSync(() => {
       desktopSnapshot = cloneSnapshot(content.desktop)
       compactSnapshot = cloneSnapshot(content.compact)
+      authoringEnabled = content.authoringEnabled
     })
 
     if (desktopSnapshot) {
@@ -254,7 +258,10 @@
     } else {
       hideWide()
     }
-    if (compactSnapshot) queueDurationLoads(compactSnapshot)
+    if (compactSnapshot) {
+      queueCueStatusLoads(compactSnapshot)
+      queueDurationLoads(compactSnapshot)
+    }
     else closeCompact()
   }
 
@@ -264,6 +271,7 @@
     flushSync(() => {
       desktopSnapshot = null
       compactSnapshot = null
+      authoringEnabled = false
     })
     hideWide()
   }
@@ -277,7 +285,10 @@
     pendingCueStatuses.clear()
     pendingDurations.clear()
     if (desktopSnapshot) queueCueStatusLoads(desktopSnapshot)
-    if (compactSnapshot) queueDurationLoads(compactSnapshot)
+    if (compactSnapshot) {
+      queueCueStatusLoads(compactSnapshot)
+      queueDurationLoads(compactSnapshot)
+    }
   }
 
   function setActive(target: AliyahNavigationTarget | null) {
@@ -398,7 +409,27 @@
     return cueStatuses[requestKey(item)] ?? 'none'
   }
 
+  function resolvedCueStatus(item: AliyahNavigationItem) {
+    const key = requestKey(item)
+    return Object.prototype.hasOwnProperty.call(cueStatuses, key)
+      ? cueStatuses[key] ?? null
+      : null
+  }
+
+  function itemCueNeedsWork(item: AliyahNavigationItem) {
+    const status = resolvedCueStatus(item)
+    return Boolean(
+      authoringEnabled &&
+        item.recordingKey &&
+        status &&
+        isAliyahCueStatusUnfinished(status)
+    )
+  }
+
   function durationLabel(item: AliyahNavigationItem) {
+    if (authoringEnabled && !item.recordingKey) {
+      return 'Record audio + cues'
+    }
     if (!item.audioKey) return 'No audio'
     return durationLabels[requestKey(item)] ?? 'Loading…'
   }
@@ -432,6 +463,24 @@
       return `Paused · ${playback.progressLabel}`
     }
     return durationLabel(item)
+  }
+
+  function compactPlayLabel(
+    item: AliyahNavigationItem,
+    playback: AliyahNavigationPlayback
+  ) {
+    if (authoringEnabled && !item.recordingKey) {
+      return `Select ${item.label} for audio and cue recording`
+    }
+    const status = resolvedCueStatus(item)
+    if (itemCueNeedsWork(item) && status) {
+      return aliyahCueAuthoringActionLabel({
+        label: item.label,
+        status,
+        playing: isPlaying(playback, item.target),
+      })
+    }
+    return `${isPlaying(playback, item.target) ? 'Pause' : 'Play'} ${item.label}`
   }
 
   function segmentLabel(
@@ -673,7 +722,13 @@
     aria-modal="true"
     aria-labelledby="mobile-aliyah-picker-title"
   >
-    <div class="mobile-aliyah-sheet-handle" aria-hidden="true"></div>
+    <button
+      class="mobile-aliyah-sheet-handle"
+      data-target-id="mobile-aliyah-sheet-handle"
+      type="button"
+      aria-label="Close aliyah picker"
+      onclick={() => closeCompact()}
+    ></button>
     <header class="mobile-aliyah-sheet-header">
       <div class="mobile-aliyah-sheet-copy">
         <h2 id="mobile-aliyah-picker-title">Choose an aliyah</h2>
@@ -698,7 +753,8 @@
             compactSnapshot?.active,
             item.target
           )}
-          class:is-unavailable={!item.audioKey}
+          class:is-unavailable={!item.audioKey && !authoringEnabled}
+          class:is-authoring-missing={authoringEnabled && !item.recordingKey}
           class:is-playing={isPlaying(
             compactPlayback(),
             item.target
@@ -730,24 +786,16 @@
               )}
             </span>
           </button>
-          {#if item.audioKey}
+          {#if item.audioKey || authoringEnabled}
             <button
               class="mobile-aliyah-play"
+              class:is-missing-audio={authoringEnabled && !item.recordingKey}
+              class:is-cue-incomplete={itemCueNeedsWork(item)}
               data-run-id={item.target.runId}
               data-aliyah-index={item.target.aliyahIndex}
               type="button"
-              title={`${isPlaying(
-                compactPlayback(),
-                item.target
-              )
-                ? 'Pause'
-                : 'Play'} ${item.label}`}
-              aria-label={`${isPlaying(
-                compactPlayback(),
-                item.target
-              )
-                ? 'Pause'
-                : 'Play'} ${item.label}`}
+              title={compactPlayLabel(item, compactPlayback())}
+              aria-label={compactPlayLabel(item, compactPlayback())}
               onclick={() => playCompactItem(item.target)}
             >
               <UiIcon

@@ -4,6 +4,7 @@ import type { UserSettings } from '../calendar-model/user-settings.ts'
 import type { LeiningRun } from '../calendar-model/model-types.ts'
 import type { RangeAudioRecording } from './types.ts'
 import {
+  findAuthoringRecordingForRun,
   findRecordingForRun,
   getCuePayloadForRecording,
   listRecordings,
@@ -95,6 +96,28 @@ test('audio lookup resolves maftir to the seventh aliyah recording', () => {
       run,
       aliyahIndex: 'Maftir',
     })?.id).toBe('noach-7')
+})
+
+test('audio authoring creates a stable missing recording identity', () => {
+  const run = generator.parseId('2026-10-10:shacharis,main')
+
+  if (!run) throw new Error('Missing Beresheet run')
+
+  expect(
+    findAuthoringRecordingForRun({
+      narratorId: 'new-reader',
+      run,
+      aliyahIndex: 3,
+      recordings: [],
+    })
+  ).toMatchObject({
+    id: 'beresheet-3',
+    narratorId: 'new-reader',
+    reading: { kind: 'parsha', id: 'beresheet' },
+    aliyah: 3,
+    playSrc: '/audio/new-reader/beresheet/3.m4a',
+    status: 'missing',
+  })
 })
 
 test('loads cue payloads for a recording on demand', async () => {

@@ -23,6 +23,11 @@ export interface RecordingSessionLibrary {
     run: LeiningRun
     aliyahIndex: PlaybackAliyahIndex
   }): AudioRecording | null
+  findAuthoringRecording(input: {
+    narratorId: string
+    run: LeiningRun
+    aliyahIndex: PlaybackAliyahIndex
+  }): AudioRecording | null
   listRecordings(): readonly AudioRecording[]
   loadCues(recording: AudioRecording): Promise<readonly WordCue[]>
 }
@@ -218,7 +223,13 @@ export function createRecordingSession(
 
     const recording =
       recordingOverride === undefined
-        ? currentRecording(run, target.aliyahIndex)
+        ? mode === 'authoring'
+          ? library.findAuthoringRecording({
+              narratorId: options.getNarratorId(),
+              run,
+              aliyahIndex: target.aliyahIndex,
+            })
+          : currentRecording(run, target.aliyahIndex)
         : recordingOverride
     const current = recording
       ? {

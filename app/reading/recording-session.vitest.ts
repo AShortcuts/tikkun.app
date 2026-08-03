@@ -47,6 +47,11 @@ const secondRecording: ParshaAudioRecording = {
   downloadSrc: '/fixture-2.mp3',
 }
 
+const missingSecondRecording: ParshaAudioRecording = {
+  ...secondRecording,
+  status: 'missing',
+}
+
 const firstCues: WordCue[] = [
   {
     timeStart: 1,
@@ -160,7 +165,11 @@ function createHarness({
       : [overlapToken, lastToken]
   )
   const loadCues = vi.fn(async (recording: ParshaAudioRecording) =>
-    recording.id === firstRecording.id ? firstCues : secondCues
+    recording.status === 'missing'
+      ? []
+      : recording.id === firstRecording.id
+        ? firstCues
+        : secondCues
   )
   const sessionLoaded = vi.fn()
   const session = createRecordingSession({
@@ -173,6 +182,12 @@ function createHarness({
           : includeSecondRecording
             ? secondRecording
             : null,
+      findAuthoringRecording: ({ aliyahIndex }) =>
+        aliyahIndex === 1
+          ? firstRecording
+          : includeSecondRecording
+            ? secondRecording
+            : missingSecondRecording,
       listRecordings: () => [firstRecording, secondRecording],
       loadCues,
     },
@@ -276,6 +291,23 @@ test('keeps overlap availability distinct from the current recording', async () 
     aliyahIndex: 2,
   })
   expect(loaded?.status).toBe('overlap-only')
+})
+
+test('creates an authoring session for an aliyah with no published audio', async () => {
+  const harness = createHarness({ includeSecondRecording: false })
+  harness.setAuthoringVisible(true)
+
+  const loaded = await harness.session.load(
+    { runId: harness.run.id, aliyahIndex: 2 },
+    { mode: 'authoring' }
+  )
+
+  expect(loaded?.recording).toBe(missingSecondRecording)
+  expect(loaded?.recording.status).toBe('missing')
+  expect(loaded?.status).toBe('current-only')
+  expect(loaded?.segments).toHaveLength(1)
+  expect(loaded?.tokenKeys).toEqual([overlapToken, lastToken])
+  expect(harness.sessionLoaded).toHaveBeenCalledWith(loaded)
 })
 
 test('reset discards an authoring checkpoint from the previous route', async () => {

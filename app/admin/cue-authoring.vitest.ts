@@ -122,6 +122,106 @@ test('restores access and binds a validated local Cue Draft to one authoring ses
   expect(cueAuthoring!.isRecording()).toBe(true)
 })
 
+test('resumes an incomplete draft by previewing its last cue before recording the next word', async () => {
+  const { audioController, highlightController } = createFixture()
+  let startPlayback!: () => void
+  let playbackAttempt = 0
+  const playNetworkRecording = vi.fn(() => {
+    playbackAttempt += 1
+    if (playbackAttempt === 1) return Promise.resolve(false)
+    return new Promise<boolean>((resolve) => {
+        startPlayback = () => resolve(true)
+      })
+  })
+  const focusReader = vi.fn()
+  let cueAuthoring!: CueAuthoring
+
+  destroy = createMount()((scope) => {
+    cueAuthoring = createCueAuthoring(
+      scope,
+      createOptions(audioController, highlightController, {
+        playNetworkRecording,
+        focusReader,
+      })
+    )
+  })
+
+  const session = createActiveAudioSession(
+    buildPlaybackPlan({
+      target: { runId: 'run', index: 1 },
+      tokenKeys,
+      current: {
+        recording: recording('current', 1),
+        cues: [cue(tokenKeys[0], 0)],
+      },
+    })!
+  )
+  await audioController.loadSession(session)
+  highlightController.setSequence(tokenKeys)
+  await cueAuthoring.bindSession(session)
+
+  const resumeDraft = required<HTMLButtonElement>(
+    '[data-target-id="admin-resume-draft"]'
+  )
+  resumeDraft.click()
+  await vi.waitFor(() => expect(playNetworkRecording).toHaveBeenCalledOnce())
+
+  expect(cueAuthoring.isRecording()).toBe(false)
+  expect(highlightController.getActiveTokenKey()).toBe(tokenKeys[0])
+  expect(focusReader).not.toHaveBeenCalled()
+
+  resumeDraft.click()
+  await vi.waitFor(() => expect(playNetworkRecording).toHaveBeenCalledTimes(2))
+  expect(cueAuthoring.isRecording()).toBe(false)
+
+  startPlayback()
+  await vi.waitFor(() => expect(cueAuthoring.isRecording()).toBe(true))
+
+  expect(focusReader).toHaveBeenCalledOnce()
+  expect(
+    required('[data-target-id="admin-status"]').textContent
+  ).toContain('recording Word 2')
+  expect(
+    required('[data-target-id="admin-record"]').getAttribute('aria-label')
+  ).toBe('Stop recording word timings and switch to playback review')
+  expect(
+    required<HTMLElement>('[data-target-id="admin-resume-wrap"]').hidden
+  ).toBe(true)
+})
+
+test('requires synchronized microphone capture for a missing recording', async () => {
+  const { audioController, highlightController } = createFixture()
+  let cueAuthoring!: CueAuthoring
+
+  destroy = createMount()((scope) => {
+    cueAuthoring = createCueAuthoring(
+      scope,
+      createOptions(audioController, highlightController)
+    )
+  })
+
+  const missing = { ...recording('missing', 1), status: 'missing' as const }
+  const session = createActiveAudioSession(
+    buildPlaybackPlan({
+      target: { runId: 'run', index: 1 },
+      tokenKeys,
+      current: { recording: missing, cues: [] },
+    })!
+  )
+  await audioController.loadSession(session)
+  highlightController.setSequence(tokenKeys)
+  await cueAuthoring.bindSession(session)
+
+  const captureAudio = required<HTMLInputElement>(
+    '[data-target-id="admin-capture-audio"]'
+  )
+  expect(captureAudio.checked).toBe(true)
+  expect(captureAudio.disabled).toBe(true)
+  expect(
+    required('[data-target-id="admin-status"]').textContent
+  ).toContain('no published audio')
+})
+
 test('keeps cue selection, seeking, focus, and timing edits behind TypeScript', async () => {
   const { audioController, highlightController } = createFixture()
   const onCueNavigationChange = vi.fn()
@@ -178,7 +278,7 @@ test('keeps cue selection, seeking, focus, and timing edits behind TypeScript', 
 
 test('routes Cue List controls through TypeScript behavior', async () => {
   const { audioController, highlightController } = createFixture()
-  const playNetworkRecording = vi.fn(async () => {})
+  const playNetworkRecording = vi.fn(async () => true)
   const onCueNavigationChange = vi.fn()
   let cueAuthoring!: CueAuthoring
 
@@ -524,7 +624,7 @@ function createOptions(
     sessionStorage,
     prepareAuthoringSession: async () => {},
     restoreReaderSession: async () => {},
-    playNetworkRecording: async () => {},
+    playNetworkRecording: async () => true,
     getAutoScroll: () => false,
     getActiveTokenKey: () => tokenKeys[0],
     getDisplayTime: () => audioController.currentTime,

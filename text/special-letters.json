@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "tradition": "contemporary-ashkenazi-sephardi",
+  "entries": [
+    {
+      "id": "genesis-2-4-small-he",
+      "verse": { "book": 1, "chapter": 2, "verse": 4 },
+      "word": { "text": "בהבראם", "occurrence": 1 },
+      "letter": { "text": "ה", "position": 2 },
+      "form": { "type": "small" }
+    },
+    {
+      "id": "genesis-23-2-small-kaf",
+      "verse": { "book": 1, "chapter": 23, "verse": 2 },
+      "word": { "text": "ולבכתה", "occurrence": 1 },
+      "letter": { "text": "כ", "position": 4 },
+      "form": { "type": "small" }
+    },
+    {
+      "id": "genesis-27-46-small-qof",
+      "verse": { "book": 1, "chapter": 27, "verse": 46 },
+      "word": { "text": "קצתי", "occurrence": 1 },
+      "letter": { "text": "ק", "position": 1 },
+      "form": { "type": "small" }
+    },
+    {
+      "id": "leviticus-1-1-small-alef",
+      "verse": { "book": 3, "chapter": 1, "verse": 1 },
+      "word": { "text": "ויקרא", "occurrence": 1 },
+      "letter": { "text": "א", "position": 5 },
+      "form": { "type": "small" }
+    },
+    {
+      "id": "leviticus-6-2-small-mem",
+      "verse": { "book": 3, "chapter": 6, "verse": 2 },
+      "word": { "text": "מוקדה", "occurrence": 1 },
+      "letter": { "text": "מ", "position": 1 },
+      "form": { "type": "small" }
+    },
+    {
+      "id": "numbers-25-11-small-yod",
+      "verse": { "book": 4, "chapter": 25, "verse": 11 },
+      "word": { "text": "פינחס", "occurrence": 1 },
+      "letter": { "text": "י", "position": 2 },
+      "form": { "type": "small" }
+    },
+    {
+      "id": "deuteronomy-32-18-small-yod",
+      "verse": { "book": 5, "chapter": 32, "verse": 18 },
+      "word": { "text": "תשי", "occurrence": 1 },
+      "letter": { "text": "י", "position": 3 },
+      "form": { "type": "small" }
+    }
+  ]
+}

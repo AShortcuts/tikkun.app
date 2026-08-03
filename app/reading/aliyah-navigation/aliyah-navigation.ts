@@ -35,6 +35,9 @@ export type AliyahToolbarState = Readonly<{
     label: string
     target: AliyahNavigationTarget | null
     audioAvailable: boolean
+    authoringAvailable: boolean
+    authoringEnabled: boolean
+    cueStatus: AliyahCueStatus | null
     playing: boolean
   }>
   compact: MobileAliyahCapsule
@@ -43,6 +46,7 @@ export type AliyahToolbarState = Readonly<{
 export type AliyahNavigationContent = Readonly<{
   desktop: AliyahNavigationSnapshot | null
   compact: AliyahNavigationSnapshot | null
+  authoringEnabled: boolean
 }>
 
 export interface AliyahNavigation {
@@ -79,6 +83,10 @@ export interface AliyahNavigationOptions {
   restoreFocus(target: HTMLElement | null): void
   getReaderFocusTarget(): HTMLElement
   loadCueStatus(item: AliyahNavigationItem): Promise<AliyahCueStatus>
+  onCueStatusChange(
+    item: AliyahNavigationItem,
+    status: AliyahCueStatus
+  ): void
   loadDurationLabel(item: AliyahNavigationItem): Promise<string>
   onCueStatusError(error: unknown, item: AliyahNavigationItem): void
   onDurationError(error: unknown, item: AliyahNavigationItem): void
@@ -86,6 +94,11 @@ export interface AliyahNavigationOptions {
 
 export interface AliyahToolbar {
   sync(state: AliyahToolbarState): void
+  setCueStatus(
+    target: AliyahNavigationTarget,
+    status: AliyahCueStatus
+  ): void
+  invalidateCueStatus(): void
   setCompactOpen(open: boolean): void
   getCompactToggle(): HTMLButtonElement
 }
@@ -149,6 +162,25 @@ export function aliyahCueStatusLabel(status: AliyahCueStatus) {
   }[status]
 }
 
+export function isAliyahCueStatusUnfinished(status: AliyahCueStatus) {
+  return status !== 'published'
+}
+
+export function aliyahCueAuthoringActionLabel({
+  label,
+  status,
+  playing = false,
+}: {
+  label: string
+  status: AliyahCueStatus
+  playing?: boolean
+}) {
+  if (playing) return `Pause ${label}`
+  return status === 'none'
+    ? `Start ${label} cue recording`
+    : `Resume ${label} cue recording`
+}
+
 function requiredEmptyRoot(document: Document, targetId: string) {
   const target = document.querySelector<HTMLElement>(
     `[data-target-id="${targetId}"]`
@@ -203,6 +235,13 @@ export function createAliyahNavigation(
       restoreFocus: options.restoreFocus,
       getReaderFocusTarget: options.getReaderFocusTarget,
       loadCueStatus: options.loadCueStatus,
+      onCueStatusChange: (
+        item: AliyahNavigationItem,
+        status: AliyahCueStatus
+      ) => {
+        toolbar?.setCueStatus(item.target, status)
+        options.onCueStatusChange(item, status)
+      },
       loadDurationLabel: options.loadDurationLabel,
       onCueStatusError: options.onCueStatusError,
       onDurationError: options.onDurationError,
@@ -256,7 +295,10 @@ export function createAliyahNavigation(
   return {
     syncContent: (content) => connectedLayer.syncContent(content),
     clearContent: () => connectedLayer.clearContent(),
-    invalidate: () => connectedLayer.invalidate(),
+    invalidate: () => {
+      connectedToolbar.invalidateCueStatus()
+      connectedLayer.invalidate()
+    },
     setActive: (target) => connectedLayer.setActive(target),
     syncPlayback: (playback) => connectedLayer.syncPlayback(playback),
     syncToolbar: (state) => {
