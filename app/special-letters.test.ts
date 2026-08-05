@@ -80,8 +80,11 @@ test('each catalog entry resolves to exactly one word in its canonical verse', (
   )
 })
 
-test('the line renderer marks every catalog target once in each display mode', () => {
+test('the line renderer keeps one live marker and one stored alternate', () => {
   const renderedCounts = new Map(
+    specialLetterCatalog.entries.map((entry) => [entry.id, 0])
+  )
+  const alternateCounts = new Map(
     specialLetterCatalog.entries.map((entry) => [entry.id, 0])
   )
   const targetWords = new Set(
@@ -123,9 +126,17 @@ test('the line renderer marks every catalog target once in each display mode', (
         })
         for (const entry of specialLetterCatalog.entries) {
           const marker = `data-special-letter-id="${entry.id}"`
+          const alternateMarker =
+            `data-special-letter-id=&quot;${entry.id}&quot;`
           renderedCounts.set(
             entry.id,
             (renderedCounts.get(entry.id) ?? 0) + html.split(marker).length - 1
+          )
+          alternateCounts.set(
+            entry.id,
+            (alternateCounts.get(entry.id) ?? 0) +
+              html.split(alternateMarker).length -
+              1
           )
         }
       }
@@ -135,7 +146,10 @@ test('the line renderer marks every catalog target once in each display mode', (
   }
 
   expect([...renderedCounts.values()]).toEqual(
-    specialLetterCatalog.entries.map(() => 2)
+    specialLetterCatalog.entries.map(() => 1)
+  )
+  expect([...alternateCounts.values()]).toEqual(
+    specialLetterCatalog.entries.map(() => 1)
   )
 })
 

@@ -52,6 +52,7 @@ function mountLazySettings(
       setPlaybackRate: vi.fn(),
       restoreFocus: vi.fn(),
       animateThemeChanges: true,
+      serviceWorker: null,
       load,
       onLoadError,
     })

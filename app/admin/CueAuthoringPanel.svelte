@@ -14,6 +14,7 @@
     visible: false,
     cueCountText: '0 Words',
     statusText: 'Select an aliyah and press play to start timing words.',
+    problems: [],
     draftStatusText: 'Drafts autosave locally per recording.',
     syncNoteVisible: false,
     captureAudio: {
@@ -82,6 +83,13 @@
       : `Resume timing draft from Word ${snapshot.resumeWord}`
   )
 
+  function runProblemAction(
+    problem: CueAuthoringPanelSnapshot['problems'][number]
+  ) {
+    if (!problem.action || problem.action.pending) return
+    action({ type: problem.action.type })
+  }
+
   function sync(nextSnapshot: CueAuthoringPanelSnapshot) {
     flushSync(() => {
       snapshot = {
@@ -133,6 +141,51 @@
   <div class="admin-panel-status" data-target-id="admin-status">
     {snapshot.statusText}
   </div>
+
+  {#if snapshot.problems.length}
+    <div class="admin-panel-problems" data-target-id="admin-problems">
+      {#each snapshot.problems as problem (problem.id)}
+        <section
+          class="admin-panel-problem"
+          class:mod-error={problem.tone === 'error'}
+          data-admin-problem={problem.id}
+          role="status"
+          aria-live="polite"
+        >
+          <div class="admin-panel-problem-heading">
+            <UiIcon
+              name={problem.tone === 'error' ? 'circleAlert' : 'triangleAlert'}
+            />
+            <strong>{problem.title}</strong>
+          </div>
+          <p>{problem.message}</p>
+          {#if problem.details.length}
+            <details class="admin-panel-problem-details">
+              <summary>Technical details</summary>
+              <ul>
+                {#each problem.details as detail (detail)}
+                  <li>{detail}</li>
+                {/each}
+              </ul>
+            </details>
+          {/if}
+          {#if problem.action}
+            <button
+              type="button"
+              class="toolbar-button admin-panel-problem-action"
+              data-admin-problem-action={problem.action.type}
+              disabled={problem.action.pending}
+              onclick={() => runProblemAction(problem)}
+            >
+              {problem.action.pending
+                ? problem.action.pendingLabel
+                : problem.action.label}
+            </button>
+          {/if}
+        </section>
+      {/each}
+    </div>
+  {/if}
 
   <label class="admin-audio-capture-option">
     <input

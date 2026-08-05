@@ -221,6 +221,8 @@ export function createRecordingSession(
     const tokenKeys = await collectTokenKeys(target, lifetime)
     if (!isCurrent(lifetime) || !tokenKeys.length) return null
 
+    const useAuthoringPlan = mode === 'authoring' || authoring.isActive()
+
     const recording =
       recordingOverride === undefined
         ? mode === 'authoring'
@@ -241,7 +243,6 @@ export function createRecordingSession(
 
     let previous: { recording: AudioRecording; cues: WordCue[] } | null = null
     let previousTokenKeys: string[] = []
-    const useAuthoringPlan = mode === 'authoring' || authoring.isActive()
     if (!options.recordingMode && !useAuthoringPlan) {
       const entry = previousEntry(run, target.aliyahIndex).previous
       if (entry?.aliyah.index) {

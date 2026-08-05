@@ -4,6 +4,7 @@ import {
   LeiningRunType,
 } from '../calendar-model/model-types.ts'
 import utils from './utils.ts'
+import { applyAnnotationMode } from './annotation-rendering.ts'
 import Line from './Line.ts'
 
 const { htmlToElement } = utils
@@ -46,7 +47,7 @@ test('renders word metadata and an inline audio button for aliyah starts', () =>
   )
 
   const words = [...node.querySelectorAll<HTMLElement>('.word')]
-  expect(words.length).toBe(4)
+  expect(words.length).toBe(2)
   expect(words[0].dataset.tokenKey).toBe('12:4:0:0')
   expect(
     node.querySelector<HTMLButtonElement>('[data-audio-button="true"]')
@@ -114,14 +115,14 @@ test('folds a standalone paseq into the previous word token', () => {
   )
 
   const words = [...node.querySelectorAll<HTMLElement>('.word')]
-  expect(words.length).toBe(4)
+  expect(words.length).toBe(2)
   expect(words[0].dataset.tokenKey).toBe('12:4:0:0')
   expect(words[0].textContent).toBe('וְכֹ֣ל ׀')
   expect(words[1].dataset.tokenKey).toBe('12:4:0:1')
   expect(words[1].textContent).toBe('רוֹמֵ֣שׂ')
 })
 
-test('keeps a small letter inside the same word token in both display modes', () => {
+test('keeps a small letter inside one stable word token in both display modes', () => {
   const node = htmlToElement(
     Line({
       pageNumber: 2,
@@ -137,32 +138,56 @@ test('keeps a small letter inside the same word token in both display modes', ()
     })
   )
 
-  const annotatedWord = node.querySelector<HTMLElement>(
-    '.fragment.mod-annotations-on .word[data-word-index="1"]'
-  )
-  const unannotatedWord = node.querySelector<HTMLElement>(
-    '.fragment.mod-annotations-off .word[data-word-index="1"]'
-  )
-  const annotatedLetter = annotatedWord?.querySelector<HTMLElement>(
-    '.special-letter.mod-small'
-  )
-  const unannotatedLetter = unannotatedWord?.querySelector<HTMLElement>(
+  const word = node.querySelector<HTMLElement>('.word[data-word-index="1"]')
+  const annotatedLetter = word?.querySelector<HTMLElement>(
     '.special-letter.mod-small'
   )
 
-  expect(node.querySelectorAll('.word')).toHaveLength(4)
-  expect(annotatedWord?.dataset.tokenKey).toBe('2:20:0:1')
-  expect(unannotatedWord?.dataset.tokenKey).toBe('2:20:0:1')
-  expect(annotatedWord?.textContent).toBe('בְּהִבָּֽרְאָ֑ם')
-  expect(unannotatedWord?.textContent).toBe('בהבראם')
+  expect(node.querySelectorAll('.word')).toHaveLength(2)
+  expect(word?.dataset.tokenKey).toBe('2:20:0:1')
+  expect(word?.textContent).toBe('בְּהִבָּֽרְאָ֑ם')
   expect(annotatedLetter?.textContent).toBe('הִ')
-  expect(unannotatedLetter?.textContent).toBe('ה')
   expect(annotatedLetter?.dataset.specialLetterId).toBe(
     'genesis-2-4-small-he'
   )
   expect(annotatedLetter?.dataset.specialLetterPosition).toBe('2')
+  applyAnnotationMode(node, false)
+  const unannotatedLetter = word?.querySelector<HTMLElement>(
+    '.special-letter.mod-small'
+  )
+
+  expect(node.querySelector<HTMLElement>('.word[data-word-index="1"]')).toBe(word)
+  expect(word?.textContent).toBe('בהבראם')
+  expect(unannotatedLetter?.textContent).toBe('ה')
   expect(unannotatedLetter?.dataset.specialLetterId).toBe(
     'genesis-2-4-small-he'
   )
   expect(unannotatedLetter?.dataset.specialLetterPosition).toBe('2')
+})
+
+test('preserves different annotated and unannotated word counts in one tree', () => {
+  const node = htmlToElement(
+    Line({
+      pageNumber: 12,
+      lineIndex: 4,
+      text: [['אָב־בֵּן']],
+      verses: [{ b: 1, c: 1, v: 1 }],
+      isPetucha: false,
+      labels: [],
+      aliyot: [],
+      aliyahStarts: [],
+      run: undefined,
+    })
+  )
+  const words = [...node.querySelectorAll<HTMLElement>('.word')]
+
+  expect(words).toHaveLength(2)
+  expect(words[0].textContent).toBe('אָב־בֵּן')
+  expect(words[1].hidden).toBe(true)
+
+  applyAnnotationMode(node, false)
+
+  expect(words[0].textContent).toBe('אב')
+  expect(words[1].textContent).toBe('בן')
+  expect(words[1].hidden).toBe(false)
 })

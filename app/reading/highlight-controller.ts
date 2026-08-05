@@ -199,7 +199,12 @@ export class HighlightController {
     const bookRect = this.book.getBoundingClientRect()
     return this.getTokenElements(tokenKey).find((element) => {
       const rect = element.getBoundingClientRect()
-      return rect.top < bookRect.bottom && rect.bottom > bookRect.top
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        rect.top < bookRect.bottom &&
+        rect.bottom > bookRect.top
+      )
     })
   }
 

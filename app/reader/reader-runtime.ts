@@ -9,6 +9,7 @@ import {
   type CalendarSettings,
 } from '../calendar-settings.ts'
 import { ScrollDisplay } from '../components/ScrollDisplay.ts'
+import { applyAnnotationMode } from '../components/annotation-rendering.ts'
 import { alignSmallSpecialLettersWhenFontsReady } from '../special-letter-layout.ts'
 import type { PageLifecycleSnapshot } from '../components/page-lifecycle.ts'
 import {
@@ -383,8 +384,8 @@ export function startReaderRuntime({
     const lifetime = readerRuntimeLifecycle.begin()
     readerRuntimeLifetime = lifetime
     const book = document.querySelector<HTMLElement>('[data-target-id="tikkun-book"]')!
-    const hideUntilSettled = pageVirtualizationSettings.state().enabled
-    book.style.visibility = hideUntilSettled ? 'hidden' : ''
+    book.style.visibility = 'hidden'
+    book.setAttribute('aria-busy', 'true')
     display = new ScrollDisplay(target, book)
     const currentDisplay = display
     readerPlaybackGlobal?.setDisplay(display)
@@ -393,20 +394,24 @@ export function startReaderRuntime({
     const settled = currentDisplay.scrolled.then(async () => {
       if (!lifetime.isCurrent() || display !== currentDisplay) return
       markPageVirtualizationReady(currentDisplay)
-      if (hideUntilSettled) await waitForAnimationFrames(2)
+      await waitForAnimationFrames(2)
       if (lifetime.isCurrent() && display === currentDisplay) {
         book.style.visibility = ''
+        book.removeAttribute('aria-busy')
         viewportTrackerGlobal?.refresh()
       }
     })
     void settled.catch((error) => {
-      if (display === currentDisplay) book.style.visibility = ''
+      if (display === currentDisplay) {
+        book.style.visibility = ''
+        book.removeAttribute('aria-busy')
+      }
       console.error(error)
     })
 
     return {
       ready,
-      complete: hideUntilSettled ? ready.then(() => settled) : ready,
+      complete: settled,
       isCurrent: () => lifetime.isCurrent() && display === currentDisplay,
       getMountedPageNode: (pageNumber) =>
         currentDisplay.getMountedPageNode(pageNumber),
@@ -525,7 +530,12 @@ export function startReaderRuntime({
   const setAnnotationsEnabled = (enabled: boolean) => {
     annotationsEnabled = enabled
     getReaderShell().setAnnotationsEnabled(enabled)
-    scheduleAliyahStartMarkerLayout(getBook())
+    const book = getBook()
+    applyAnnotationMode(book, enabled)
+    if (readerRuntimeLifetime) {
+      scheduleSpecialLetterAlignment(book, readerRuntimeLifetime.signal)
+    }
+    scheduleAliyahStartMarkerLayout(book)
     readerControlsGlobal?.sync()
   }
 
@@ -1973,15 +1983,10 @@ export function startReaderRuntime({
     syncActiveReaderIssueNotice()
 
     if (session && recording) {
-      let publishedIssues: RecordingIssue[] = []
-      try {
-        publishedIssues = await getIssuesForRecording(
-          recording,
-          TOKENIZATION_VERSION
-        )
-      } catch (error) {
-        console.error(`Failed to load published recording issues for ${recording.id}`, error)
-      }
+      const publishedIssues = await getIssuesForRecording(
+        recording,
+        TOKENIZATION_VERSION
+      )
       const currentRecording =
         cueAuthoringGlobal?.isVisible() && cueAuthoringGlobal.getSession()
         ? audioController?.session?.recording ?? null
@@ -3015,11 +3020,10 @@ export function startReaderRuntime({
             state.recording.id
           )
         : null
-      const cueNeedsWork = Boolean(
-        authoringEnabled &&
-          state?.recording &&
-          cueStatus &&
-          isAliyahCueStatusUnfinished(cueStatus)
+      const cueIsIncomplete = Boolean(
+        state?.recording &&
+        cueStatus &&
+        isAliyahCueStatusUnfinished(cueStatus)
       )
       const isCurrentSession = isCurrentPlaybackTarget(audioController, {
         recording: undefined,
@@ -3035,7 +3039,7 @@ export function startReaderRuntime({
       const label = state?.lineInfo.labels[0] ?? 'aliyah'
       button.title = authoringAvailable
         ? `Select ${label} for audio and cue recording`
-        : cueNeedsWork && cueStatus
+        : authoringEnabled && cueIsIncomplete && cueStatus
           ? aliyahCueAuthoringActionLabel({
               label,
               status: cueStatus,
@@ -3049,7 +3053,7 @@ export function startReaderRuntime({
       else delete button.dataset.cueStatus
       button.classList.toggle('is-active', isPlayingCurrentSession)
       button.classList.toggle('is-missing-audio', authoringAvailable)
-      button.classList.toggle('is-cue-incomplete', cueNeedsWork)
+      button.classList.toggle('is-cue-incomplete', cueIsIncomplete)
     }
   }
 
@@ -3741,12 +3745,16 @@ export function startReaderRuntime({
         formatDuration,
         onChange: (change: CueAuthoringChange) => {
           if (change === 'access') commandPaletteGlobal?.refresh()
-          else if (change === 'draft') {
+          else if (change === 'cue-data') {
             resolvedAliyahCueStatuses.clear()
             refreshInlineAudioButtons(audioController)
             aliyahNavigationGlobal?.invalidate()
-          }
-          else if (change === 'mode') syncReaderMode()
+            void loadIssuesForActiveSession()
+          } else if (change === 'draft') {
+            resolvedAliyahCueStatuses.clear()
+            refreshInlineAudioButtons(audioController)
+            aliyahNavigationGlobal?.invalidate()
+          } else if (change === 'mode') syncReaderMode()
           else if (change === 'playback') playbackTimeline.refresh()
           else if (change === 'playback-progress') {
             playbackTimeline.refresh('progress')
@@ -3905,6 +3913,10 @@ export function startReaderRuntime({
       },
       restoreFocus: focusOverlayReturnTarget,
       animateThemeChanges: !recordingMode.enabled,
+      serviceWorker:
+        'serviceWorker' in window.navigator
+          ? window.navigator.serviceWorker
+          : null,
       onLoadError: (error) => {
         console.error('Failed to load Reader Settings', error)
         showPersistenceNotice(
@@ -4007,6 +4019,7 @@ export function startReaderRuntime({
     (event) => {
       const renderedPage = event instanceof CustomEvent ? event.detail?.node : null
       const pageRoot = renderedPage instanceof Element ? renderedPage : book
+      applyAnnotationMode(pageRoot, annotationsEnabled)
       scheduleSpecialLetterAlignment(pageRoot, scope.signal)
       indexAliyahDomTargets(pageRoot)
       applyAliyahStartWordMarkers(book, pageRoot)

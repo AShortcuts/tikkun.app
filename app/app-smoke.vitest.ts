@@ -119,8 +119,8 @@ test('boots the real app and keeps core routes and lazy tools working', async ()
     new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
   )
 
-  frameWindow.sessionStorage.setItem(CUE_AUTHORING_UNLOCKED_KEY, '1')
-  frameWindow.sessionStorage.setItem(CUE_AUTHORING_PANEL_OPEN_KEY, '0')
+  frameWindow.sessionStorage.removeItem(CUE_AUTHORING_UNLOCKED_KEY)
+  frameWindow.sessionStorage.removeItem(CUE_AUTHORING_PANEL_OPEN_KEY)
   frameDocument.dispatchEvent(
     new KeyboardEvent('keydown', {
       key: 'a',
@@ -131,13 +131,87 @@ test('boots the real app and keeps core routes and lazy tools working', async ()
   )
   await vi.waitFor(
     () => {
+      const dialog = frameDocument.querySelector<HTMLElement>(
+        '[data-target-id="admin-access-dialog"]'
+      )
+      const password = frameDocument.querySelector<HTMLInputElement>(
+        '[data-target-id="admin-access-password"]'
+      )
+      expect(dialog).not.toBeNull()
+      expect(dialog?.classList.contains('u-hidden')).toBe(false)
+      expect(frameDocument.activeElement).toBe(password)
+    },
+    { timeout: 10_000, interval: 50 }
+  )
+  const password = frameDocument.querySelector<HTMLInputElement>(
+    '[data-target-id="admin-access-password"]'
+  )
+  if (!password) throw new Error('Admin access dialog requires its password input')
+  password.value = 'admin'
+  password.dispatchEvent(new InputEvent('input', { bubbles: true }))
+  click(frameDocument, '[data-target-id="admin-access-submit"]')
+  await vi.waitFor(
+    () => {
       const panel = frameDocument.querySelector<HTMLElement>(
         '[data-target-id="admin-panel"]'
       )
       expect(panel).not.toBeNull()
       expect(panel?.classList.contains('u-hidden')).toBe(false)
+      expect(
+        frameDocument
+          .querySelector<HTMLElement>('[data-target-id="admin-access-dialog"]')
+          ?.classList.contains('u-hidden')
+      ).toBe(true)
+      expect(frameWindow.sessionStorage.getItem(CUE_AUTHORING_UNLOCKED_KEY)).toBe(
+        '1'
+      )
     },
     { timeout: 10_000, interval: 50 }
+  )
+
+  frameWindow.location.hash = '#/torah/parsha/vayetzei/1-29-18'
+  await vi.waitFor(
+    () => {
+      expect(frameWindow.location.hash).toBe(
+        '#/torah/parsha/vayetzei/1-29-18'
+      )
+      expect(
+        frameDocument.querySelector('[data-target-id="parsha-title"]')
+          ?.textContent
+      ).toContain('ויצא')
+      expect(
+        frameDocument.querySelector(
+          '.aliyah-audio-button[data-aliyah-index="3"]'
+        )
+      ).not.toBeNull()
+    },
+    { timeout: 15_000, interval: 50 }
+  )
+
+  click(frameDocument, '.aliyah-audio-button[data-aliyah-index="3"]')
+  await vi.waitFor(
+    () => {
+      expect(
+        frameDocument.querySelector('[data-target-id="admin-cue-count"]')
+          ?.textContent
+      ).toBe('334 / 334 Words - 334')
+      expect(
+        frameDocument.querySelectorAll('[data-admin-cue-index]')
+      ).toHaveLength(334)
+      expect(
+        frameDocument
+          .querySelector<HTMLElement>('[data-target-id="admin-resume-wrap"]')
+          ?.hidden
+      ).toBe(true)
+      expect(
+        frameDocument.querySelector('[data-target-id="admin-status"]')
+          ?.textContent
+      ).toContain('all 334 Words are timed')
+      expect(
+        frameDocument.querySelector('[data-admin-problem="published-cue-data"]')
+      ).toBeNull()
+    },
+    { timeout: 15_000, interval: 50 }
   )
 }, 40_000)
 

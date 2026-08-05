@@ -77,6 +77,7 @@
   <div class="app" data-target-id="app-root">
     <div data-target-id="reader-shell-anchor" hidden></div>
     <div data-target-id="cue-authoring-panel-root"></div>
+    <div data-target-id="cue-authoring-access-dialog-root"></div>
     <div data-target-id="command-palette-root"></div>
     <div data-target-id="recording-issue-dialog-root"></div>
     <div class="reader-issue-toast u-hidden" data-target-id="reader-issue-toast" role="status" aria-live="polite"></div>
@@ -98,10 +99,16 @@
         aria-label="Dismiss update prompt">Later</button>
     </div>
   </div>
-  <script type="module" src="/app/index.ts"></script>
   <script>
       ; (() => {
         if (!('serviceWorker' in navigator)) return
+
+        const isLocalDevelopment = [
+          'localhost',
+          '127.0.0.1',
+          '[::1]',
+        ].includes(window.location.hostname)
+        const shellCachePrefix = 'tikkun-shell-'
 
         const updatePrompt = document.querySelector('[data-target-id="app-update-prompt"]')
         const applyUpdate = document.querySelector('[data-target-id="app-update-apply"]')
@@ -141,14 +148,36 @@
           if (isReloadingForUpdate) window.location.reload()
         })
 
-        window.addEventListener('load', async () => {
+        const removeDevelopmentWorker = async () => {
+          const hadController = Boolean(navigator.serviceWorker.controller)
+          const registrations = await navigator.serviceWorker.getRegistrations()
+          await Promise.all(registrations.map((registration) => registration.unregister()))
+
+          if ('caches' in window) {
+            const cacheNames = await window.caches.keys()
+            await Promise.all(
+              cacheNames
+                .filter((name) => name.startsWith(shellCachePrefix))
+                .map((name) => window.caches.delete(name))
+            )
+          }
+
+          if (hadController) window.location.reload()
+        }
+
+        const prepareServiceWorker = async () => {
           try {
             const response = await fetch('/service-worker.js', {
               cache: 'no-store',
               method: 'HEAD',
             })
             const contentType = response.headers.get('content-type') ?? ''
-            if (!response.ok || !/(?:java|ecma)script/i.test(contentType)) return
+            const hasProductionWorker =
+              response.ok && /(?:java|ecma)script/i.test(contentType)
+            if (!hasProductionWorker) {
+              if (isLocalDevelopment) await removeDevelopmentWorker()
+              return
+            }
 
             const registration = await navigator.serviceWorker.register('/service-worker.js')
             if (registration.waiting) showUpdatePrompt(registration.waiting)
@@ -168,12 +197,15 @@
               lastUpdateCheck = Date.now()
               void registration.update()
             })
-          } catch {
-            // Development servers do not generate the production service worker.
+          } catch (error) {
+            console.error('Failed to prepare the application service worker', error)
           }
-        })
+        }
+
+        void prepareServiceWorker()
       })()
   </script>
+  <script type="module" src="/app/index.ts"></script>
 </body>
 
 </html>

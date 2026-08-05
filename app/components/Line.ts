@@ -14,6 +14,13 @@ const inlineWordJoiners = new Set(['׀'])
 
 const stripKriMarkers = (word: string) => word.replace(/[{}]/g, '')
 
+const escapeAttribute = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+
 const tokenizeWords = (text: string) =>
   text
     .trim()
@@ -41,41 +48,67 @@ const tokenizeWords = (text: string) =>
     )
 
 const renderWords = ({
-  text,
+  annotatedText,
+  unannotatedText,
+  annotationsEnabled,
   pageNumber,
   lineIndex,
   fragmentIndex,
-  renderSpecialLetters,
+  renderAnnotatedSpecialLetters,
+  renderUnannotatedSpecialLetters,
 }: {
-  text: string
+  annotatedText: string
+  unannotatedText: string
+  annotationsEnabled: boolean
   pageNumber: number
   lineIndex: number
   fragmentIndex: number
-  renderSpecialLetters: (text: string) => string
-}) =>
-  tokenizeWords(text)
-    .map((word, wordIndex) => {
+  renderAnnotatedSpecialLetters: (text: string) => string
+  renderUnannotatedSpecialLetters: (text: string) => string
+}) => {
+  const annotatedWords = tokenizeWords(annotatedText)
+  const unannotatedWords = tokenizeWords(unannotatedText)
+  const wordCount = Math.max(annotatedWords.length, unannotatedWords.length)
+
+  return Array.from({ length: wordCount }, (_, wordIndex) => {
+      const annotatedWord = annotatedWords[wordIndex]
+      const unannotatedWord = unannotatedWords[wordIndex]
+      const annotatedMarkup = annotatedWord
+        ? renderAnnotatedSpecialLetters(annotatedWord.text)
+        : ''
+      const unannotatedMarkup = unannotatedWord
+        ? renderUnannotatedSpecialLetters(unannotatedWord.text)
+        : ''
+      const activeWord = annotationsEnabled ? annotatedWord : unannotatedWord
+      const activeMarkup = annotationsEnabled
+        ? annotatedMarkup
+        : unannotatedMarkup
+      const alternateMarkup = annotationsEnabled
+        ? unannotatedMarkup
+        : annotatedMarkup
       const tokenKey = `${pageNumber}:${lineIndex}:${fragmentIndex}:${wordIndex}`
       return `<span
-        class="word ${word.isKri ? 'ktiv-kri' : ''}"
+        class="word ${activeWord?.isKri ? 'ktiv-kri' : ''}"
         data-token-key="${tokenKey}"
         data-page-number="${pageNumber}"
         data-line-index="${lineIndex}"
         data-fragment-index="${fragmentIndex}"
         data-word-index="${wordIndex}"
-      >${renderSpecialLetters(word.text)}</span>`
+        data-annotations-mode="${annotationsEnabled ? 'on' : 'off'}"
+        data-annotations-alternate="${escapeAttribute(alternateMarkup)}"
+        data-annotations-on-text="${escapeAttribute(annotatedWord?.text ?? '')}"
+        data-annotations-on-present="${Boolean(annotatedWord)}"
+        data-annotations-off-present="${Boolean(unannotatedWord)}"
+        data-annotations-on-kri="${Boolean(annotatedWord?.isKri)}"
+        data-annotations-off-kri="${Boolean(unannotatedWord?.isKri)}"
+        ${activeWord ? '' : 'hidden'}
+      >${activeMarkup}</span>`
     })
     .join(' ')
+}
 
 const addLabelBreakOpportunities = (label: string) =>
   label.replace(/([־-])/g, '$1<wbr>')
-
-const escapeAttribute = (value: string) =>
-  value
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
 
 const aliyahStartTitle = (run: RenderedLineInfo['run']) =>
   run?.leining.date.title.he.replace(/^פרשת /, '') ??
@@ -173,9 +206,11 @@ const Line = ({
   aliyahStarts,
   run,
   lineIndex,
+  annotationsEnabled = true,
 }: {
   pageNumber: number
   lineIndex: number
+  annotationsEnabled?: boolean
 } & RenderedLineInfo) => {
   const startLabel = aliyahStartLabel(aliyahStarts)
   const startTitle = aliyahStartTitle(run)
@@ -222,23 +257,15 @@ const Line = ({
             ${column
               .map(
                 (fragment, fragmentIndex) => `
-              <span class="fragment ${setumaClass(
-                column
-              )} mod-annotations-on">${renderWords({
-                  text: textFilter({ text: fragment, annotated: true }),
+              <span class="fragment ${setumaClass(column)}">${renderWords({
+                  annotatedText: textFilter({ text: fragment, annotated: true }),
+                  unannotatedText: textFilter({ text: fragment, annotated: false }),
+                  annotationsEnabled,
                   pageNumber,
                   lineIndex,
                   fragmentIndex: columnIndex * 100 + fragmentIndex,
-                  renderSpecialLetters: renderAnnotatedSpecialLetters,
-                })}</span>
-              <span class="fragment ${setumaClass(
-                column
-              )} mod-annotations-off">${renderWords({
-                  text: textFilter({ text: fragment, annotated: false }),
-                  pageNumber,
-                  lineIndex,
-                  fragmentIndex: columnIndex * 100 + fragmentIndex,
-                  renderSpecialLetters: renderUnannotatedSpecialLetters,
+                  renderAnnotatedSpecialLetters,
+                  renderUnannotatedSpecialLetters,
                 })}</span>
             `
               )

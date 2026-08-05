@@ -248,7 +248,7 @@ test('exposes missing-audio recording targets only while authoring is active', a
   })
 })
 
-test('distinguishes cue work from missing audio only while authoring is active', async () => {
+test('shows cue status in every mode while keeping authoring actions admin-only', async () => {
   let recordedCueStatus: 'none' | 'pending' | 'published' = 'none'
   const navigation = mountNavigation({
     loadCueStatus: async (item) =>
@@ -318,6 +318,7 @@ test('distinguishes cue work from missing audio only while authoring is active',
   expect(recordedPlay.classList).not.toContain('is-cue-incomplete')
   expect(toolbarPlay.classList).not.toContain('is-cue-incomplete')
 
+  recordedCueStatus = 'pending'
   navigation.syncContent({
     desktop: snapshot,
     compact: snapshot,
@@ -341,8 +342,12 @@ test('distinguishes cue work from missing audio only while authoring is active',
       playbackState: 'default',
     },
   })
-  expect(recordedPlay.classList).not.toContain('is-cue-incomplete')
-  expect(toolbarPlay.classList).not.toContain('is-cue-incomplete')
+  navigation.invalidate()
+  await flushPromises()
+  expect(recordedPlay.classList).toContain('is-cue-incomplete')
+  expect(recordedPlay.getAttribute('aria-label')).toBe('Play ראשון')
+  expect(toolbarPlay.classList).toContain('is-cue-incomplete')
+  expect(toolbarPlay.getAttribute('aria-label')).toBe('Play ראשון')
 })
 
 test('closes the compact picker from its sheet handle', () => {

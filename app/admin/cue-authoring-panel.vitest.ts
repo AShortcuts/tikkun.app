@@ -24,6 +24,7 @@ function snapshot(
     visible: true,
     cueCountText: '2 / 5 Words - 3',
     statusText: 'Reader: 2/5 Words saved. Resume from Word 3.',
+    problems: [],
     draftStatusText: 'Local draft active for Reader.',
     syncNoteVisible: true,
     captureAudio: {
@@ -203,6 +204,40 @@ test('emits semantic actions and honors disabled controls', () => {
     { type: 'resume' },
     { type: 'export' },
   ])
+})
+
+test('presents actionable problems with progressive technical details', () => {
+  const { action, panel } = mountPanel()
+  panel.sync(snapshot({
+    problems: [{
+      id: 'published-cue-data',
+      tone: 'warning',
+      title: 'Published cue file needs repair',
+      message: 'Published timing was skipped so playback can continue.',
+      details: [
+        'File: audio-cues/reader/test/1.json',
+        'cueCount: cueCount does not match cues.',
+      ],
+      action: {
+        type: 'retry-cue-data',
+        label: 'Retry Cue File',
+        pendingLabel: 'Checking Cue File...',
+        pending: false,
+      },
+    }],
+  }))
+
+  const problem = required<HTMLElement>(
+    '[data-admin-problem="published-cue-data"]'
+  )
+  expect(problem.textContent).toContain('Published cue file needs repair')
+  expect(problem.textContent).toContain('Technical details')
+  expect(problem.querySelector('details')?.open).toBe(false)
+
+  required<HTMLButtonElement>(
+    '[data-admin-problem-action="retry-cue-data"]'
+  ).click()
+  expect(action).toHaveBeenCalledWith({ type: 'retry-cue-data' })
 })
 
 test('updates progress without replacing controls or waveform targets', () => {

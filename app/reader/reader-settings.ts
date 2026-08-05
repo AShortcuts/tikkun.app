@@ -2,6 +2,10 @@ import { flushSync, mount, unmount } from 'svelte'
 import type { AudioNarrator } from '../audio/types.ts'
 import type { MountScope } from '../lifecycle/mount.ts'
 import type { ReaderPreferences } from '../reader-preferences.ts'
+import {
+  createOfflineTorahDownloadController,
+  type OfflineTorahDownloadController,
+} from '../offline/torah-download.ts'
 import ReaderSettingsPane from './ReaderSettings.svelte'
 
 export interface ReaderSettingsOptions {
@@ -13,6 +17,7 @@ export interface ReaderSettingsOptions {
   setPlaybackRate(rate: number): void
   restoreFocus(target: HTMLElement | null): void
   animateThemeChanges: boolean
+  serviceWorker: ServiceWorkerContainer | null
 }
 
 export interface ReaderSettings {
@@ -23,6 +28,7 @@ export interface ReaderSettings {
 
 export interface ReaderSettingsComponentProps extends ReaderSettingsOptions {
   toggle: HTMLButtonElement
+  offlineTorah: OfflineTorahDownloadController
   connect(settings: ReaderSettings): void
 }
 
@@ -52,12 +58,17 @@ export function createReaderSettings(
   }
 
   let settings: ReaderSettings | null = null
+  const offlineTorah = createOfflineTorahDownloadController({
+    serviceWorker: options.serviceWorker,
+  })
+  scope.own(() => offlineTorah.destroy())
   const getConnectedSettings = () => settings
   const component = mount(ReaderSettingsPane, {
     target,
     props: {
       ...options,
       toggle,
+      offlineTorah,
       connect: (connectedSettings: ReaderSettings) => {
         settings = connectedSettings
       },

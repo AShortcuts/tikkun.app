@@ -254,6 +254,43 @@ test('loads, clones, activates, and caches a reader recording transaction', asyn
   expect(harness.session.tokenCacheSize()).toBe(1)
 })
 
+test('loads an audio-only reader session when the library resolves no Cue Data', async () => {
+  const harness = createHarness()
+  harness.loadCues.mockResolvedValueOnce([])
+
+  const loaded = await harness.session.load({
+    runId: harness.run.id,
+    aliyahIndex: 1,
+  })
+
+  expect(loaded).not.toBeNull()
+  expect(loaded?.recording).toBe(firstRecording)
+  expect(loaded?.cues).toEqual([])
+  expect(loaded?.segments[0]?.cues).toEqual([])
+  expect(highlightController.activateTokenKey).toHaveBeenCalledWith(
+    firstToken,
+    { scroll: true }
+  )
+  expect(harness.sessionLoaded).toHaveBeenCalledWith(loaded)
+})
+
+test('continues with audio-only playback while authoring is active', async () => {
+  const harness = createHarness()
+  harness.loadCues.mockResolvedValueOnce([])
+  harness.setAuthoringVisible(true)
+
+  const loaded = await harness.session.load({
+    runId: harness.run.id,
+    aliyahIndex: 1,
+  })
+
+  expect(loaded).not.toBeNull()
+  expect(loaded?.recording).toBe(firstRecording)
+  expect(loaded?.cues).toEqual([])
+  expect(audioController.session).toBe(loaded)
+  expect(harness.sessionLoaded).toHaveBeenCalledWith(loaded)
+})
+
 test('finishes the initial cue activation before publishing the session', async () => {
   const harness = createHarness()
   let finishActivation!: (value: HTMLElement | null) => void

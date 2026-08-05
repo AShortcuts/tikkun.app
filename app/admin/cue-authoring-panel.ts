@@ -4,6 +4,7 @@ import CueAuthoringPanelView from './CueAuthoringPanel.svelte'
 
 export type CueAuthoringPanelAction =
   | { type: 'close' }
+  | { type: 'retry-cue-data' }
   | { type: 'capture-audio'; requested: boolean }
   | { type: 'record' }
   | { type: 'step-back' }
@@ -25,10 +26,25 @@ export type CueAuthoringRecordMode =
   | 'audio'
   | 'confirm'
 
+export interface CueAuthoringPanelProblem {
+  id: string
+  tone: 'warning' | 'error'
+  title: string
+  message: string
+  details: string[]
+  action: {
+    type: 'retry-cue-data'
+    label: string
+    pendingLabel: string
+    pending: boolean
+  } | null
+}
+
 export interface CueAuthoringPanelSnapshot {
   visible: boolean
   cueCountText: string
   statusText: string
+  problems: CueAuthoringPanelProblem[]
   draftStatusText: string
   syncNoteVisible: boolean
   captureAudio: {

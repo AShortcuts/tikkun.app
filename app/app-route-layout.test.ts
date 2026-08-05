@@ -33,6 +33,10 @@ const cueAuthoringIssueDialogSource = readFileSync(
   new URL('./admin/CueAuthoringIssueDialog.svelte', import.meta.url),
   'utf8'
 )
+const cueAuthoringAccessDialogSource = readFileSync(
+  new URL('./admin/CueAuthoringAccessDialog.svelte', import.meta.url),
+  'utf8'
+)
 const cueAuthoringCueListSource = readFileSync(
   new URL('./admin/CueAuthoringCueList.svelte', import.meta.url),
   'utf8'
@@ -132,6 +136,26 @@ test('delegates recording issue dialog presentation to Cue Authoring Svelte', ()
   expect(cueAuthoringIssueDialogSource).toContain(
     'data-target-id="recording-issue-modal"'
   )
+})
+
+test('delegates admin access to a theme-aware Svelte dialog', () => {
+  expect(indexHtmlSource).toContain(
+    'data-target-id="cue-authoring-access-dialog-root"'
+  )
+  expect(indexHtmlSource).not.toContain(
+    'data-target-id="admin-access-dialog"'
+  )
+  expect(cueAuthoringSource).toContain(
+    'createCueAuthoringAccessDialog(scope, {'
+  )
+  expect(cueAuthoringSource).not.toContain("view.prompt('Admin password')")
+  expect(cueAuthoringAccessDialogSource).toContain(
+    'data-target-id="admin-access-dialog"'
+  )
+  expect(cueAuthoringAccessDialogSource).toContain(
+    'data-target-id="admin-access-password"'
+  )
+  expect(cueAuthoringAccessDialogSource).toContain('aria-modal="true"')
 })
 
 test('delegates cue list presentation to Cue Authoring Svelte', () => {
@@ -242,4 +266,18 @@ test('briefly reveals absolute page numbers for page routes only', () => {
   expect(readerRouteSource).toMatch(/function pageNumberFromPageRouteHash\(hash: string \| null\)[\s\S]*\^#\\\/\(\?:torah\|esther\)\\\/page\\\/\(\\d\+\)\$/)
   expect(readerRouteSource).toMatch(/marker\.classList\.add\('mod-route-reveal'\)/)
   expect(readerRouteSource).toMatch(/marker\.classList\.remove\('mod-route-reveal'\)/)
+})
+
+test('removes stale app-shell workers before loading the development app', () => {
+  const cleanupIndex = indexHtmlSource.indexOf('removeDevelopmentWorker')
+  const appIndex = indexHtmlSource.indexOf('src="/app/index.ts"')
+
+  expect(cleanupIndex).toBeGreaterThan(-1)
+  expect(cleanupIndex).toBeLessThan(appIndex)
+  expect(indexHtmlSource).toContain(
+    'navigator.serviceWorker.getRegistrations()'
+  )
+  expect(indexHtmlSource).toContain("name.startsWith(shellCachePrefix)")
+  expect(indexHtmlSource).toContain("const shellCachePrefix = 'tikkun-shell-'")
+  expect(indexHtmlSource).not.toContain("startsWith('tikkun-torah-')")
 })

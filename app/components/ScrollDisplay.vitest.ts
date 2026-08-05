@@ -115,7 +115,7 @@ test('centers the first token for the starting line', async () => {
     (line) => getAliyahLabel(line) === 'נח'
   )
   const token = startingLine?.querySelector<HTMLElement>(
-    '.fragment.mod-annotations-off .word'
+    '.fragment .word'
   )
   if (!token) throw new Error('Expected a starting token')
 
@@ -130,7 +130,7 @@ test('mounting the next Yitro page preserves the focal word exactly', async () =
     (line) => getAliyahLabel(line) === 'יתרו'
   )
   const token = startingLine?.querySelector<HTMLElement>(
-    '.fragment.mod-annotations-off .word'
+    '.fragment .word'
   )
   if (!token) throw new Error('Expected the first Yitro token')
 
@@ -916,7 +916,7 @@ function getAliyahLabel(lineEl: HTMLTableRowElement | null) {
 
 function textFromLine(lineEl: HTMLTableRowElement | null) {
   if (!lineEl) throw new Error('Expected a rendered line')
-  return [...lineEl.querySelectorAll('.mod-annotations-off')]
+  return [...lineEl.querySelectorAll('.fragment')]
     .map((e) => e.textContent)
     .join('\t')
 }

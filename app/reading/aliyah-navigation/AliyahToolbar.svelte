@@ -77,11 +77,10 @@
     })
   }
 
-  function currentCueNeedsWork() {
+  function currentCueIsIncomplete() {
     const status = toolbarState.current.cueStatus
     return Boolean(
-      toolbarState.current.authoringEnabled &&
-        !toolbarState.current.authoringAvailable &&
+      toolbarState.current.audioAvailable &&
         status &&
         isAliyahCueStatusUnfinished(status)
     )
@@ -89,7 +88,11 @@
 
   function currentPlayLabel() {
     const status = toolbarState.current.cueStatus
-    if (currentCueNeedsWork() && status) {
+    if (
+      toolbarState.current.authoringEnabled &&
+      currentCueIsIncomplete() &&
+      status
+    ) {
       return aliyahCueAuthoringActionLabel({
         label: toolbarState.current.label,
         status,
@@ -184,7 +187,7 @@
     !toolbarState.current.authoringAvailable}
   class:is-active={toolbarState.current.playing}
   class:is-missing-audio={toolbarState.current.authoringAvailable}
-  class:is-cue-incomplete={currentCueNeedsWork()}
+  class:is-cue-incomplete={currentCueIsIncomplete()}
   data-target-id="toolbar-current-aliyah-audio"
   data-run-id={toolbarState.current.target?.runId ?? ''}
   data-aliyah-index={toolbarState.current.target

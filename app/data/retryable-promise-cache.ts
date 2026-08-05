@@ -12,4 +12,9 @@ export class RetryablePromiseCache<Key, Value> {
     })
     return pending
   }
+
+  delete(key: Key, expected?: Promise<Value>) {
+    if (expected && this.entries.get(key) !== expected) return false
+    return this.entries.delete(key)
+  }
 }

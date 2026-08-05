@@ -1,6 +1,7 @@
 <script lang="ts">
   import { flushSync, onMount } from 'svelte'
   import UiIcon from '../components/UiIcon.svelte'
+  import type { OfflineTorahDownloadSnapshot } from '../offline/torah-download.ts'
   import { getDefaultHighlightPreferences } from '../reader-preferences.ts'
   import type {
     ReaderSettings,
@@ -16,6 +17,7 @@
     setPlaybackRate,
     restoreFocus,
     animateThemeChanges,
+    offlineTorah,
     toggle,
     connect,
   }: ReaderSettingsComponentProps = $props()
@@ -25,11 +27,46 @@
   }
 
   let preferences = $state(readPreferences())
+  let offlineSnapshot = $state<OfflineTorahDownloadSnapshot>({
+    supported: false,
+    phase: 'checking',
+    downloaded: 0,
+    total: 0,
+    errorMessage: null,
+  })
   let isOpen = $state(false)
   let returnFocus: HTMLElement | null = null
   let closeButton: HTMLButtonElement
   let focusFrame = 0
   let themeTransitionTimer = 0
+
+  const offlineStatusText = $derived.by(() => {
+    const { phase, downloaded, total, errorMessage } = offlineSnapshot
+    if (phase === 'checking') return 'Checking offline availability…'
+    if (phase === 'unavailable') {
+      return 'Offline Torah download is not available in this browser.'
+    }
+    if (phase === 'complete') {
+      return `All ${total} Torah pages are available offline.`
+    }
+    if (phase === 'downloading') {
+      return `Saving Torah pages: ${downloaded} of ${total}.`
+    }
+    if (phase === 'error') {
+      return errorMessage ?? 'The download paused. You can try again.'
+    }
+    return `${downloaded} of ${total} Torah pages are saved.`
+  })
+
+  const offlineButtonLabel = $derived(
+    offlineSnapshot.phase === 'complete'
+      ? 'Torah available offline'
+      : offlineSnapshot.phase === 'downloading'
+        ? 'Downloading Torah…'
+        : offlineSnapshot.phase === 'error'
+          ? 'Try download again'
+          : 'Download Torah for offline use'
+  )
 
   function refreshPreferences() {
     flushSync(() => {
@@ -94,6 +131,7 @@
     flushSync(() => {
       isOpen = true
     })
+    void offlineTorah.refresh()
     toggle.setAttribute('aria-expanded', 'true')
     cancelScheduledFocus()
     focusFrame = view.requestAnimationFrame(() => {
@@ -122,6 +160,11 @@
   const settings: ReaderSettings = { open, close, sync }
 
   onMount(() => {
+    const unsubscribeOffline = offlineTorah.subscribe((nextSnapshot) => {
+      offlineSnapshot = nextSnapshot
+    })
+    void offlineTorah.refresh()
+
     const handleOutsidePointer = (event: PointerEvent) => {
       const target = event.target
       if (!(target instanceof Element) || !isOpen) return
@@ -134,6 +177,7 @@
     ownerDocument.addEventListener('pointerdown', handleOutsidePointer)
 
     return () => {
+      unsubscribeOffline()
       ownerDocument.removeEventListener('pointerdown', handleOutsidePointer)
       cancelScheduledFocus()
       if (themeTransitionTimer) view.clearTimeout(themeTransitionTimer)
@@ -225,6 +269,44 @@
           <span>x</span>
         </div>
       </label>
+    </section>
+
+    <section class="settings-section">
+      <h3 class="settings-section-title">Offline</h3>
+      <div class="settings-field settings-offline-field">
+        <span class="settings-field-copy">
+          <span class="settings-field-label">Torah pages</span>
+          <span class="settings-field-helper"
+            >Saves every Torah page in this browser. Recordings continue to
+            stream separately.</span
+          >
+        </span>
+        {#if offlineSnapshot.total > 0}
+          <progress
+            class="settings-offline-progress"
+            max={offlineSnapshot.total}
+            value={offlineSnapshot.downloaded}
+            aria-label="Offline Torah download progress"
+          ></progress>
+        {/if}
+        <span
+          class="settings-offline-status"
+          id="settings-offline-status"
+          data-target-id="settings-offline-status"
+          aria-live="polite">{offlineStatusText}</span
+        >
+        <button
+          class="settings-offline-button"
+          type="button"
+          data-target-id="settings-offline-download"
+          aria-describedby="settings-offline-status"
+          disabled={offlineSnapshot.phase === 'checking' ||
+            offlineSnapshot.phase === 'downloading' ||
+            offlineSnapshot.phase === 'complete' ||
+            offlineSnapshot.phase === 'unavailable'}
+          onclick={() => void offlineTorah.download()}
+        >{offlineButtonLabel}</button>
+      </div>
     </section>
 
     <section class="settings-section">

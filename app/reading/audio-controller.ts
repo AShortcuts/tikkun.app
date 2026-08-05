@@ -489,7 +489,7 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
     this.clearNextSourcePreload()
     if (!next || !nextKey) return
     const preload = new Audio()
-    preload.preload = 'auto'
+    preload.preload = 'metadata'
     preload.src = next.recording.playSrc
     this.nextSourcePreload = preload
     this.nextSourcePreloadKey = nextKey

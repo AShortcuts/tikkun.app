@@ -1,5 +1,9 @@
 import { cueFileRelativePath, formatCueFileJson } from '../audio/cue-file.ts'
-import { getCueSavedAtForRecording } from '../audio/library.ts'
+import {
+  getCueDataResolutionForRecording,
+  retryCueDataResolutionForRecording,
+} from '../audio/library.ts'
+import type { CueDataResolution } from '../audio/cue-data.ts'
 import { normalizeFirstCueStart } from '../audio/normalize-first-cue.ts'
 import { getWordProgress } from '../audio/progress.ts'
 import {
@@ -10,7 +14,11 @@ import {
   type RecordingIssue,
   type RecordingIssueKind,
 } from '../audio/recording-issues.ts'
-import type { CueExportPayload, WordCue } from '../audio/types.ts'
+import type {
+  AudioRecording,
+  CueExportPayload,
+  WordCue,
+} from '../audio/types.ts'
 import type { MountScope } from '../lifecycle/mount.ts'
 import {
   writeStorageItem,
@@ -22,6 +30,7 @@ import type {
   AudioController,
 } from '../reading/audio-controller.ts'
 import type { HighlightController } from '../reading/highlight-controller.ts'
+import { selectCuesForTokenKeys } from '../reading/playback-plan.ts'
 import {
   CUE_AUTHORING_PANEL_OPEN_KEY,
   CUE_AUTHORING_UNLOCKED_KEY,
@@ -29,6 +38,10 @@ import {
   readCueAuthoringAccessState,
   verifyAdminPassword,
 } from './access.ts'
+import {
+  createCueAuthoringAccessDialog,
+  type CueAuthoringAccessDialog,
+} from './cue-authoring-access-dialog.ts'
 import {
   createCueAuthoringCueList,
   type CueAuthoringCueList,
@@ -73,6 +86,7 @@ import {
 
 export type CueAuthoringChange =
   | 'access'
+  | 'cue-data'
   | 'draft'
   | 'mode'
   | 'playback'
@@ -92,6 +106,10 @@ export interface CueAuthoringOptions {
   getActiveTokenKey: () => string | null
   getDisplayTime: () => number
   getRecordingIssues: () => readonly RecordingIssue[]
+  cueData?: {
+    resolve(recording: AudioRecording): Promise<CueDataResolution>
+    retry(recording: AudioRecording): Promise<CueDataResolution>
+  }
   focusReader: () => void
   formatDuration: (seconds: number) => string
   onChange: (change: CueAuthoringChange) => void
@@ -138,6 +156,9 @@ type CueAuthoringState = {
   draftSavedAt: number | null
   draftSaveError: string | null
   recordingIssueSaveError: string | null
+  cueDataResolution: CueDataResolution | null
+  cueDataLoading: boolean
+  cueDataRetrying: boolean
 }
 
 const cloneCue = (cue: WordCue): WordCue => ({ ...cue })
@@ -166,12 +187,19 @@ export function createCueAuthoring(
     draftSavedAt: null,
     draftSaveError: null,
     recordingIssueSaveError: null,
+    cueDataResolution: null,
+    cueDataLoading: false,
+    cueDataRetrying: false,
   }
   const microphoneCapture = new MicrophoneCapture()
   const draftTimeFormat = Intl.DateTimeFormat(undefined, {
     dateStyle: 'medium',
     timeStyle: 'short',
   })
+  const cueData = options.cueData ?? {
+    resolve: getCueDataResolutionForRecording,
+    retry: retryCueDataResolutionForRecording,
+  }
   let exportDownloadUrl: string | null = null
   let exportAudioDownloadUrl: string | null = null
   let exportPresentationRevision = 0
@@ -185,6 +213,7 @@ export function createCueAuthoring(
   let sessionBindingGeneration = 0
   let pendingIssueTokenKey: string | null = null
   let pendingIssueTimeStart: number | undefined
+  let accessDialog: CueAuthoringAccessDialog | null = null
   let panel: CueAuthoringPanel | null = null
   let cueList: CueAuthoringCueList | null = null
   let issueDialog: CueAuthoringIssueDialog | null = null
@@ -322,6 +351,9 @@ export function createCueAuthoring(
     state.draftSavedAt = null
     state.draftSaveError = null
     state.recordingIssueSaveError = null
+    state.cueDataResolution = null
+    state.cueDataLoading = false
+    state.cueDataRetrying = false
     waveform?.contentChanged()
     syncPanel()
   }
@@ -333,12 +365,47 @@ export function createCueAuthoring(
       return
     }
 
-    const sourceCues = cloneCues(session.cues)
-    const draft = loadAdminDraft(session.recording.id, session.tokenKeys)
-    const savedAt =
-      draft?.updatedAt ??
-      (await getCueSavedAtForRecording(session.recording)) ??
-      null
+    const initialSourceCues = cloneCues(session.cues)
+    const storedDraft = loadAdminDraft(
+      session.recording.id,
+      session.tokenKeys
+    )
+    state.sourceCues = []
+    state.cues = []
+    state.tokenPointer = -1
+    state.recording = false
+    state.draftOrigin = 'none'
+    state.draftSavedAt = null
+    state.draftSaveError = null
+    state.recordingIssueSaveError = null
+    state.cueDataResolution = null
+    state.cueDataLoading = true
+    state.cueDataRetrying = false
+    waveform?.contentChanged()
+    syncPanel()
+
+    const cueDataResolution = await cueData.resolve(session.recording)
+    const sourceCues =
+      cueDataResolution.status === 'ready'
+        ? normalizeFirstCueStart(
+            cloneCues(
+              selectCuesForTokenKeys(
+                cueDataResolution.payload.cues,
+                session.tokenKeys
+              )
+            )
+          )
+        : initialSourceCues
+    const draft = storedDraft?.cues.length ? storedDraft : null
+    const savedAtValue =
+      cueDataResolution.status === 'ready'
+        ? cueDataResolution.payload.savedAt
+        : null
+    const parsedSavedAt = savedAtValue ? Date.parse(savedAtValue) : NaN
+    const publishedSavedAt = Number.isFinite(parsedSavedAt)
+      ? parsedSavedAt
+      : null
+    const savedAt = draft?.updatedAt ?? publishedSavedAt
     if (
       generation !== sessionBindingGeneration ||
       audioController.session !== session ||
@@ -359,6 +426,9 @@ export function createCueAuthoring(
     state.draftSavedAt = savedAt
     state.draftSaveError = null
     state.recordingIssueSaveError = null
+    state.cueDataResolution = cueDataResolution
+    state.cueDataLoading = false
+    state.cueDataRetrying = false
     state.recording = false
     syncPanel()
   }
@@ -537,6 +607,9 @@ export function createCueAuthoring(
   const getDraftStatusText = () => {
     const session = getSession()
     if (!session) return 'Drafts autosave locally per recording.'
+    if (state.cueDataLoading) {
+      return 'Checking published timing and locally saved work.'
+    }
     if (state.recordingIssueSaveError) {
       return state.recordingIssueSaveError
     }
@@ -567,7 +640,7 @@ export function createCueAuthoring(
 
   const syncCueList = ({ follow = true } = {}) => {
     const session = getSession()
-    const items = session
+    const items = session && !state.cueDataLoading
       ? state.cues.map((cue, index) => ({
           key: `${formatTokenKey(cue)}:${index}`,
           tokenLabel: getTokenLabel(index),
@@ -590,6 +663,8 @@ export function createCueAuthoring(
     cueList?.sync({
       emptyMessage: !session
         ? 'Select an aliyah to load timing.'
+        : state.cueDataLoading
+          ? 'Loading timing...'
         : items.length
           ? null
           : 'No timing saved yet. Start recording, then refine it.',
@@ -644,13 +719,48 @@ export function createCueAuthoring(
     state.cues.length > 0 &&
     !areCueDraftsEquivalent(state.cues, state.sourceCues)
 
+  const getCueDataProblems = (): CueAuthoringPanelSnapshot['problems'] => {
+    const resolution = state.cueDataResolution
+    if (
+      !resolution ||
+      resolution.status === 'ready' ||
+      resolution.status === 'missing'
+    ) {
+      return []
+    }
+
+    const filePath = resolution.path.replace(/^\.\.\/\.\.\//, '')
+    return [{
+      id: 'published-cue-data',
+      tone: resolution.status === 'invalid' ? 'warning' : 'error',
+      title:
+        resolution.status === 'invalid'
+          ? 'Published cue file needs repair'
+          : 'Published cue file is unavailable',
+      message:
+        `${resolution.problem.message} Published timing was skipped so ` +
+        'playback and authoring can continue. Fix the file, then retry here.',
+      details: [
+        `File: ${filePath}`,
+        ...resolution.problem.details,
+      ],
+      action: {
+        type: 'retry-cue-data',
+        label: 'Retry Cue File',
+        pendingLabel: 'Checking Cue File...',
+        pending: state.cueDataRetrying,
+      },
+    }]
+  }
+
   const getPanelSnapshot = (): CueAuthoringPanelSnapshot => {
     const session = getSession()
     const tokenCount = session?.tokenKeys.length ?? 0
     const hasSession = Boolean(session && tokenCount)
+    const sessionReady = hasSession && !state.cueDataLoading
     const hasCues = state.cues.length > 0
     const hasIncompleteDraft =
-      hasSession && hasCues && state.cues.length < tokenCount
+      sessionReady && hasCues && state.cues.length < tokenCount
     const canResumeDraft = hasIncompleteDraft && !state.recording
     const microphoneTransitioning =
       microphoneCapture.state === 'starting' ||
@@ -669,13 +779,16 @@ export function createCueAuthoring(
     let cueCountText = '0 Words'
     let statusText =
       'Select an aliyah and press play to start timing words.'
-    if (hasSession && session) {
+    if (hasSession && session && state.cueDataLoading) {
+      cueCountText = `${tokenCount} Words - Loading timing...`
+      statusText = `${session.recording.title}: loading published timing...`
+    } else if (hasSession && session) {
       const counterPointer =
         state.tokenPointer >= 0 ? state.tokenPointer + 1 : 0
       cueCountText =
         `${state.cues.length} / ${tokenCount} Words - ${counterPointer}`
     }
-    if (hasSession && session && state.recording) {
+    if (!state.cueDataLoading && hasSession && session && state.recording) {
       const pointer =
         Math.max(
           1,
@@ -691,6 +804,7 @@ export function createCueAuthoring(
         `${recordingMicrophone ? 'audio + ' : ''}Word ${pointer}. ` +
         'Space or Right Arrow saves the current time; Left Arrow steps back.'
     } else if (
+      !state.cueDataLoading &&
       hasSession &&
       session &&
       state.cues.length === tokenCount &&
@@ -699,7 +813,7 @@ export function createCueAuthoring(
       statusText =
         `${session.recording.title}: all ${tokenCount} Words are timed. ` +
         'Select one to play, adjust, or export.'
-    } else if (hasSession && session) {
+    } else if (!state.cueDataLoading && hasSession && session) {
       const pointer =
         state.cues.length < tokenCount
           ? Math.min(state.cues.length + 1, tokenCount)
@@ -755,12 +869,14 @@ export function createCueAuthoring(
       visible: state.visible,
       cueCountText,
       statusText,
+      problems: getCueDataProblems(),
       draftStatusText: getDraftStatusText(),
       syncNoteVisible: state.recording,
       captureAudio: {
         requested: isMicrophoneCaptureRequested(),
         disabled:
           !session ||
+          state.cueDataLoading ||
           !microphoneSupported ||
           microphoneBusy ||
           requiresMicrophoneCapture(session),
@@ -768,7 +884,7 @@ export function createCueAuthoring(
         tone: captureTone,
       },
       record: {
-        disabled: !hasSession || microphoneTransitioning,
+        disabled: !sessionReady || microphoneTransitioning,
         mode: confirmingFreshPass
           ? 'confirm'
           : state.recording
@@ -777,11 +893,12 @@ export function createCueAuthoring(
               : 'timing'
             : 'idle',
       },
-      canStepBack: hasSession && state.tokenPointer >= 0,
-      canUndo: hasCues,
-      canMarkIssue: hasSession,
-      canReset: hasCues || state.recording || state.tokenPointer >= 0,
-      canExport: hasSession && hasCues,
+      canStepBack: sessionReady && state.tokenPointer >= 0,
+      canUndo: sessionReady && hasCues,
+      canMarkIssue: sessionReady,
+      canReset:
+        sessionReady && (hasCues || state.recording || state.tokenPointer >= 0),
+      canExport: sessionReady && hasCues,
       exportChanged: hasLocalCueChanges(),
       resumeWord: canResumeDraft ? state.cues.length + 1 : null,
     }
@@ -1138,9 +1255,14 @@ export function createCueAuthoring(
     if (!session?.tokenKeys.length) return
     const recordingMicrophone = isMicrophoneRecordingForSession(session)
     const selectedCueIndex = getEditableCueIndex()
+    const activeIndex = highlightController.getActiveIndex()
+    const originIndex =
+      state.recording && activeIndex >= 0
+        ? activeIndex
+        : selectedCueIndex
     const targetIndex =
-      selectedCueIndex > 0
-        ? selectedCueIndex - 1
+      originIndex > 0
+        ? originIndex - 1
         : state.tokenPointer <= 0
           ? 0
           : Math.max(0, state.tokenPointer - 1)
@@ -1371,9 +1493,18 @@ export function createCueAuthoring(
   }
 
   const closeAccess = () => {
+    accessDialog?.close()
     state.unlocked = false
     options.onChange('access')
     setVisible(false)
+  }
+
+  const unlockAccess = (candidate: string) => {
+    if (!verifyAdminPassword(candidate)) return false
+    state.unlocked = true
+    options.onChange('access')
+    setVisible(true)
+    return true
   }
 
   const restoreAccessState = () => {
@@ -1403,10 +1534,11 @@ export function createCueAuthoring(
     if (isCueAuthoringToggleShortcut(event)) {
       event.preventDefault()
       if (!state.unlocked) {
-        const provided = view.prompt('Admin password')
-        if (!provided || !verifyAdminPassword(provided)) return true
-        state.unlocked = true
-        options.onChange('access')
+        if (!accessDialog) {
+          throw new Error('Cue Authoring Access Dialog is not mounted')
+        }
+        accessDialog.open()
+        return true
       }
       setVisible(!isVisible())
       return true
@@ -1474,10 +1606,63 @@ export function createCueAuthoring(
     await resetRecorder()
   }
 
+  const retryPublishedCueData = async () => {
+    const session = getSession()
+    if (!session || state.cueDataRetrying) return
+
+    const generation = sessionBindingGeneration
+    const preserveLocalCues =
+      state.draftOrigin === 'local' || hasLocalCueChanges()
+    state.cueDataRetrying = true
+    syncPanel()
+
+    const resolution = await cueData.retry(session.recording)
+    if (
+      generation !== sessionBindingGeneration ||
+      getSession() !== session
+    ) {
+      return
+    }
+
+    state.cueDataResolution = resolution
+    if (resolution.status === 'ready') {
+      const publishedCues = normalizeFirstCueStart(
+        cloneCues(
+          selectCuesForTokenKeys(
+            resolution.payload.cues,
+            session.tokenKeys
+          )
+        )
+      )
+      state.sourceCues = cloneCues(publishedCues)
+      if (!preserveLocalCues) {
+        assignCues(cloneCues(publishedCues))
+        state.draftOrigin = publishedCues.length ? 'published' : 'none'
+        const savedAt = resolution.payload.savedAt
+          ? Date.parse(resolution.payload.savedAt)
+          : NaN
+        state.draftSavedAt = Number.isFinite(savedAt) ? savedAt : null
+      }
+    } else {
+      state.sourceCues = []
+      if (!preserveLocalCues) {
+        assignCues([])
+        state.draftOrigin = 'none'
+        state.draftSavedAt = null
+      }
+    }
+    state.cueDataRetrying = false
+    options.onChange('cue-data')
+    syncPanel()
+  }
+
   const handlePanelAction = (action: CueAuthoringPanelAction) => {
     switch (action.type) {
       case 'close':
         closeAccess()
+        break
+      case 'retry-cue-data':
+        void retryPublishedCueData()
         break
       case 'capture-audio':
         state.captureAudioRequested = action.requested
@@ -1509,6 +1694,13 @@ export function createCueAuthoring(
     }
   }
 
+  accessDialog = createCueAuthoringAccessDialog(scope, {
+    document,
+    submit: unlockAccess,
+  })
+  scope.own(() => {
+    accessDialog = null
+  })
   panel = createCueAuthoringPanel(scope, {
     document,
     action: handlePanelAction,
@@ -1618,6 +1810,7 @@ export function createCueAuthoring(
 
   scope.own(() => {
     resetExportDownloadLinks()
+    accessDialog?.close()
     closeIssueModal()
     if (isMicrophoneCaptureActive()) {
       void microphoneCapture.stop().catch((error) => {
@@ -1648,6 +1841,7 @@ export function createCueAuthoring(
     },
     handleKeydown,
     closeOverlays: () => {
+      accessDialog?.close()
       hideExport()
       closeIssueModal()
     },

@@ -206,6 +206,7 @@ function createOptions(
     setPlaybackRate: state.setPlaybackRate,
     restoreFocus: state.restoreFocus,
     animateThemeChanges: true,
+    serviceWorker: null,
   }
 }
 

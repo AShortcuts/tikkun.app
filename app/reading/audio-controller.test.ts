@@ -10,6 +10,7 @@ class FakeAudioElement {
   paused = true
   readyState: number
   src = ''
+  preload = ''
   error: { code: number } | null = null
   playCount = 0
   loadCount = 0
@@ -318,6 +319,7 @@ test('does not borrow the previous recording duration for an open final segment'
 
   expect(controller.duration).toBe(Number.POSITIVE_INFINITY)
   expect(preloads).toHaveLength(1)
+  expect(preloads[0].preload).toBe('metadata')
   preloads[0].setMetadata(614)
   expect(controller.duration).toBe(604)
 })

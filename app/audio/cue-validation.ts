@@ -13,6 +13,15 @@ import type {
   WordCue,
 } from './types.ts'
 
+export interface CuePayloadValidationIssue {
+  path: string
+  message: string
+}
+
+export type CuePayloadInspection =
+  | { status: 'valid'; payload: CueExportPayload }
+  | { status: 'invalid'; issues: CuePayloadValidationIssue[] }
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
@@ -220,6 +229,157 @@ export function parseCueExportPayload(value: unknown): CueExportPayload | null {
   if (readingId) return { ...payload, readingId }
   if (parshaSlug) return { ...payload, parshaSlug }
   return null
+}
+
+export function inspectCueExportPayload(value: unknown): CuePayloadInspection {
+  const payload = parseCueExportPayload(value)
+  if (payload) return { status: 'valid', payload }
+
+  if (!isRecord(value)) {
+    return {
+      status: 'invalid',
+      issues: [{ path: '$', message: 'Cue Data must be a JSON object.' }],
+    }
+  }
+
+  const issues: CuePayloadValidationIssue[] = []
+  const addIssue = (path: string, message: string) => {
+    issues.push({ path, message })
+  }
+
+  if (
+    ('tokenPointer' in value || 'updatedAt' in value) &&
+    (!('audioFormat' in value) || !('cueCount' in value))
+  ) {
+    addIssue(
+      '$',
+      'This looks like a local Cue Draft. Use Export in Admin Timing Mode and publish the exported Cue Data JSON.'
+    )
+  }
+
+  if (!isNonEmptyString(value.audioId)) {
+    addIssue('audioId', 'audioId must be a non-empty string.')
+  }
+  if (value.audioFormat !== 'mp3' && value.audioFormat !== 'm4a') {
+    addIssue('audioFormat', 'audioFormat must be "mp3" or "m4a".')
+  }
+  if (!isNonEmptyString(value.narratorId)) {
+    addIssue('narratorId', 'narratorId must be a non-empty string.')
+  }
+
+  const hasReadingId = isNonEmptyString(value.readingId)
+  const hasParshaSlug = isNonEmptyString(value.parshaSlug)
+  if (hasReadingId === hasParshaSlug) {
+    addIssue(
+      'readingId',
+      'Provide exactly one non-empty readingId or parshaSlug.'
+    )
+  }
+  if (!isPositiveInteger(value.aliyah)) {
+    addIssue('aliyah', 'aliyah must be a positive integer.')
+  }
+  if (!isNonNegativeInteger(value.tokenCount)) {
+    addIssue('tokenCount', 'tokenCount must be a non-negative integer.')
+  }
+  if (!isNonNegativeInteger(value.cueCount)) {
+    addIssue('cueCount', 'cueCount must be a non-negative integer.')
+  }
+  if (!isNonEmptyString(value.tokenizationVersion)) {
+    addIssue(
+      'tokenizationVersion',
+      'tokenizationVersion must be a non-empty string.'
+    )
+  }
+
+  const draftCues = parseDraftWordCues(value.cues)
+  if (!Array.isArray(value.cues)) {
+    addIssue('cues', 'cues must be an array.')
+  } else if (!draftCues) {
+    const invalidCueIndex = value.cues.findIndex(
+      (candidate) => !parseWordCue(candidate)
+    )
+    addIssue(
+      invalidCueIndex >= 0 ? `cues[${invalidCueIndex}]` : 'cues',
+      'Every cue must contain a valid timestamp and token position.'
+    )
+  } else {
+    const invalidNumberIndex = draftCues.findIndex(
+      (cue, index) => cue.cueNumber !== index + 1
+    )
+    if (invalidNumberIndex >= 0) {
+      addIssue(
+        `cues[${invalidNumberIndex}].cueNumber`,
+        `Published cues require sequential cueNumber values; expected ${invalidNumberIndex + 1}.`
+      )
+    } else if (!isPublishableCueSequence(draftCues)) {
+      const invalidOrderIndex = draftCues.findIndex((cue, index) => {
+        if (index === 0) return false
+        const previous = draftCues[index - 1]
+        return (
+          cue.timeStart <= previous.timeStart ||
+          (previous.timeEnd !== undefined &&
+            previous.timeEnd > cue.timeStart) ||
+          compareTokenPositions(previous, cue) >= 0
+        )
+      })
+      addIssue(
+        invalidOrderIndex >= 0 ? `cues[${invalidOrderIndex}]` : 'cues',
+        'Published cues must move forward in both time and Torah token order without overlapping.'
+      )
+    }
+
+    if (
+      isNonNegativeInteger(value.cueCount) &&
+      value.cueCount !== draftCues.length
+    ) {
+      addIssue(
+        'cueCount',
+        `cueCount is ${value.cueCount}, but cues contains ${draftCues.length} entries.`
+      )
+    }
+    if (
+      isNonNegativeInteger(value.tokenCount) &&
+      value.tokenCount < draftCues.length
+    ) {
+      addIssue(
+        'tokenCount',
+        `tokenCount cannot be smaller than the ${draftCues.length} published cues.`
+      )
+    }
+  }
+
+  if (value.audioVersion !== undefined && !isNonEmptyString(value.audioVersion)) {
+    addIssue('audioVersion', 'audioVersion must be a non-empty string.')
+  }
+  if (value.savedAt !== undefined && !isIsoTimestamp(value.savedAt)) {
+    addIssue('savedAt', 'savedAt must be an ISO timestamp.')
+  }
+  if (
+    value.mediaIdentity !== undefined &&
+    !parseAudioMediaIdentity(value.mediaIdentity)
+  ) {
+    addIssue(
+      'mediaIdentity',
+      'mediaIdentity must contain a SHA-256 digest and positive byteLength.'
+    )
+  }
+  if (
+    value.issues !== undefined &&
+    isNonEmptyString(value.audioId) &&
+    isNonEmptyString(value.tokenizationVersion) &&
+    !parseRecordingIssues(
+      value.issues,
+      value.audioId,
+      value.tokenizationVersion
+    )
+  ) {
+    addIssue('issues', 'issues contains invalid recording issue data.')
+  }
+
+  if (!issues.length) {
+    addIssue('$', 'Cue Data does not satisfy the published file contract.')
+  }
+  return { status: 'invalid', issues }
 }
 
 export function cuePayloadMatchesRecording(

@@ -656,7 +656,7 @@ export class ScrollDisplay {
   }
 
   private mountPageEntry(page: RenderedPageInfo, insertPosition: InsertPosition) {
-    if (this.disposed) return renderPageNode(page)
+    if (this.disposed) return renderPageNode(page, this.annotationsEnabled())
     const existing = this.pageMounts.get(page.contentIndex)
     if (existing?.state === 'mounted' && existing.node?.isConnected) {
       this.touchPageRecord(existing)
@@ -666,7 +666,7 @@ export class ScrollDisplay {
       return this.mountEvictedPage(page, existing)
     }
 
-    const node = renderPageNode(page)
+    const node = renderPageNode(page, this.annotationsEnabled())
     this.insertEntryNodeInOrder(page.contentIndex, node, insertPosition)
     this.renderedPages.set(page.contentIndex, node)
     this.renderedEntries.set(page.contentIndex, node)
@@ -724,7 +724,7 @@ export class ScrollDisplay {
   }
 
   private mountEvictedPage(page: RenderedPageInfo, record: PageMountRecord) {
-    const node = renderPageNode(page)
+    const node = renderPageNode(page, this.annotationsEnabled())
     if (this.disposed) return node
     record.placeholderNode?.replaceWith(node)
     this.renderedPages.set(page.contentIndex, node)
@@ -732,15 +732,19 @@ export class ScrollDisplay {
     this.markPageMounted(page, node)
     return node
   }
+
+  private annotationsEnabled() {
+    return this.root.classList.contains('mod-annotations-on')
+  }
 }
 
-function renderPageNode(page: RenderedPageInfo) {
+function renderPageNode(page: RenderedPageInfo, annotationsEnabled: boolean) {
   const node = document.createElement('div')
   node.classList.add('tikkun-page')
   node.dataset.contentIndex = `${page.contentIndex}`
   node.tikkunPage = page
 
-  node.appendChild(htmlToElement(Page(page)))
+  node.appendChild(htmlToElement(Page(page, { annotationsEnabled })))
 
   return node
 }

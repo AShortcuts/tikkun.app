@@ -644,14 +644,12 @@
     );
   }
 
-  html[data-reader-mode='admin-authoring']
-    .mobile-aliyah-play.is-cue-incomplete:not(.is-missing-audio) {
+  .mobile-aliyah-play.is-cue-incomplete:not(.is-missing-audio) {
     background: var(--admin-cue-incomplete-color);
     color: var(--admin-cue-incomplete-ink);
   }
 
-  html[data-reader-mode='admin-authoring']
-    .mobile-aliyah-play.is-cue-incomplete:not(.is-missing-audio):hover {
+  .mobile-aliyah-play.is-cue-incomplete:not(.is-missing-audio):hover {
     background: color-mix(
       in srgb,
       var(--admin-cue-incomplete-color) 86%,

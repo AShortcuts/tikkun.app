@@ -419,10 +419,7 @@
   function itemCueNeedsWork(item: AliyahNavigationItem) {
     const status = resolvedCueStatus(item)
     return Boolean(
-      authoringEnabled &&
-        item.recordingKey &&
-        status &&
-        isAliyahCueStatusUnfinished(status)
+      item.recordingKey && status && isAliyahCueStatusUnfinished(status)
     )
   }
 
@@ -473,7 +470,7 @@
       return `Select ${item.label} for audio and cue recording`
     }
     const status = resolvedCueStatus(item)
-    if (itemCueNeedsWork(item) && status) {
+    if (authoringEnabled && itemCueNeedsWork(item) && status) {
       return aliyahCueAuthoringActionLabel({
         label: item.label,
         status,

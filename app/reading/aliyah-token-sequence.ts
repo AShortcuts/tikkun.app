@@ -1,11 +1,14 @@
 function endsWithSofPasuk(words: HTMLElement[]) {
   const lastWord = words[words.length - 1]
-  return lastWord?.textContent?.trim().endsWith('׃') ?? false
+  return annotatedText(lastWord).trim().endsWith('׃')
 }
+
+const annotatedText = (word: HTMLElement | undefined) =>
+  word?.dataset.annotationsOnText ?? word?.textContent ?? ''
 
 function firstWordAfterSofPasuk(words: HTMLElement[], startingAt = 0) {
   const sofPasukIndex = words.findIndex(
-    (word, index) => index >= startingAt && word.textContent?.includes('׃')
+    (word, index) => index >= startingAt && annotatedText(word).includes('׃')
   )
   return sofPasukIndex < 0 ? words.length : sofPasukIndex + 1
 }
@@ -31,7 +34,9 @@ export function verseStartWordIndex({
 }
 
 const annotatedWordsIn = (node: ParentNode) =>
-  [...node.querySelectorAll<HTMLElement>('.fragment.mod-annotations-on .word')]
+  [...node.querySelectorAll<HTMLElement>('.fragment .word')].filter(
+    (word) => word.dataset.annotationsOnPresent !== 'false'
+  )
 
 function exactAliyahStartContext({
   book,
@@ -86,7 +91,7 @@ export function adjustStartingLineTokens({
   }
 
   const firstSofPasukIndex = currentLineWords.findIndex((word) =>
-    word.textContent?.includes('׃')
+    annotatedText(word).includes('׃')
   )
 
   if (firstSofPasukIndex < 0) return currentLineWords
@@ -105,7 +110,7 @@ export function adjustEndingLineTokens({
   }
 
   const firstSofPasukIndex = currentLineWords.findIndex((word) =>
-    word.textContent?.includes('׃')
+    annotatedText(word).includes('׃')
   )
 
   if (firstSofPasukIndex < 0) return []
@@ -210,7 +215,7 @@ export function collectTokenKeysForExactAliyahRange({
   const startOffset = lineOffsets[startLineIndex] + startWordIndex
   const endVerseOffset = lineOffsets[endLineIndex] + endVerseStartIndex
   const endOffset = flattenedWords.findIndex(
-    (word, index) => index >= endVerseOffset && word.textContent?.includes('׃')
+    (word, index) => index >= endVerseOffset && annotatedText(word).includes('׃')
   )
   const inclusiveEndOffset = endOffset < 0 ? flattenedWords.length : endOffset + 1
 

@@ -9,6 +9,7 @@ import {
 import { HighlightController } from '../reading/highlight-controller.ts'
 import { buildPlaybackPlan } from '../reading/playback-plan.ts'
 import { createCueAuthoring, type CueAuthoring } from './cue-authoring.ts'
+import { incompleteCueSessionFixture } from './cue-authoring.fixture.ts'
 
 let fixture: HTMLElement | null = null
 let destroy: (() => void) | null = null
@@ -61,6 +62,219 @@ test('owns its DOM listeners across replacement mounts without duplicating edito
   expect(firstRestore).not.toHaveBeenCalled()
   expect(secondRestore).toHaveBeenCalledTimes(1)
   expect(second!.isVisible()).toBe(false)
+})
+
+test('surfaces malformed published Cue Data and recovers it without leaving authoring', async () => {
+  const { audioController, highlightController } = createFixture()
+  const publishedCue = {
+    ...cue(tokenKeys[0], 0),
+    cueNumber: 1,
+  }
+  const resolve = vi.fn(async () => ({
+    status: 'invalid' as const,
+    path: '../../audio-cues/reader/test/1.json',
+    payload: null,
+    problem: {
+      code: 'invalid-payload' as const,
+      message: 'The published Cue Data file is not valid.',
+      details: ['$: This looks like a local Cue Draft.'],
+    },
+  }))
+  const retry = vi.fn(async () => ({
+    status: 'ready' as const,
+    path: '../../audio-cues/reader/test/1.json',
+    payload: {
+      audioId: 'current',
+      audioFormat: 'mp3' as const,
+      narratorId: 'reader',
+      readingId: 'test',
+      aliyah: 1,
+      tokenCount: tokenKeys.length,
+      cueCount: 1,
+      tokenizationVersion: TOKENIZATION_VERSION,
+      savedAt: '2026-08-03T12:00:00.000Z',
+      cues: [publishedCue],
+    },
+  }))
+  let cueAuthoring: CueAuthoring | null = null
+
+  destroy = createMount()((scope) => {
+    cueAuthoring = createCueAuthoring(
+      scope,
+      createOptions(audioController, highlightController, {
+        cueData: { resolve, retry },
+      })
+    )
+  })
+
+  const session = createActiveAudioSession(
+    buildPlaybackPlan({
+      target: { runId: 'run', index: 1 },
+      tokenKeys,
+      current: {
+        recording: recording('current', 1),
+        cues: [],
+      },
+    })!
+  )
+
+  await audioController.loadSession(session)
+  await cueAuthoring!.bindSession(session)
+
+  expect(cueAuthoring!.getSession()).toBe(session)
+  expect(session.cues).toEqual([])
+  expect(resolve).toHaveBeenCalledWith(session.recording)
+  expect(
+    required('[data-admin-problem="published-cue-data"]').textContent
+  ).toContain('Published cue file needs repair')
+
+  required<HTMLButtonElement>(
+    '[data-admin-problem-action="retry-cue-data"]'
+  ).click()
+  await vi.waitFor(() => {
+    expect(retry).toHaveBeenCalledWith(session.recording)
+    expect(session.cues).toEqual([publishedCue])
+  })
+  expect(
+    document.querySelector('[data-admin-problem="published-cue-data"]')
+  ).toBeNull()
+  expect(
+    required('[data-target-id="admin-draft-status"]').textContent
+  ).toContain('Published timing loaded')
+})
+
+test('loads an incomplete 137-of-334 published session as resumable', async () => {
+  const { tokenKeys: incompleteTokenKeys, cues: publishedCues } =
+    incompleteCueSessionFixture
+  const { audioController, highlightController } = createFixture(
+    incompleteTokenKeys
+  )
+  const activeRecording = recording('current', 1)
+  let finishResolve!: (
+    value: ReturnType<typeof readyCueData>
+  ) => void
+  const resolution = new Promise<ReturnType<typeof readyCueData>>((resolve) => {
+    finishResolve = resolve
+  })
+  let cueAuthoring!: CueAuthoring
+
+  destroy = createMount()((scope) => {
+    cueAuthoring = createCueAuthoring(
+      scope,
+      createOptions(audioController, highlightController, {
+        cueData: {
+          resolve: () => resolution,
+          retry: async () =>
+            readyCueData(
+              activeRecording,
+              publishedCues,
+              incompleteTokenKeys.length
+            ),
+        },
+      })
+    )
+  })
+
+  const session = createActiveAudioSession(
+    buildPlaybackPlan({
+      target: { runId: 'run', index: 1 },
+      tokenKeys: incompleteTokenKeys,
+      current: { recording: activeRecording, cues: [] },
+    })!
+  )
+  await audioController.loadSession(session)
+
+  const binding = cueAuthoring.bindSession(session)
+  await vi.waitFor(() => {
+    expect(required('[data-target-id="admin-status"]').textContent).toContain(
+      'loading published timing'
+    )
+  })
+  expect(
+    required<HTMLButtonElement>('[data-target-id="admin-record"]').disabled
+  ).toBe(true)
+  expect(document.querySelectorAll('[data-admin-cue-index]')).toHaveLength(0)
+  expect(
+    required<HTMLElement>('[data-target-id="admin-resume-wrap"]').hidden
+  ).toBe(true)
+
+  finishResolve(
+    readyCueData(
+      activeRecording,
+      publishedCues,
+      incompleteTokenKeys.length
+    )
+  )
+  await binding
+
+  expect(session.cues).toHaveLength(incompleteCueSessionFixture.cueCount)
+  expect(document.querySelectorAll('[data-admin-cue-index]')).toHaveLength(
+    incompleteCueSessionFixture.cueCount
+  )
+  expect(
+    required<HTMLElement>('[data-target-id="admin-resume-wrap"]').hidden
+  ).toBe(false)
+  expect(required('[data-target-id="admin-cue-count"]').textContent).toBe(
+    '137 / 334 Words - 138'
+  )
+  expect(
+    required('[data-target-id="admin-resume-draft"]').getAttribute(
+      'aria-label'
+    )
+  ).toContain('Word 138')
+  expect(
+    document.querySelector('[data-admin-problem="published-cue-data"]')
+  ).toBeNull()
+})
+
+test('does not let an empty local draft suppress published timing', async () => {
+  const { audioController, highlightController } = createFixture()
+  const activeRecording = recording('current', 1)
+  const publishedCue = {
+    ...cue(tokenKeys[0], 0),
+    cueNumber: 1,
+  }
+  let cueAuthoring!: CueAuthoring
+
+  localStorage.setItem(
+    'tikkun-admin-draft:current',
+    JSON.stringify({
+      audioId: 'current',
+      tokenCount: tokenKeys.length,
+      tokenPointer: -1,
+      tokenizationVersion: TOKENIZATION_VERSION,
+      updatedAt: 200,
+      cues: [],
+    })
+  )
+  destroy = createMount()((scope) => {
+    cueAuthoring = createCueAuthoring(
+      scope,
+      createOptions(audioController, highlightController, {
+        cueData: {
+          resolve: async () => readyCueData(activeRecording, [publishedCue]),
+          retry: async () => readyCueData(activeRecording, [publishedCue]),
+        },
+      })
+    )
+  })
+
+  const session = createActiveAudioSession(
+    buildPlaybackPlan({
+      target: { runId: 'run', index: 1 },
+      tokenKeys,
+      current: { recording: activeRecording, cues: [publishedCue] },
+    })!
+  )
+  await audioController.loadSession(session)
+  await cueAuthoring.bindSession(session)
+
+  expect(session.cues).toEqual([publishedCue])
+  expect(document.querySelectorAll('[data-admin-cue-index]')).toHaveLength(1)
+  expect(required<HTMLElement>('[data-target-id="admin-resume-wrap"]').hidden).toBe(false)
+  expect(required('[data-target-id="admin-draft-status"]').textContent).toContain(
+    'Published timing loaded'
+  )
 })
 
 test('restores access and binds a validated local Cue Draft to one authoring session', async () => {
@@ -274,6 +488,74 @@ test('keeps cue selection, seeking, focus, and timing edits behind TypeScript', 
   ).toBe(secondRow)
   expect(secondRow.textContent).toContain('0:03.300')
   expect(onCueNavigationChange).toHaveBeenLastCalledWith(1)
+})
+
+test('steps back from the highlighted word only while timing existing cues', async () => {
+  const timingTokenKeys = [
+    '1:0:0:0',
+    '1:0:0:1',
+    '1:0:0:2',
+    '1:0:0:3',
+  ]
+  const { audioController, highlightController } = createFixture(
+    timingTokenKeys
+  )
+  let cueAuthoring!: CueAuthoring
+
+  destroy = createMount()((scope) => {
+    cueAuthoring = createCueAuthoring(
+      scope,
+      createOptions(audioController, highlightController)
+    )
+  })
+  sessionStorage.setItem('tikkun-admin-unlocked', '1')
+  cueAuthoring.restoreAccessState()
+
+  const session = createActiveAudioSession(
+    buildPlaybackPlan({
+      target: { runId: 'run', index: 1 },
+      tokenKeys: timingTokenKeys,
+      current: {
+        recording: recording('current', 1),
+        cues: timingTokenKeys.map((key, index) => cue(key, index)),
+      },
+    })!
+  )
+  await audioController.loadSession(session)
+  highlightController.setSequence(timingTokenKeys)
+  await cueAuthoring.bindSession(session)
+
+  await cueAuthoring.selectReaderToken(1)
+  await highlightController.activateTokenKey(timingTokenKeys[3], {
+    scroll: false,
+  })
+  required<HTMLButtonElement>('[data-target-id="admin-step-back"]').click()
+  await vi.waitFor(() => {
+    expect(highlightController.getActiveTokenKey()).toBe(timingTokenKeys[0])
+  })
+
+  await cueAuthoring.selectReaderToken(1)
+  required<HTMLButtonElement>('[data-target-id="admin-record"]').click()
+  expect(cueAuthoring.isRecording()).toBe(true)
+
+  const right = new KeyboardEvent('keydown', {
+    key: 'ArrowRight',
+    cancelable: true,
+  })
+  expect(cueAuthoring.handleKeydown(right)).toBe(true)
+  expect(right.defaultPrevented).toBe(true)
+  expect(highlightController.getActiveTokenKey()).toBe(timingTokenKeys[2])
+
+  const left = new KeyboardEvent('keydown', {
+    key: 'ArrowLeft',
+    cancelable: true,
+  })
+  expect(cueAuthoring.handleKeydown(left)).toBe(true)
+  expect(left.defaultPrevented).toBe(true)
+  expect(highlightController.getActiveTokenKey()).toBe(timingTokenKeys[1])
+  expect(
+    required<HTMLElement>('[data-target-id="admin-cue-count"]').textContent
+  ).toBe('4 / 4 Words - 2')
 })
 
 test('routes Cue List controls through TypeScript behavior', async () => {
@@ -522,7 +804,6 @@ test('keeps the export available when clipboard copying is blocked', async () =>
 
 test('owns the admin shortcut, access check, and panel toggle', () => {
   const { audioController, highlightController } = createFixture()
-  const prompt = vi.spyOn(window, 'prompt').mockReturnValue('admin')
   let cueAuthoring: CueAuthoring | null = null
 
   destroy = createMount()((scope) => {
@@ -540,7 +821,22 @@ test('owns the admin shortcut, access check, and panel toggle', () => {
   })
   expect(cueAuthoring!.handleKeydown(openEvent)).toBe(true)
   expect(openEvent.defaultPrevented).toBe(true)
-  expect(prompt).toHaveBeenCalledWith('Admin password')
+  const accessDialog = required<HTMLElement>(
+    '[data-target-id="admin-access-dialog"]'
+  )
+  const password = required<HTMLInputElement>(
+    '[data-target-id="admin-access-password"]'
+  )
+  expect(accessDialog.classList).not.toContain('u-hidden')
+  expect(document.activeElement).toBe(password)
+  expect(cueAuthoring!.isActive()).toBe(false)
+  expect(sessionStorage.getItem('tikkun-admin-unlocked')).toBeNull()
+
+  password.value = 'admin'
+  password.dispatchEvent(new InputEvent('input', { bubbles: true }))
+  required<HTMLButtonElement>('[data-target-id="admin-access-submit"]').click()
+
+  expect(accessDialog.classList).toContain('u-hidden')
   expect(cueAuthoring!.isActive()).toBe(true)
   expect(sessionStorage.getItem('tikkun-admin-unlocked')).toBe('1')
   expect(sessionStorage.getItem('tikkun-admin-panel-open')).toBe('1')
@@ -553,7 +849,7 @@ test('owns the admin shortcut, access check, and panel toggle', () => {
   })
   expect(cueAuthoring!.handleKeydown(closeEvent)).toBe(true)
   expect(cueAuthoring!.isVisible()).toBe(false)
-  expect(prompt).toHaveBeenCalledTimes(1)
+  expect(accessDialog.classList).toContain('u-hidden')
 })
 
 test('keeps the Svelte issue dialog open when persistence fails and retries safely', async () => {
@@ -641,14 +937,19 @@ function createOptions(
 
 const tokenKeys = ['1:0:0:0', '1:0:0:1']
 
-function createFixture() {
+function createFixture(keys: readonly string[] = tokenKeys) {
   fixture = document.createElement('div')
   fixture.innerHTML = `
     <main data-target-id="tikkun-book" tabindex="-1">
-      <span class="word" data-token-key="${tokenKeys[0]}">First</span>
-      <span class="word" data-token-key="${tokenKeys[1]}">Second</span>
+      ${keys
+        .map(
+          (key, index) =>
+            `<span class="word" data-token-key="${key}">Word ${index + 1}</span>`
+        )
+        .join('')}
     </main>
     <div data-target-id="cue-authoring-panel-root"></div>
+    <div data-target-id="cue-authoring-access-dialog-root"></div>
     <div data-target-id="recording-issue-dialog-root"></div>
     <div data-target-id="cue-authoring-export-sheet-root"></div>
     <audio data-target-id="reader-audio"></audio>
@@ -703,6 +1004,29 @@ function recording(
     downloadSrc: `/${id}.mp3`,
     format: 'mp3',
     status: 'available',
+  }
+}
+
+function readyCueData(
+  activeRecording: ParshaAudioRecording,
+  cues: WordCue[],
+  tokenCount = tokenKeys.length
+) {
+  return {
+    status: 'ready' as const,
+    path: `../../audio-cues/${activeRecording.narratorId}/${activeRecording.reading.id}/${activeRecording.aliyah}.json`,
+    payload: {
+      audioId: activeRecording.id,
+      audioFormat: activeRecording.format,
+      narratorId: activeRecording.narratorId,
+      readingId: activeRecording.reading.id,
+      aliyah: activeRecording.aliyah,
+      tokenCount,
+      cueCount: cues.length,
+      tokenizationVersion: TOKENIZATION_VERSION,
+      savedAt: '2026-08-03T12:00:00.000Z',
+      cues,
+    },
   }
 }
 

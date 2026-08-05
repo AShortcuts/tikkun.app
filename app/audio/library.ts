@@ -1,4 +1,8 @@
-import { loadCuePayloadForRecording } from './cue-data.ts'
+import {
+  loadCuePayloadForRecording,
+  resolveCueDataForRecording,
+  retryCueDataForRecording,
+} from './cue-data.ts'
 import {
   audioNarrators,
 } from '../../generated/audio-manifest.ts'
@@ -22,6 +26,14 @@ export function listRecordings(): AudioRecording[] {
 
 export async function getCuePayloadForRecording(recording: AudioRecording) {
   return loadCuePayloadForRecording(recording)
+}
+
+export function getCueDataResolutionForRecording(recording: AudioRecording) {
+  return resolveCueDataForRecording(recording)
+}
+
+export function retryCueDataResolutionForRecording(recording: AudioRecording) {
+  return retryCueDataForRecording(recording)
 }
 
 export async function getCuesForRecording(recording: AudioRecording): Promise<WordCue[]> {

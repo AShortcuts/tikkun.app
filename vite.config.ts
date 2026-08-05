@@ -77,6 +77,7 @@ export default defineConfig({
   plugins: [svelte()],
   publicDir: 'site',
   build: {
+    manifest: true,
     rollupOptions: {
       output: {
         chunkFileNames: chunkFileName,

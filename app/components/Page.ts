@@ -14,12 +14,20 @@ export type LineType = {
   isPetucha: boolean
 }
 
-const Page = (page: RenderedPageInfo) => `
+const Page = (
+  page: RenderedPageInfo,
+  { annotationsEnabled = true }: { annotationsEnabled?: boolean } = {}
+) => `
   <table data-page-number="${page.pageNumber}">
     <caption class="tikkun-page-number" aria-hidden="true">${page.pageNumber}</caption>
     ${page.lines
       .map((line, idx) =>
-        Line({ pageNumber: page.pageNumber, lineIndex: idx, ...line })
+        Line({
+          pageNumber: page.pageNumber,
+          lineIndex: idx,
+          annotationsEnabled,
+          ...line,
+        })
       )
       .join('')}
   </table>

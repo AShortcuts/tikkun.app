@@ -396,8 +396,14 @@ test('keeps unavailable mobile aliyot fully visible and adds controls only for a
   expect(pageCss).toContain(
     '.aliyah-audio-button.is-cue-incomplete:not(.is-missing-audio)'
   )
+  expect(pageCss).not.toMatch(
+    /html\[data-reader-mode='admin-authoring'\]\s*\.aliyah-audio-button\.is-cue-incomplete/
+  )
   expect(mobileReaderCss).toContain(
     '.mobile-aliyah-play.is-cue-incomplete:not(.is-missing-audio)'
+  )
+  expect(mobileReaderCss).not.toMatch(
+    /html\[data-reader-mode='admin-authoring'\]\s*\.mobile-aliyah-play\.is-cue-incomplete/
   )
   expect(aliyahNavigationLayerSource).toContain("? 'pause'")
   expect(aliyahNavigationLayerSource).not.toContain("'playOff'")

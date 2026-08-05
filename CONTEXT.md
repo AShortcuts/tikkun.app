@@ -84,6 +84,13 @@ _Avoid_: Playback Timeline, audio controller
 Validated word timing and token-position data loaded from a published cue file.
 _Avoid_: Raw cue JSON
 
+**Cue Data Resolution**:
+The stable, cached result of loading Cue Data for one recording: ready, missing,
+invalid, or temporarily unavailable. Invalid and unavailable results remain
+inspectable until an explicit retry so reader surfaces do not create request or
+error storms.
+_Avoid_: Thrown cue error, repeated cue retry
+
 **Cue Draft**:
 Validated local authoring state for Cue Data that has not yet been published.
 _Avoid_: Published cues, raw localStorage data

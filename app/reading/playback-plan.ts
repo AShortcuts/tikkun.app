@@ -47,7 +47,10 @@ export function contiguousOpeningOverlap(
   return []
 }
 
-function selectCues(cues: WordCue[], tokenKeys: string[]) {
+export function selectCuesForTokenKeys(
+  cues: readonly WordCue[],
+  tokenKeys: readonly string[]
+) {
   const requested = new Set(tokenKeys)
   return cues.filter((cue) => requested.has(cueKey(cue)))
 }
@@ -63,7 +66,7 @@ function segment(
   tokenKeys: string[],
   endPolicy: SegmentEndPolicy
 ): PlaybackSegment | null {
-  const cues = selectCues(source.cues, tokenKeys)
+  const cues = selectCuesForTokenKeys(source.cues, tokenKeys)
   const firstCue = cues[0]
   if (!firstCue) {
     if (source.cues.length || endPolicy === 'cue-boundary') return null
