@@ -7,7 +7,6 @@ import type { MountScope } from '../lifecycle/mount.ts'
 import { ScrollViewModel } from '../view-model/scroll-view-model.ts'
 import {
   canonicalReaderUrl,
-  generateAboutUrl,
   parseUrl,
   type AppRoute,
 } from '../view-model/navigation/url-parser.ts'
@@ -30,6 +29,7 @@ export interface ReaderRouteHost {
     model: ScrollViewModel
   ): ReaderRouteRendering
   leaveReader(): void
+  openAbout(): void
   readerRouteChanged(hash: string): void
   readerReady(): void
   preparePicker(): void
@@ -312,35 +312,25 @@ export function createReaderRoute(
     view: 'about' | 'cue-analytics'
   }>) => {
     leaveReader()
+    if (route.view === 'about') {
+      host.openAbout()
+      return
+    }
+
     shell.setView('optional')
     optionalView.innerHTML =
-      route.view === 'about'
-        ? '<section class="about-card" aria-busy="true"><h2>Loading About</h2></section>'
-        : '<section class="about-card" aria-busy="true"><h2>Loading Cue Analytics</h2></section>'
+      '<section class="about-card" aria-busy="true"><h2>Loading Cue Analytics</h2></section>'
 
     const controller = new AbortController()
     optionalRouteController = controller
-    if (route.view === 'about') {
-      void import('../components/AboutPage.ts')
-        .then(({ default: AboutPage }) => {
-          if (!controller.signal.aborted) optionalView.innerHTML = AboutPage()
-        })
-        .catch((error) => {
-          if (controller.signal.aborted) return
-          console.error('Failed to load the About page', error)
-          optionalView.innerHTML =
-            '<section class="about-card"><h2>About unavailable</h2><p>Reload this page to try again.</p></section>'
-        })
-    } else {
-      void mountCueAnalyticsRoute(optionalView, {
-        signal: controller.signal,
-      }).catch((error) => {
-        if (controller.signal.aborted) return
-        console.error('Failed to load Cue Data analytics', error)
-        optionalView.innerHTML =
-          '<section class="about-card"><h2>Analytics unavailable</h2><p>Reload this page to try again.</p></section>'
-      })
-    }
+    void mountCueAnalyticsRoute(optionalView, {
+      signal: controller.signal,
+    }).catch((error) => {
+      if (controller.signal.aborted) return
+      console.error('Failed to load Cue Data analytics', error)
+      optionalView.innerHTML =
+        '<section class="about-card"><h2>Analytics unavailable</h2><p>Reload this page to try again.</p></section>'
+    })
     setTitle(OPTIONAL_ROUTE_TITLE)
   }
 
@@ -404,12 +394,7 @@ export function createReaderRoute(
   }
 
   const toggleAbout = () => {
-    const currentView = parseCurrentRoute()?.view
-    navigate(
-      currentView === 'about' || currentView === 'cue-analytics'
-        ? lastReaderHash
-        : generateAboutUrl()
-    )
+    host.openAbout()
   }
 
   const snapshot = (): ReaderRouteSnapshot => ({

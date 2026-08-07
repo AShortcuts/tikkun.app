@@ -1,4 +1,42 @@
-# Mobile Reader Design QA
+# Tikkun Design QA
+
+## Homepage direction 1
+
+- Source visual truth: `/Users/adambh/.codex/generated_images/019f6b21-9ff3-7960-918a-73a88354ef09/exec-6c02aa32-b857-4c36-be9a-ea52549febc6.png` (1487 x 1058 px).
+- Implementation screenshot: `/private/tmp/tikkun-homepage-final.png` (1487 x 1005 capture from a 1487 x 1058 CSS viewport at 1x).
+- Normalized source crop: `/private/tmp/tikkun-homepage-reference-final-crop.png`.
+- Full combined comparison: `/private/tmp/tikkun-homepage-final-comparison.png`.
+- Focused source and implementation comparison: `/private/tmp/tikkun-homepage-focused-comparison.png`.
+- Responsive evidence: `/private/tmp/tikkun-homepage-mobile.png` at 390 x 896, with no horizontal overflow.
+- State: `#/about`, initial scroll position, dark homepage, reader demonstration visible, and no modal or menu open.
+
+The homepage follows the selected desktop-first direction: concise practical copy at left, an accurate reader demonstration at right, and a compact availability dock beneath it. The former technical About tables and Google Sheet link are replaced with product benefits, a three-step explanation, and a data-backed available-readings section.
+
+### Fidelity surfaces
+
+- Typography: the hero hierarchy, measure, and line wrapping match the source direction. The live product capture preserves the Torah type, spacing, line breaks, and alignment exactly.
+- Spacing and layout: header placement, split hero composition, angled reader, availability dock, and section transition align with the reference. The responsive layout preserves the desktop reader demonstration instead of presenting the product as mobile-first.
+- Colors: near-black surfaces, white type, restrained blue accents, muted supporting copy, and green availability states follow the selected visual direction.
+- Images and icons: the atmosphere is a generated raster asset sized for the hero, the demonstration is a fresh capture of the actual reader, and the existing brand asset is used instead of an invented logo. There are no placeholders, fake interface drawings, or CSS gradients.
+- Copy and content: every visible line explains practical value or a next action. Reading availability is generated from the recording manifest rather than hard-coded marketing claims.
+
+### Findings and iteration history
+
+- P0: none.
+- P1: none.
+- P2: none.
+- P3: the real reader content and existing aleph brand mark intentionally replace the generated mock's invented UI and scroll icon; this improves product accuracy without changing the selected composition.
+- First pass: the title focus ring was visible on load, the hero sat too low, the reader crop was oversized, the dock label clipped, and the following section did not enter the viewport.
+- Final pass: focus styling, hero rhythm, title scale, reader capture/aspect, and dock geometry were corrected, then compared again against the normalized source in one combined image.
+
+### Functional and regression checks
+
+- `Available readings` scrolls to and focuses the readings section.
+- `Start practicing`, available-reading cards, and all `Open reader` actions enter the existing reader routes.
+- The readings grid reflects the live recording manifest and its existing availability states.
+- The 390 px responsive pass has no horizontal overflow and retains the same product story.
+- Browser console errors and warnings: none during the final interaction pass.
+- `npm run check`, `npm run build`, and the full test suite pass: 109 files, 687 tests passed, and 1 skipped.
 
 final result: passed
 

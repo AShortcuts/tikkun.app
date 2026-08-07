@@ -38,6 +38,7 @@ type SegmentActivationResult =
   | { status: 'failed'; error: Error }
 
 const MEDIA_METADATA_TIMEOUT_MS = 15_000
+const PLAYBACK_ACTIVATION_CANCELLED = Symbol('playback-activation-cancelled')
 
 export interface AudioControllerOptions {
   signal?: AbortSignal
@@ -264,12 +265,34 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
     this.emit('playback-updated', { playing: false })
   }
 
+  authorizePlayback(recording: AudioRecording) {
+    if (recording.status === 'missing') return false
+
+    const sourceChanged = !this.isMediaSource(recording.playSrc)
+    if (!sourceChanged && this.audio.readyState >= HTMLMediaElement.HAVE_METADATA) {
+      return true
+    }
+
+    // Safari on iOS only unlocks media loading when load() or play() runs
+    // synchronously from the user's gesture. Call this before any await.
+    if (sourceChanged) {
+      this.cancelPendingActivation?.()
+      this.audio.pause()
+      this.audio.src = recording.playSrc
+    }
+    this.activationError = null
+    this.activationNeedsReload = false
+    this.audio.load()
+    return true
+  }
+
   togglePlayback() {
     if (this.audio.paused) return this.play()
     this.audio.pause()
   }
 
   play(): Promise<void> {
+    if (!this.activeSession) return Promise.resolve()
     if (this.activeSegment?.recording.status === 'missing') {
       return Promise.reject(
         new Error('No source recording is available; record microphone audio first')
@@ -288,19 +311,32 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
 
     const generation = this.activationGeneration
     const ready = this.segmentReady
-    return ready.then(async (result) => {
+    const playback = this.startMediaPlayback(generation)
+    if (!this.segmentTransitioning) return playback
+
+    const readiness = ready.then((result) => {
       if (result.status === 'cancelled' || generation !== this.activationGeneration) {
-        return
+        throw PLAYBACK_ACTIVATION_CANCELLED
       }
       if (result.status === 'failed') throw result.error
-      try {
-        await this.audio.play()
-      } catch (error) {
-        const playbackError = this.asError(error, 'Audio playback failed')
-        this.reportPlaybackError(playbackError, generation, false)
-        throw playbackError
-      }
     })
+    return Promise.all([readiness, playback])
+      .then(() => undefined)
+      .catch((error) => {
+        if (error === PLAYBACK_ACTIVATION_CANCELLED) return
+        throw error
+      })
+  }
+
+  private async startMediaPlayback(generation: number) {
+    try {
+      await this.audio.play()
+    } catch (error) {
+      if (generation !== this.activationGeneration) return
+      const playbackError = this.asError(error, 'Audio playback failed')
+      this.reportPlaybackError(playbackError, generation, false)
+      throw playbackError
+    }
   }
 
   pause() {
@@ -397,12 +433,9 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
     this.activeSegmentIndex = index
     this.emit('segment-updated', { index, segment })
     const missingSource = segment.recording.status === 'missing'
-    const absoluteSrc = missingSource
-      ? ''
-      : new URL(segment.recording.playSrc, window.location.href).href
     const sourceChanged = missingSource
       ? Boolean(this.audio.src)
-      : forceReload || this.audio.src !== absoluteSrc
+      : forceReload || !this.isMediaSource(segment.recording.playSrc)
     if (missingSource) {
       this.audio.pause()
       if (sourceChanged) {
@@ -455,10 +488,7 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
 
     if (missingSource) {
       finish({ status: 'ready' })
-    } else if (
-      sourceChanged &&
-      this.audio.readyState < HTMLMediaElement.HAVE_METADATA
-    ) {
+    } else if (this.audio.readyState < HTMLMediaElement.HAVE_METADATA) {
       this.audio.addEventListener('loadedmetadata', loaded, { once: true })
       metadataTimeout = setTimeout(() => {
         finish({
@@ -526,6 +556,13 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
 
   private sourceKey(src: string) {
     return new URL(src, window.location.href).href
+  }
+
+  private isMediaSource(src: string) {
+    const currentSource = this.audio.currentSrc || this.audio.src
+    return Boolean(
+      currentSource && this.sourceKey(currentSource) === this.sourceKey(src)
+    )
   }
 
   private rememberActiveMediaDuration() {

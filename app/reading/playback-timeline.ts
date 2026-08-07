@@ -436,6 +436,10 @@ export function createPlaybackTimeline(
     const session = audioController.session
     if (!session) return
 
+    const playback = restartAudio
+      ? options.replayNetworkRecordingFromStart(() => restart(restartAudio))
+      : null
+
     if (session.cues.length) {
       cueNavigationIndex = 0
       await highlightController.activateCue(session.cues[0], {
@@ -447,11 +451,7 @@ export function createPlaybackTimeline(
       })
     }
 
-    if (restartAudio) {
-      await options.replayNetworkRecordingFromStart(() =>
-        restart(restartAudio)
-      )
-    }
+    if (playback) await playback
   }
 
   const command: PlaybackTimeline['command'] = async (nextCommand) => {

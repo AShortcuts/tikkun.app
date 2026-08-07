@@ -2,19 +2,19 @@
   "name": "Tikkun",
   "short_name": "Tikkun",
   "description": "Practice torah reading using this online tikkun.",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "oklch(98.5% 0 0)",
   "theme_color": "oklch(98.5% 0 0)",
   "icons": [
     {
-      "src": "/assets/images/android-chrome-192x192.png",
+      "src": "assets/images/android-chrome-192x192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/assets/images/apple-touch-icon.png",
+      "src": "assets/images/apple-touch-icon.png",
       "sizes": "180x180",
       "type": "image/png",
       "purpose": "any maskable"

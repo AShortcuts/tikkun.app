@@ -6,6 +6,14 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const repoRoot = path.resolve(fileURLToPath(new URL('..', import.meta.url)))
 const distRoot = path.join(repoRoot, 'dist')
+const clientManifestPath = path.join(
+  repoRoot,
+  '.svelte-kit',
+  'output',
+  'client',
+  '.vite',
+  'manifest.json'
+)
 
 const excludedPathPrefixes = ['audio/', '.vite/']
 const excludedExtensions = new Set([
@@ -22,37 +30,97 @@ const excludedExtensions = new Set([
   '.wav',
   '.webm',
 ])
-const deferredAssetPattern =
-  /^assets\/(?:cue-data|optional-(?:about|cue-authoring|cue-analytics|recording-harness))-[A-Za-z0-9_-]+\.js$/
-const deferredStylesheetPattern = /^assets\/cue-authoring-[A-Za-z0-9_-]+\.css$/
-const pageChunkPattern = /^assets\/page-[A-Za-z0-9_-]+\.js$/
+const deferredSourcePatterns = [
+  /^audio-cues\//,
+  /^app\/admin\/cue-authoring\.ts$/,
+  /^app\/components\/CueAnalyticsPage\.ts$/,
+  /^app\/video\/recording-harness\.ts$/,
+]
 const verificationFilePattern = /^google[A-Za-z0-9_-]+\.html$/
-const nonCriticalFontPattern = /^assets\/Lora-Regular-[A-Za-z0-9_-]+\.ttf$/
+const nonCriticalFontPattern = /(?:^|\/)Lora-Regular(?:\.[A-Za-z0-9_-]+)?\.ttf$/
 
 function normalizePath(filePath) {
   return filePath.split(path.sep).join('/')
 }
 
-function toUrlPath(filePath) {
-  return `/${filePath.split(path.sep).map(encodeURIComponent).join('/')}`
+export function normalizeBasePath(value = '') {
+  if (!value || value === '/') return ''
+  if (!value.startsWith('/')) {
+    throw new Error('Deployment base path must be empty or start with "/"')
+  }
+  return value.replace(/\/+$/, '')
 }
 
-export function isPageChunk(relativePath) {
-  return pageChunkPattern.test(normalizePath(relativePath))
+export function toDeploymentUrl(filePath, basePath = '') {
+  const normalized = normalizePath(filePath)
+  const base = normalizeBasePath(basePath)
+  if (normalized === 'index.html') return `${base}/`
+  if (normalized.endsWith('/index.html')) {
+    const route = normalized.slice(0, -'index.html'.length)
+    return `${base}/${route
+      .split('/')
+      .filter(Boolean)
+      .map(encodeURIComponent)
+      .join('/')}/`
+  }
+  return `${base}/${normalized.split('/').map(encodeURIComponent).join('/')}`
 }
 
-export function shouldPrecache(relativePath) {
+function filesForManifestEntry(entry) {
+  if (!entry || typeof entry !== 'object') return []
+  return [
+    typeof entry.file === 'string' ? entry.file : null,
+    ...(Array.isArray(entry.css) ? entry.css : []),
+    ...(Array.isArray(entry.assets) ? entry.assets : []),
+  ].filter((filePath) => typeof filePath === 'string')
+}
+
+export function classifyManifestFiles(manifest) {
+  const excludedFiles = new Set()
+  const torahPageFiles = []
+
+  for (const [sourcePath, entry] of Object.entries(manifest)) {
+    const normalizedSource = normalizePath(sourcePath)
+    const files = filesForManifestEntry(entry)
+    const isTextPage = normalizedSource.startsWith('text/pages/')
+    const isDeferred = deferredSourcePatterns.some((pattern) =>
+      pattern.test(normalizedSource)
+    )
+
+    if (isTextPage || isDeferred) {
+      for (const filePath of files) excludedFiles.add(normalizePath(filePath))
+    }
+    if (normalizedSource.startsWith('text/pages/torah/')) {
+      const filePath = entry?.file
+      if (typeof filePath === 'string') {
+        torahPageFiles.push(normalizePath(filePath))
+      }
+    }
+  }
+
+  return {
+    excludedFiles,
+    torahPageFiles: [...new Set(torahPageFiles)].sort(),
+  }
+}
+
+export function isPageChunk(relativePath, manifest = null) {
+  const normalized = normalizePath(relativePath)
+  if (!manifest) return /^assets\/page-[A-Za-z0-9_-]+\.js$/.test(normalized)
+  const { excludedFiles } = classifyManifestFiles(manifest)
+  return excludedFiles.has(normalized)
+}
+
+export function shouldPrecache(relativePath, excludedFiles = new Set()) {
   const normalized = normalizePath(relativePath)
   if (normalized === 'service-worker.js') return false
+  if (excludedFiles.has(normalized)) return false
   if (excludedPathPrefixes.some((prefix) => normalized.startsWith(prefix))) {
     return false
   }
   if (
-    deferredAssetPattern.test(normalized) ||
-    deferredStylesheetPattern.test(normalized) ||
     verificationFilePattern.test(normalized) ||
-    nonCriticalFontPattern.test(normalized) ||
-    isPageChunk(normalized)
+    nonCriticalFontPattern.test(normalized)
   ) {
     return false
   }
@@ -60,14 +128,7 @@ export function shouldPrecache(relativePath) {
 }
 
 export function torahPageFilesFromManifest(manifest) {
-  const files = Object.entries(manifest)
-    .filter(([sourcePath]) =>
-      normalizePath(sourcePath).includes('text/pages/torah/')
-    )
-    .map(([, entry]) => entry?.file)
-    .filter((filePath) => typeof filePath === 'string' && isPageChunk(filePath))
-
-  return [...new Set(files)].sort()
+  return classifyManifestFiles(manifest).torahPageFiles
 }
 
 async function walk(directory) {
@@ -83,18 +144,21 @@ async function walk(directory) {
 }
 
 export function renderServiceWorkerSource({
+  basePath = '',
   buildHash,
   shellUrls,
   torahPageUrls,
 }) {
-  return `const SHELL_CACHE_PREFIX = 'tikkun-shell-'
+  return `const BASE_PATH = '${normalizeBasePath(basePath)}'
+const APP_FALLBACK_URL = BASE_PATH + '/'
+const SHELL_CACHE_PREFIX = 'tikkun-shell-'
 const SHELL_CACHE_NAME = SHELL_CACHE_PREFIX + '${buildHash}'
 const TORAH_CACHE_NAME = 'tikkun-torah-v1'
 const SHELL_URLS = ${JSON.stringify(shellUrls, null, 2)}
 const TORAH_PAGE_URLS = ${JSON.stringify(torahPageUrls, null, 2)}
 const TORAH_PAGE_PATHS = new Set(TORAH_PAGE_URLS)
 const TORAH_DOWNLOAD_CONCURRENCY = 4
-const MEDIA_PATH_RE = /^\\/(?:audio)\\//
+const MEDIA_PATH_PREFIX = BASE_PATH + '/audio/'
 const MEDIA_EXTENSION_RE = /\\.(?:aac|aiff|flac|m4a|m4v|mov|mp3|mp4|ogg|opus|wav|webm)$/i
 let activeTorahDownload = null
 
@@ -133,12 +197,12 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url)
   if (url.origin !== self.location.origin) return
-  if (MEDIA_PATH_RE.test(url.pathname) || MEDIA_EXTENSION_RE.test(url.pathname)) {
+  if (url.pathname.startsWith(MEDIA_PATH_PREFIX) || MEDIA_EXTENSION_RE.test(url.pathname)) {
     return
   }
 
   if (request.mode === 'navigate') {
-    event.respondWith(networkFirst(request, '/index.html'))
+    event.respondWith(networkFirst(request, APP_FALLBACK_URL))
     return
   }
 
@@ -279,7 +343,7 @@ async function pruneTorahCache() {
   await Promise.all(
     requests
       .filter((request) => !TORAH_PAGE_PATHS.has(new URL(request.url).pathname))
-      .map((request) => cache.delete(request))
+      .map((request) => caches.delete(request))
   )
 }
 
@@ -291,6 +355,18 @@ async function cacheFirst(request, cacheName) {
   const response = await fetch(request)
   if (response.ok) await cache.put(request, response.clone())
   return response
+}
+
+async function matchCachedNavigation(cache, request) {
+  const cached = await cache.match(request)
+  if (cached) return cached
+
+  const url = new URL(request.url)
+  const finalSegment = url.pathname.split('/').at(-1) ?? ''
+  if (!url.pathname.endsWith('/') && !finalSegment.includes('.')) {
+    return cache.match(url.pathname + '/')
+  }
+  return undefined
 }
 
 async function networkFirst(request, fallbackUrl) {
@@ -310,7 +386,7 @@ async function networkFirst(request, fallbackUrl) {
   }
 
   const cache = await caches.open(SHELL_CACHE_NAME)
-  const cached = await cache.match(request)
+  const cached = await matchCachedNavigation(cache, request)
   const fallback = cached ?? (await cache.match(fallbackUrl))
   if (fallback) return fallback
   if (networkResponse) return networkResponse
@@ -319,23 +395,29 @@ async function networkFirst(request, fallbackUrl) {
 `
 }
 
-async function readTorahPageFiles(root) {
-  const manifestPath = path.join(root, '.vite', 'manifest.json')
-  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
-  const files = torahPageFilesFromManifest(manifest)
-  if (!files.length) {
-    throw new Error('Vite manifest did not contain any Torah page chunks')
-  }
-  return files
+async function readBuildManifest(manifestPath = clientManifestPath) {
+  return JSON.parse(await readFile(manifestPath, 'utf8'))
 }
 
-export async function generateServiceWorker(root = distRoot) {
+export async function generateServiceWorker(
+  root = distRoot,
+  {
+    basePath = process.env.TIKKUN_BASE_PATH ?? '',
+    manifestPath = clientManifestPath,
+  } = {}
+) {
+  const normalizedBasePath = normalizeBasePath(basePath)
+  const manifest = await readBuildManifest(manifestPath)
+  const { excludedFiles, torahPageFiles } = classifyManifestFiles(manifest)
+  if (!torahPageFiles.length) {
+    throw new Error('SvelteKit client manifest did not contain Torah page chunks')
+  }
+
   const allFiles = await walk(root)
   const shellFiles = allFiles
-    .map((filePath) => path.relative(root, filePath))
-    .filter(shouldPrecache)
+    .map((filePath) => normalizePath(path.relative(root, filePath)))
+    .filter((relativePath) => shouldPrecache(relativePath, excludedFiles))
     .sort()
-  const torahPageFiles = await readTorahPageFiles(root)
 
   const hash = createHash('sha256')
   const buildFiles = [...new Set([...shellFiles, ...torahPageFiles])].sort()
@@ -345,11 +427,16 @@ export async function generateServiceWorker(root = distRoot) {
   }
 
   const buildHash = hash.digest('hex').slice(0, 16)
-  const shellUrls = ['/', ...shellFiles.map(toUrlPath)]
-  const torahPageUrls = torahPageFiles.map(toUrlPath)
+  const shellUrls = shellFiles.map((filePath) =>
+    toDeploymentUrl(filePath, normalizedBasePath)
+  )
+  const torahPageUrls = torahPageFiles.map((filePath) =>
+    toDeploymentUrl(filePath, normalizedBasePath)
+  )
   const distStats = await stat(root)
   const generatedAt = new Date(distStats.mtimeMs).toISOString()
   const serviceWorkerSource = renderServiceWorkerSource({
+    basePath: normalizedBasePath,
     buildHash,
     shellUrls,
     torahPageUrls,

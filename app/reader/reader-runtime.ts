@@ -261,6 +261,7 @@ export interface ReaderRuntimeOptions {
   localStorage: Storage | null
   sessionStorage: Storage | null
   recordingMode: RecordingModeConfig
+  aboutHref: string
 }
 
 export function startReaderRuntime({
@@ -269,6 +270,7 @@ export function startReaderRuntime({
   localStorage: browserLocalStorage,
   sessionStorage: browserSessionStorage,
   recordingMode,
+  aboutHref,
 }: ReaderRuntimeOptions): ReaderRuntime {
   const window = view
   const location = view.location
@@ -3003,6 +3005,17 @@ export function startReaderRuntime({
     )
   }
 
+  function authorizePlaybackForUserGesture(
+    audioController: AudioController,
+    ...recordings: Array<AudioRecording | null | undefined>
+  ) {
+    const recording = recordings.find(
+      (candidate): candidate is AudioRecording =>
+        Boolean(candidate && candidate.status !== 'missing')
+    )
+    if (recording) audioController.authorizePlayback(recording)
+  }
+
   function refreshInlineAudioButtons(audioController: AudioController) {
     for (const button of document.querySelectorAll<HTMLButtonElement>(
       '[data-audio-button="true"]'
@@ -3284,7 +3297,14 @@ export function startReaderRuntime({
         aliyahIndex: state.aliyahIndex,
       })
     ) {
-      if (audioController.audio.paused) {
+      const resumePlayback = audioController.audio.paused
+      const playback = readerPlayback.timeline.command({
+        type: 'toggle',
+        retry: () =>
+          startPlaybackForButton(button, audioController, highlightController),
+      })
+
+      if (resumePlayback) {
         const session = audioController.session
         const activeTokenKey = highlightController.getActiveTokenKey()
         const cueIndex = session?.cues.length
@@ -3309,12 +3329,7 @@ export function startReaderRuntime({
           })
         }
       }
-
-      await readerPlayback.timeline.command({
-        type: 'toggle',
-        retry: () =>
-          startPlaybackForButton(button, audioController, highlightController),
-      })
+      await playback
       return
     }
 
@@ -3325,6 +3340,17 @@ export function startReaderRuntime({
     ) {
       return
     }
+
+    const availability = readerPlayback.recordingSession.lookup(
+      state.run,
+      state.aliyahIndex
+    )
+    authorizePlaybackForUserGesture(
+      audioController,
+      availability.recording,
+      availability.overlapRecording,
+      state.recording
+    )
 
     const session = await readerPlayback.recordingSession.load({
       runId: state.run.id,
@@ -3346,12 +3372,6 @@ export function startReaderRuntime({
     const readerPlayback = readerPlaybackGlobal
     if (!readerPlayback) return
     const actionToken = playbackAction.start()
-
-    const target = await ensureAliyahDomTargetRendered(runId, aliyahIndex)
-    if (!playbackAction.isCurrent(actionToken)) return
-    const marker = target?.marker ?? target?.element
-    if (!marker) return
-
     const run =
       display?.viewModel.relevantRuns.find((candidate) => candidate.id === runId) ??
       createCalendarGenerator().parseId(runId)
@@ -3361,18 +3381,10 @@ export function startReaderRuntime({
       run,
       aliyahIndex
     )
-    if (cueAuthoringGlobal?.isActive() && !availability.recording) {
-      await loadAliyahForAudioAuthoring(
-        { runId, aliyahIndex },
-        actionToken,
-        audioController
-      )
-      return
-    }
-    if (!availability.available) {
-      return
-    }
-    selectAliyah({ runId, index: aliyahIndex })
+    const authoringTarget = Boolean(
+      cueAuthoringGlobal?.isActive() && !availability.recording
+    )
+    if (!authoringTarget && !availability.available) return
 
     if (
       isActivePlaybackTarget(audioController.session, {
@@ -3380,6 +3392,7 @@ export function startReaderRuntime({
         aliyahIndex,
       })
     ) {
+      selectAliyah({ runId, index: aliyahIndex })
       await readerPlayback.timeline.command({
         type: 'toggle',
         retry: () =>
@@ -3392,17 +3405,37 @@ export function startReaderRuntime({
       return
     }
 
-    if (
-      !canPlayNetworkRecording(() =>
-        startPlaybackForToolbarCurrentAliyah(
-          { runId, aliyahIndex },
-          audioController,
-          highlightController
-        )
+    const retry = () =>
+      startPlaybackForToolbarCurrentAliyah(
+        { runId, aliyahIndex },
+        audioController,
+        highlightController
       )
-    ) {
+    if (!authoringTarget && !canPlayNetworkRecording(retry)) {
       return
     }
+    if (!authoringTarget) {
+      authorizePlaybackForUserGesture(
+        audioController,
+        availability.recording,
+        availability.overlapRecording
+      )
+    }
+
+    const target = await ensureAliyahDomTargetRendered(runId, aliyahIndex)
+    if (!playbackAction.isCurrent(actionToken)) return
+    const marker = target?.marker ?? target?.element
+    if (!marker) return
+
+    if (authoringTarget) {
+      await loadAliyahForAudioAuthoring(
+        { runId, aliyahIndex },
+        actionToken,
+        audioController
+      )
+      return
+    }
+    selectAliyah({ runId, index: aliyahIndex })
 
     const session = await readerPlayback.recordingSession.load({
       runId,
@@ -3411,13 +3444,7 @@ export function startReaderRuntime({
     if (!session) return
     if (!playbackAction.isCurrent(actionToken)) return
 
-    await playNetworkRecording(audioController, () =>
-      startPlaybackForToolbarCurrentAliyah(
-        { runId, aliyahIndex },
-        audioController,
-        highlightController
-      )
-    )
+    await playNetworkRecording(audioController, retry)
   }
 
   function updateReaderProgress(range: ViewportRange | null = latestViewportRange) {
@@ -4060,8 +4087,6 @@ export function startReaderRuntime({
   )
 
   book.addEventListener('click', async (event) => {
-    if (await handleAliyahPermalinkClick(event)) return
-
     const target = event.target as HTMLElement
     const playButton = target.closest<HTMLButtonElement>('[data-audio-button="true"]')
     if (playButton) {
@@ -4071,6 +4096,8 @@ export function startReaderRuntime({
       focusReaderSurface()
       return
     }
+
+    if (await handleAliyahPermalinkClick(event)) return
 
     const word = target.closest<HTMLElement>('.word')
     if (!word || !audioController.session) return
@@ -4111,7 +4138,7 @@ export function startReaderRuntime({
       ) {
         return
       }
-      await playbackTimeline.command({
+      void playbackTimeline.command({
         type: 'set-cue-index',
         index: audioController.session.cues.indexOf(cue),
       })
@@ -4273,6 +4300,7 @@ export function startReaderRuntime({
         closeCueAuthoring()
         lastReadingPromptGlobal?.hide()
       },
+      openAbout: () => view.location.assign(aboutHref),
       readerRouteChanged: (nextReaderHash) => {
         if (explicitAliyahSelectionHash !== nextReaderHash) {
           clearExplicitAliyahSelection()

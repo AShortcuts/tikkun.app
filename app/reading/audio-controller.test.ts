@@ -241,6 +241,54 @@ test('loads a missing recording as an authoring target without requesting media'
   )
 })
 
+test('authorizes media loading synchronously without starting playback', () => {
+  stubMediaGlobals()
+  const audio = new FakeAudioElement(Number.NaN, 0)
+  const controller = new AudioController(audio as unknown as HTMLAudioElement)
+
+  expect(controller.authorizePlayback(recording)).toBe(true)
+  expect(audio.src).toBe(recording.playSrc)
+  expect(audio.loadCount).toBe(1)
+  expect(audio.playCount).toBe(0)
+})
+
+test('plays synchronously when the active segment already has metadata', async () => {
+  stubMediaGlobals()
+  const audio = new FakeAudioElement(614.957)
+  const controller = new AudioController(audio as unknown as HTMLAudioElement)
+
+  await controller.loadSession(createActiveAudioSession(plan(null)))
+  const playback = controller.play()
+
+  expect(audio.playCount).toBe(1)
+  await playback
+})
+
+test('requests playback synchronously while a user-authorized source loads metadata', async () => {
+  stubMediaGlobals()
+  const audio = new FakeAudioElement(Number.NaN, 0)
+  const controller = new AudioController(audio as unknown as HTMLAudioElement)
+
+  controller.authorizePlayback(recording)
+  await controller.loadSession(createActiveAudioSession(plan(null)))
+  const playback = controller.play()
+  let completed = false
+  void playback.then(() => {
+    completed = true
+  })
+
+  expect(audio.loadCount).toBe(1)
+  expect(audio.playCount).toBe(1)
+  await Promise.resolve()
+  expect(completed).toBe(false)
+
+  audio.setMetadata(614.957)
+  await playback
+
+  expect(completed).toBe(true)
+  expect(audio.currentTime).toBe(0)
+})
+
 test('seeks repeatedly within the current segment without reactivating its media', async () => {
   stubMediaGlobals()
   const audio = new FakeAudioElement(614.957)
@@ -420,7 +468,7 @@ test('fails pending playback on a media error and recovers on retry', async () =
   await retry
 
   expect(controller.error).toBeNull()
-  expect(audio.playCount).toBe(1)
+  expect(audio.playCount).toBe(2)
 })
 
 test('cancels pending playback when the session is cleared', async () => {
@@ -435,7 +483,7 @@ test('cancels pending playback when the session is cleared', async () => {
 
   await expect(pendingPlay).resolves.toBeUndefined()
   expect(controller.session).toBeNull()
-  expect(audio.playCount).toBe(0)
+  expect(audio.playCount).toBe(1)
 })
 
 test('times out pending metadata instead of leaving playback unresolved', async () => {

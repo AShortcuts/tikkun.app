@@ -8,7 +8,7 @@ const masterCss = readFileSync(
   'utf8'
 )
 const hebrewUiFont = readFileSync(
-  new URL('../../assets/fonts/NotoSansHebrew-Variable.ttf', import.meta.url)
+  new URL('../../site/assets/fonts/NotoSansHebrew-Variable.ttf', import.meta.url)
 )
 const readerEnhancementsCss = readFileSync(
   new URL('../../css/reader-enhancements.css', import.meta.url),
@@ -114,7 +114,7 @@ test('aligns half-size Hebrew letters from measured font metrics', () => {
 test('uses one bundled Hebrew UI face throughout the app without changing Torah text', () => {
   expect(hebrewUiFont.byteLength).toBeGreaterThan(0)
   expect(masterCss).toMatch(
-    /@font-face\s*{[\s\S]*?font-family:\s*'Noto Sans Hebrew UI';[\s\S]*?src:\s*url\(\/assets\/fonts\/NotoSansHebrew-Variable\.ttf\) format\('truetype'\);[\s\S]*?font-weight:\s*100 900;[\s\S]*?font-display:\s*swap;[\s\S]*?unicode-range:\s*U\+0590-05FF, U\+FB1D-FB4F;/
+    /@font-face\s*{[\s\S]*?font-family:\s*'Noto Sans Hebrew UI';[\s\S]*?src:\s*url\('\/assets\/fonts\/NotoSansHebrew-Variable\.ttf'\) format\('truetype'\);[\s\S]*?font-weight:\s*100 900;[\s\S]*?font-display:\s*swap;[\s\S]*?unicode-range:\s*U\+0590-05FF, U\+FB1D-FB4F;/
   )
   expect(masterCss).toContain(
     "--hebrew-ui-font-family: 'Noto Sans Hebrew UI', -apple-system, sans-serif;"
@@ -157,6 +157,12 @@ test('keeps the desktop reader column centered in the app body', () => {
   )
   expect(readerEnhancementsCss).toMatch(
     /@media screen and \(max-width:\s*870px\)\s*{[\s\S]*?--reader-main-half-fit-width:\s*352px;/
+  )
+})
+
+test('keeps the programmatic reader focus target visually neutral', () => {
+  expect(masterCss).toMatch(
+    /\.tikkun-book:focus\s*{[\s\S]*?outline:\s*none;/
   )
 })
 

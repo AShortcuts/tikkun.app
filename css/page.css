@@ -373,8 +373,8 @@ html[data-reader-theme='dark'] .word[data-recording-issue] {
   width: 0.56em;
   height: 0.56em;
   background: var(--reader-recording-issue-highlight-color);
-  -webkit-mask-image: url('../assets/images/recording-issue-mark.svg');
-  mask-image: url('../assets/images/recording-issue-mark.svg');
+  -webkit-mask-image: url('/assets/images/recording-issue-mark.svg');
+  mask-image: url('/assets/images/recording-issue-mark.svg');
   -webkit-mask-position: center;
   mask-position: center;
   -webkit-mask-repeat: no-repeat;

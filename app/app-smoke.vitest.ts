@@ -19,7 +19,7 @@ test('boots the real app and keeps core routes and lazy tools working', async ()
   frame.title = 'Tikkun application smoke test'
   frame.style.width = '1280px'
   frame.style.height = '900px'
-  frame.src = `/app/app-smoke-harness.html?app-smoke=${Date.now()}#/torah/parsha/beresheet`
+  frame.src = `/reader/?app-smoke=${Date.now()}#/torah/parsha/beresheet`
   document.body.appendChild(frame)
 
   await vi.waitFor(
@@ -79,29 +79,6 @@ test('boots the real app and keeps core routes and lazy tools working', async ()
         frameDocument.querySelector('[data-target-id="parsha-picker-root"]')
       ).toBeNull(),
     { timeout: 5_000, interval: 50 }
-  )
-
-  click(frameDocument, '[data-target-id="about-link"]')
-  await vi.waitFor(
-    () => {
-      expect(frameWindow.location.hash).toBe('#/about')
-      expect(frameDocument.querySelector('.about-title')?.textContent).toContain(
-        'audio synced highlights'
-      )
-    },
-    { timeout: 10_000, interval: 50 }
-  )
-  click(frameDocument, '[data-target-id="about-link"]')
-  await vi.waitFor(
-    () => {
-      expect(frameWindow.location.hash).toBe('#/torah/parsha/beresheet')
-      expect(
-        frameDocument.querySelector(
-          '[data-target-id="tikkun-book"] [data-page-number]'
-        )
-      ).not.toBeNull()
-    },
-    { timeout: 15_000, interval: 50 }
   )
 
   click(frameDocument, '[data-target-id="settings-toggle"]')

@@ -129,6 +129,36 @@ test('timed playback keeps controls, cue progress, highlighting, and speed in sy
   )
 })
 
+test('restart begins playback before asynchronous highlighting completes', async () => {
+  const { audioController, highlightController } = createFixture()
+  const viewport = createViewport()
+  const replayNetworkRecordingFromStart = vi.fn(async () => true)
+  let finishHighlight!: () => void
+  const highlightPending = new Promise<void>((resolve) => {
+    finishHighlight = resolve
+  })
+
+  destroy = createMount()((scope) => {
+    createPlaybackTimeline(
+      scope,
+      createOptions(audioController, highlightController, viewport, {
+        replayNetworkRecordingFromStart,
+      })
+    )
+  })
+  await audioController.loadSession(createSession())
+  vi.spyOn(highlightController, 'activateCue').mockImplementation(async () => {
+    await highlightPending
+    return null
+  })
+
+  required<HTMLButtonElement>('[data-target-id="floating-replay"]').click()
+
+  expect(replayNetworkRecordingFromStart).toHaveBeenCalledTimes(1)
+  finishHighlight()
+  await flushPromises()
+})
+
 test('untimed playback steps by ten seconds and compact expansion cleans up', async () => {
   const { audio, audioController, highlightController } = createFixture()
   const viewport = createViewport('compact')

@@ -12,12 +12,12 @@
 
 @font-face {
   font-family: 'ShlomosemiStam';
-  src: url(/assets/fonts/ShlomosemiStam.ttf);
+  src: url('/assets/fonts/ShlomosemiStam.ttf');
 }
 
 @font-face {
   font-family: 'Lora';
-  src: url(/assets/fonts/Lora-Regular.ttf) format('truetype');
+  src: url('/assets/fonts/Lora-Regular.ttf') format('truetype');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -25,7 +25,7 @@
 
 @font-face {
   font-family: 'Noto Sans Hebrew UI';
-  src: url(/assets/fonts/NotoSansHebrew-Variable.ttf) format('truetype');
+  src: url('/assets/fonts/NotoSansHebrew-Variable.ttf') format('truetype');
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
@@ -283,6 +283,11 @@ html[data-reader-theme='dark'] {
 
   --pull-transform: 0s;
   --pull-translation: 0;
+}
+
+/* Focus returns here after reader overlays close; the surface itself is not a control. */
+.tikkun-book:focus {
+  outline: none;
 }
 
 .tikkun-book.mod-pull-releasing {

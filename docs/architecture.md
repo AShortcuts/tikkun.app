@@ -6,14 +6,16 @@ This file is a living summary of the architectural choices in this app. Keep it 
 
 Tikkun is a browser-first, static web app for preparing Torah readings. The core experience is a page-based reader with selectable readings, reader preferences, audio playback, word-level cue highlighting, and optional publishing workflows for synced audio/video assets.
 
-The app uses TypeScript modules and DOM APIs for its domain and browser logic, with Svelte added incrementally for stateful UI features. It does not use SvelteKit, a framework router, or a global store.
+SvelteKit owns the static public shell and clean pathname routes. The Reader keeps its mature TypeScript modules, Svelte feature mounts, and browser-local hash router behind the `/reader/` boundary. No server or global store is required.
 
 ## Runtime Architecture
 
-- `index.html` owns the Reader Shell mount anchor, non-reader authoring and app-service elements, app metadata, PWA manifest link, and a small early theme bootstrap.
-- `app/index.ts` is the small browser bootstrap. It resolves browser storage and recording mode, then starts the Reader Runtime after the DOM is ready.
+- `src/app.html` owns shared metadata, the PWA manifest link, and the early Reader theme bootstrap.
+- `src/routes/(site)/` owns the prerendered Home, Readings & Coverage, Tidbits, and About pages. `src/lib/readings.ts` derives public coverage from the real recording catalog and maintained tracker.
+- `src/routes/reader/+page.svelte` renders `src/lib/components/ReaderApp.svelte`. Reader App owns the stable mount targets and loads `app/index.ts` only in `onMount`, so public pages never execute the Reader Runtime.
+- `app/index.ts` is the small Reader bootstrap. It resolves browser storage, recording mode, and the public About URL, then exposes explicit start and stop functions to the SvelteKit route.
 - `app/reader/reader-runtime.ts` is the composition root and the real Reader Runtime Module. Its lexical lifetime owns reader state and wires page rendering, preference policy, feature Interfaces, Reader Playback, and the Reader Route host without exposing mutable globals.
-- `app/reader/reader-route.ts` is the Reader Route Module. Its small Interface hides hash listening, same-hash navigation, canonical reader hashes, reader/About/Cue Analytics/not-found switching, visible title state, Optional Feature cancellation, first-use Parsha Picker loading and lifetime, and route-safe post-render work. Reader Runtime supplies page rendering and cross-feature effects through one host seam.
+- `app/reader/reader-route.ts` is the Reader Route Module. Its small Interface hides hash listening, same-hash navigation, canonical reader hashes, Cue Analytics/not-found switching, visible title state, Optional Feature cancellation, first-use Parsha Picker loading and lifetime, and route-safe post-render work. Public About navigation crosses the host seam into the SvelteKit page.
 - `app/reader/reader-shell.ts` mounts `app/reader/ReaderShell.svelte` before the rest of Reader Runtime. Reader Shell owns the stable reader frame and presents title, progress, route and Parsha Picker visibility, annotations, static chrome icons, and the empty targets used by nested reader features.
 - `app/reading/aliyah-navigation/aliyah-navigation.ts` is the public Interface for the Aliyah Navigation Module. Its two Svelte views own the toolbar capsule, compact segments and sheet, wide rail, local focus and reveal state, async presentation data, and cleanup. Reader Runtime supplies typed snapshots and actions while keeping routing, page scrolling, playback, recording lookup, and Cue Data policy outside Svelte.
 - `app/reading/reader-playback.ts` is the Reader Playback Module. It owns construction, cross-wiring, route reset, and teardown for the Audio Controller, Highlight Controller, Recording Session, and Playback Timeline while accepting page, network, preference, Cue Authoring, and presentation Adapters from Reader Runtime.
@@ -69,28 +71,28 @@ The app uses TypeScript modules and DOM APIs for its domain and browser logic, w
 - A Svelte Module owns only the descendants or anchored siblings created by its explicit mount. Its TypeScript bridge mounts and unmounts it through the existing lifetime scope so Svelte and imperative controllers never compete for the same DOM.
 - Reader Shell renders stable empty targets for nested Svelte and imperative features but never manages their contents. It updates classes, text, progress styles, and annotation state without conditionally replacing the `tikkun-book` reader root or optional-page outlet.
 - Add Svelte feature by feature. Prefer a pure model plus a small mount adapter when the feature has meaningful domain preparation, as Parsha Picker does. Do not introduce a global store simply to connect old and new UI.
-- SvelteKit is not currently part of the app. If it later solves a concrete routing or delivery need, components should keep browser APIs inside their mounted lifetime and keep domain models safe to import outside the browser.
+- SvelteKit is the delivery and public-routing layer. Reader components keep browser APIs inside their mounted lifetime, and Reader domain models remain safe to import during prerendering.
 - A future Capacitor entry should compose Platform Capability adapters at the application boundary. Use native-platform or plugin-availability checks only to choose implementations such as native filesystem versus web download.
 - Reader Viewport remains responsible for compact versus wide layout in browsers, PWAs, and Capacitor WebViews. Platform Capability must never become a responsive breakpoint.
 
 ## Build and Delivery
 
-- Vite compiles and bundles the static app.
-- `site/` contains files copied unchanged by Vite.
+- SvelteKit and `adapter-static` prerender the public pages and fixed Reader entry; Vite compiles the client bundles.
+- `site/` contains files copied unchanged by SvelteKit, including audio and install assets.
 - `dist/` is the deployable static output.
 - `scripts/generate-torah-index.mjs` validates canonical `text/torah-toc.json` and writes the smaller `generated/torah-index.json` used at runtime. `predev` and the production build keep it current.
-- `npm run build` generates the Torah runtime index, runs `vite build`, and then generates `dist/service-worker.js`.
+- `npm run dev` renders routes on demand with hot reload. `npm run build` generates the Torah runtime index, prerenders the routes, and then generates `dist/service-worker.js`.
 - The project is suitable for static hosting; no app server is part of the production runtime.
 
 ## PWA Strategy
 
 The app is treated as a PWA-capable static site rather than a native shell.
 
-- `manifest.webmanifest` defines install metadata, display mode, colors, and icons.
-- `index.html` includes Apple mobile web app metadata and icon links.
+- `site/manifest.webmanifest` defines install metadata, display mode, colors, and relative install URLs.
+- `src/app.html` includes Apple mobile web app metadata and icon links.
 - `scripts/generate-service-worker.mjs` creates a versioned cache after each build.
 - The generated service worker precaches the app shell, page chunks, and first-use core reader chunks, then uses cache-first behavior for requested same-origin assets.
-- Navigation requests use network-first behavior with cached fallback to `/index.html`.
+- Navigation requests use network-first behavior with an exact cached clean-route match, then the cached Home page as a final fallback.
 - Cue Data, Optional Feature bundles, the recording-only harness, and large media files are intentionally excluded from the initial precache so installation does not download content the reader has not requested.
 - Reader Settings, Command Palette, and Parsha Picker are deferred from the initial JavaScript execution but remain precached because they are core reader controls that must work offline.
 - Command Palette can read saved Cue Authoring access without importing Cue Authoring. The authoring Implementation loads only when an unlocked user opens it or invokes its dedicated shortcut.
@@ -113,12 +115,17 @@ The app separates calendar/reading rules from rendering.
 
 ## Routing
 
-Routing is hash-based and browser-local.
+Public routing uses clean SvelteKit pathnames. Reader routing remains hash-based and browser-local.
+
+- `/`, `/readings/`, `/tidbits/`, and `/about/` are prerendered public pages.
+- `/tidbits/[slug]/` is generated only for entries in `src/lib/tidbits.ts`; with no published Tidbits, no detail pages are emitted.
+- `/reader/` is a prerendered entry document. Everything after `/reader/#/` belongs to the Reader Route Module.
+- Legacy hashes opened at `/` are redirected to their public page or the equivalent `/reader/#/...` URL.
 
 - `app/view-model/navigation/url-parser.ts` parses hashes into app routes.
 - `app/reader/reader-route.ts` owns the browser route transaction and uses Reader Shell as its presentation Adapter.
 - Reader routes resolve to a `ScrollViewModel`.
-- Supported route families include current/next reading, explicit run IDs, legacy references, parsha slugs, about pages, and cue analytics.
+- Supported Reader route families include current/next reading, explicit run IDs, legacy references, parsha slugs, physical pages, and cue analytics.
 - Canonical parsha hashes are generated through the navigation view-model layer and applied once by Reader Route rather than directly in UI handlers.
 
 ## Rendering and Scrolling
@@ -182,7 +189,7 @@ Reader preferences are local, explicit, and CSS-variable driven.
 - `app/reader-preferences.ts` defines the preference type, defaults, validation, persistence, and CSS application.
 - Reader Runtime owns the canonical preference value and supplies narrow adapters for persistence, focal recentering, playback, and reader refresh.
 - Reader Settings owns preference presentation and synchronization; external playback-rate changes call its `sync()` interface instead of reaching into its DOM.
-- The early inline script in `index.html` applies the saved theme before the bundle loads to reduce flash.
+- The early inline script in `src/app.html` applies the saved theme before the bundle loads to reduce flash.
 - Highlight styling is applied through root CSS variables so the rendering code does not need to know presentation details.
 
 ## Testing Strategy
@@ -205,7 +212,7 @@ The project uses Vitest in two complementary workspaces.
 - Cue Authoring browser tests cover deferred loading, locked access, Panel snapshots and semantic actions, stable nested targets and progress updates, Cue List control actions and disabled states, row semantics and keyed updates, selection, focus, timing edits, list following, Recording Issue dialog form ownership, Cue Export Sheet downloads and text selection, payload and clipboard outcomes, object URL replacement and revocation, persistence failure, retry, and cleanup. Cue Waveform tests separately cover visible windows, sampled bars, loading and retry, seeking, resizing, and teardown.
 - Recording Harness browser tests cover its external Interface, deterministic render delegation, duplicate-mount protection, and teardown.
 - Optional Feature tests cover deferred mounting, aborted routes, keyboard loading, saved-open restoration, and retry after a failed import.
-- The full-app browser smoke test loads the actual `index.html` and bootstrap in an isolated same-origin frame, then verifies the initial reader, Parsha Picker, About return, first-use Reader Settings, and first-use Cue Authoring shortcut.
+- The full-app browser smoke test loads the real `/reader/` entry and bootstrap in an isolated same-origin frame, then verifies the initial Reader, Parsha Picker, first-use Reader Settings, and first-use Cue Authoring shortcut.
 - `npm run check` runs typecheck and lint.
 
 ## Architectural Preferences
@@ -221,7 +228,7 @@ Prefer these patterns:
 
 Avoid these patterns:
 
-- Do not move domain logic into Svelte or introduce SvelteKit, a framework router, or a global store unless it removes concrete complexity across multiple features.
+- Do not move Reader domain logic into SvelteKit or introduce a global store simply to connect public pages and Reader features.
 - Do not make production depend on a server process.
 - Do not precache the whole audio/video library by default.
 - Do not duplicate leining/calendar rules in UI code.

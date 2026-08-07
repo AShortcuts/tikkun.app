@@ -49,8 +49,16 @@ const cueAuthoringExportSheetSource = readFileSync(
   new URL('./admin/CueAuthoringExportSheet.svelte', import.meta.url),
   'utf8'
 )
-const indexHtmlSource = readFileSync(
-  new URL('../index.html', import.meta.url),
+const readerPageSource = readFileSync(
+  new URL('../src/routes/reader/+page.svelte', import.meta.url),
+  'utf8'
+)
+const readerAppSource = readFileSync(
+  new URL('../src/lib/components/ReaderApp.svelte', import.meta.url),
+  'utf8'
+)
+const serviceWorkerUpdateSource = readFileSync(
+  new URL('../src/lib/components/ServiceWorkerUpdate.svelte', import.meta.url),
   'utf8'
 )
 
@@ -58,8 +66,9 @@ test('keeps application bootstrap separate from the Reader Runtime Module', () =
   expect(bootstrapSource).toContain('startReaderRuntime({')
   expect(bootstrapSource).toContain("getBrowserStorage('local')")
   expect(bootstrapSource).toContain('getRecordingModeConfig(')
+  expect(bootstrapSource).toContain('export function stopApp()')
   expect(bootstrapSource).not.toContain('createReaderShell(')
-  expect(bootstrapSource.split('\n').length).toBeLessThan(40)
+  expect(bootstrapSource.split('\n').length).toBeLessThan(45)
   expect(indexSource).toContain('export function startReaderRuntime(')
   expect(indexSource).toContain('const destroy = mountReaderRuntime((scope) => {')
   expect(indexSource).not.toContain("document.addEventListener('DOMContentLoaded'")
@@ -123,10 +132,10 @@ test('delegates playback implementation ownership to Reader Playback', () => {
 })
 
 test('delegates recording issue dialog presentation to Cue Authoring Svelte', () => {
-  expect(indexHtmlSource).toContain(
+  expect(readerAppSource).toContain(
     'data-target-id="recording-issue-dialog-root"'
   )
-  expect(indexHtmlSource).not.toContain(
+  expect(readerAppSource).not.toContain(
     'data-target-id="recording-issue-modal"'
   )
   expect(cueAuthoringSource).toContain(
@@ -139,10 +148,10 @@ test('delegates recording issue dialog presentation to Cue Authoring Svelte', ()
 })
 
 test('delegates admin access to a theme-aware Svelte dialog', () => {
-  expect(indexHtmlSource).toContain(
+  expect(readerAppSource).toContain(
     'data-target-id="cue-authoring-access-dialog-root"'
   )
-  expect(indexHtmlSource).not.toContain(
+  expect(readerAppSource).not.toContain(
     'data-target-id="admin-access-dialog"'
   )
   expect(cueAuthoringSource).toContain(
@@ -184,10 +193,10 @@ test('delegates cue list presentation to Cue Authoring Svelte', () => {
 })
 
 test('delegates Cue Authoring panel presentation to one Svelte module', () => {
-  expect(indexHtmlSource).toContain(
+  expect(readerAppSource).toContain(
     'data-target-id="cue-authoring-panel-root"'
   )
-  expect(indexHtmlSource).not.toContain(
+  expect(readerAppSource).not.toContain(
     'data-target-id="admin-panel"'
   )
   expect(cueAuthoringSource).toContain(
@@ -227,10 +236,10 @@ test('delegates waveform rendering and browser lifetime to Cue Waveform', () => 
 })
 
 test('delegates Cue Authoring export presentation to one Svelte module', () => {
-  expect(indexHtmlSource).toContain(
+  expect(readerAppSource).toContain(
     'data-target-id="cue-authoring-export-sheet-root"'
   )
-  expect(indexHtmlSource).not.toContain(
+  expect(readerAppSource).not.toContain(
     'data-target-id="export-modal"'
   )
   expect(cueAuthoringSource).toContain(
@@ -268,16 +277,19 @@ test('briefly reveals absolute page numbers for page routes only', () => {
   expect(readerRouteSource).toMatch(/marker\.classList\.remove\('mod-route-reveal'\)/)
 })
 
-test('removes stale app-shell workers before loading the development app', () => {
-  const cleanupIndex = indexHtmlSource.indexOf('removeDevelopmentWorker')
-  const appIndex = indexHtmlSource.indexOf('src="/app/index.ts"')
-
-  expect(cleanupIndex).toBeGreaterThan(-1)
-  expect(cleanupIndex).toBeLessThan(appIndex)
-  expect(indexHtmlSource).toContain(
+test('removes stale app-shell workers while loading the Reader on mount', () => {
+  expect(readerPageSource).toContain(
+    "import ReaderApp from '$lib/components/ReaderApp.svelte'"
+  )
+  expect(readerAppSource).toContain("import('../../../app/index.ts')")
+  expect(serviceWorkerUpdateSource).toContain('removeDevelopmentWorker')
+  expect(serviceWorkerUpdateSource).toContain(
     'navigator.serviceWorker.getRegistrations()'
   )
-  expect(indexHtmlSource).toContain("name.startsWith(shellCachePrefix)")
-  expect(indexHtmlSource).toContain("const shellCachePrefix = 'tikkun-shell-'")
-  expect(indexHtmlSource).not.toContain("startsWith('tikkun-torah-')")
+  expect(serviceWorkerUpdateSource).toContain(
+    "name.startsWith('tikkun-shell-')"
+  )
+  expect(serviceWorkerUpdateSource).not.toContain(
+    "startsWith('tikkun-torah-')"
+  )
 })

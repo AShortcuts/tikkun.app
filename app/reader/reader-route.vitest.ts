@@ -81,6 +81,7 @@ function createHost(rendering = createRendering()) {
   const host: ReaderRouteHost = {
     renderReader: vi.fn(() => rendering),
     leaveReader: vi.fn(),
+    openAbout: vi.fn(),
     readerRouteChanged: vi.fn(),
     readerReady: vi.fn(),
     preparePicker: vi.fn(),
@@ -128,12 +129,6 @@ async function flushRouteWork() {
   await Promise.resolve()
 }
 
-function waitForHashChange() {
-  return new Promise<void>((resolve) => {
-    window.addEventListener('hashchange', () => resolve(), { once: true })
-  })
-}
-
 beforeEach(() => {
   installFixture()
   setHash()
@@ -171,29 +166,17 @@ test('canonicalizes reader aliases without starting a second render', () => {
   expect(host.renderReader).toHaveBeenCalledOnce()
 })
 
-test('switches to About and returns to the last canonical reader hash', async () => {
+test('sends About to the public page without mutating the reader hash', async () => {
   setHash('#/next')
-  const { host, route, state } = mountRoute()
+  const { host, route } = mountRoute()
   await flushRouteWork()
 
-  let changed = waitForHashChange()
   route.toggleAbout()
-  await changed
-
-  expect(window.location.hash).toBe('#/about')
-  expect(route.snapshot().view).toBe('about')
-  expect(state.view).toBe('optional')
-  expect(state.title).toBe('תיקון קוראים')
-  expect(host.leaveReader).toHaveBeenCalledOnce()
-
-  changed = waitForHashChange()
-  route.toggleAbout()
-  await changed
-  await flushRouteWork()
 
   expect(window.location.hash).toBe('#/next')
-  expect(state.view).toBe('reader')
-  expect(host.renderReader).toHaveBeenCalledTimes(2)
+  expect(host.openAbout).toHaveBeenCalledOnce()
+  expect(host.leaveReader).not.toHaveBeenCalled()
+  expect(host.renderReader).toHaveBeenCalledOnce()
 })
 
 test('opens and destroys the Parsha Picker from the not-found action', async () => {

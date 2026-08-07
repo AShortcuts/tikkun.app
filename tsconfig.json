@@ -1,7 +1,7 @@
 {
+  "extends": "./.svelte-kit/tsconfig.json",
   "compilerOptions": {
     "moduleResolution": "Bundler",
-    "outDir": "./dist",
     "noEmit": true,
     "allowJs": true,
     "module": "ESNext",
@@ -9,11 +9,24 @@
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "noImplicitAny": true,
-    "strictNullChecks": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": false,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "sourceMap": true,
     "allowImportingTsExtensions": true
   },
-  "include": ["./app/**/*", "./generated/**/*"]
+  "include": [
+    "./.svelte-kit/ambient.d.ts",
+    "./.svelte-kit/non-ambient.d.ts",
+    "./.svelte-kit/types/**/$types.d.ts",
+    "./app/**/*",
+    "./functions/**/*",
+    "./generated/**/*",
+    "./scripts/**/*.ts",
+    "./src/**/*",
+    "./vite.config.ts",
+    "./vitest.workspace.ts"
+  ]
 }
