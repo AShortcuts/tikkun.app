@@ -1,9 +1,14 @@
 import { isParshaAudioRecording } from '../../app/audio/types.ts'
 import { audioRecordings } from '../../app/data/audio-catalog.ts'
 import {
-  recordingProgressRows,
-  type RecordingStatus,
+  recordingWorkRows,
+  type RecordingWorkStatus,
 } from '../../app/data/about-progress.ts'
+import {
+  publicAliyotByParsha,
+  type GeneratedPublicAliyah,
+  type PublicCueStatus,
+} from '../../generated/public-reading-manifest.ts'
 
 export const aliyahLetters = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז'] as const
 
@@ -14,49 +19,71 @@ export type ReadingStatusKind =
   | 'audio'
   | 'planned'
 
+export type CoverageFilter =
+  | 'all'
+  | 'audio'
+  | 'ready'
+  | 'active'
+  | 'planned'
+
+export type CueCoverageStatus = PublicCueStatus
+export type PublicAliyah = GeneratedPublicAliyah
+
 export type PublicReading = {
   number: number | null
   parshaSlug: string | null
   parshaName: string
   parshaHebrew: string
   availableAliyot: readonly number[]
-  trackerStatus: RecordingStatus
+  aliyot: readonly PublicAliyah[]
+  workStatus: RecordingWorkStatus | null
   statusKind: ReadingStatusKind
   statusLabel: string
 }
 
-type CatalogReading = {
-  parshaSlug: string
-  parshaName: string
-  parshaNumber?: number
-  availableAliyot: Set<number>
+function getPublicAliyot(parshaSlug: string | undefined) {
+  if (!parshaSlug) return []
+  const aliyot = publicAliyotByParsha[parshaSlug]
+  if (!aliyot) {
+    throw new Error(`Public aliyah manifest is missing ${parshaSlug}`)
+  }
+  return aliyot
 }
 
-const catalogByNumber = new Map<number, CatalogReading>()
+const parshaSlugByNumber = new Map<number, string>()
 
 for (const recording of audioRecordings.filter(isParshaAudioRecording)) {
-  if (recording.parshaNumber === undefined) continue
-  const reading = catalogByNumber.get(recording.parshaNumber) ?? {
-    parshaSlug: recording.parshaSlug,
-    parshaName: recording.parshaName,
-    parshaNumber: recording.parshaNumber,
-    availableAliyot: new Set<number>(),
+  if (recording.status !== 'available' || recording.parshaNumber === undefined) {
+    continue
   }
-  if (recording.status === 'available') {
-    reading.availableAliyot.add(recording.aliyah)
-  }
-  catalogByNumber.set(recording.parshaNumber, reading)
+  parshaSlugByNumber.set(recording.parshaNumber, recording.parshaSlug)
 }
 
-function publicStatus(status: RecordingStatus, availableCount: number) {
-  if (status === 'Completed') {
+function publicStatus(
+  workStatus: RecordingWorkStatus | undefined,
+  aliyot: readonly PublicAliyah[]
+) {
+  const availableCount = aliyot.filter((aliyah) => aliyah.audioId).length
+  const wordSyncReady =
+    aliyot.length === 7 &&
+    aliyot.every(
+      (aliyah) => aliyah.audioId !== null && aliyah.cueStatus === 'cued'
+    )
+  const timingStarted = aliyot.some(
+    (aliyah) => aliyah.cueStatus === 'cued' || aliyah.cueStatus === 'draft'
+  )
+
+  if (wordSyncReady) {
     return { statusKind: 'ready', statusLabel: 'Word sync ready' } as const
   }
-  if (status === 'In progress') {
-    return { statusKind: 'progress', statusLabel: 'Sync in progress' } as const
-  }
-  if (status === 'Redo, please') {
+  if (workStatus === 'Needs review') {
     return { statusKind: 'review', statusLabel: 'Recording review' } as const
+  }
+  if (timingStarted || workStatus === 'Active') {
+    return {
+      statusKind: 'progress',
+      statusLabel: availableCount > 0 ? 'Sync in progress' : 'Recording in progress',
+    } as const
   }
   if (availableCount > 0) {
     return { statusKind: 'audio', statusLabel: 'Audio available' } as const
@@ -64,21 +91,25 @@ function publicStatus(status: RecordingStatus, availableCount: number) {
   return { statusKind: 'planned', statusLabel: 'Planned' } as const
 }
 
-export const readingCoverage: readonly PublicReading[] = recordingProgressRows.map(
-  (progress) => {
-    const catalog =
-      progress.number === null ? undefined : catalogByNumber.get(progress.number)
-    const availableAliyot = [...(catalog?.availableAliyot ?? [])].sort(
-      (a, b) => a - b
-    )
+export const readingCoverage: readonly PublicReading[] = recordingWorkRows.map(
+  (work) => {
+    const parshaSlug =
+      work.number === null
+        ? undefined
+        : parshaSlugByNumber.get(work.number)
+    const aliyot = getPublicAliyot(parshaSlug)
+    const availableAliyot = aliyot
+      .filter((aliyah) => aliyah.audioId !== null)
+      .map((aliyah) => aliyah.number)
     return {
-      number: progress.number,
-      parshaSlug: catalog?.parshaSlug ?? null,
-      parshaName: progress.parshaEnglish,
-      parshaHebrew: progress.parshaHebrew,
+      number: work.number,
+      parshaSlug: parshaSlug ?? null,
+      parshaName: work.parshaEnglish,
+      parshaHebrew: work.parshaHebrew,
       availableAliyot,
-      trackerStatus: progress.status,
-      ...publicStatus(progress.status, availableAliyot.length),
+      aliyot,
+      workStatus: work.workStatus ?? null,
+      ...publicStatus(work.workStatus, aliyot),
     }
   }
 )
@@ -97,6 +128,44 @@ export const coverageSummary = {
   syncedReadings: readingCoverage.filter(
     (reading) => reading.statusKind === 'ready'
   ).length,
+}
+
+export function matchesCoverageFilter(
+  reading: PublicReading,
+  filter: CoverageFilter
+) {
+  if (filter === 'audio') return reading.availableAliyot.length > 0
+  if (filter === 'ready') return reading.statusKind === 'ready'
+  if (filter === 'active') {
+    return reading.statusKind === 'progress' || reading.statusKind === 'review'
+  }
+  if (filter === 'planned') return reading.statusKind === 'planned'
+  return true
+}
+
+function normalizeCoverageSearch(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/[\p{P}\p{S}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLocaleLowerCase()
+}
+
+export function filterReadingCoverage(
+  readings: readonly PublicReading[],
+  query: string,
+  filter: CoverageFilter
+) {
+  const normalizedQuery = normalizeCoverageSearch(query)
+  return readings.filter((reading) => {
+    if (!matchesCoverageFilter(reading, filter)) return false
+    if (!normalizedQuery) return true
+    return normalizeCoverageSearch(
+      `${reading.parshaName} ${reading.parshaHebrew}`
+    ).includes(normalizedQuery)
+  })
 }
 
 export function getRequiredReading(parshaSlug: string) {

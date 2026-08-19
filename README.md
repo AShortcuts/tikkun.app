@@ -8,16 +8,19 @@ The source text is pulled from the [Sefaria API](https://github.com/Sefaria/Sefa
 
 ## Local workflow
 
-This is a self-contained static site:
+This is a browser-first static site with one optional deployment adapter:
 
 - application code lives in `app/`
 - protected page layouts and TOCs live in `text/`
 - published Cue Data lives in `audio-cues/`
 - generated audio and video catalogs live in `generated/`
 - files copied directly into the built site, including recordings, live in `site/`
+- `functions/audio/` adds verified byte-range delivery on Cloudflare Pages
 - Vite is only used as a thin local dev/build step for TypeScript and static bundling
 
 ### Install
+
+Requires Node.js 22.13 or newer and npm 10 or newer.
 
 ```sh
 npm install
@@ -29,13 +32,20 @@ npm install
 npm run dev
 ```
 
+Development and preview servers bind to `127.0.0.1` by default. Opt into LAN
+access explicitly with `npm run dev -- --host 0.0.0.0` on a trusted network.
+
 ### Build static output
 
 ```sh
 npm run build
 ```
 
-The build output in `dist/` is ready for static hosting.
+`dist/` is a portable static artifact. A generic static host can serve the full
+product, but media seeking follows that host's Range support. The Cloudflare
+release deploys the project with `functions/audio/` alongside the static output;
+uploading `dist/` alone does not satisfy the verified `206 Partial Content`
+release gate.
 
 ### Sync audio library
 
@@ -104,7 +114,7 @@ Video generation flags:
 | `--output-root=/path` | `TIKKUN_VIDEO_OUTPUT_ROOT` or Koofr default | Sets the final MP4 output folder. |
 | `--work-root=/path` | `/private/tmp/tikkun-video-render` | Sets the disposable temp frame/work folder. |
 | `--external-server` | off | Reuses an already running app server instead of starting Vite. |
-| `--base-url=http://127.0.0.1:5173` | `http://127.0.0.1:4177` | Points the recorder at a specific local app server and implies `--external-server`. |
+| `--base-url=http://127.0.0.1:5176` | `http://127.0.0.1:4177` | Points the recorder at a specific local app server and implies `--external-server`. |
 | `--keep-frames` | off | Keeps temporary PNG frames for debugging. |
 | `--max-concurrency=3` | `3` | Sets the highest concurrency level tested by `npm run video:calibrate`. |
 | `--include-output` | off | Used with `npm run video:cleanup` to delete local MP4 outputs as well as temp files. |
@@ -154,8 +164,8 @@ TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:recor
 If Vite is already running elsewhere, point the recorder at that server:
 
 ```sh
-npm run dev -- --host 127.0.0.1 --port 5173
-npm run video:record -- --external-server --base-url=http://127.0.0.1:5173 --ids=beresheet-2
+npm run dev -- --host 127.0.0.1 --port 5176
+npm run video:record -- --external-server --base-url=http://127.0.0.1:5176 --ids=beresheet-2
 ```
 
 After Koofr syncs a validated MP4, create the Koofr share link manually and add it to `koofr-video-links.local.json` using `koofr-video-links.local.example.json` as the shape:
@@ -189,6 +199,13 @@ Force-cancel a stuck recording run, then clean temp files:
 npm run video:shut-down
 ```
 
+Recorder ownership fails closed after a hard crash. If startup reports that the
+registry transition is already in progress, first verify that no
+`record-aliyah-videos.mjs` owner or registered FFmpeg, ffprobe, Vite, or browser
+child is still live. Only then remove the exact
+`<work-root>.processes.json.transition` marker and retry. Never delete a broad
+temp directory to recover ownership.
+
 Cleanup temporary files and local MP4 output after Koofr sync/link registration:
 
 ```sh
@@ -198,9 +215,17 @@ TIKKUN_VIDEO_OUTPUT_ROOT="/Users/adambh/Koofr/Tikkun Videos" npm run video:clean
 ### Checks
 
 ```sh
-npm run typecheck
-npm run lint
+npm run verify:quick
+npm run test:browser
+npm run test:browser:webkit
+npm run build
 ```
+
+`npm run verify` runs that complete release gate and rejects checked-in generated
+manifest drift. The build regenerates authoritative data, authorizes every built
+inline script in the report-only CSP, and rejects code or static assets that
+exceed the checked-in size ceilings. See [`docs/release-checklist.md`](docs/release-checklist.md)
+for deployed media, security-header, offline, accessibility, and device checks.
 
 ## License
 

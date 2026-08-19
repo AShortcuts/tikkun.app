@@ -97,10 +97,8 @@
   display: none;
 }
 
-.toolbar-overflow-item:hover,
 .toolbar-overflow-item:focus-visible {
   background: var(--light-accent-color);
-  outline: none;
 }
 
 .toolbar-overflow-item:disabled {
@@ -130,13 +128,14 @@
   line-height: 1;
 }
 
-.toolbar-overflow-shortcut {
-  color: var(--light-text-color);
-  font-size: 0.78rem;
-}
+@media (hover: hover) and (pointer: fine) {
+  .toolbar-overflow-item:hover {
+    background: var(--light-accent-color);
+  }
 
-.parsha-title:hover {
-  background-color: var(--medium-accent-color);
+  .parsha-title:hover {
+    background-color: var(--medium-accent-color);
+  }
 }
 
 .parsha-title:active {
@@ -161,8 +160,7 @@
     white-space: nowrap;
   }
 
-  .toolbar-button.mod-icon-label[data-target-id='bookmark-current'],
-  .toolbar-button[data-target-id='command-palette-open'] {
+  .toolbar-button.mod-icon-label[data-target-id='bookmark-current'] {
     display: none;
   }
 

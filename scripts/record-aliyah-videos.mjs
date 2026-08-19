@@ -3,7 +3,7 @@ import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { execFile, spawn } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { Buffer } from 'node:buffer'
 import process from 'node:process'
 import { audioRecordings } from '../generated/audio-manifest.ts'
@@ -13,6 +13,10 @@ import {
   renderCueConcatFile,
 } from '../app/video/cue-frame-plan.ts'
 import { currentAppBuildHash } from './video-provenance.mjs'
+import {
+  openOwnedProcessRegistry,
+  shutdownOwnedRun,
+} from './video-process-ownership.mjs'
 
 const repoRoot = fileURLToPath(new URL('../', import.meta.url))
 const defaultOutputRoot = '/Users/adambh/Koofr/Tikkun Videos'
@@ -23,6 +27,9 @@ const siteRoot = path.join(repoRoot, 'site')
 const cueRoot = path.join(repoRoot, 'audio-cues')
 let cuePayloadsByAudioId = null
 let appBuildHashPromise = null
+let processRegistry = null
+let shuttingDown = false
+const ownedProcesses = new Map()
 
 const defaults = {
   width: 1920,
@@ -60,6 +67,8 @@ function parseArgs(argv) {
       options.command = 'calibrate'
     } else if (arg === 'cleanup') {
       options.command = 'cleanup'
+    } else if (arg === 'shutdown') {
+      options.command = 'shutdown'
     } else if (arg === '--keep-frames') {
       options.keepFrames = true
     } else if (arg === '--include-output') {
@@ -154,16 +163,31 @@ function appBuildHash() {
   return appBuildHashPromise
 }
 
-function execFileText(command, args, options = {}) {
-  return new Promise((resolve, reject) => {
-    execFile(command, args, options, (error, stdout, stderr) => {
-      if (error) {
-        reject(new Error(`${command} ${args.join(' ')} failed: ${stderr || error.message}`))
-        return
-      }
-      resolve(stdout)
+async function execFileText(command, args, options = {}, kind = command) {
+  let completion
+  await spawnOwnedProcess(command, args, {
+    ...options,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }, kind, (child) => {
+    completion = new Promise((resolve, reject) => {
+      let stdout = ''
+      let stderr = ''
+      child.stdout.on('data', (chunk) => {
+        stdout += chunk.toString()
+      })
+      child.stderr.on('data', (chunk) => {
+        stderr += chunk.toString()
+      })
+      child.on('close', (code) => {
+        if (code === 0) resolve(stdout)
+        else reject(new Error(`${command} ${args.join(' ')} failed: ${stderr || `exit ${code}`}`))
+      })
+      child.on('error', reject)
     })
+    // Registration can still be in flight when a short command exits.
+    completion.catch(() => {})
   })
+  return completion
 }
 
 async function readJsonFile(filePath, fallback) {
@@ -221,6 +245,58 @@ async function pathExists(filePath) {
   }
 }
 
+async function spawnOwnedProcess(command, args, options, kind, observe = undefined) {
+  if (shuttingDown) throw new Error(`Cannot start owned ${kind} process during shutdown`)
+  if (!processRegistry) throw new Error('Video process registry is not initialized')
+  const registry = processRegistry
+  const child = spawn(command, args, {
+    ...options,
+    detached: process.platform !== 'win32',
+  })
+  const entry = {
+    child,
+    record: null,
+    spawnError: null,
+    stopPromise: null,
+    exited: false,
+  }
+  ownedProcesses.set(child, entry)
+  observe?.(child)
+  child.on('error', (error) => {
+    entry.spawnError = error
+  })
+  child.once('exit', () => {
+    entry.exited = true
+    ownedProcesses.delete(child)
+    if (entry.record) {
+      const record = entry.record
+      entry.record = null
+      registry.remove(record).catch((error) => {
+        const message = error instanceof Error ? error.message : String(error)
+        console.error(`Could not update video process registry: ${message}`)
+      })
+    }
+  })
+
+  try {
+    const record = await registry.add(child, {
+      kind,
+      cwd: options.cwd ?? repoRoot,
+    })
+    entry.record = record
+    if (entry.exited && record) {
+      entry.record = null
+      await registry.remove(record)
+    }
+    if (entry.spawnError) throw entry.spawnError
+    if (!record && !entry.exited) throw new Error(`Could not verify owned ${kind} process`)
+    return child
+  } catch (error) {
+    await stopOwnedProcess(child)
+    throw error
+  }
+}
+
 function chromeExecutable() {
   const candidates = [
     process.env.TIKKUN_CHROME,
@@ -236,20 +312,21 @@ function chromeExecutable() {
 async function startVite(options) {
   if (options.externalServer) return null
 
-  const vite = spawn(
+  const vite = await spawnOwnedProcess(
     'npm',
     ['run', 'dev', '--', '--host', '127.0.0.1', '--port', '4177'],
     {
       cwd: repoRoot,
       stdio: ['ignore', 'pipe', 'pipe'],
-    }
+    },
+    'vite'
   )
 
   try {
     await waitForHttp(options.baseUrl, 30000)
     return vite
   } catch (error) {
-    vite.kill('SIGTERM')
+    await stopOwnedProcess(vite)
     throw error
   }
 }
@@ -269,11 +346,11 @@ async function waitForHttp(url, timeoutMs) {
   throw new Error(`Timed out waiting for ${url}: ${lastError?.message ?? 'no response'}`)
 }
 
-function startChrome(options, userDataDir) {
+async function startChrome(options, userDataDir) {
   const executable = chromeExecutable()
   if (!executable) throw new Error('Set TIKKUN_CHROME to a Chromium executable')
 
-  const chrome = spawn(
+  const chrome = await spawnOwnedProcess(
     executable,
     [
       '--headless=new',
@@ -284,12 +361,16 @@ function startChrome(options, userDataDir) {
       `--user-data-dir=${userDataDir}`,
       'about:blank',
     ],
-    { stdio: ['ignore', 'ignore', 'pipe'] }
+    { stdio: ['ignore', 'ignore', 'pipe'] },
+    'chrome'
   )
 
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
-      chrome.kill('SIGTERM')
+      stopOwnedProcess(chrome).catch((error) => {
+        const message = error instanceof Error ? error.message : String(error)
+        console.error(`Could not stop timed-out Chrome process: ${message}`)
+      })
       reject(new Error('Timed out waiting for Chrome DevTools endpoint'))
     }, 15000)
 
@@ -471,8 +552,13 @@ async function encodeVideo({ frameDir, audioPath, outputPath, options }) {
     outputPath,
   ]
 
+  const ffmpeg = await spawnOwnedProcess(
+    'ffmpeg',
+    args,
+    { stdio: ['ignore', 'ignore', 'pipe'] },
+    'ffmpeg'
+  )
   return new Promise((resolve, reject) => {
-    const ffmpeg = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] })
     let stderr = ''
     ffmpeg.stderr.on('data', (chunk) => {
       stderr += chunk.toString()
@@ -481,6 +567,7 @@ async function encodeVideo({ frameDir, audioPath, outputPath, options }) {
       if (code === 0) resolve(stderr)
       else reject(new Error(`ffmpeg exited ${code}: ${stderr}`))
     })
+    ffmpeg.on('error', reject)
   })
 }
 
@@ -515,8 +602,13 @@ async function encodeConcatVideo({ concatPath, audioPath, outputPath, options })
     outputPath,
   ]
 
+  const ffmpeg = await spawnOwnedProcess(
+    'ffmpeg',
+    args,
+    { stdio: ['ignore', 'ignore', 'pipe'] },
+    'ffmpeg'
+  )
   return new Promise((resolve, reject) => {
-    const ffmpeg = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] })
     let stderr = ''
     ffmpeg.stderr.on('data', (chunk) => {
       stderr += chunk.toString()
@@ -525,20 +617,26 @@ async function encodeConcatVideo({ concatPath, audioPath, outputPath, options })
       if (code === 0) resolve(stderr)
       else reject(new Error(`ffmpeg exited ${code}: ${stderr}`))
     })
+    ffmpeg.on('error', reject)
   })
 }
 
 async function ffprobe(outputPath) {
-  const stdout = await execFileText('ffprobe', [
-    '-v',
-    'error',
-    '-count_frames',
-    '-show_streams',
-    '-show_format',
-    '-of',
-    'json',
-    outputPath,
-  ])
+  const stdout = await execFileText(
+    'ffprobe',
+    [
+      '-v',
+      'error',
+      '-count_frames',
+      '-show_streams',
+      '-show_format',
+      '-of',
+      'json',
+      outputPath,
+    ],
+    {},
+    'ffprobe'
+  )
   return JSON.parse(stdout)
 }
 
@@ -600,7 +698,12 @@ async function validateOutput({
   if (/non-monotonous/i.test(ffmpegLog)) errors.push('ffmpeg reported non-monotonous timestamps')
   if (/\berror\b/i.test(ffmpegLog)) errors.push('ffmpeg log contains error wording')
 
-  await execFileText('ffmpeg', ['-v', 'error', '-i', outputPath, '-f', 'null', '-'])
+  await execFileText(
+    'ffmpeg',
+    ['-v', 'error', '-i', outputPath, '-f', 'null', '-'],
+    {},
+    'ffmpeg-validation'
+  )
 
   return {
     passed: errors.length === 0,
@@ -653,27 +756,85 @@ async function nextAvailableOutput({ outputRoot, fileName }) {
   throw new Error(`Could not find an available output filename for ${fileName}`)
 }
 
+function processHasExited(child) {
+  return !child?.pid || child.exitCode !== null || child.signalCode !== null
+}
+
 function waitForProcessExit(child, timeoutMs) {
-  if (!child || child.exitCode !== null || child.signalCode !== null) {
-    return Promise.resolve()
-  }
+  if (processHasExited(child)) return Promise.resolve(true)
 
   return new Promise((resolve) => {
-    const timeout = setTimeout(resolve, timeoutMs)
-    child.once('exit', () => {
+    const finish = (exited) => {
       clearTimeout(timeout)
-      resolve()
-    })
+      child.removeListener('exit', onExit)
+      resolve(exited)
+    }
+    const onExit = () => finish(true)
+    const timeout = setTimeout(() => finish(processHasExited(child)), timeoutMs)
+    child.once('exit', onExit)
   })
 }
 
 async function stopChrome(chrome) {
-  if (!chrome) return
-  chrome.kill('SIGTERM')
-  await waitForProcessExit(chrome, 3000)
-  if (chrome.exitCode === null && chrome.signalCode === null) {
-    chrome.kill('SIGKILL')
-    await waitForProcessExit(chrome, 1000)
+  await stopOwnedProcess(chrome)
+}
+
+function signalOwnedProcess(child, signal) {
+  if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return
+  const target = process.platform === 'win32' ? child.pid : -child.pid
+  try {
+    process.kill(target, signal)
+  } catch (error) {
+    if (!error || typeof error !== 'object' || error.code !== 'ESRCH') throw error
+  }
+}
+
+async function stopOwnedProcess(child) {
+  if (!child) return
+  const entry = ownedProcesses.get(child)
+  if (entry?.stopPromise) return entry.stopPromise
+
+  const stopPromise = (async () => {
+    signalOwnedProcess(child, 'SIGTERM')
+    let exited = await waitForProcessExit(child, 3000)
+    if (!exited) {
+      signalOwnedProcess(child, 'SIGKILL')
+      exited = await waitForProcessExit(child, 1000)
+    }
+    if (!exited) {
+      throw new Error(`Owned process ${child.pid} did not stop after SIGKILL`)
+    }
+    ownedProcesses.delete(child)
+    if (entry?.record) {
+      const record = entry.record
+      entry.record = null
+      await processRegistry?.remove(record)
+    }
+  })()
+  if (entry) entry.stopPromise = stopPromise
+  return stopPromise
+}
+
+async function stopAllOwnedProcesses() {
+  await Promise.all([...ownedProcesses.keys()].map((child) => stopOwnedProcess(child)))
+}
+
+function installShutdownHandlers() {
+  const exitCodes = { SIGINT: 130, SIGTERM: 143 }
+  for (const signal of Object.keys(exitCodes)) {
+    process.on(signal, () => {
+      if (shuttingDown) process.exit(exitCodes[signal])
+      shuttingDown = true
+      void (async () => {
+        await stopAllOwnedProcesses()
+        await processRegistry?.close()
+        process.exit(exitCodes[signal])
+      })().catch((error) => {
+        const message = error instanceof Error ? error.message : String(error)
+        console.error(`Could not stop owned video processes: ${message}`)
+        process.exit(1)
+      })
+    })
   }
 }
 
@@ -1037,7 +1198,7 @@ async function recordBatch(options) {
       throw new Error(`${failed.length}/${results.length} video job(s) failed: ${summary}`)
     }
   } finally {
-    vite?.kill('SIGTERM')
+    await stopOwnedProcess(vite)
   }
 }
 
@@ -1090,8 +1251,33 @@ const options = parseArgs(process.argv.slice(2))
 
 if (options.command === 'cleanup') {
   await cleanup(options)
+} else if (options.command === 'shutdown') {
+  const result = await shutdownOwnedRun({
+    repoRoot,
+    workRoot: options.workRoot,
+    cleanup: () => cleanup(options),
+  })
+  console.log(
+    result.status === 'stopped'
+      ? `Stopped owned video processes: ${result.stopped.join(', ')}`
+      : 'No active owned video processes found'
+  )
 } else if (options.command === 'calibrate') {
-  await calibrate(options)
+  processRegistry = await openOwnedProcessRegistry({ repoRoot, workRoot: options.workRoot })
+  installShutdownHandlers()
+  try {
+    await calibrate(options)
+  } finally {
+    await stopAllOwnedProcesses()
+    await processRegistry.close()
+  }
 } else {
-  await recordBatch(options)
+  processRegistry = await openOwnedProcessRegistry({ repoRoot, workRoot: options.workRoot })
+  installShutdownHandlers()
+  try {
+    await recordBatch(options)
+  } finally {
+    await stopAllOwnedProcesses()
+    await processRegistry.close()
+  }
 }

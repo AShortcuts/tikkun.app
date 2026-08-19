@@ -34,9 +34,13 @@ export default {
         throw new Error(message)
       },
       handleUnseenRoutes: ({ routes, message }) => {
-        // The Tidbit detail route intentionally has no entries until the first article exists.
+        // The public and prototype Tidbit detail routes stay empty until the first article exists.
+        const intentionallyEmptyRoutes = new Set([
+          '/(site)/tidbits/[slug]',
+          '/prototypes/apple-sentient/tidbits/[slug]',
+        ])
         const unexpectedRoutes = routes.filter(
-          (route) => route !== '/(site)/tidbits/[slug]'
+          (route) => !intentionallyEmptyRoutes.has(route)
         )
         if (unexpectedRoutes.length > 0) throw new Error(message)
       },

@@ -1,6 +1,35 @@
 export type StorageOperation = 'read' | 'write' | 'remove'
 
+export type PersistedJsonReadResult<T> =
+  | { status: 'ready'; value: T }
+  | { status: 'missing' }
+  | { status: 'unavailable'; error: PersistedStateStorageError }
+  | {
+      status: 'invalid'
+      reason: 'invalid-json' | 'invalid-value'
+      error?: unknown
+    }
+
 const MAX_QUARANTINED_VALUE_LENGTH = 32_768
+export const PERSISTED_TIMESTAMP_FUTURE_TOLERANCE_MS = 5 * 60 * 1000
+
+export function isPlausiblePersistedTimestamp(
+  value: unknown,
+  {
+    now = Date.now(),
+    futureToleranceMs = PERSISTED_TIMESTAMP_FUTURE_TOLERANCE_MS,
+  }: { now?: number; futureToleranceMs?: number } = {}
+): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isSafeInteger(value) &&
+    value >= 0 &&
+    Number.isSafeInteger(now) &&
+    Number.isSafeInteger(futureToleranceMs) &&
+    futureToleranceMs >= 0 &&
+    value <= now + futureToleranceMs
+  )
+}
 
 export class PersistedStateStorageError extends Error {
   constructor(
@@ -90,4 +119,54 @@ export function quarantineStorageItem({
     console.error(`Failed to quarantine invalid browser state for ${key}`, error)
     return false
   }
+}
+
+export function readPersistedJson<T>({
+  storage,
+  key,
+  validate,
+}: {
+  storage: Storage | null
+  key: string
+  validate: (value: unknown) => value is T
+}): PersistedJsonReadResult<T> {
+  let rawValue: string | null
+  try {
+    rawValue = readStorageItem(storage, key)
+  } catch (error) {
+    return {
+      status: 'unavailable',
+      error:
+        error instanceof PersistedStateStorageError
+          ? error
+          : new PersistedStateStorageError('read', key, error),
+    }
+  }
+
+  if (rawValue === null) return { status: 'missing' }
+
+  let value: unknown
+  try {
+    value = JSON.parse(rawValue)
+  } catch (error) {
+    quarantineStorageItem({
+      storage,
+      key,
+      rawValue,
+      reason: 'stored value is not valid JSON',
+    })
+    return { status: 'invalid', reason: 'invalid-json', error }
+  }
+
+  if (!validate(value)) {
+    quarantineStorageItem({
+      storage,
+      key,
+      rawValue,
+      reason: 'stored value has an invalid shape',
+    })
+    return { status: 'invalid', reason: 'invalid-value' }
+  }
+
+  return { status: 'ready', value }
 }

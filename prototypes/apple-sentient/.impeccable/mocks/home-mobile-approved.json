@@ -1,0 +1,13 @@
+{
+  "approved": true,
+  "source": "built-in-imagegen",
+  "selected_display_position": 1,
+  "surface": "mobile-first public homepage",
+  "prompt_summary": "A high-fidelity Tikkun Korim mobile website with a compact header, cinematic ink-black hero, authentic reader screenshot, and a warm paper section containing Automatic, Light, Sepia, and Dark theme controls.",
+  "user_refinements": [
+    "Right-align the Start practicing action.",
+    "Replace its blue treatment with black.",
+    "Add a white border to the black action in Dark mode.",
+    "Make each theme control change the public page and reader preview."
+  ]
+}

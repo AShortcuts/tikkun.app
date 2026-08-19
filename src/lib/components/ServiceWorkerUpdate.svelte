@@ -4,12 +4,36 @@
 
   let visible = $state(false)
   let waitingWorker: ServiceWorker | null = null
-  let reloadingForUpdate = false
+  let reloadingForUpdate = $state(false)
+  let updateError = $state<string | null>(null)
+  let activationTimer: number | null = null
+  const activationTimeoutMs = 10_000
+
+  function clearActivationTimer() {
+    if (activationTimer !== null) window.clearTimeout(activationTimer)
+    activationTimer = null
+  }
+
+  function markUpdateFailed() {
+    clearActivationTimer()
+    reloadingForUpdate = false
+    updateError = 'Update did not finish. Reload the page to try again.'
+  }
 
   function applyUpdate() {
-    if (!waitingWorker) return
+    if (!waitingWorker || reloadingForUpdate) return
+    updateError = null
     reloadingForUpdate = true
-    waitingWorker.postMessage({ type: 'SKIP_WAITING' })
+    try {
+      waitingWorker.postMessage({ type: 'SKIP_WAITING' })
+      activationTimer = window.setTimeout(markUpdateFailed, activationTimeoutMs)
+    } catch {
+      markUpdateFailed()
+    }
+  }
+
+  function reloadPage() {
+    window.location.reload()
   }
 
   onMount(() => {
@@ -26,7 +50,17 @@
 
     const showUpdate = (worker: ServiceWorker) => {
       waitingWorker = worker
+      updateError = null
       visible = true
+      worker.addEventListener(
+        'statechange',
+        () => {
+          if (worker.state === 'redundant' && reloadingForUpdate) {
+            markUpdateFailed()
+          }
+        },
+        { signal: listeners.signal }
+      )
     }
 
     const watchInstallingWorker = (worker: ServiceWorker | null) => {
@@ -45,7 +79,10 @@
     navigator.serviceWorker.addEventListener(
       'controllerchange',
       () => {
-        if (reloadingForUpdate) window.location.reload()
+        if (reloadingForUpdate) {
+          clearActivationTimer()
+          window.location.reload()
+        }
       },
       { signal: listeners.signal }
     )
@@ -98,16 +135,50 @@
       }
     }
 
+    if (import.meta.env.DEV && import.meta.env.MODE !== 'test') {
+      void removeDevelopmentWorker().catch((error) => {
+        console.error('Failed to clear the development service worker', error)
+      })
+      return () => {
+        clearActivationTimer()
+        listeners.abort()
+      }
+    }
+
     void prepare()
-    return () => listeners.abort()
+    return () => {
+      clearActivationTimer()
+      listeners.abort()
+    }
   })
 </script>
 
 {#if visible}
-  <div class="service-worker-update" role="status" aria-live="polite">
-    <span>Update available</span>
-    <button type="button" onclick={applyUpdate}>Reload</button>
-    <button type="button" aria-label="Dismiss update" onclick={() => (visible = false)}>
+  <div
+    class="service-worker-update"
+    role={updateError ? 'alert' : 'status'}
+    aria-live={updateError ? 'assertive' : 'polite'}
+    aria-busy={reloadingForUpdate}
+  >
+    <span>{reloadingForUpdate
+        ? 'Applying update…'
+        : updateError ?? 'Update available'}</span>
+    <button
+      class="service-worker-update-action"
+      type="button"
+      disabled={reloadingForUpdate}
+      onclick={updateError ? reloadPage : applyUpdate}
+    >{reloadingForUpdate
+        ? 'Reloading…'
+        : updateError
+          ? 'Reload page'
+          : 'Reload'}</button>
+    <button
+      type="button"
+      aria-label="Dismiss update"
+      disabled={reloadingForUpdate}
+      onclick={() => (visible = false)}
+    >
       Later
     </button>
   </div>
@@ -117,26 +188,72 @@
   .service-worker-update {
     position: fixed;
     z-index: 10000;
-    right: 1rem;
-    bottom: 1rem;
+    right: max(1rem, env(safe-area-inset-right, 0px));
+    bottom: max(1rem, env(safe-area-inset-bottom, 0px));
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    border: 1px solid rgba(255, 255, 255, 0.18);
+    max-width: calc(
+      100vw - max(1rem, env(safe-area-inset-left, 0px)) -
+        max(1rem, env(safe-area-inset-right, 0px))
+    );
+    border: 1px solid
+      var(--site-line-strong, color-mix(in srgb, currentColor 18%, transparent));
     border-radius: 0.9rem;
     padding: 0.75rem 0.9rem;
-    background: #11161d;
+    background: var(--site-surface, var(--paper-color, #11161d));
     box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.35);
-    color: #f5f7fa;
-    font: 600 0.875rem/1.2 sans-serif;
+    color: var(--site-text, var(--text-color, #f5f7fa));
+    font: 600 0.875rem/1.2 var(--hebrew-ui-font-family, sans-serif);
   }
 
   button {
     border: 0;
-    padding: 0.3rem;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    border-radius: 0.6rem;
+    padding: 0.55rem;
     background: transparent;
-    color: #79aaff;
+    color: var(--site-accent-soft, var(--reader-focus-color, #79aaff));
     font: inherit;
     cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+
+  button:disabled {
+    cursor: default;
+    opacity: 0.62;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    button:not(:disabled):hover {
+      background: color-mix(in srgb, currentColor 10%, transparent);
+    }
+  }
+
+  @media (max-width: 36rem) {
+    .service-worker-update {
+      right: max(0.75rem, env(safe-area-inset-right, 0px));
+      bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+      left: max(0.75rem, env(safe-area-inset-left, 0px));
+      max-width: none;
+      flex-wrap: wrap;
+    }
+  }
+
+  @media (forced-colors: active) {
+    .service-worker-update {
+      border-color: CanvasText;
+    }
+
+    button:focus-visible {
+      outline-color: Highlight;
+    }
   }
 </style>

@@ -4,6 +4,7 @@ import type createParshaPicker from '../components/ParshaPicker.ts'
 import PageNotFoundPage from '../components/PageNotFoundPage.ts'
 import { mountCueAnalyticsRoute } from '../components/cue-analytics-route.ts'
 import type { MountScope } from '../lifecycle/mount.ts'
+import type { NavigationAction } from '../navigation/actions.ts'
 import { ScrollViewModel } from '../view-model/scroll-view-model.ts'
 import {
   canonicalReaderUrl,
@@ -54,10 +55,17 @@ export interface ReaderRoute {
     options?: { saveReadingAfterRender?: boolean }
   ): void
   toggleAbout(): void
-  togglePicker(): void
+  togglePicker(options?: PickerOpenOptions): void
+  focusPickerSearch(): boolean
+  refreshPickerSearch(): void
   closePicker(): void
   setTitle(title: string): void
   snapshot(): ReaderRouteSnapshot
+}
+
+export interface PickerOpenOptions {
+  animate?: boolean
+  focusSearch?: boolean
 }
 
 export interface ReaderRouteOptions {
@@ -68,6 +76,9 @@ export interface ReaderRouteOptions {
   createGenerator(): LeiningGenerator
   getCalendarSettings(): CalendarSettings
   updateCalendarSettings(settings: CalendarSettings): void
+  getSearchActions?(): NavigationAction[]
+  isBookmarkAction?(action: NavigationAction): boolean
+  formatSearchBadge?(label: string): string
   loadParshaPicker?: () => Promise<ParshaPickerModule>
 }
 
@@ -112,12 +123,14 @@ export function createReaderRoute(
   let pickerLoading = false
   let pickerRequestGeneration = 0
   let pickerModulePromise: Promise<ParshaPickerModule> | null = null
+  let pickerFocusSearchPending = false
   let pickerReturnView: 'not-found' | null = null
   let activeRendering: ReaderRouteRendering | null = null
   let currentReaderHash: string | null = null
   let lastReaderHash = DEFAULT_READER_HASH
   let currentTitle = INITIAL_READER_TITLE
   let saveReadingAfterRender = false
+  let pickerReturnFocus: HTMLElement | null = null
 
   const hashPath = (hash = view.location.hash) => hash.split('?', 1)[0]
   const parseHash = (hash: string) =>
@@ -140,16 +153,24 @@ export function createReaderRoute(
   }
 
   const closePicker = () => {
+    const hadPicker = Boolean(picker) || pickerLoading
+    const returnFocus = pickerReturnFocus
     const restoreNotFound =
       pickerReturnView === 'not-found' &&
       parseCurrentRoute()?.view === 'not-found'
     pickerRequestGeneration += 1
     pickerLoading = false
     pickerReturnView = null
+    pickerReturnFocus = null
+    pickerFocusSearchPending = false
     destroyPicker()
     shell.setPickerOpen(false)
     host.pickerChanged(false)
     if (restoreNotFound) shell.setView('optional')
+    if (hadPicker) {
+      returnFocus?.focus({ preventScroll: true })
+      if (document.activeElement !== returnFocus) shell.focusTitle()
+    }
   }
 
   const navigate = (
@@ -184,15 +205,25 @@ export function createReaderRoute(
       pickerReturnView === 'not-found' &&
       parseCurrentRoute()?.view === 'not-found'
     pickerReturnView = null
+    pickerFocusSearchPending = false
     shell.setPickerOpen(false)
     host.pickerChanged(false)
     if (restoreNotFound) shell.setView('optional')
   }
 
-  const openPicker = (returnView: 'not-found' | null = null) => {
+  const openPicker = (
+    returnView: 'not-found' | null = null,
+    { animate = false, focusSearch = !animate }: PickerOpenOptions = {}
+  ) => {
+    pickerReturnFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
     destroyPicker()
+    const animateOnOpen = animate
     const requestGeneration = ++pickerRequestGeneration
     pickerLoading = true
+    pickerFocusSearchPending = focusSearch
     pickerReturnView = returnView
     host.preparePicker()
 
@@ -208,6 +239,7 @@ export function createReaderRoute(
 
         const nextPicker = createPicker(options.createGenerator(), {
           calendarSettings: options.getCalendarSettings(),
+          animateOnOpen,
           onCalendarSettingsChange: (settings) => {
             options.updateCalendarSettings(settings)
             if (!picker) return
@@ -218,6 +250,10 @@ export function createReaderRoute(
           navigate: (hash) => {
             navigate(hash, { saveReadingAfterRender: true })
           },
+          getActions: options.getSearchActions,
+          requestClose: closePicker,
+          isBookmarkAction: options.isBookmarkAction,
+          formatBadge: options.formatSearchBadge,
         })
 
         try {
@@ -228,6 +264,10 @@ export function createReaderRoute(
           if (pickerReturnView === 'not-found') shell.setView('reader')
           shell.setPickerOpen(true)
           host.pickerChanged(true)
+          const shouldFocusSearch = pickerFocusSearchPending
+          pickerFocusSearchPending = false
+          if (shouldFocusSearch) nextPicker.focusSearch()
+          else nextPicker.node.focus({ preventScroll: true })
         } catch (error) {
           nextPicker.destroy()
           if (requestGeneration !== pickerRequestGeneration) return
@@ -249,7 +289,7 @@ export function createReaderRoute(
       })
   }
 
-  const togglePicker = () => {
+  const togglePicker = (pickerOptions: PickerOpenOptions = {}) => {
     const route = parseCurrentRoute()
     const isRenderedReaderView = Boolean(
       activeRendering?.isCurrent() && shell.isReaderVisible()
@@ -261,7 +301,21 @@ export function createReaderRoute(
     }
 
     if (picker || pickerLoading) closePicker()
-    else openPicker()
+    else openPicker(null, pickerOptions)
+  }
+
+  const focusPickerSearch = () => {
+    if (picker) {
+      picker.focusSearch()
+      return true
+    }
+    if (!pickerLoading) return false
+    pickerFocusSearchPending = true
+    return true
+  }
+
+  const refreshPickerSearch = () => {
+    picker?.refreshSearch()
   }
 
   const revealPageNumber = (
@@ -301,7 +355,7 @@ export function createReaderRoute(
     ).addEventListener(
       'click',
       () => {
-        openPicker('not-found')
+        openPicker('not-found', { animate: true })
       },
       { signal: scope.signal }
     )
@@ -441,6 +495,8 @@ export function createReaderRoute(
     navigate,
     toggleAbout,
     togglePicker,
+    focusPickerSearch,
+    refreshPickerSearch,
     closePicker,
     setTitle,
     snapshot,

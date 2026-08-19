@@ -1,23 +1,28 @@
-/// <reference types="vitest/config" />
 import { sveltekit } from '@sveltejs/kit/vite'
 import { fileURLToPath } from 'node:url'
-import { defineConfig } from 'vite'
+import { defineConfig, type UserConfig } from 'vite'
 
 const projectRoot = fileURLToPath(new URL('.', import.meta.url))
+export const defaultViteHost = '127.0.0.1'
 
-export default defineConfig({
+export const viteConfig = {
   plugins: [sveltekit()],
   server: {
+    host: defaultViteHost,
+    port: 5176,
+    strictPort: true,
     fs: {
       allow: [projectRoot],
     },
   },
+  preview: {
+    host: defaultViteHost,
+    port: 4176,
+    strictPort: true,
+  },
   build: {
     manifest: true,
   },
-  test: {
-    include: ['**/*.{test,vitest}.{ts,tsx,js,jsx}'],
-    includeTaskLocation: true,
-    mockReset: true,
-  },
-})
+} satisfies UserConfig
+
+export default defineConfig(viteConfig)

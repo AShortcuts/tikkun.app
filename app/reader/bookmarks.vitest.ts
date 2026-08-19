@@ -53,6 +53,39 @@ test('loads only valid bookmarks from storage', () => {
   expect(storage.getItem(`${BOOKMARKS_STORAGE_KEY}:quarantine`)).not.toBeNull()
 })
 
+test('quarantines grammar-valid bookmarks that are not routable', () => {
+  const deadBookmark = createBookmark({
+    hash: '#/torah/parsha/noach/1-1-1',
+    label: 'Dead route',
+    tokenKey: '1:0:0:0',
+    createdAt: 1,
+  })
+  const storage = createStorage(JSON.stringify([deadBookmark]))
+
+  expect(loadBookmarks(storage, () => false)).toEqual([])
+  expect(storage.getItem(BOOKMARKS_STORAGE_KEY)).toBeNull()
+  expect(storage.getItem(`${BOOKMARKS_STORAGE_KEY}:quarantine`)).not.toBeNull()
+})
+
+test.each([
+  { label: '' },
+  { createdAt: -1 },
+  { audioId: 42 },
+  { timeStart: -0.1 },
+])('rejects malformed persisted bookmark fields: %o', (override) => {
+  const validBookmark = createBookmark({
+    hash: '#/torah/parsha/noach',
+    label: 'Keep',
+    tokenKey: '1:0:0:0',
+    createdAt: 1,
+  })
+  const storage = createStorage(JSON.stringify([{ ...validBookmark, ...override }]))
+
+  expect(loadBookmarks(storage)).toEqual([])
+  expect(storage.getItem(BOOKMARKS_STORAGE_KEY)).toBeNull()
+  expect(storage.getItem(`${BOOKMARKS_STORAGE_KEY}:quarantine`)).not.toBeNull()
+})
+
 test('saves bookmarks newest first', () => {
   const storage = createStorage()
   saveBookmarks(storage, [

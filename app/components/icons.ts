@@ -38,6 +38,7 @@ export type IconName =
   | 'circleX'
   | 'fileDown'
   | 'audioLines'
+  | 'search'
 
 // Icons are from https://lucide.dev/icons v1.0.
 // Keep every horizontal arrow alias on the shared full-stem geometry.
@@ -227,6 +228,10 @@ const iconPaths: Record<IconName, string> = {
     <path d="M14 8v7" />
     <path d="M18 5v13" />
     <path d="M22 10v3" />
+  `,
+  search: `
+    <circle cx="11" cy="11" r="8" />
+    <path d="m21 21-4.35-4.35" />
   `,
 }
 

@@ -54,6 +54,10 @@ export function hasScrollData(name: string): name is ScrollName {
   return Object.prototype.hasOwnProperty.call(pageIndexes, name)
 }
 
+export function getScrollPageCount(name: ScrollName) {
+  return pageIndexes[name].getPageCount()
+}
+
 export function isIndexedReference({
   b: book,
   c: chapter,

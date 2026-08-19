@@ -10,7 +10,7 @@ export default [
       'app/**/*.{js,mjs,cjs,ts,svelte}',
       'functions/**/*.{js,mjs,cjs,ts}',
       'src/**/*.{js,mjs,cjs,ts,svelte}',
-      'scripts/*.mjs',
+      'scripts/**/*.{js,mjs,cjs,ts}',
       'vite.config.ts',
       'svelte.config.js',
     ],

@@ -195,6 +195,7 @@ test('opens and destroys the Parsha Picker from the not-found action', async () 
   expect(state.pickerOpen).toBe(true)
   expect(route.snapshot().pickerOpen).toBe(true)
   expect(document.querySelector('[data-target-id="parsha-picker-root"]')).not.toBeNull()
+  expect(document.querySelector('.parsha-picker.mod-animate-open')).not.toBeNull()
   expect(host.preparePicker).toHaveBeenCalledOnce()
 
   route.closePicker()
@@ -204,6 +205,121 @@ test('opens and destroys the Parsha Picker from the not-found action', async () 
   expect(route.snapshot().pickerOpen).toBe(false)
   expect(document.body.textContent).toContain('Page Not Found')
   expect(document.querySelector('[data-target-id="parsha-picker-root"]')).toBeNull()
+})
+
+test('keeps shortcut TOC opening instant and opts pointer opening into motion', async () => {
+  setHash('#/next')
+  const pickerOptions: Array<Parameters<ParshaPickerModule['default']>[1]> = []
+  const createPicker = vi.fn<ParshaPickerModule['default']>(
+    (_generator, options) => {
+      pickerOptions.push(options)
+      return {
+        node: document.createElement('div'),
+        onMount: vi.fn(),
+        focusSearch: vi.fn(),
+        refreshSearch: vi.fn(),
+        destroy: vi.fn(),
+      }
+    }
+  )
+  const { route } = mountRoute({
+    loadParshaPicker: async () => ({ default: createPicker }),
+  })
+  await flushRouteWork()
+
+  route.togglePicker()
+  await vi.waitFor(() => expect(createPicker).toHaveBeenCalledTimes(1))
+  expect(pickerOptions[0]?.animateOnOpen).toBe(false)
+
+  route.closePicker()
+  route.togglePicker({ animate: true })
+  await vi.waitFor(() => expect(createPicker).toHaveBeenCalledTimes(2))
+  expect(pickerOptions[1]?.animateOnOpen).toBe(true)
+})
+
+test('moves focus into the picker and restores the activating control', async () => {
+  setHash('#/next')
+  const opener = document.createElement('button')
+  opener.textContent = 'Open reading index'
+  document.body.appendChild(opener)
+  opener.focus()
+
+  const pickerNode = document.createElement('div')
+  pickerNode.tabIndex = -1
+  const focusSearch = vi.fn()
+  const createPicker = vi.fn<ParshaPickerModule['default']>(() => ({
+    node: pickerNode,
+    onMount: vi.fn(),
+    focusSearch,
+    refreshSearch: vi.fn(),
+    destroy: vi.fn(() => pickerNode.remove()),
+  }))
+  const { route } = mountRoute({
+    loadParshaPicker: async () => ({ default: createPicker }),
+  })
+  await flushRouteWork()
+
+  route.togglePicker()
+  await flushRouteWork()
+  expect(focusSearch).toHaveBeenCalledOnce()
+
+  route.closePicker()
+  expect(document.activeElement).toBe(opener)
+})
+
+test('focuses the picker region without opening a soft keyboard for pointer opens', async () => {
+  setHash('#/next')
+  const pickerNode = document.createElement('div')
+  pickerNode.tabIndex = -1
+  const focusSearch = vi.fn()
+  const createPicker = vi.fn<ParshaPickerModule['default']>(() => ({
+    node: pickerNode,
+    onMount: vi.fn(),
+    focusSearch,
+    refreshSearch: vi.fn(),
+    destroy: vi.fn(() => pickerNode.remove()),
+  }))
+  const { route } = mountRoute({
+    loadParshaPicker: async () => ({ default: createPicker }),
+  })
+  await flushRouteWork()
+
+  route.togglePicker({ animate: true })
+  await flushRouteWork()
+
+  expect(focusSearch).not.toHaveBeenCalled()
+  expect(document.activeElement).toBe(pickerNode)
+})
+
+test('upgrades a loading pointer-open picker to focus search on Cmd-K intent', async () => {
+  setHash('#/next')
+  let resolvePicker!: (module: ParshaPickerModule) => void
+  const focusSearch = vi.fn()
+  const pickerNode = document.createElement('div')
+  pickerNode.tabIndex = -1
+  const { route } = mountRoute({
+    loadParshaPicker: () =>
+      new Promise<ParshaPickerModule>((resolve) => {
+        resolvePicker = resolve
+      }),
+  })
+  await flushRouteWork()
+
+  route.togglePicker({ animate: true })
+  expect(route.focusPickerSearch()).toBe(true)
+  resolvePicker({
+    default: () => ({
+      node: pickerNode,
+      onMount: vi.fn(),
+      focusSearch,
+      refreshSearch: vi.fn(),
+      destroy: vi.fn(),
+    }),
+  })
+  await flushRouteWork()
+
+  expect(focusSearch).toHaveBeenCalledOnce()
+  expect(document.activeElement).not.toBe(pickerNode)
 })
 
 test('closing while the Parsha Picker module loads cancels the pending mount', async () => {
@@ -282,6 +398,72 @@ test('retries the Parsha Picker after a load failure', async () => {
   expect(state.view).toBe('reader')
   expect(state.pickerOpen).toBe(true)
   expect(route.snapshot().pickerOpen).toBe(true)
+})
+
+test('rebuilds the Parsha Picker after calendar settings change', async () => {
+  setHash('#/torah/page/999')
+  const destroyed: Array<ReturnType<typeof vi.fn>> = []
+  const pickerOptions: Array<Parameters<ParshaPickerModule['default']>[1]> = []
+  const createPicker = vi.fn<ParshaPickerModule['default']>(
+    (_generator, options) => {
+      const destroy = vi.fn()
+      const node = document.createElement('div')
+      destroyed.push(destroy)
+      pickerOptions.push(options)
+      return {
+        node,
+        onMount: vi.fn(),
+        focusSearch: vi.fn(),
+        refreshSearch: vi.fn(),
+        destroy,
+      }
+    }
+  )
+  const { route } = mountRoute({
+    loadParshaPicker: async () => ({ default: createPicker }),
+  })
+
+  document
+    .querySelector<HTMLButtonElement>('[data-target-id="open-reading-index"]')
+    ?.click()
+  await flushRouteWork()
+  pickerOptions[0]?.onCalendarSettingsChange({ israel: true })
+  await flushRouteWork()
+
+  expect(createPicker).toHaveBeenCalledTimes(2)
+  expect(destroyed[0]).toHaveBeenCalledOnce()
+  expect(pickerOptions[1]?.calendarSettings).toEqual({ israel: true })
+  expect(route.snapshot().pickerOpen).toBe(true)
+})
+
+test('focuses and refreshes the embedded search only while its picker is active', async () => {
+  setHash('#/torah/page/999')
+  const focusSearch = vi.fn()
+  const refreshSearch = vi.fn()
+  const createPicker = vi.fn<ParshaPickerModule['default']>(() => ({
+    node: document.createElement('div'),
+    onMount: vi.fn(),
+    focusSearch,
+    refreshSearch,
+    destroy: vi.fn(),
+  }))
+  const { route } = mountRoute({
+    loadParshaPicker: async () => ({ default: createPicker }),
+  })
+
+  expect(route.focusPickerSearch()).toBe(false)
+  document
+    .querySelector<HTMLButtonElement>('[data-target-id="open-reading-index"]')
+    ?.click()
+  await flushRouteWork()
+
+  expect(route.focusPickerSearch()).toBe(true)
+  expect(focusSearch).toHaveBeenCalledOnce()
+  route.refreshPickerSearch()
+  expect(refreshSearch).toHaveBeenCalledOnce()
+
+  route.closePicker()
+  expect(route.focusPickerSearch()).toBe(false)
 })
 
 test('rerenders the same hash and saves only after that render completes', async () => {

@@ -9,7 +9,6 @@
   let {
     document: ownerDocument,
     getState,
-    openCommandPalette,
     toggleBookmark,
     openAliyahNavigation,
     showAliyahStarts,
@@ -117,22 +116,12 @@
 </button>
 
 <button
-  class="toolbar-button mod-command"
-  data-target-id="command-palette-open"
-  type="button"
-  title="Open command palette"
-  aria-label="Open command palette"
-  onclick={openCommandPalette}>⌘K</button
->
-
-<button
   bind:this={menuToggle}
   class="toolbar-button mod-icon-label toolbar-overflow-toggle"
   data-target-id="toolbar-overflow-toggle"
   type="button"
   title="Reader controls"
   aria-label="Reader controls"
-  aria-haspopup="menu"
   aria-expanded={menuOpen}
   aria-controls="toolbar-overflow-menu"
   onclick={toggleMenu}
@@ -145,24 +134,13 @@
   class:u-hidden={!menuOpen}
   data-target-id="toolbar-overflow-menu"
   id="toolbar-overflow-menu"
-  role="menu"
+  role="group"
   aria-label="Reader actions"
   aria-hidden={!menuOpen}
 >
   <button
     class="toolbar-overflow-item"
     type="button"
-    role="menuitem"
-    data-toolbar-overflow-action="command"
-    onclick={() => run(openCommandPalette)}
-  >
-    <span>Command Palette</span>
-    <span class="toolbar-overflow-shortcut">⌘K</span>
-  </button>
-  <button
-    class="toolbar-overflow-item"
-    type="button"
-    role="menuitem"
     data-toolbar-overflow-action="bookmark"
     disabled={!controlState.bookmarkAvailable}
     onclick={() => run(toggleBookmark)}
@@ -182,7 +160,6 @@
   <button
     class="toolbar-overflow-item"
     type="button"
-    role="menuitem"
     data-toolbar-overflow-action="aliyah-rail"
     disabled={!controlState.aliyahNavigationAvailable}
     onclick={() => run(() => openAliyahNavigation(menuToggle))}
@@ -192,7 +169,6 @@
   <button
     class="toolbar-overflow-item mod-aliyah-starts"
     type="button"
-    role="menuitem"
     data-toolbar-overflow-action="aliyah-starts"
     disabled={!controlState.aliyahNavigationAvailable}
     onclick={() => run(showAliyahStarts)}
@@ -209,7 +185,6 @@
   <button
     class="toolbar-overflow-item"
     type="button"
-    role="menuitem"
     data-toolbar-overflow-action="annotations"
     onclick={() => run(toggleAnnotations)}
   >
@@ -227,7 +202,6 @@
   <button
     class="toolbar-overflow-item"
     type="button"
-    role="menuitem"
     data-toolbar-overflow-action="settings"
     onclick={() => run(() => openSettings(menuToggle))}
   >

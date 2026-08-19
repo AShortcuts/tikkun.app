@@ -38,6 +38,7 @@ export interface ShiftHoldEvent {
   metaKey: boolean
   ctrlKey: boolean
   altKey: boolean
+  target: unknown
 }
 
 export function createTemporaryShiftToggle({
@@ -66,6 +67,7 @@ export function createTemporaryShiftToggle({
         event.metaKey ||
         event.ctrlKey ||
         event.altKey ||
+        isShortcutEditableTarget(event.target) ||
         isDisabled() ||
         restoreValue !== null
       ) {

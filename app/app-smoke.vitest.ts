@@ -70,8 +70,52 @@ test('boots the real app and keeps core routes and lazy tools working', async ()
       ).not.toBeNull(),
     { timeout: 10_000, interval: 50 }
   )
+  const embeddedSearch = frameDocument.querySelector<HTMLInputElement>(
+    '[data-search-presentation="embedded"] [data-target-id="reader-search-input"]'
+  )
+  expect(embeddedSearch).not.toBeNull()
+  expect(frameDocument.activeElement).toBe(
+    frameDocument.querySelector('[data-target-id="parsha-picker-root"]')
+  )
+  expect(frameDocument.activeElement).not.toBe(embeddedSearch)
+  expect(embeddedSearch?.getAttribute('aria-expanded')).toBe('false')
+  expect(
+    frameDocument.querySelector(
+      '[data-search-presentation="embedded"] [data-target-id="reader-search-results"]'
+    )
+  ).toBeNull()
+  const calendarSettings = frameDocument.querySelector<HTMLElement>(
+    '.calendar-settings'
+  )
+  if (!calendarSettings) throw new Error('Expected TOC calendar settings')
+  const calendarSettingsTop = calendarSettings.getBoundingClientRect().top
+  expect(
+    frameDocument.querySelector('[data-target-id="command-palette-open"]')
+  ).toBeNull()
   frameDocument.dispatchEvent(
-    new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
+    new KeyboardEvent('keydown', {
+      key: 'k',
+      metaKey: true,
+      bubbles: true,
+    })
+  )
+  expect(frameDocument.activeElement).toBe(embeddedSearch)
+  expect(embeddedSearch?.getAttribute('aria-expanded')).toBe('true')
+  const embeddedResults = frameDocument.querySelector<HTMLElement>(
+    '[data-search-presentation="embedded"] [data-target-id="reader-search-results"]'
+  )
+  expect(embeddedResults).not.toBeNull()
+  expect(frameWindow.getComputedStyle(embeddedResults!).position).toBe('absolute')
+  expect(calendarSettings.getBoundingClientRect().top).toBeCloseTo(
+    calendarSettingsTop,
+    1
+  )
+  expect(
+    frameDocument.querySelector<HTMLElement>('[data-target-id="command-palette"]')
+      ?.classList.contains('u-hidden') ?? true
+  ).toBe(true)
+  embeddedSearch?.dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true })
   )
   await vi.waitFor(
     () =>
@@ -80,6 +124,39 @@ test('boots the real app and keeps core routes and lazy tools working', async ()
       ).toBeNull(),
     { timeout: 5_000, interval: 50 }
   )
+
+  frameDocument.dispatchEvent(
+    new KeyboardEvent('keydown', {
+      key: 'k',
+      metaKey: true,
+      bubbles: true,
+    })
+  )
+  await vi.waitFor(
+    () => {
+      const overlay = frameDocument.querySelector<HTMLElement>(
+        '[data-target-id="command-palette"]'
+      )
+      const overlaySearch = frameDocument.querySelector<HTMLInputElement>(
+        '[data-search-presentation="overlay"] [data-target-id="reader-search-input"]'
+      )
+      expect(overlay?.classList.contains('u-hidden')).toBe(false)
+      expect(frameDocument.activeElement).toBe(overlaySearch)
+    },
+    { timeout: 10_000, interval: 50 }
+  )
+  const overlaySearch = frameDocument.querySelector<HTMLInputElement>(
+    '[data-search-presentation="overlay"] [data-target-id="reader-search-input"]'
+  )
+  if (!overlaySearch) throw new Error('Expected the overlay search input')
+  overlaySearch.dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true })
+  )
+  expect(
+    frameDocument
+      .querySelector<HTMLElement>('[data-target-id="command-palette"]')
+      ?.classList.contains('u-hidden')
+  ).toBe(true)
 
   click(frameDocument, '[data-target-id="settings-toggle"]')
   await vi.waitFor(

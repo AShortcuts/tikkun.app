@@ -14,8 +14,20 @@ const clientManifestPath = path.join(
   '.vite',
   'manifest.json'
 )
+const clientAppPath = path.join(
+  repoRoot,
+  '.svelte-kit',
+  'generated',
+  'client-optimized',
+  'app.js'
+)
 
-const excludedPathPrefixes = ['audio/', '.vite/']
+const excludedPathPrefixes = [
+  'audio/',
+  '.vite/',
+  'prototypes/',
+  'assets/images/prototypes/',
+]
 const excludedExtensions = new Set([
   '.aac',
   '.aiff',
@@ -35,9 +47,14 @@ const deferredSourcePatterns = [
   /^app\/admin\/cue-authoring\.ts$/,
   /^app\/components\/CueAnalyticsPage\.ts$/,
   /^app\/video\/recording-harness\.ts$/,
+  /^src\/routes\/prototypes\//,
 ]
 const verificationFilePattern = /^google[A-Za-z0-9_-]+\.html$/
 const nonCriticalFontPattern = /(?:^|\/)Lora-Regular(?:\.[A-Za-z0-9_-]+)?\.ttf$/
+const hostControlFiles = new Set(['_headers', '_redirects'])
+
+export const MAX_SHELL_PRECACHE_URLS = 64
+export const MAX_SHELL_PRECACHE_RAW_BYTES = 1_600_000
 
 function normalizePath(filePath) {
   return filePath.split(path.sep).join('/')
@@ -49,6 +66,14 @@ export function normalizeBasePath(value = '') {
     throw new Error('Deployment base path must be empty or start with "/"')
   }
   return value.replace(/\/+$/, '')
+}
+
+export function cacheNamespaceForBasePath(basePath = '') {
+  const normalized = normalizeBasePath(basePath)
+  return createHash('sha256')
+    .update(normalized || '/')
+    .digest('hex')
+    .slice(0, 12)
 }
 
 export function toDeploymentUrl(filePath, basePath = '') {
@@ -75,20 +100,75 @@ function filesForManifestEntry(entry) {
   ].filter((filePath) => typeof filePath === 'string')
 }
 
-export function classifyManifestFiles(manifest) {
-  const excludedFiles = new Set()
+function manifestImports(entry) {
+  if (!entry || typeof entry !== 'object' || !Array.isArray(entry.imports)) {
+    return []
+  }
+  // Dynamic entries are classified as roots; following app.js dynamic imports
+  // would incorrectly make every deferred route and data module part of core.
+  return entry.imports.filter((sourcePath) => typeof sourcePath === 'string')
+}
+
+function reachableManifestEntries(manifest, rootSourcePaths) {
+  const reachable = new Set()
+  const pending = [...rootSourcePaths]
+
+  while (pending.length) {
+    const sourcePath = pending.pop()
+    if (reachable.has(sourcePath)) continue
+
+    const entry = manifest[sourcePath]
+    if (!entry || typeof entry !== 'object') continue
+    reachable.add(sourcePath)
+    pending.push(...manifestImports(entry))
+  }
+
+  return reachable
+}
+
+function filesForManifestEntries(manifest, sourcePaths) {
+  const files = new Set()
+  for (const sourcePath of sourcePaths) {
+    for (const filePath of filesForManifestEntry(manifest[sourcePath])) {
+      files.add(normalizePath(filePath))
+    }
+  }
+  return files
+}
+
+export function prototypeRouteNodeSources(clientAppSource) {
+  const nodeIds = new Set()
+  const routePattern = /^\s*"\/prototypes[^"]*":\s*\[(\d+)(?:,\[([^\]]*)\])?\],?$/gm
+  for (const match of clientAppSource.matchAll(routePattern)) {
+    nodeIds.add(Number(match[1]))
+    for (const layoutId of match[2]?.split(',') ?? []) {
+      if (/^\d+$/.test(layoutId.trim())) nodeIds.add(Number(layoutId))
+    }
+  }
+  return new Set(
+    [...nodeIds].map(
+      (nodeId) => `.svelte-kit/generated/client-optimized/nodes/${nodeId}.js`
+    )
+  )
+}
+
+export function classifyManifestFiles(manifest, deferredSourcePaths = new Set()) {
+  const coreRoots = new Set()
+  const deferredRoots = new Set()
   const torahPageFiles = []
 
   for (const [sourcePath, entry] of Object.entries(manifest)) {
     const normalizedSource = normalizePath(sourcePath)
-    const files = filesForManifestEntry(entry)
     const isTextPage = normalizedSource.startsWith('text/pages/')
-    const isDeferred = deferredSourcePatterns.some((pattern) =>
-      pattern.test(normalizedSource)
-    )
+    const isDeferred =
+      deferredSourcePaths.has(normalizedSource) ||
+      deferredSourcePatterns.some((pattern) => pattern.test(normalizedSource))
+    const isEntryPoint = entry?.isEntry === true || entry?.isDynamicEntry === true
 
     if (isTextPage || isDeferred) {
-      for (const filePath of files) excludedFiles.add(normalizePath(filePath))
+      deferredRoots.add(sourcePath)
+    } else if (isEntryPoint) {
+      coreRoots.add(sourcePath)
     }
     if (normalizedSource.startsWith('text/pages/torah/')) {
       const filePath = entry?.file
@@ -97,6 +177,18 @@ export function classifyManifestFiles(manifest) {
       }
     }
   }
+
+  const deferredFiles = filesForManifestEntries(
+    manifest,
+    reachableManifestEntries(manifest, deferredRoots)
+  )
+  const coreFiles = filesForManifestEntries(
+    manifest,
+    reachableManifestEntries(manifest, coreRoots)
+  )
+  const excludedFiles = new Set(
+    [...deferredFiles].filter((filePath) => !coreFiles.has(filePath))
+  )
 
   return {
     excludedFiles,
@@ -114,6 +206,7 @@ export function isPageChunk(relativePath, manifest = null) {
 export function shouldPrecache(relativePath, excludedFiles = new Set()) {
   const normalized = normalizePath(relativePath)
   if (normalized === 'service-worker.js') return false
+  if (hostControlFiles.has(normalized)) return false
   if (excludedFiles.has(normalized)) return false
   if (excludedPathPrefixes.some((prefix) => normalized.startsWith(prefix))) {
     return false
@@ -125,6 +218,101 @@ export function shouldPrecache(relativePath, excludedFiles = new Set()) {
     return false
   }
   return !excludedExtensions.has(path.extname(normalized).toLowerCase())
+}
+
+function htmlAttribute(tag, name) {
+  const quoted = tag.match(
+    new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, 'i')
+  )
+  if (quoted) return quoted[1] ?? quoted[2] ?? ''
+
+  const unquoted = tag.match(
+    new RegExp(`\\b${name}\\s*=\\s*([^\\s"'=<>]+)`, 'i')
+  )
+  return unquoted?.[1] ?? null
+}
+
+export function shellAssetReferencesFromHtml(
+  htmlSource,
+  htmlFile = 'index.html',
+  basePath = ''
+) {
+  const base = normalizeBasePath(basePath)
+  const origin = 'https://tikkun.invalid'
+  const documentUrl = new URL(toDeploymentUrl(htmlFile, base), origin)
+  const references = new Set()
+
+  for (const match of htmlSource.matchAll(/<link\b[^>]*>/gi)) {
+    const tag = match[0]
+    const rel = htmlAttribute(tag, 'rel')
+    const href = htmlAttribute(tag, 'href')
+    const relTokens = new Set(rel?.toLowerCase().split(/\s+/).filter(Boolean))
+    if (
+      !href ||
+      (!relTokens.has('stylesheet') && !relTokens.has('modulepreload'))
+    ) {
+      continue
+    }
+
+    const resolved = new URL(href, documentUrl)
+    if (resolved.origin !== origin) continue
+
+    let deploymentPath = decodeURIComponent(resolved.pathname)
+    if (base) {
+      if (!deploymentPath.startsWith(`${base}/`)) continue
+      deploymentPath = deploymentPath.slice(base.length)
+    }
+    const outputPath = normalizePath(deploymentPath).replace(/^\/+/, '')
+    if (outputPath) references.add(outputPath)
+  }
+
+  return [...references].sort()
+}
+
+export function assertPrecachedHtmlDependencies({
+  shellFiles,
+  htmlSources,
+  basePath = '',
+}) {
+  const shellFileSet = new Set(shellFiles.map(normalizePath))
+  const missing = []
+
+  for (const [htmlFile, htmlSource] of htmlSources) {
+    for (const dependency of shellAssetReferencesFromHtml(
+      htmlSource,
+      htmlFile,
+      basePath
+    )) {
+      if (!shellFileSet.has(dependency)) {
+        missing.push(`${normalizePath(htmlFile)} -> ${dependency}`)
+      }
+    }
+  }
+
+  if (missing.length) {
+    throw new Error(
+      `Service-worker shell omits assets required by precached HTML: ${missing.join('; ')}`
+    )
+  }
+}
+
+export function assertShellPrecacheBudget({ urlCount, rawBytes }) {
+  const violations = []
+  if (urlCount > MAX_SHELL_PRECACHE_URLS) {
+    violations.push(
+      `${urlCount} URLs exceeds ${MAX_SHELL_PRECACHE_URLS}-URL limit`
+    )
+  }
+  if (rawBytes > MAX_SHELL_PRECACHE_RAW_BYTES) {
+    violations.push(
+      `${rawBytes} raw bytes exceeds ${MAX_SHELL_PRECACHE_RAW_BYTES}-byte limit`
+    )
+  }
+  if (violations.length) {
+    throw new Error(
+      `Service-worker shell precache budget exceeded: ${violations.join('; ')}. Defer nonessential routes or assets.`
+    )
+  }
 }
 
 export function torahPageFilesFromManifest(manifest) {
@@ -149,11 +337,14 @@ export function renderServiceWorkerSource({
   shellUrls,
   torahPageUrls,
 }) {
+  const cacheNamespace = cacheNamespaceForBasePath(basePath)
   return `const BASE_PATH = '${normalizeBasePath(basePath)}'
 const APP_FALLBACK_URL = BASE_PATH + '/'
-const SHELL_CACHE_PREFIX = 'tikkun-shell-'
+const SHELL_CACHE_PREFIX = 'tikkun-shell-${cacheNamespace}-'
 const SHELL_CACHE_NAME = SHELL_CACHE_PREFIX + '${buildHash}'
-const TORAH_CACHE_NAME = 'tikkun-torah-v1'
+const TORAH_CACHE_NAME = 'tikkun-torah-${cacheNamespace}-v1'
+const LEGACY_TORAH_CACHE_NAME = 'tikkun-torah-v1'
+const LEGACY_SHELL_CACHE_PATTERN = /^tikkun-shell-[a-f0-9]{16}$/
 const SHELL_URLS = ${JSON.stringify(shellUrls, null, 2)}
 const TORAH_PAGE_URLS = ${JSON.stringify(torahPageUrls, null, 2)}
 const TORAH_PAGE_PATHS = new Set(TORAH_PAGE_URLS)
@@ -329,9 +520,9 @@ async function removeObsoleteShellCaches() {
       .filter(
         (key) =>
           (key.startsWith(SHELL_CACHE_PREFIX) && key !== SHELL_CACHE_NAME) ||
-          (key.startsWith('tikkun-') &&
-            !key.startsWith(SHELL_CACHE_PREFIX) &&
-            !key.startsWith('tikkun-torah-'))
+          (BASE_PATH === '' &&
+            (LEGACY_SHELL_CACHE_PATTERN.test(key) ||
+              key === LEGACY_TORAH_CACHE_NAME))
       )
       .map((key) => caches.delete(key))
   )
@@ -404,11 +595,18 @@ export async function generateServiceWorker(
   {
     basePath = process.env.TIKKUN_BASE_PATH ?? '',
     manifestPath = clientManifestPath,
+    appPath = clientAppPath,
   } = {}
 ) {
   const normalizedBasePath = normalizeBasePath(basePath)
-  const manifest = await readBuildManifest(manifestPath)
-  const { excludedFiles, torahPageFiles } = classifyManifestFiles(manifest)
+  const [manifest, clientAppSource] = await Promise.all([
+    readBuildManifest(manifestPath),
+    readFile(appPath, 'utf8'),
+  ])
+  const { excludedFiles, torahPageFiles } = classifyManifestFiles(
+    manifest,
+    prototypeRouteNodeSources(clientAppSource)
+  )
   if (!torahPageFiles.length) {
     throw new Error('SvelteKit client manifest did not contain Torah page chunks')
   }
@@ -419,12 +617,36 @@ export async function generateServiceWorker(
     .filter((relativePath) => shouldPrecache(relativePath, excludedFiles))
     .sort()
 
+  const htmlSources = new Map(
+    await Promise.all(
+      shellFiles
+        .filter((relativePath) => relativePath.endsWith('.html'))
+        .map(async (relativePath) => [
+          relativePath,
+          await readFile(path.join(root, relativePath), 'utf8'),
+        ])
+    )
+  )
+  assertPrecachedHtmlDependencies({
+    shellFiles,
+    htmlSources,
+    basePath: normalizedBasePath,
+  })
+
   const hash = createHash('sha256')
   const buildFiles = [...new Set([...shellFiles, ...torahPageFiles])].sort()
+  const shellFileSet = new Set(shellFiles)
+  let shellRawBytes = 0
   for (const relativePath of buildFiles) {
+    const contents = await readFile(path.join(root, relativePath))
     hash.update(relativePath)
-    hash.update(await readFile(path.join(root, relativePath)))
+    hash.update(contents)
+    if (shellFileSet.has(relativePath)) shellRawBytes += contents.byteLength
   }
+  assertShellPrecacheBudget({
+    urlCount: shellFiles.length,
+    rawBytes: shellRawBytes,
+  })
 
   const buildHash = hash.digest('hex').slice(0, 16)
   const shellUrls = shellFiles.map((filePath) =>
@@ -452,7 +674,7 @@ export async function generateServiceWorker(
   }
 
   console.log(
-    `Generated service-worker.js with ${shellUrls.length} shell URLs and ${torahPageUrls.length} opt-in Torah pages (${buildHash}, ${generatedAt})`
+    `Generated service-worker.js with ${shellUrls.length} shell URLs, ${shellRawBytes} shell raw bytes, and ${torahPageUrls.length} opt-in Torah pages (${buildHash}, ${generatedAt})`
   )
 }
 

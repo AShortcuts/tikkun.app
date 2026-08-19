@@ -1,23 +1,15 @@
 import { expect, test, vi } from 'vitest'
-import { mountCueAnalyticsRoute } from './cue-analytics-route.ts'
+import {
+  type CueAnalyticsPageModule,
+  mountCueAnalyticsRoute,
+} from './cue-analytics-route.ts'
 
 test('does not render a late Analytics import after its route is cancelled', async () => {
   const root = document.createElement('main')
   root.textContent = 'Current route'
-  const deferred: {
-    resolve?: (module: {
-      default(): string
-      mountCueAnalyticsPage: ReturnType<typeof vi.fn>
-    }) => void
-  } = {}
+  const deferred = Promise.withResolvers<CueAnalyticsPageModule>()
   const mount = vi.fn(async () => {})
-  const load = () =>
-    new Promise<{
-      default(): string
-      mountCueAnalyticsPage: typeof mount
-    }>((resolve) => {
-      deferred.resolve = resolve
-    })
+  const load = () => deferred.promise
   const controller = new AbortController()
 
   const pending = mountCueAnalyticsRoute(root, {
@@ -25,7 +17,7 @@ test('does not render a late Analytics import after its route is cancelled', asy
     load,
   })
   controller.abort()
-  deferred.resolve?.({
+  deferred.resolve({
     default: () => '<section>Analytics</section>',
     mountCueAnalyticsPage: mount,
   })

@@ -132,7 +132,7 @@
           bind:this={titleButton}
           class="parsha-title"
           data-target-id="parsha-title"
-          data-tooltip='Tip: Press "/" to open quickly'
+          data-tooltip="Tip: Press Cmd/Ctrl+K to search"
           onclick={onTitleClick}
         >
           {title}
@@ -203,15 +203,16 @@
   <div
     class="reader-progress-mobile-fill"
     data-target-id="reader-progress-mobile-fill"
-    style:width={`${progress.percent}%`}
+    style:--reader-progress-ratio={`${progress.percent / 100}`}
   ></div>
 </div>
 
 <div id="js-app" class="app-body">
-  <section
+  <main
     class="reader-shell"
     class:u-hidden={view !== 'reader'}
     data-target-id="reader-shell"
+    aria-label="Torah reader"
   >
     <div
       class="reader-side mod-left"
@@ -243,6 +244,12 @@
         class:u-hidden={!readerChromeVisible}
         class:mod-animated={!readerChromeVisible}
         data-target-id="reader-progress"
+        role="progressbar"
+        aria-label="Reading progress"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow={progress.percent}
+        aria-valuetext={`${progress.label}, ${progress.percent}%`}
       >
         <div
           class="reader-progress-label"
@@ -254,7 +261,7 @@
           <div
             class="reader-progress-fill"
             data-target-id="reader-progress-fill"
-            style:height={`${progress.percent}%`}
+            style:--reader-progress-ratio={`${progress.percent / 100}`}
           ></div>
         </div>
         <div
@@ -265,7 +272,7 @@
         </div>
       </div>
     </div>
-  </section>
+  </main>
   <section
     class="about-route"
     class:u-hidden={view !== 'optional'}
@@ -283,23 +290,23 @@
     class:u-hidden={pickerOpen}
     class:mod-animated={pickerOpen}
     data-test-id="annotations-toggle"
+    data-target-id="annotations-toggle"
     data-tooltip='Tip: Hold "Shift" to toggle quickly'
     data-tooltip-position="top-left"
     type="button"
+    title={annotationsEnabled ? 'Hide vowels' : 'Show vowels'}
+    aria-label={annotationsEnabled
+      ? 'Hide vowels and cantillation marks'
+      : 'Show vowels and cantillation marks'}
+    aria-pressed={annotationsEnabled}
+    onclick={() => onAnnotationsChange(!annotationsEnabled)}
   >
-    <label class="toggle">
-      <div class="shadowed-circle">
-        <input
-          data-target-id="annotations-toggle"
-          type="checkbox"
-          checked={annotationsEnabled}
-          onchange={(event) =>
-            onAnnotationsChange(event.currentTarget.checked)}
-        />
+    <span class="toggle" aria-hidden="true">
+      <span class="shadowed-circle">
         <span class="toggle-state mod-off">א</span>
         <span class="toggle-state mod-on">אֶ֨</span>
-      </div>
-    </label>
+      </span>
+    </span>
   </button>
 </div>
 

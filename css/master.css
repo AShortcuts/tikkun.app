@@ -2,6 +2,7 @@
 @import '../node_modules/normalize.css/normalize.css';
 
 @import './app-layout.css';
+@import './reader-search.css';
 @import './tooltip.css';
 @import './page.css';
 @import './parsha-picker.css';
@@ -196,6 +197,12 @@ ol {
   --text-color: oklch(0% 0 0 / 0.7);
   --light-text-color: oklch(0% 0 0 / 0.5);
   --button-border-radius: 8px;
+  --reader-control-press-scale: 0.97;
+  --reader-motion-fast: 140ms;
+  --reader-motion-color: 160ms;
+  --reader-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --reader-ease-standard: cubic-bezier(0.2, 0.75, 0.25, 1);
+  --reader-focus-color: #0a84ff;
   --reader-highlight-fill: #ffd700;
   --reader-highlight-fill-tint: rgba(255,255,0,0.15);
   --reader-highlight-fill-alpha-percent: 15%;

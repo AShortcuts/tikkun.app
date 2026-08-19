@@ -1,5 +1,7 @@
 <script lang="ts">
   import { flushSync, onMount } from 'svelte'
+  import ReaderSearchBar from '../search/ReaderSearchBar.svelte'
+  import { createReaderSearch } from '../search/reader-search.ts'
   import UiIcon from './UiIcon.svelte'
   import type { ParshaPickerComponentProps } from './ParshaPicker.ts'
   import {
@@ -11,7 +13,6 @@
     type ParshaAliyahChoice,
     type ParshaAliyahChoiceGroup,
     type ParshaPickerEntry,
-    type ParshaPickerSearchResult,
   } from './parsha-picker-model.ts'
   import {
     generateTorahReferenceHash,
@@ -23,10 +24,16 @@
   let {
     model,
     calendarSettings,
+    animateOnOpen,
     onCalendarSettingsChange,
     navigate,
     document: ownerDocument,
     view,
+    getActions,
+    requestClose,
+    isBookmarkAction,
+    formatBadge,
+    connectSearch,
   }: ParshaPickerComponentProps = $props()
 
   type AliyahMenuState = {
@@ -42,10 +49,7 @@
   const firstBook = torahBooks[0]
   if (!firstBook) throw new Error('Torah reference index has no books')
 
-  let query = $state('')
-  let selectedSearchIndex = $state(0)
-  let searchInput: HTMLInputElement
-  const searchResults = $derived(query ? model.search(query) : [])
+  let searchQuery = $state('')
 
   const initialChapters = listTorahChapters(firstBook.number)
   const initialChapter = initialChapters[0] ?? 1
@@ -65,7 +69,6 @@
   let menuStack = $state<HTMLElement | null>(null)
   let popup = $state<HTMLElement | null>(null)
   let submenu = $state<HTMLElement | null>(null)
-  let focusTimer = 0
 
   function isModifiedClick(event: MouseEvent) {
     return (
@@ -81,51 +84,6 @@
     event.preventDefault()
     navigate(href)
     return true
-  }
-
-  function handleSearchInput(event: Event) {
-    flushSync(() => {
-      query = (event.currentTarget as HTMLInputElement).value
-      selectedSearchIndex = 0
-    })
-  }
-
-  function selectSearchAdjustment(adjustment: number) {
-    if (!searchResults.length) return
-    selectedSearchIndex =
-      (selectedSearchIndex + adjustment + searchResults.length) %
-      searchResults.length
-  }
-
-  function handleSearchKeydown(event: KeyboardEvent) {
-    const key = event.key.toLocaleLowerCase()
-    if (event.key === 'ArrowDown' || (event.ctrlKey && key === 'n')) {
-      event.preventDefault()
-      selectSearchAdjustment(1)
-      return
-    }
-    if (event.key === 'ArrowUp' || (event.ctrlKey && key === 'p')) {
-      event.preventDefault()
-      selectSearchAdjustment(-1)
-      return
-    }
-    if (event.key !== 'Enter') return
-
-    const selected = searchResults[selectedSearchIndex]
-    if (!selected) return
-    event.preventDefault()
-    navigate(selected.href)
-  }
-
-  function isMatchedCharacter(
-    result: ParshaPickerSearchResult,
-    field: number,
-    index: number
-  ) {
-    return (
-      result.matchedField === field &&
-      result.matchedIndexes.includes(index)
-    )
   }
 
   function updateBook(rawValue: string) {
@@ -273,7 +231,7 @@
     if (hoverFlyout) positionAliyahSubmenu()
     if (focusFirstChoice) {
       const target = hoverFlyout ? submenu : popup
-      target?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
+      target?.querySelector<HTMLElement>('.aliyah-selection-option')?.focus()
     }
   }
 
@@ -322,7 +280,7 @@
     if (event.key === 'ArrowDown') {
       event.preventDefault()
       showAliyahMenu(event.currentTarget as HTMLAnchorElement, entry)
-      popup?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
+      popup?.querySelector<HTMLElement>('.aliyah-selection-option')?.focus()
       return
     }
     if (event.key === 'Escape') closeAliyahMenu()
@@ -393,10 +351,6 @@
     flushSync(() => {
       hoverFlyout = flyoutMedia?.matches ?? false
     })
-    focusTimer = view.setTimeout(() => {
-      focusTimer = 0
-      searchInput.focus()
-    }, 0)
     ownerDocument.addEventListener(
       'pointerdown',
       handleDocumentPointerDown,
@@ -407,8 +361,6 @@
     flyoutMedia.addEventListener('change', handleFlyoutChange)
 
     return () => {
-      if (focusTimer) view.clearTimeout(focusTimer)
-      focusTimer = 0
       ownerDocument.removeEventListener(
         'pointerdown',
         handleDocumentPointerDown,
@@ -423,76 +375,25 @@
   })
 </script>
 
-<div class="parsha-picker" onscroll={closeAliyahMenu}>
+<div
+  class="parsha-picker"
+  class:mod-animate-open={animateOnOpen}
+  onscroll={closeAliyahMenu}
+>
   <div class="stack xlarge">
     <div class="centerize">
-      <div class="search">
-        <div class="search-bar">
-          <span class="search-icon">⚲</span>
-          <input
-            bind:this={searchInput}
-            class="search-input"
-            placeholder="Search..."
-            autocomplete="off"
-            autocorrect="off"
-            autocapitalize="off"
-            spellcheck="false"
-            value={query}
-            oninput={handleSearchInput}
-            onkeydown={handleSearchKeydown}
-          />
-        </div>
-        <div class="search-results" class:u-hidden={!query}>
-          {#if query}
-            {#if searchResults.length}
-              <ol class="list">
-                {#each searchResults as result, index (result.id)}
-                  <li
-                    class="list-item"
-                    data-target-class="list-item"
-                    data-selected={index === selectedSearchIndex
-                      ? 'true'
-                      : undefined}
-                  >
-                    <a
-                      data-target-class="parsha-result"
-                      href={result.href}
-                      onclick={(event) =>
-                        navigateLink(event, result.href)}
-                    >
-                      <p
-                        class="search-result-tag mod-hebrew"
-                        data-target-class="result-hebrew"
-                      >
-                        {#each result.hebrewLabel.split('') as character, characterIndex (characterIndex)}
-                          {#if isMatchedCharacter(result, 0, characterIndex)}
-                            <strong>{character}</strong>
-                          {:else}
-                            {character}
-                          {/if}
-                        {/each}
-                      </p>
-                      <p class="search-result-tag">
-                        {#each result.englishLabel.split('') as character, characterIndex (characterIndex)}
-                          {#if isMatchedCharacter(result, 1, characterIndex)}
-                            <strong>{character}</strong>
-                          {:else}
-                            {character}
-                          {/if}
-                        {/each}
-                      </p>
-                    </a>
-                  </li>
-                {/each}
-              </ol>
-            {:else}
-              <p style="text-align: center; color: var(--light-text-color);">
-                No results
-              </p>
-            {/if}
-          {/if}
-        </div>
-      </div>
+      <ReaderSearchBar
+        presentation="embedded"
+        createSearch={() =>
+          createReaderSearch(model.searchLeinings, getActions())}
+        {navigate}
+        {requestClose}
+        resultActivated={() => undefined}
+        queryChanged={(query) => (searchQuery = query)}
+        {isBookmarkAction}
+        {formatBadge}
+        connect={connectSearch}
+      />
     </div>
 
     <section class="calendar-settings" dir="ltr">
@@ -573,7 +474,7 @@
       dir="ltr"
       id="coming-up"
       class="section mod-alternate mod-padding"
-      class:u-hidden={Boolean(query)}
+      class:u-hidden={Boolean(searchQuery)}
     >
       <div class="stack medium">
         <div class="section-label">Coming up</div>
@@ -610,7 +511,7 @@
       </div>
     </section>
 
-    <div class="browse" class:u-hidden={Boolean(query)}>
+    <div class="browse" class:u-hidden={Boolean(searchQuery)}>
       <h2 class="section-heading">פרשת השבוע</h2>
       <ol class="parsha-books mod-emphasize-first-in-group">
         {#each model.parshaBooks as book, bookIndex (book[0]?.id ?? bookIndex)}
@@ -623,9 +524,6 @@
                     href={entry.href}
                     data-aliyah-choice-id={entry.aliyahGroups.length
                       ? entry.id
-                      : undefined}
-                    aria-haspopup={entry.aliyahGroups.length
-                      ? 'menu'
                       : undefined}
                     aria-expanded={entry.aliyahGroups.length
                       ? menu?.entryId === entry.id
@@ -699,7 +597,7 @@
       bind:this={popup}
       class="aliyah-selection-popup"
       id={`${menu.entryId}-menu`}
-      role="menu"
+      role="group"
       tabindex="-1"
       aria-label="Select aliyah"
     >
@@ -708,7 +606,6 @@
         {#each menu.groups[0].choices as choice (choice.href)}
           <a
             class="aliyah-selection-option"
-            role="menuitem"
             href={choice.href}
             onclick={(event) => handleChoiceClick(event, choice)}
           >
@@ -735,7 +632,6 @@
           {#each activeGroup.choices as choice (choice.href)}
             <a
               class="aliyah-selection-option"
-              role="menuitem"
               href={choice.href}
               onclick={(event) => handleChoiceClick(event, choice)}
             >
@@ -749,9 +645,7 @@
           <button
             class="aliyah-selection-option mod-group"
             type="button"
-            role="menuitem"
             data-choice-group-index={groupIndex}
-            aria-haspopup="menu"
             aria-expanded={menu.activeGroupIndex === groupIndex}
             onpointerover={(event) =>
               handleGroupPointerOver(event, groupIndex)}
@@ -773,7 +667,7 @@
           <div
             bind:this={submenu}
             class="aliyah-selection-popup mod-submenu"
-            role="menu"
+            role="group"
             tabindex="-1"
             aria-label={`Select aliyah from ${activeGroup.label}`}
           >
@@ -781,7 +675,6 @@
             {#each activeGroup.choices as choice (choice.href)}
               <a
                 class="aliyah-selection-option"
-                role="menuitem"
                 href={choice.href}
                 onclick={(event) => handleChoiceClick(event, choice)}
               >

@@ -1,9 +1,16 @@
 import vm from 'node:vm'
 import { expect, test, vi } from 'vitest'
 import {
+  assertPrecachedHtmlDependencies,
+  assertShellPrecacheBudget,
+  cacheNamespaceForBasePath,
   classifyManifestFiles,
+  MAX_SHELL_PRECACHE_RAW_BYTES,
+  MAX_SHELL_PRECACHE_URLS,
   normalizeBasePath,
+  prototypeRouteNodeSources,
   renderServiceWorkerSource,
+  shellAssetReferencesFromHtml,
   shouldPrecache,
   toDeploymentUrl,
   torahPageFilesFromManifest,
@@ -90,6 +97,34 @@ const manifest = {
   'app/components/ParshaPicker.ts': {
     file: '_app/immutable/chunks/parsha-picker.js',
   },
+  '.svelte-kit/generated/client-optimized/app.js': {
+    file: '_app/immutable/entry/app.js',
+    isEntry: true,
+    dynamicImports: [
+      '.svelte-kit/generated/client-optimized/nodes/10.js',
+    ],
+  },
+  '.svelte-kit/generated/client-optimized/nodes/10.js': {
+    file: '_app/immutable/nodes/prototype-index.js',
+    isEntry: true,
+    imports: ['_BCaVwE0w.js', '_CZtLFM2E.js'],
+    css: [
+      '_app/immutable/assets/prototype-index.css',
+      '_app/immutable/assets/site.css',
+    ],
+  },
+  '.svelte-kit/generated/client-optimized/nodes/2.js': {
+    file: '_app/immutable/nodes/site-layout.js',
+    isEntry: true,
+    imports: ['_CZtLFM2E.js'],
+    css: ['_app/immutable/assets/site.css'],
+  },
+  '_BCaVwE0w.js': {
+    file: '_app/immutable/chunks/BCaVwE0w.js',
+  },
+  '_CZtLFM2E.js': {
+    file: '_app/immutable/chunks/CZtLFM2E.js',
+  },
 }
 
 test('navigation falls back for server errors and thrown network failures', async () => {
@@ -137,8 +172,11 @@ test('navigation preserves non-server HTTP responses and uncached server failure
   ).resolves.toBe(serverFailure)
 })
 
-test('classifies manifest-backed deferred content without excluding core controls', () => {
-  const { excludedFiles, torahPageFiles } = classifyManifestFiles(manifest)
+test('excludes prototype-only dependencies while retaining shared core assets', () => {
+  const { excludedFiles, torahPageFiles } = classifyManifestFiles(
+    manifest,
+    new Set(['.svelte-kit/generated/client-optimized/nodes/10.js'])
+  )
 
   expect(torahPageFiles).toEqual([
     '_app/immutable/chunks/torah-1.js',
@@ -148,7 +186,68 @@ test('classifies manifest-backed deferred content without excluding core control
   expect(excludedFiles).toContain('_app/immutable/chunks/cues-1.js')
   expect(excludedFiles).toContain('_app/immutable/chunks/cue-authoring.js')
   expect(excludedFiles).toContain('_app/immutable/assets/cue-authoring.css')
+  expect(excludedFiles).toContain('_app/immutable/nodes/prototype-index.js')
+  expect(excludedFiles).toContain('_app/immutable/assets/prototype-index.css')
+  expect(excludedFiles).toContain('_app/immutable/chunks/BCaVwE0w.js')
+  expect(excludedFiles).not.toContain('_app/immutable/assets/site.css')
+  expect(excludedFiles).not.toContain('_app/immutable/chunks/CZtLFM2E.js')
   expect(excludedFiles).not.toContain('_app/immutable/chunks/parsha-picker.js')
+})
+
+test('requires every stylesheet and modulepreload referenced by shell HTML', () => {
+  const html = `
+    <link href="./_app/site.css" rel="stylesheet preload">
+    <link rel='modulepreload' href='./_app/entry.js'>
+    <link rel="icon" href="./favicon.ico">
+    <link rel="stylesheet" href="https://cdn.example.com/external.css">
+  `
+  const shellFiles = ['index.html', '_app/site.css', '_app/entry.js']
+
+  expect(shellAssetReferencesFromHtml(html)).toEqual([
+    '_app/entry.js',
+    '_app/site.css',
+  ])
+  expect(() =>
+    assertPrecachedHtmlDependencies({
+      shellFiles,
+      htmlSources: new Map([['index.html', html]]),
+    })
+  ).not.toThrow()
+  expect(() =>
+    assertPrecachedHtmlDependencies({
+      shellFiles: shellFiles.filter((file) => file !== '_app/site.css'),
+      htmlSources: new Map([['index.html', html]]),
+    })
+  ).toThrow('index.html -> _app/site.css')
+})
+
+test('resolves nested shell dependencies within a deployment base path', () => {
+  const html = '<link rel="stylesheet" href="../_app/site.css">'
+
+  expect(
+    shellAssetReferencesFromHtml(
+      html,
+      'about/index.html',
+      '/pr-preview/pr-42'
+    )
+  ).toEqual(['_app/site.css'])
+})
+
+test('finds prototype page and layout nodes in the generated route table', () => {
+  expect(
+    [...prototypeRouteNodeSources(`
+      "/": [5],
+      "/prototypes": [10],
+      "/prototypes/apple-sentient": [11,[3]],
+      "/prototypes/scroll-story": [16,[4]],
+    `)].sort()
+  ).toEqual([
+    '.svelte-kit/generated/client-optimized/nodes/10.js',
+    '.svelte-kit/generated/client-optimized/nodes/11.js',
+    '.svelte-kit/generated/client-optimized/nodes/16.js',
+    '.svelte-kit/generated/client-optimized/nodes/3.js',
+    '.svelte-kit/generated/client-optimized/nodes/4.js',
+  ])
 })
 
 test('precache keeps the app shell small and excludes deferred content', () => {
@@ -160,6 +259,12 @@ test('precache keeps the app shell small and excludes deferred content', () => {
   ).toBe(false)
   expect(
     shouldPrecache('_app/immutable/chunks/parsha-picker.js', excludedFiles)
+  ).toBe(true)
+  expect(
+    shouldPrecache('_app/immutable/chunks/search-index.js', excludedFiles)
+  ).toBe(true)
+  expect(
+    shouldPrecache('_app/immutable/chunks/command-palette.js', excludedFiles)
   ).toBe(true)
   expect(shouldPrecache('audio/reader/aliyah.m4a', excludedFiles)).toBe(false)
   expect(shouldPrecache('_app/immutable/assets/movie.mp4', excludedFiles)).toBe(false)
@@ -181,6 +286,48 @@ test('precache keeps the app shell small and excludes deferred content', () => {
     )
   ).toBe(true)
   expect(shouldPrecache('service-worker.js', excludedFiles)).toBe(false)
+  expect(shouldPrecache('_headers', excludedFiles)).toBe(false)
+  expect(shouldPrecache('_redirects', excludedFiles)).toBe(false)
+  expect(shouldPrecache('prototypes/index.html', excludedFiles)).toBe(false)
+  expect(
+    shouldPrecache('assets/images/prototypes/reader.png', excludedFiles)
+  ).toBe(false)
+})
+
+test('accepts shell precache metrics at both release limits', () => {
+  expect(() =>
+    assertShellPrecacheBudget({
+      urlCount: MAX_SHELL_PRECACHE_URLS,
+      rawBytes: MAX_SHELL_PRECACHE_RAW_BYTES,
+    })
+  ).not.toThrow()
+})
+
+test('rejects shell precache URL and raw-byte budget overruns clearly', () => {
+  expect(() =>
+    assertShellPrecacheBudget({
+      urlCount: MAX_SHELL_PRECACHE_URLS + 1,
+      rawBytes: MAX_SHELL_PRECACHE_RAW_BYTES,
+    })
+  ).toThrow(
+    `${MAX_SHELL_PRECACHE_URLS + 1} URLs exceeds ${MAX_SHELL_PRECACHE_URLS}-URL limit`
+  )
+  expect(() =>
+    assertShellPrecacheBudget({
+      urlCount: MAX_SHELL_PRECACHE_URLS,
+      rawBytes: MAX_SHELL_PRECACHE_RAW_BYTES + 1,
+    })
+  ).toThrow(
+    `${MAX_SHELL_PRECACHE_RAW_BYTES + 1} raw bytes exceeds ${MAX_SHELL_PRECACHE_RAW_BYTES}-byte limit`
+  )
+  expect(() =>
+    assertShellPrecacheBudget({
+      urlCount: MAX_SHELL_PRECACHE_URLS + 1,
+      rawBytes: MAX_SHELL_PRECACHE_RAW_BYTES + 1,
+    })
+  ).toThrow(
+    `Service-worker shell precache budget exceeded: ${MAX_SHELL_PRECACHE_URLS + 1} URLs exceeds ${MAX_SHELL_PRECACHE_URLS}-URL limit; ${MAX_SHELL_PRECACHE_RAW_BYTES + 1} raw bytes exceeds ${MAX_SHELL_PRECACHE_RAW_BYTES}-byte limit. Defer nonessential routes or assets.`
+  )
 })
 
 test('selects only Torah entries from the SvelteKit client manifest', () => {
@@ -204,6 +351,7 @@ test('maps static files to clean deployment URLs and validates base paths', () =
 })
 
 test('renders base-aware shell and opt-in Torah caches without caching recordings', () => {
+  const cacheNamespace = cacheNamespaceForBasePath('/preview/app')
   const source = renderServiceWorkerSource({
     basePath: '/preview/app',
     buildHash: 'abc123',
@@ -212,10 +360,99 @@ test('renders base-aware shell and opt-in Torah caches without caching recording
   })
 
   expect(source).toContain("const BASE_PATH = '/preview/app'")
+  expect(source).toContain(
+    `const SHELL_CACHE_PREFIX = 'tikkun-shell-${cacheNamespace}-'`
+  )
   expect(source).toContain("const SHELL_CACHE_NAME = SHELL_CACHE_PREFIX + 'abc123'")
-  expect(source).toContain("const TORAH_CACHE_NAME = 'tikkun-torah-v1'")
+  expect(source).toContain(
+    `const TORAH_CACHE_NAME = 'tikkun-torah-${cacheNamespace}-v1'`
+  )
   expect(source).toContain("event.data?.type === 'DOWNLOAD_TORAH_PAGES'")
   expect(source).toContain('TORAH_DOWNLOAD_CONCURRENCY = 4')
   expect(source).toContain("const MEDIA_PATH_PREFIX = BASE_PATH + '/audio/'")
   expect(source).toContain('TORAH_PAGE_PATHS.has(url.pathname)')
+})
+
+test('namespaces cache cleanup to one deployment base path', async () => {
+  const currentNamespace = cacheNamespaceForBasePath('/preview/current')
+  const otherNamespace = cacheNamespaceForBasePath('/preview/other')
+  const currentCache = `tikkun-shell-${currentNamespace}-current`
+  const obsoleteCache = `tikkun-shell-${currentNamespace}-obsolete`
+  const otherCache = `tikkun-shell-${otherNamespace}-current`
+  const deleted: string[] = []
+  const context = {
+    URL,
+    fetch: vi.fn(),
+    caches: {
+      keys: vi.fn(async () => [currentCache, obsoleteCache, otherCache]),
+      delete: vi.fn(async (key: string) => {
+        deleted.push(key)
+        return true
+      }),
+    },
+    self: {
+      addEventListener: vi.fn(),
+      location: { origin: 'https://tikkun.test' },
+      clients: { claim: vi.fn() },
+      skipWaiting: vi.fn(),
+    },
+  }
+  vm.runInNewContext(
+    `${renderServiceWorkerSource({
+      basePath: '/preview/current',
+      buildHash: 'current',
+      shellUrls: [],
+      torahPageUrls: [],
+    })}\nglobalThis.cleanupForTest = removeObsoleteShellCaches`,
+    context
+  )
+
+  await (
+    context as typeof context & { cleanupForTest: () => Promise<void> }
+  ).cleanupForTest()
+
+  expect(deleted).toEqual([obsoleteCache])
+})
+
+test('cleans legacy unnamespaced caches only from the root deployment', async () => {
+  const legacyShell = 'tikkun-shell-0123456789abcdef'
+  const legacyTorah = 'tikkun-torah-v1'
+  const unrelated = 'tikkun-shell-custom'
+
+  const runCleanup = async (basePath: string) => {
+    const deleted: string[] = []
+    const context = {
+      URL,
+      fetch: vi.fn(),
+      caches: {
+        keys: vi.fn(async () => [legacyShell, legacyTorah, unrelated]),
+        delete: vi.fn(async (key: string) => {
+          deleted.push(key)
+          return true
+        }),
+      },
+      self: {
+        addEventListener: vi.fn(),
+        location: { origin: 'https://tikkun.test' },
+        clients: { claim: vi.fn() },
+        skipWaiting: vi.fn(),
+      },
+    }
+    vm.runInNewContext(
+      `${renderServiceWorkerSource({
+        basePath,
+        buildHash: 'current',
+        shellUrls: [],
+        torahPageUrls: [],
+      })}\nglobalThis.cleanupForTest = removeObsoleteShellCaches`,
+      context
+    )
+    await (
+      context as typeof context & { cleanupForTest: () => Promise<void> }
+    ).cleanupForTest()
+    return deleted
+  }
+
+  await expect(runCleanup('')).resolves.toEqual([legacyShell, legacyTorah])
+  await expect(runCleanup('/preview/current')).resolves.toEqual([])
 })

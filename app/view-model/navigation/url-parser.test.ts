@@ -173,6 +173,17 @@ test('Parsha slug can start at a specific ref', async () => {
     ))
 })
 
+test('run and parsha routes reject indexed references outside their reading', () => {
+  expect(
+    parseUrl(generator, '/torah/parsha/beresheet/1-13-1', {
+      now: new Date('2024-10-01'),
+    })
+  ).toEqual({ view: 'not-found' })
+  expect(
+    parseUrl(generator, '/run/2024-10-26:shacharis,main/1-13-1')
+  ).toEqual({ view: 'not-found' })
+})
+
 test('Vezos Haberacha has its own parsha route and display title', async () => {
   const route = toReaderRoute(
     parseUrl(generator, '/torah/parsha/vezos-haberacha/5-33-1', {

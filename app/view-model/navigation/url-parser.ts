@@ -1,7 +1,12 @@
 import { LeiningGenerator } from '../../calendar-model/generator.ts'
 import type { LeiningRun } from '../../calendar-model/model-types.ts'
+import { containsRef } from '../../calendar-model/ref-utils.ts'
 import type { RefWithScroll, ScrollName } from '../../ref.ts'
-import { hasScrollData, isIndexedReference } from '../../location.ts'
+import {
+  getScrollPageCount,
+  hasScrollData,
+  isIndexedReference,
+} from '../../location.ts'
 import { ScrollViewModel } from '../scroll-view-model.ts'
 import { generateParshaUrl, resolveParshaRun } from './parsha-routes.ts'
 
@@ -69,6 +74,9 @@ const pathHandlers: Record<
     if (!hasScrollData(run.scroll)) return { view: 'not-found' }
     const initialRef = refFromPath(ref, run.scroll)
     if (ref && !initialRef) return missingReferenceRoute(ref)
+    if (initialRef && !refBelongsToRun(initialRef, run)) {
+      return { view: 'not-found' }
+    }
     const model = ScrollViewModel.forId(generator, run.id, initialRef ?? undefined)
     return model ? { view: 'reader', model } : null
   },
@@ -122,6 +130,9 @@ function parseTorahRoute(
 
     const initialRef = refFromPath(ref, resolved.run.scroll)
     if (ref && !initialRef) return missingReferenceRoute(ref)
+    if (initialRef && !refBelongsToRun(initialRef, resolved.run)) {
+      return { view: 'not-found' }
+    }
 
     const model = ScrollViewModel.forId(
       generator,
@@ -166,6 +177,9 @@ function parseEstherRoute(
 
   const initialRef = refFromPath(ref, resolved.run.scroll)
   if (ref && !initialRef) return missingReferenceRoute(ref)
+  if (initialRef && !refBelongsToRun(initialRef, resolved.run)) {
+    return { view: 'not-found' }
+  }
 
   const model = ScrollViewModel.forId(
     generator,
@@ -221,8 +235,11 @@ function parsePageRoute(
 }
 
 function isValidPageNumber(scroll: ScrollName, page: number) {
-  const pageCount = scroll === 'torah' ? 245 : 17
-  return page >= 1 && page <= pageCount
+  return page >= 1 && page <= getScrollPageCount(scroll)
+}
+
+function refBelongsToRun(ref: RefWithScroll, run: LeiningRun) {
+  return ref.scroll === run.scroll && containsRef(run, ref)
 }
 
 function missingReferenceRoute(ref: string): AppRoute | null {

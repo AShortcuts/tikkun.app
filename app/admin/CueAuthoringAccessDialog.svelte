@@ -12,15 +12,15 @@
   }: CueAuthoringAccessDialogComponentProps = $props()
 
   let openState = $state(false)
-  let password = $state('')
+  let unlockCode = $state('')
   let errorMessage = $state('')
   let modal: HTMLElement
-  let passwordInput: HTMLInputElement
+  let unlockCodeInput: HTMLInputElement
   let returnFocus: HTMLElement | null = null
 
   function open() {
     if (openState) {
-      passwordInput.focus({ preventScroll: true })
+      unlockCodeInput.focus({ preventScroll: true })
       return
     }
 
@@ -31,11 +31,11 @@
         ? activeElement
         : null
     flushSync(() => {
-      password = ''
+      unlockCode = ''
       errorMessage = ''
       openState = true
     })
-    passwordInput.focus({ preventScroll: true })
+    unlockCodeInput.focus({ preventScroll: true })
   }
 
   function close() {
@@ -45,7 +45,7 @@
     returnFocus = null
     flushSync(() => {
       openState = false
-      password = ''
+      unlockCode = ''
       errorMessage = ''
     })
     if (focusTarget?.isConnected) {
@@ -53,25 +53,25 @@
     }
   }
 
-  function submitPassword(event: SubmitEvent) {
+  function submitUnlockCode(event: SubmitEvent) {
     event.preventDefault()
-    if (!password) return
-    if (submit(password)) {
+    if (!unlockCode) return
+    if (submit(unlockCode)) {
       close()
       return
     }
 
     flushSync(() => {
-      errorMessage = "That password isn't correct. Try again."
+      errorMessage = "That unlock code isn't correct. Try again."
     })
-    passwordInput.focus({ preventScroll: true })
-    passwordInput.select()
+    unlockCodeInput.focus({ preventScroll: true })
+    unlockCodeInput.select()
   }
 
-  function updatePassword(event: Event) {
-    const nextPassword = (event.currentTarget as HTMLInputElement).value
+  function updateUnlockCode(event: Event) {
+    const nextUnlockCode = (event.currentTarget as HTMLInputElement).value
     flushSync(() => {
-      password = nextPassword
+      unlockCode = nextUnlockCode
       if (errorMessage) errorMessage = ''
     })
   }
@@ -121,7 +121,7 @@
     connect(dialog)
     return () => {
       returnFocus = null
-      password = ''
+      unlockCode = ''
       errorMessage = ''
     }
   })
@@ -142,31 +142,32 @@
 >
   <section class="admin-access-card">
     <header class="admin-access-header">
-      <h2 id="admin-access-title">Admin Access</h2>
+      <h2 id="admin-access-title">Cue Authoring</h2>
       <p id="admin-access-description">
-        Enter the admin password to open cue authoring.
+        Enter the local unlock code. This convenience lock prevents accidental
+        access; it is not a security control.
       </p>
     </header>
     <form
       class="admin-access-form"
       data-target-id="admin-access-form"
-      onsubmit={submitPassword}
+      onsubmit={submitUnlockCode}
     >
       <label class="admin-access-field">
-        <span>Password</span>
+        <span>Local unlock code</span>
         <input
-          bind:this={passwordInput}
+          bind:this={unlockCodeInput}
           class="admin-access-input"
           data-target-id="admin-access-password"
           type="password"
-          name="admin-password"
-          autocomplete="current-password"
+          name="cue-authoring-unlock-code"
+          autocomplete="off"
           autocapitalize="none"
           spellcheck="false"
           aria-invalid={Boolean(errorMessage)}
           aria-describedby="admin-access-error"
-          value={password}
-          oninput={updatePassword}
+          value={unlockCode}
+          oninput={updateUnlockCode}
         />
       </label>
       <p
@@ -189,7 +190,7 @@
           class="toolbar-button admin-access-submit"
           data-target-id="admin-access-submit"
           type="submit"
-          disabled={!password}
+          disabled={!unlockCode}
         >Unlock</button>
       </div>
     </form>

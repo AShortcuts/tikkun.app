@@ -338,6 +338,37 @@
     })
   }
 
+  function handlePlayerKeydown(event: KeyboardEvent) {
+    if (!snapshot.compact || !snapshot.expanded) return
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      setExpanded(false, 'close')
+      return
+    }
+    if (event.key !== 'Tab') return
+
+    const root = requireElement(playerElement, 'its player element')
+    const focusable = [
+      ...root.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), input:not(:disabled), a[href]:not([aria-disabled="true"]), [tabindex]:not([tabindex="-1"])'
+      ),
+    ].filter(
+      (element) =>
+        element.offsetParent !== null && !element.closest('.u-hidden')
+    )
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (!first || !last) return
+
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first.focus()
+    }
+  }
+
   function formatPlaybackRate(rate: number) {
     const rounded = Math.round(rate * 100) / 100
     return `${rounded.toFixed(2).replace(/\.?0+$/, '')}x`
@@ -407,7 +438,8 @@
   data-target-id="floating-player"
   data-cue-mode={snapshot.untimed ? 'untimed' : 'timed'}
   id="floating-player"
-  role="region"
+  role={snapshot.expanded && snapshot.compact ? 'dialog' : 'region'}
+  aria-modal={snapshot.expanded && snapshot.compact ? 'true' : undefined}
   aria-label={snapshot.expanded && snapshot.compact
     ? 'Expanded audio player'
     : 'Audio player'}
@@ -415,6 +447,7 @@
   style:--cue-progress-ratio={`${progress.cueRatio}`}
   style:left={position ? `${position.left}px` : undefined}
   style:top={position ? `${position.top}px` : undefined}
+  onkeydown={handlePlayerKeydown}
 >
   <div class="floating-player-sheet-handle" aria-hidden="true"></div>
   <header class="floating-player-header">

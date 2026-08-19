@@ -1,0 +1,2507 @@
+/* Isolated scroll-story landing-page prototype. */
+.prototype-scroll-story {
+  --scroll-bg: #06080b;
+  --scroll-surface: #0d1117;
+  --scroll-surface-raised: #121820;
+  --scroll-line: rgba(255, 255, 255, 0.12);
+  --scroll-line-strong: rgba(255, 255, 255, 0.22);
+  --scroll-frame-border: rgba(221, 232, 249, 0.74);
+  --scroll-frame-glow: 0 0 1.8rem -0.45rem rgba(132, 177, 255, 0.86);
+  --scroll-text: #f6f7f9;
+  --scroll-muted: rgba(236, 240, 246, 0.68);
+  --scroll-blue: #3984ff;
+  --scroll-green: #68c47b;
+  --scroll-draft: #5b9cff;
+  --scroll-missing: #e0b84f;
+  --scroll-paper: #f6f5f1;
+  --scroll-paper-text: #111210;
+  --scroll-paper-muted: #5a5b56;
+  --scroll-ui-font: 'Noto Sans Hebrew', sans-serif;
+  --scroll-control-radius: 0.9rem;
+  --scroll-control-height: 2.75rem;
+  --scroll-action-height: 3.45rem;
+  --scroll-press-scale: 0.97;
+  --scroll-motion-fast: 140ms;
+  --scroll-motion-color: 160ms;
+  --scroll-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --scroll-ease-standard: cubic-bezier(0.2, 0.75, 0.25, 1);
+  --scroll-action-shadow: 0 1.25rem 3rem -1.8rem rgba(57, 132, 255, 0.88);
+  display: flex;
+  min-height: 100svh;
+  flex-direction: column;
+  overflow: hidden;
+  overflow: clip;
+  background: var(--scroll-bg);
+  color: var(--scroll-text);
+  color-scheme: dark;
+}
+
+.prototype-scroll-story main {
+  flex: 1;
+}
+
+.prototype-scroll-story .scroll-reader-journey,
+.prototype-scroll-story .scroll-reader-track,
+.prototype-scroll-story .scroll-reader-motion {
+  display: contents;
+}
+
+.prototype-scroll-story button,
+.prototype-scroll-story a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.prototype-scroll-story button:focus-visible,
+.prototype-scroll-story a:focus-visible,
+.prototype-scroll-story iframe:focus-visible {
+  outline: 3px solid rgba(95, 157, 255, 0.95);
+  outline-offset: 4px;
+}
+
+.prototype-scroll-story .scroll-header {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  box-sizing: border-box;
+  width: min(100% - 2rem, 92rem);
+  min-height: 4.25rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0.75rem auto 0;
+  border: 1px solid var(--scroll-frame-border);
+  border-radius: 1.15rem;
+  padding: 0 0.65rem;
+  background: rgba(6, 8, 11, 0.82);
+  box-shadow: 0 1.2rem 2.8rem -2rem rgba(0, 0, 0, 0.92), var(--scroll-frame-glow);
+}
+
+.prototype-scroll-story .scroll-brand,
+.prototype-scroll-story .scroll-nav,
+.prototype-scroll-story .scroll-open-reader,
+.prototype-scroll-story .scroll-hero-actions,
+.prototype-scroll-story .scroll-reader-toolbar,
+.prototype-scroll-story .scroll-reader-toolbar a,
+.prototype-scroll-story .home-reading-card-header,
+.prototype-scroll-story .home-reading-bubbles,
+.prototype-scroll-story .home-reading-open,
+.prototype-scroll-story .scroll-project-note a,
+.prototype-scroll-story .scroll-footer nav {
+  display: flex;
+  align-items: center;
+}
+
+.prototype-scroll-story .scroll-brand {
+  min-height: 2.75rem;
+  min-width: 0;
+  gap: 0.68rem;
+  color: var(--scroll-text);
+  font-family: var(--scroll-ui-font);
+  text-decoration: none;
+}
+
+.prototype-scroll-story .scroll-brand-mark {
+  display: grid;
+  width: 2.55rem;
+  height: 2.55rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--scroll-line-strong);
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.prototype-scroll-story .scroll-brand-mark img {
+  width: 1.35rem;
+  height: 1.35rem;
+  filter: invert(1);
+}
+
+.prototype-scroll-story .scroll-brand-copy {
+  display: grid;
+  min-width: 0;
+  gap: 0.14rem;
+}
+
+.prototype-scroll-story .scroll-brand-copy strong {
+  font-size: 0.98rem;
+  font-weight: 720;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.prototype-scroll-story .scroll-brand-copy small {
+  display: none;
+  overflow: hidden;
+  color: var(--scroll-muted);
+  font-size: 0.66rem;
+  font-weight: 500;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prototype-scroll-story .scroll-nav {
+  gap: 1.25rem;
+  font-family: var(--scroll-ui-font);
+}
+
+.prototype-scroll-story .scroll-nav-link {
+  display: none;
+  min-height: 2.75rem;
+  align-items: center;
+  color: var(--scroll-muted);
+  font-size: 0.84rem;
+  text-decoration: none;
+  transition: color var(--scroll-motion-color) var(--scroll-ease-standard);
+}
+
+.prototype-scroll-story .scroll-open-reader,
+.prototype-scroll-story .scroll-primary-action {
+  justify-content: center;
+  border: 0;
+  background: var(--scroll-blue);
+  box-shadow: var(--scroll-action-shadow);
+  color: white;
+  font-family: var(--scroll-ui-font);
+  font-weight: 720;
+  text-decoration: none;
+  transition:
+    background-color var(--scroll-motion-color) var(--scroll-ease-standard),
+    transform var(--scroll-motion-fast) var(--scroll-ease-out);
+}
+
+.prototype-scroll-story .scroll-open-reader {
+  min-height: var(--scroll-control-height);
+  border-radius: var(--scroll-control-radius);
+  padding: 0.68rem 0.95rem;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.prototype-scroll-story .scroll-hero {
+  position: relative;
+  display: grid;
+  width: min(100% - 2rem, 92rem);
+  min-height: calc(100svh - 5rem);
+  align-content: center;
+  gap: clamp(2.8rem, 9vw, 4.5rem);
+  margin: 0 auto;
+  padding: 3rem 0 5.5rem;
+  isolation: isolate;
+}
+
+.prototype-scroll-story .scroll-hero-ambient {
+  position: absolute;
+  z-index: -2;
+  top: -5rem;
+  right: -18vw;
+  bottom: -4rem;
+  left: -18vw;
+  width: calc(100% + 36vw);
+  height: calc(100% + 9rem);
+  object-fit: cover;
+  object-position: center top;
+  opacity: 0.42;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 66%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 66%, transparent 100%);
+}
+
+.prototype-scroll-story .scroll-hero::after {
+  position: absolute;
+  z-index: -1;
+  inset: -5rem -18vw -1rem;
+  background: linear-gradient(
+    90deg,
+    rgba(6, 8, 11, 0.86) 0%,
+    rgba(6, 8, 11, 0.24) 62%,
+    rgba(6, 8, 11, 0.48) 100%
+  );
+  content: '';
+  pointer-events: none;
+}
+
+.prototype-scroll-story .scroll-hero-copy {
+  position: relative;
+  z-index: 2;
+  max-width: 31rem;
+  animation: scroll-copy-arrive 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.prototype-scroll-story .scroll-hero h1 {
+  max-width: 8.7ch;
+  margin: 0;
+  color: var(--scroll-text);
+  font-size: clamp(3.65rem, 16vw, 5.8rem);
+  font-weight: 400;
+  letter-spacing: -0.04em;
+  line-height: 0.9;
+}
+
+.prototype-scroll-story .scroll-hero h1 span {
+  white-space: nowrap;
+}
+
+.prototype-scroll-story .scroll-hero-byline {
+  margin: 1.6rem 0 0;
+  color: #79aaff;
+  font-family: var(--scroll-ui-font);
+  font-size: 0.88rem;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.prototype-scroll-story .scroll-hero-lede {
+  max-width: 28rem;
+  margin: 1.15rem 0 0;
+  color: var(--scroll-muted);
+  font-size: clamp(1.02rem, 3.7vw, 1.25rem);
+  line-height: 1.62;
+}
+
+.prototype-scroll-story .scroll-hero-actions {
+  flex-wrap: wrap;
+  gap: 1rem 1.25rem;
+  margin-top: 2.15rem;
+}
+
+.prototype-scroll-story .scroll-primary-action {
+  display: inline-flex;
+  min-width: 12.5rem;
+  min-height: var(--scroll-action-height);
+  align-items: center;
+  border-radius: var(--scroll-control-radius);
+  padding: 0.82rem 1.35rem;
+  font-size: 0.98rem;
+}
+
+.prototype-scroll-story .scroll-text-action {
+  display: inline-flex;
+  min-height: var(--scroll-action-height);
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--scroll-line-strong);
+  border-radius: var(--scroll-control-radius);
+  padding: 0.82rem 1.15rem;
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(235, 240, 247, 0.88);
+  font-family: var(--scroll-ui-font);
+  font-size: 0.9rem;
+  font-weight: 680;
+  text-decoration: none;
+  transition:
+    border-color var(--scroll-motion-color) var(--scroll-ease-standard),
+    background-color var(--scroll-motion-color) var(--scroll-ease-standard),
+    color var(--scroll-motion-color) var(--scroll-ease-standard),
+    transform var(--scroll-motion-fast) var(--scroll-ease-out);
+}
+
+.prototype-scroll-story .scroll-reader-stage {
+  position: relative;
+  z-index: 1;
+  width: calc(100% + 1rem);
+  margin-right: -0.5rem;
+  margin-left: -0.5rem;
+}
+
+.prototype-scroll-story .scroll-reader-stack {
+  position: relative;
+  isolation: isolate;
+  --reader-rest: perspective(100rem) rotateX(1deg) rotateY(-3deg) rotateZ(-0.8deg);
+  transform: var(--reader-rest);
+  transform-origin: center left;
+  transform-style: preserve-3d;
+  transition: transform 680ms cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+.prototype-scroll-story .scroll-mobile-theme-release-sentinel {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.prototype-scroll-story .scroll-reader-frame {
+  position: relative;
+  z-index: 2;
+  overflow: hidden;
+  border: 1px solid var(--scroll-frame-border);
+  border-radius: 1.1rem;
+  background: #0b0e13;
+  box-shadow: 0 3.2rem 7rem -3rem rgba(0, 0, 0, 0.96),
+    0 1.3rem 5rem -3rem rgba(65, 126, 241, 0.7), var(--scroll-frame-glow);
+  transform: none;
+  transform-origin: center left;
+  transition:
+    background-color 420ms cubic-bezier(0.23, 1, 0.32, 1),
+    box-shadow 520ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.prototype-scroll-story .scroll-reader-toolbar {
+  min-height: 3rem;
+  justify-content: space-between;
+  gap: 0.8rem;
+  border-bottom: 1px solid var(--scroll-line);
+  padding: 0.62rem 0.75rem 0.62rem 1rem;
+  background: #11161d;
+  color: rgba(245, 247, 250, 0.7);
+  font-family: var(--scroll-ui-font);
+  font-size: 0.72rem;
+}
+
+.prototype-scroll-story .scroll-reader-toolbar > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prototype-scroll-story .scroll-reader-toolbar a {
+  min-height: 2.75rem;
+  flex: 0 0 auto;
+  gap: 0.35rem;
+  color: #9fc2ff;
+  font-weight: 680;
+  text-decoration: none;
+  transition: color var(--scroll-motion-color) var(--scroll-ease-standard);
+}
+
+.prototype-scroll-story .scroll-reader-toolbar svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.prototype-scroll-story .scroll-reader-viewport {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: #e8e5dd;
+}
+
+.prototype-scroll-story .scroll-reader-viewport::before {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  background: var(--scroll-paper);
+  content: '';
+  opacity: 0;
+  pointer-events: none;
+}
+
+.prototype-scroll-story .scroll-reader-viewport::after {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  border: 3px solid rgba(95, 157, 255, 0.98);
+  opacity: 0;
+  content: '';
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.prototype-scroll-story .scroll-reader-viewport:focus-within::after {
+  opacity: 1;
+}
+
+.prototype-scroll-story .scroll-reader-viewport iframe:focus-visible {
+  outline: 0;
+}
+
+.prototype-scroll-story .scroll-reader-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: #41423e;
+  font-family: var(--scroll-ui-font);
+  font-size: 0.82rem;
+}
+
+.prototype-scroll-story .scroll-reader-viewport iframe {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: white;
+  opacity: 0;
+  transition: opacity 220ms cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+
+.prototype-scroll-story .scroll-reader-viewport.mod-loaded iframe {
+  opacity: 1;
+}
+
+.prototype-scroll-story .scroll-reader-note {
+  margin: 1rem 0 0;
+  color: rgba(235, 240, 247, 0.58);
+  font-family: var(--scroll-ui-font);
+  font-size: 0.74rem;
+  text-align: center;
+}
+
+.prototype-scroll-story .scroll-mobile-theme-sheet {
+  position: relative;
+  z-index: 4;
+  display: none;
+  color: var(--scroll-paper-text);
+  color-scheme: light;
+}
+
+.prototype-scroll-story .scroll-practice {
+  position: relative;
+  border-top: 1px solid var(--scroll-line);
+  background: var(--scroll-bg);
+  padding: clamp(6rem, 16vw, 10rem) 0;
+}
+
+.prototype-scroll-story .scroll-practice-shell {
+  width: min(100% - 2rem, 82rem);
+  margin: 0 auto;
+}
+
+.prototype-scroll-story .scroll-practice-intro {
+  max-width: 39rem;
+  margin-bottom: clamp(3rem, 8vw, 5rem);
+}
+
+.prototype-scroll-story .scroll-practice-grid {
+  position: relative;
+  display: grid;
+  gap: 2rem;
+}
+
+.prototype-scroll-story .scroll-practice-step,
+.prototype-scroll-story .scroll-practice-mobile-demo {
+  display: none;
+}
+
+.prototype-scroll-story .scroll-practice-sticky {
+  position: sticky;
+  z-index: 3;
+  top: 0.35rem;
+  display: grid;
+  align-self: start;
+  align-content: start;
+  gap: 0.65rem;
+  padding: 0.35rem 0;
+  background: linear-gradient(
+    to bottom,
+    var(--scroll-bg) 0%,
+    var(--scroll-bg) calc(100% - 1.25rem),
+    transparent 100%
+  );
+}
+
+.prototype-scroll-story .scroll-practice h2,
+.prototype-scroll-story .scroll-theme-copy h2,
+.prototype-scroll-story .scroll-readings-heading h2,
+.prototype-scroll-story .scroll-project-note h2 {
+  margin: 0;
+  font-size: clamp(2.8rem, 12vw, 5.75rem);
+  font-weight: 400;
+  letter-spacing: -0.04em;
+  line-height: 0.98;
+}
+
+.prototype-scroll-story .scroll-practice-intro > p {
+  max-width: 35rem;
+  margin: 1.25rem 0 0;
+  color: var(--scroll-muted);
+  font-size: clamp(1rem, 3vw, 1.18rem);
+  line-height: 1.62;
+}
+
+.prototype-scroll-story .scroll-practice-visual {
+  display: grid;
+  min-height: clamp(16.5rem, 80vw, 20rem);
+  align-items: center;
+  border-top: 1px solid var(--scroll-line-strong);
+  border-bottom: 1px solid var(--scroll-line-strong);
+  padding: clamp(1rem, 4vw, 1.6rem) 0;
+}
+
+.prototype-scroll-story .scroll-practice-scene {
+  min-width: 0;
+  animation: scroll-scene-change 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.prototype-scroll-story .scroll-toc-trigger,
+.prototype-scroll-story .scroll-toc-reading,
+.prototype-scroll-story .scroll-demo-heading,
+.prototype-scroll-story .scroll-continue-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.prototype-scroll-story .scroll-toc-trigger {
+  width: 100%;
+  min-height: 4.35rem;
+  border: 1px solid var(--scroll-line-strong);
+  border-radius: var(--scroll-control-radius);
+  padding: 0.72rem 0.85rem;
+  background: #10151c;
+  color: var(--scroll-text);
+  cursor: pointer;
+  font-family: var(--scroll-ui-font);
+  text-align: left;
+  transition:
+    border-color var(--scroll-motion-color) var(--scroll-ease-standard),
+    background-color var(--scroll-motion-color) var(--scroll-ease-standard),
+    transform var(--scroll-motion-fast) var(--scroll-ease-out);
+}
+
+.prototype-scroll-story .scroll-toc-trigger[aria-expanded='true'] {
+  border-bottom-color: transparent;
+  border-radius: var(--scroll-control-radius) var(--scroll-control-radius) 0 0;
+  background: #121820;
+}
+
+.prototype-scroll-story .scroll-toc-trigger > span:first-child,
+.prototype-scroll-story .scroll-toc-reading > span:first-child,
+.prototype-scroll-story .scroll-demo-heading > span,
+.prototype-scroll-story .scroll-continue-prompt > span {
+  display: grid;
+  min-width: 0;
+  gap: 0.16rem;
+}
+
+.prototype-scroll-story .scroll-toc-trigger small,
+.prototype-scroll-story .scroll-toc-reading small,
+.prototype-scroll-story .scroll-demo-heading small,
+.prototype-scroll-story .scroll-continue-prompt small {
+  color: var(--scroll-muted);
+  font-size: 0.66rem;
+  font-weight: 560;
+  letter-spacing: 0.03em;
+  line-height: 1.35;
+}
+
+.prototype-scroll-story .scroll-toc-trigger strong,
+.prototype-scroll-story .scroll-toc-reading strong,
+.prototype-scroll-story .scroll-demo-heading strong,
+.prototype-scroll-story .scroll-continue-prompt strong {
+  overflow: hidden;
+  font-size: 0.88rem;
+  font-weight: 720;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prototype-scroll-story .scroll-toc-trigger > span:last-child {
+  flex: 0 0 auto;
+  color: #9fc2ff;
+  font-size: 0.73rem;
+  font-weight: 680;
+}
+
+.prototype-scroll-story .scroll-toc-panel {
+  border: 1px solid var(--scroll-line-strong);
+  border-top: 0;
+  border-radius: 0 0 var(--scroll-control-radius) var(--scroll-control-radius);
+  padding: 1rem 0.85rem 0.9rem;
+  background: rgba(13, 17, 23, 0.92);
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transform-origin: top center;
+  transition:
+    opacity var(--scroll-motion-color) var(--scroll-ease-out),
+    transform var(--scroll-motion-color) var(--scroll-ease-out);
+}
+
+@starting-style {
+  .prototype-scroll-story .scroll-toc-panel {
+    opacity: 0;
+    transform: translateY(-0.2rem) scale(0.985);
+  }
+}
+
+.prototype-scroll-story .scroll-toc-reading strong {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+}
+
+.prototype-scroll-story .scroll-toc-reading strong span {
+  color: rgba(246, 247, 249, 0.68);
+  font-family: 'ShlomosemiStam', serif;
+  font-size: 1.05rem;
+  font-weight: 400;
+}
+
+.prototype-scroll-story .scroll-toc-status {
+  flex: 0 0 auto;
+  color: #91d9a1;
+  font-family: var(--scroll-ui-font);
+  font-size: 0.67rem;
+  line-height: 1.35;
+}
+
+.prototype-scroll-story .scroll-toc-panel .home-reading-bubbles {
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  overflow-x: auto;
+  padding: 0.15rem 0 0.35rem;
+  scrollbar-width: none;
+}
+
+.prototype-scroll-story .scroll-toc-panel .home-reading-bubbles::-webkit-scrollbar {
+  display: none;
+}
+
+.prototype-scroll-story .scroll-toc-panel .home-aliyah-bubble {
+  width: 2.75rem;
+  height: 2.75rem;
+  font-size: 0.9rem;
+}
+
+.prototype-scroll-story .scroll-toc-panel > p,
+.prototype-scroll-story .scroll-continue-demo > p:last-child {
+  margin: 0.7rem 0 0;
+  color: var(--scroll-muted);
+  font-family: var(--scroll-ui-font);
+  font-size: 0.69rem;
+  line-height: 1.45;
+}
+
+.prototype-scroll-story .scroll-listen-demo {
+  min-width: 0;
+}
+
+.prototype-scroll-story .scroll-demo-heading {
+  margin-bottom: 0.8rem;
+  font-family: var(--scroll-ui-font);
+}
+
+.prototype-scroll-story .scroll-demo-heading a {
+  display: inline-flex;
+  min-height: 2.75rem;
+  flex: 0 0 auto;
+  align-items: center;
+  color: #9fc2ff;
+  font-size: 0.72rem;
+  font-weight: 680;
+  text-underline-offset: 0.22rem;
+}
+
+.prototype-scroll-story .scroll-torah-line {
+  display: flex;
+  min-height: 6.2rem;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: center;
+  gap: 0.45rem 0.7rem;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.34);
+  font-family: 'ShlomosemiStam', serif;
+  font-size: clamp(1.45rem, 6vw, 2.35rem);
+  line-height: 1.8;
+}
+
+.prototype-scroll-story .scroll-torah-line span {
+  position: relative;
+  border-radius: 0.35rem;
+  padding: 0.02em 0.12em;
+  transition: background-color 260ms cubic-bezier(0.2, 0.75, 0.25, 1),
+    color 260ms cubic-bezier(0.2, 0.75, 0.25, 1),
+    text-shadow 260ms cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+
+.prototype-scroll-story .scroll-torah-line span.mod-highlighted {
+  background: rgba(255, 215, 0, 0.15);
+  color: #fff7c1;
+  text-shadow: 0 0.55rem 1.5rem rgba(255, 209, 52, 0.18);
+  animation: scroll-word-cue 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.prototype-scroll-story .scroll-playback {
+  height: 2px;
+  margin-top: 1.35rem;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.prototype-scroll-story .scroll-playback span {
+  display: block;
+  width: 58%;
+  height: 100%;
+  background: var(--scroll-blue);
+  box-shadow: 0 0.4rem 1.2rem rgba(57, 132, 255, 0.65);
+  animation: scroll-playback-arrive 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.prototype-scroll-story .scroll-listen-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.85rem 0 0;
+  color: #a8c7ff;
+  font-family: var(--scroll-ui-font);
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+
+.prototype-scroll-story .scroll-listen-status > span {
+  width: 0.48rem;
+  height: 0.48rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--scroll-blue);
+  box-shadow: 0 0 0 0.28rem rgba(57, 132, 255, 0.13);
+}
+
+.prototype-scroll-story .scroll-continue-demo {
+  padding: clamp(0.5rem, 3vw, 1rem) 0;
+}
+
+.prototype-scroll-story .scroll-continue-eyebrow {
+  margin: 0 0 0.75rem;
+  color: #79aaff;
+  font-family: var(--scroll-ui-font);
+  font-size: 0.72rem;
+  font-weight: 680;
+}
+
+.prototype-scroll-story .scroll-continue-prompt {
+  border-top: 1px solid var(--scroll-line-strong);
+  border-bottom: 1px solid var(--scroll-line-strong);
+  padding: 1.2rem 0;
+  font-family: var(--scroll-ui-font);
+  animation: scroll-continue-arrive 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.prototype-scroll-story .scroll-continue-prompt a {
+  display: inline-flex;
+  min-height: var(--scroll-control-height);
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--scroll-control-radius);
+  padding: 0.65rem 0.95rem;
+  background: var(--scroll-blue);
+  box-shadow: var(--scroll-action-shadow);
+  color: white;
+  font-size: 0.76rem;
+  font-weight: 720;
+  text-decoration: none;
+  transition:
+    background-color var(--scroll-motion-color) var(--scroll-ease-standard),
+    transform var(--scroll-motion-fast) var(--scroll-ease-out);
+}
+
+.prototype-scroll-story .scroll-beat-status {
+  margin: 0;
+  color: #a8c7ff;
+  font-family: var(--scroll-ui-font);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  animation: scroll-status-change 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.prototype-scroll-story .scroll-practice-beats {
+  display: grid;
+}
+
+.prototype-scroll-story .scroll-practice-beat {
+  display: grid;
+  min-height: 55svh;
+  align-content: center;
+  border-top: 1px solid var(--scroll-line);
+  padding: 3.5rem 0;
+}
+
+.prototype-scroll-story .scroll-practice-beat:last-child {
+  border-bottom: 1px solid var(--scroll-line);
+}
+
+.prototype-scroll-story .scroll-practice-beat h3 {
+  max-width: 13ch;
+  margin: 0;
+  font-size: clamp(2.1rem, 8vw, 3.9rem);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  line-height: 1;
+}
+
+.prototype-scroll-story .scroll-practice-beat p {
+  max-width: 33rem;
+  margin: 1.25rem 0 0;
+  color: var(--scroll-muted);
+  font-size: clamp(1rem, 3vw, 1.13rem);
+  line-height: 1.68;
+}
+
+.prototype-scroll-story .scroll-theme-chapter {
+  position: relative;
+  z-index: 2;
+  overflow: hidden;
+  border-radius: clamp(2rem, 7vw, 4.5rem);
+  padding: clamp(6rem, 16vw, 10rem) max(1rem, calc((100vw - 86rem) / 2));
+  background: var(--scroll-paper);
+  color: var(--scroll-paper-text);
+  color-scheme: light;
+}
+
+.prototype-scroll-story .scroll-theme-copy {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+
+.prototype-scroll-story .scroll-theme-copy h2 {
+  max-width: 10ch;
+}
+
+.prototype-scroll-story .scroll-theme-copy p {
+  max-width: 38rem;
+  margin: 1.25rem 0 0;
+  color: var(--scroll-paper-muted);
+  font-size: clamp(1rem, 3vw, 1.18rem);
+  line-height: 1.62;
+}
+
+.prototype-scroll-story .scroll-theme-reader-space {
+  position: relative;
+  max-width: 72rem;
+  margin: 0 auto;
+  pointer-events: none;
+}
+
+.prototype-scroll-story .scroll-theme-footer {
+  max-width: 64rem;
+  margin: clamp(2rem, 6vw, 3.5rem) auto 0;
+  border-top: 1px solid rgba(17, 18, 16, 0.2);
+  padding-top: 1.25rem;
+}
+
+.prototype-scroll-story .scroll-theme-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid rgba(17, 18, 16, 0.18);
+  border-radius: var(--scroll-control-radius);
+}
+
+.prototype-scroll-story .scroll-theme-controls button {
+  display: grid;
+  min-width: 0;
+  min-height: 4.8rem;
+  align-content: center;
+  gap: 0.18rem;
+  border: 0;
+  border-right: 1px solid rgba(17, 18, 16, 0.16);
+  border-bottom: 1px solid rgba(17, 18, 16, 0.16);
+  padding: 0.75rem 0.85rem;
+  background: transparent;
+  color: var(--scroll-paper-text);
+  cursor: pointer;
+  font-family: var(--scroll-ui-font);
+  text-align: left;
+  transition:
+    background-color var(--scroll-motion-color) var(--scroll-ease-standard),
+    color var(--scroll-motion-color) var(--scroll-ease-standard);
+}
+
+.prototype-scroll-story .scroll-theme-controls button:nth-child(2n) {
+  border-right: 0;
+}
+
+.prototype-scroll-story .scroll-theme-controls button:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+.prototype-scroll-story .scroll-theme-controls button[aria-pressed='true'] {
+  background: #10110f;
+  color: white;
+}
+
+.prototype-scroll-story .scroll-theme-controls button:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 3px solid #276fe6;
+  outline-offset: -4px;
+}
+
+.prototype-scroll-story .scroll-theme-control-content {
+  display: grid;
+  min-width: 0;
+  gap: 0.18rem;
+  transform: scale(1);
+  transition: transform var(--scroll-motion-fast) var(--scroll-ease-out);
+}
+
+.prototype-scroll-story
+  .scroll-theme-controls
+  button:active
+  .scroll-theme-control-content {
+  transform: scale(var(--scroll-press-scale));
+}
+
+.prototype-scroll-story .scroll-theme-control-content > strong {
+  overflow: hidden;
+  font-size: 0.9rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prototype-scroll-story .scroll-theme-control-content > span {
+  overflow: hidden;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  opacity: 0.72;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prototype-scroll-story .scroll-mobile-theme-controls {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.prototype-scroll-story .scroll-mobile-theme-controls button,
+.prototype-scroll-story .scroll-mobile-theme-controls button:nth-child(2n) {
+  min-height: 4rem;
+  justify-items: center;
+  border-right: 1px solid rgba(17, 18, 16, 0.16);
+  border-bottom: 0;
+  padding: 0.65rem 0.25rem;
+  text-align: center;
+}
+
+.prototype-scroll-story .scroll-mobile-theme-controls button:last-child {
+  border-right: 0;
+}
+
+.prototype-scroll-story .scroll-mobile-theme-controls .scroll-theme-control-content {
+  justify-items: center;
+}
+
+.prototype-scroll-story .scroll-mobile-theme-controls .scroll-theme-control-content > strong {
+  font-size: clamp(0.7rem, 3.4vw, 0.84rem);
+}
+
+.prototype-scroll-story .scroll-mobile-theme-controls .scroll-theme-control-content > span {
+  display: none;
+}
+
+.prototype-scroll-story .scroll-theme-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.prototype-scroll-story .scroll-readings {
+  width: min(100% - 2rem, 86rem);
+  margin: 0 auto;
+  padding: clamp(7rem, 18vw, 11rem) 0 clamp(6rem, 14vw, 9rem);
+}
+
+.prototype-scroll-story .scroll-readings-heading {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.prototype-scroll-story .scroll-readings-heading h2 {
+  max-width: 12ch;
+}
+
+.prototype-scroll-story .scroll-readings-heading > p {
+  max-width: 39rem;
+  margin: 0;
+  color: var(--scroll-muted);
+  line-height: 1.68;
+}
+
+.prototype-scroll-story .scroll-readings-grid {
+  margin-top: clamp(3.5rem, 9vw, 6rem);
+  border-bottom: 1px solid var(--scroll-line);
+}
+
+.prototype-scroll-story .home-reading-card {
+  display: grid;
+  gap: 1.25rem;
+  border-top: 1px solid var(--scroll-line);
+  padding: 1.6rem 0;
+}
+
+.prototype-scroll-story .home-reading-card-header {
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.prototype-scroll-story .home-reading-title-link {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 2.75rem;
+  align-items: center;
+  color: var(--scroll-text);
+  font-size: clamp(1.25rem, 5vw, 1.65rem);
+  text-decoration: none;
+  transition: color var(--scroll-motion-color) var(--scroll-ease-standard);
+}
+
+.prototype-scroll-story .home-reading-title-link strong {
+  font-weight: 400;
+}
+
+.prototype-scroll-story .home-reading-status {
+  flex: 0 0 auto;
+  color: var(--scroll-muted);
+  font-family: var(--scroll-ui-font);
+  font-size: 0.7rem;
+}
+
+.prototype-scroll-story .home-reading-bubbles {
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.prototype-scroll-story .home-aliyah-bubble {
+  display: inline-grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--scroll-line);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(255, 255, 255, 0.4);
+  font-family: var(--scroll-ui-font);
+  font-size: 1rem;
+  text-decoration: none;
+  transition:
+    border-color var(--scroll-motion-color) var(--scroll-ease-standard),
+    background-color var(--scroll-motion-color) var(--scroll-ease-standard),
+    color var(--scroll-motion-color) var(--scroll-ease-standard),
+    transform var(--scroll-motion-fast) var(--scroll-ease-out);
+}
+
+.prototype-scroll-story .home-aliyah-bubble.mod-cued {
+  border-color: rgba(104, 196, 123, 0.48);
+  background: rgba(48, 116, 65, 0.58);
+  color: #e8ffed;
+}
+
+.prototype-scroll-story .home-aliyah-bubble.mod-draft {
+  border-color: rgba(91, 156, 255, 0.54);
+  background: rgba(43, 93, 166, 0.68);
+  color: #eff6ff;
+}
+
+.prototype-scroll-story .home-aliyah-bubble.mod-missing {
+  border-color: rgba(224, 184, 79, 0.58);
+  background: rgba(133, 101, 20, 0.62);
+  color: #fff4c5;
+}
+
+.prototype-scroll-story .home-reading-open {
+  width: fit-content;
+  min-height: 2.75rem;
+  color: #9fc2ff;
+  font-family: var(--scroll-ui-font);
+  font-size: 0.82rem;
+  font-weight: 680;
+  text-underline-offset: 0.25rem;
+  transition: color var(--scroll-motion-color) var(--scroll-ease-standard);
+}
+
+.prototype-scroll-story .scroll-project-note {
+  display: grid;
+  max-width: 54rem;
+  gap: 1.3rem;
+  margin-top: clamp(6rem, 15vw, 10rem);
+}
+
+.prototype-scroll-story .scroll-project-note h2 {
+  max-width: 11ch;
+}
+
+.prototype-scroll-story .scroll-project-note p {
+  max-width: 40rem;
+  margin: 0;
+  color: var(--scroll-muted);
+  font-size: clamp(1rem, 3vw, 1.16rem);
+  line-height: 1.68;
+}
+
+.prototype-scroll-story .scroll-project-note a {
+  width: fit-content;
+  min-height: 2.75rem;
+  color: #9fc2ff;
+  font-family: var(--scroll-ui-font);
+  font-size: 0.9rem;
+  font-weight: 680;
+  text-underline-offset: 0.3rem;
+  transition: color var(--scroll-motion-color) var(--scroll-ease-standard);
+}
+
+.prototype-scroll-story .scroll-footer {
+  display: grid;
+  width: min(100% - 2rem, 86rem);
+  gap: 2rem;
+  margin: 0 auto;
+  border-top: 1px solid var(--scroll-line);
+  padding: 2.5rem 0 3rem;
+  color: var(--scroll-muted);
+  font-family: var(--scroll-ui-font);
+  font-size: 0.76rem;
+  line-height: 1.55;
+}
+
+.prototype-scroll-story .scroll-footer p {
+  margin: 0.45rem 0 0;
+}
+
+.prototype-scroll-story .scroll-footer-brand {
+  color: var(--scroll-text);
+  font-family: 'Lora', Georgia, serif;
+  font-size: 1.3rem;
+  text-decoration: none;
+}
+
+.prototype-scroll-story .scroll-footer nav {
+  flex-wrap: wrap;
+  gap: 0.8rem 1.2rem;
+}
+
+.prototype-scroll-story .scroll-footer nav a {
+  color: rgba(236, 240, 246, 0.72);
+  text-underline-offset: 0.22rem;
+  transition: color var(--scroll-motion-color) var(--scroll-ease-standard);
+}
+
+.prototype-scroll-story .scroll-footer-credit {
+  color: rgba(236, 240, 246, 0.48);
+}
+
+.prototype-scroll-story .scroll-open-reader:active,
+.prototype-scroll-story .scroll-primary-action:active,
+.prototype-scroll-story .scroll-text-action:active,
+.prototype-scroll-story .scroll-toc-trigger:active,
+.prototype-scroll-story .scroll-continue-prompt a:active,
+.prototype-scroll-story .home-aliyah-bubble-link:active {
+  transform: scale(var(--scroll-press-scale));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .prototype-scroll-story .scroll-nav-link:hover,
+  .prototype-scroll-story .scroll-reader-toolbar a:hover,
+  .prototype-scroll-story .home-reading-title-link:hover,
+  .prototype-scroll-story .home-reading-open:hover,
+  .prototype-scroll-story .scroll-project-note a:hover,
+  .prototype-scroll-story .scroll-footer nav a:hover {
+    color: white;
+  }
+
+  .prototype-scroll-story .scroll-open-reader:hover,
+  .prototype-scroll-story .scroll-primary-action:hover,
+  .prototype-scroll-story .scroll-continue-prompt a:hover {
+    background: #4b90ff;
+  }
+
+  .prototype-scroll-story .scroll-text-action:hover {
+    border-color: rgba(159, 194, 255, 0.62);
+    background: rgba(57, 132, 255, 0.1);
+    color: white;
+  }
+
+  .prototype-scroll-story .scroll-toc-trigger:hover {
+    border-color: rgba(159, 194, 255, 0.62);
+  }
+
+  .prototype-scroll-story .scroll-theme-controls button:hover:not([aria-pressed='true']) {
+    background: rgba(17, 18, 16, 0.055);
+  }
+
+  .prototype-scroll-story .home-aliyah-bubble-link:hover {
+    border-color: currentColor;
+  }
+}
+
+@media (min-width: 34rem) {
+  .prototype-scroll-story .scroll-brand-copy small {
+    display: block;
+  }
+}
+
+@media (max-width: 47.999rem) {
+  .prototype-scroll-story .scroll-hero {
+    z-index: 1;
+    align-content: start;
+    gap: 2rem;
+    padding: clamp(1.75rem, 6svh, 2.75rem) 0 0;
+  }
+
+  .prototype-scroll-story .scroll-hero-byline {
+    margin-top: 1.35rem;
+  }
+
+  .prototype-scroll-story .scroll-hero-lede {
+    margin-top: 0.9rem;
+    line-height: 1.52;
+  }
+
+  .prototype-scroll-story .scroll-hero-actions {
+    flex-wrap: nowrap;
+    gap: 0.75rem;
+    margin-top: 1.65rem;
+  }
+
+  .prototype-scroll-story .scroll-primary-action {
+    min-width: 0;
+    min-height: 3rem;
+    flex: 1 1 9.25rem;
+    border-radius: var(--scroll-control-radius);
+    padding: 0.72rem 1rem;
+  }
+
+  .prototype-scroll-story .scroll-text-action {
+    min-height: 3rem;
+    flex: 0 0 auto;
+    padding: 0.72rem 0.9rem;
+  }
+
+  .prototype-scroll-story .scroll-reader-stage {
+    --mobile-theme-handoff-gap: 1.5rem;
+    --mobile-theme-sheet-height: 12.75rem;
+    display: grid;
+    width: calc(100% + 1rem);
+    margin-bottom: calc(
+      var(--mobile-theme-handoff-gap) + var(--mobile-theme-sheet-height)
+    );
+  }
+
+  .prototype-scroll-story .scroll-reader-stack {
+    --reader-rest: none;
+    transform: none;
+    transition: none;
+  }
+
+  .prototype-scroll-story .scroll-reader-frame {
+    --mobile-device-bezel: clamp(0.55rem, 2.4vw, 0.75rem);
+    border-color: var(--scroll-frame-border);
+    border-radius: clamp(1.8rem, 9vw, 2.65rem);
+    padding: var(--mobile-device-bezel);
+    background: linear-gradient(145deg, #171c24 0%, #080b10 48%, #11161d 100%);
+    box-shadow: 0 2.6rem 5rem -2.5rem rgba(0, 0, 0, 0.96),
+      0 0 0 1px rgba(119, 164, 234, 0.08),
+      0 0.8rem 2.8rem -1.6rem rgba(100, 149, 230, 0.38), var(--scroll-frame-glow);
+    transform: none;
+  }
+
+  .prototype-scroll-story .scroll-reader-frame::after {
+    position: absolute;
+    z-index: 4;
+    inset: 0;
+    border: 1px solid rgba(231, 238, 249, 0.42);
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 var(--mobile-device-bezel) rgba(7, 10, 14, 0.96),
+      inset 0 0 0 calc(var(--mobile-device-bezel) + 1px) rgba(177, 201, 240, 0.22),
+      inset 0 1.2rem 1.8rem -1.45rem rgba(255, 255, 255, 0.34);
+    content: '';
+    pointer-events: none;
+  }
+
+  .prototype-scroll-story .scroll-reader-toolbar {
+    display: none;
+  }
+
+  .prototype-scroll-story .scroll-reader-viewport {
+    aspect-ratio: 9 / 16;
+    border-radius: clamp(1.3rem, 6.7vw, 2rem);
+    background: white;
+  }
+
+  .prototype-scroll-story .scroll-reader-viewport::after {
+    border-radius: inherit;
+  }
+
+  .prototype-scroll-story .scroll-mobile-theme-sheet {
+    position: absolute;
+    right: auto;
+    bottom: 0;
+    left: -0.5rem;
+    display: block;
+    width: calc(100% + 1rem);
+    margin: 0;
+    border-radius: 48% 48% 1.5rem 1.5rem / 2rem 2rem 1.5rem 1.5rem;
+    padding: clamp(3.4rem, 12vw, 4.6rem) 1rem
+      max(1.15rem, calc(0.65rem + env(safe-area-inset-bottom)));
+    background: var(--scroll-paper);
+    box-shadow: 0 -2.4rem 4.5rem -3.15rem rgba(255, 252, 242, 0.9),
+      0 -1.2rem 3.5rem -2.35rem rgba(0, 0, 0, 0.86);
+    transform-origin: bottom center;
+    transition: opacity 220ms cubic-bezier(0.23, 1, 0.32, 1),
+      transform 260ms cubic-bezier(0.23, 1, 0.32, 1), visibility 0s linear;
+  }
+
+  .prototype-scroll-story .scroll-mobile-theme-sheet.mod-waiting {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(38%) scale(0.985);
+  }
+
+  .prototype-scroll-story .scroll-mobile-theme-sheet.mod-pinned {
+    position: fixed;
+    z-index: 30;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+  }
+
+  .prototype-scroll-story .scroll-mobile-theme-sheet.mod-released {
+    top: calc(100% + var(--mobile-theme-handoff-gap));
+    bottom: auto;
+  }
+
+  .prototype-scroll-story .scroll-mobile-theme-sheet h2 {
+    margin: 0 0 1.45rem;
+    font-size: clamp(2.15rem, 10vw, 3rem);
+    font-weight: 400;
+    letter-spacing: -0.035em;
+    line-height: 1;
+    text-align: center;
+  }
+
+  .prototype-scroll-story .scroll-reader-note,
+  .prototype-scroll-story .scroll-theme-chapter {
+    display: none;
+  }
+
+  .prototype-scroll-story .scroll-practice {
+    padding: 5rem 0;
+  }
+
+  .prototype-scroll-story .scroll-practice-shell {
+    width: min(calc(100% - 1.5rem), 82rem);
+  }
+
+  .prototype-scroll-story .scroll-practice-intro {
+    margin-bottom: 3.75rem;
+  }
+
+  .prototype-scroll-story .scroll-practice-grid {
+    display: block;
+  }
+
+  .prototype-scroll-story .scroll-practice-sticky {
+    display: none;
+  }
+
+  .prototype-scroll-story .scroll-practice-beats {
+    position: relative;
+    padding-left: 1.25rem;
+  }
+
+  .prototype-scroll-story .scroll-practice-beats::before {
+    position: absolute;
+    top: 0.35rem;
+    bottom: 2.5rem;
+    left: 0.2rem;
+    width: 1px;
+    background: linear-gradient(
+      to bottom,
+      rgba(81, 144, 255, 0.72),
+      rgba(151, 176, 218, 0.2) 34%,
+      rgba(151, 176, 218, 0.2) 68%,
+      rgba(81, 144, 255, 0.58)
+    );
+    content: '';
+  }
+
+  .prototype-scroll-story .scroll-practice-beat {
+    position: relative;
+    display: grid;
+    min-height: 0;
+    align-content: start;
+    gap: 1.8rem;
+    border: 0;
+    padding: 0 0 5.75rem;
+  }
+
+  .prototype-scroll-story .scroll-practice-beat:last-child {
+    border: 0;
+    padding-bottom: 0;
+  }
+
+  .prototype-scroll-story .scroll-practice-beat::before {
+    position: absolute;
+    top: 0.1rem;
+    left: -1.25rem;
+    width: 0.68rem;
+    height: 0.68rem;
+    border: 1px solid rgba(136, 171, 231, 0.58);
+    border-radius: 50%;
+    background: var(--scroll-bg);
+    box-shadow: 0 0 0 0.28rem var(--scroll-bg);
+    content: '';
+    transition: border-color 180ms ease, background-color 180ms ease,
+      box-shadow 180ms ease;
+  }
+
+  .prototype-scroll-story .scroll-practice-beat.mod-active::before {
+    border-color: #8db7ff;
+    background: var(--scroll-blue);
+    box-shadow: 0 0 0 0.28rem var(--scroll-bg), 0 0 1.3rem 0.08rem rgba(57, 132, 255, 0.52);
+  }
+
+  .prototype-scroll-story .scroll-practice-beat-copy {
+    min-width: 0;
+  }
+
+  .prototype-scroll-story .scroll-practice-step {
+    display: flex;
+    align-items: center;
+    gap: 0.48rem;
+    margin: 0 0 0.9rem;
+    color: #8cb7ff;
+    font-family: var(--scroll-ui-font);
+    font-size: 0.72rem;
+    font-weight: 680;
+    letter-spacing: 0.035em;
+    line-height: 1.3;
+  }
+
+  .prototype-scroll-story .scroll-practice-step span {
+    color: rgba(233, 239, 249, 0.42);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .prototype-scroll-story .scroll-practice-beat h3 {
+    max-width: 11ch;
+    font-size: clamp(2.25rem, 10.5vw, 3.2rem);
+    line-height: 0.98;
+  }
+
+  .prototype-scroll-story .scroll-practice-beat p:not(.scroll-practice-step) {
+    margin-top: 1rem;
+    font-size: 1rem;
+    line-height: 1.58;
+  }
+
+  .prototype-scroll-story .scroll-practice-mobile-demo {
+    position: relative;
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid rgba(152, 181, 229, 0.22);
+    border-radius: 1.2rem;
+    padding: clamp(0.65rem, 3vw, 0.9rem);
+    background: radial-gradient(circle at 92% 0%, rgba(57, 132, 255, 0.13), transparent 42%),
+      #0b1016;
+    box-shadow: 0 1.6rem 3.5rem -2.3rem rgba(0, 0, 0, 0.96),
+      inset 0 1px rgba(255, 255, 255, 0.025);
+  }
+
+  .prototype-scroll-story .scroll-practice-mobile-demo .scroll-practice-scene {
+    animation: none;
+  }
+
+  .prototype-scroll-story .scroll-practice-mobile-demo .scroll-toc-panel .home-reading-bubbles {
+    gap: 0.2rem;
+    justify-content: space-between;
+    overflow: visible;
+  }
+
+  .prototype-scroll-story .scroll-practice-mobile-demo .scroll-toc-panel .home-aliyah-bubble {
+    width: clamp(1.9rem, calc((100vw - 6.4rem) / 7), 2.55rem);
+    height: clamp(1.9rem, calc((100vw - 6.4rem) / 7), 2.55rem);
+    font-size: clamp(0.7rem, 3.2vw, 0.88rem);
+  }
+
+  .prototype-scroll-story .scroll-practice-mobile-demo .scroll-torah-line {
+    min-height: 7rem;
+    gap: 0.3rem 0.5rem;
+    font-size: clamp(1.3rem, 6.4vw, 1.7rem);
+    line-height: 1.65;
+  }
+
+  .prototype-scroll-story .scroll-practice-mobile-demo .scroll-continue-demo {
+    padding: 0.25rem 0;
+  }
+
+  .prototype-scroll-story .scroll-practice-mobile-demo .scroll-continue-prompt {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 1rem 0;
+  }
+
+  .prototype-scroll-story .scroll-practice-mobile-demo .scroll-continue-prompt strong {
+    white-space: normal;
+  }
+
+  .prototype-scroll-story .scroll-practice-mobile-demo .scroll-continue-prompt a {
+    width: 100%;
+    margin-top: 0.9rem;
+  }
+
+  .prototype-scroll-story .scroll-readings {
+    padding-top: 6.5rem;
+  }
+}
+
+@media (min-width: 48rem) {
+  .prototype-scroll-story .scroll-header,
+  .prototype-scroll-story .scroll-hero {
+    width: min(100% - 4rem, 92rem);
+  }
+
+  .prototype-scroll-story .scroll-practice-shell {
+    width: min(100% - 4rem, 82rem);
+  }
+
+  .prototype-scroll-story .scroll-readings,
+  .prototype-scroll-story .scroll-footer {
+    width: min(100% - 4rem, 86rem);
+  }
+
+  .prototype-scroll-story .scroll-nav-link {
+    display: inline-flex;
+  }
+
+  .prototype-scroll-story .scroll-reader-stack::after {
+    position: absolute;
+    z-index: 1;
+    right: 7%;
+    bottom: -0.35rem;
+    left: 10%;
+    height: 1px;
+    border-radius: 50%;
+    box-shadow: 0 0 3.4rem 1.15rem rgba(255, 255, 255, 0.3),
+      0 0 6rem 2rem rgba(70, 126, 223, 0.2);
+    content: '';
+    pointer-events: none;
+  }
+
+  .prototype-scroll-story .scroll-reader-frame::before {
+    position: absolute;
+    z-index: 4;
+    top: 2%;
+    right: 0;
+    width: 1px;
+    height: 76%;
+    background: rgba(235, 244, 255, 0.94);
+    box-shadow: 0 0 0.45rem 0.08rem rgba(112, 165, 255, 0.92),
+      0 0 1.15rem 0.12rem rgba(76, 139, 255, 0.66);
+    content: '';
+    opacity: 0.8;
+    pointer-events: none;
+  }
+
+  .prototype-scroll-story .scroll-theme-controls {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .prototype-scroll-story .scroll-reader-viewport {
+    aspect-ratio: 100 / 67;
+  }
+
+  .prototype-scroll-story .scroll-theme-controls button {
+    border-right: 1px solid rgba(17, 18, 16, 0.16);
+    border-bottom: 0;
+  }
+
+  .prototype-scroll-story .scroll-theme-controls button:nth-child(2n) {
+    border-right: 1px solid rgba(17, 18, 16, 0.16);
+  }
+
+  .prototype-scroll-story .scroll-theme-controls button:last-child {
+    border-right: 0;
+  }
+
+  .prototype-scroll-story .scroll-readings-heading {
+    grid-template-columns: minmax(0, 1.1fr) minmax(18rem, 0.65fr);
+    align-items: end;
+    gap: 3rem;
+  }
+
+  .prototype-scroll-story .home-reading-card {
+    grid-template-columns: minmax(13rem, 0.75fr) minmax(18rem, 1.25fr) auto;
+    align-items: center;
+    gap: 2rem;
+    padding: 1.75rem 0;
+  }
+
+  .prototype-scroll-story .home-reading-bubbles {
+    gap: 0.82rem;
+  }
+
+  .prototype-scroll-story .home-aliyah-bubble {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  .prototype-scroll-story .home-reading-open {
+    justify-self: end;
+  }
+
+  .prototype-scroll-story .scroll-footer {
+    grid-template-columns: minmax(16rem, 1fr) auto;
+    align-items: start;
+  }
+
+  .prototype-scroll-story .scroll-footer nav {
+    justify-content: flex-end;
+  }
+
+  .prototype-scroll-story .scroll-footer-credit {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 64rem) {
+  .prototype-scroll-story .scroll-hero {
+    grid-template-columns: minmax(20rem, 0.72fr) minmax(38rem, 1.55fr);
+    min-height: clamp(43rem, calc(100svh - 5rem), 54.125rem);
+    align-items: center;
+    gap: clamp(2rem, 4vw, 5rem);
+    padding: 1.5rem 0 6.5rem;
+  }
+
+  .prototype-scroll-story .scroll-reader-stage {
+    top: 3.25rem;
+    width: min(68vw, 60.5rem);
+    margin-right: -11vw;
+    margin-left: 0;
+  }
+
+  .prototype-scroll-story .scroll-reader-stack {
+    --reader-rest: perspective(100rem) rotateX(1.8deg) rotateY(-5.4deg) rotateZ(-1deg);
+  }
+
+  .prototype-scroll-story .scroll-reader-frame {
+    border-color: var(--scroll-frame-border);
+    box-shadow: 0 3.8rem 7rem -3.1rem rgba(0, 0, 0, 0.98),
+      0 0 0 1px rgba(173, 204, 255, 0.12),
+      var(--scroll-frame-glow);
+  }
+
+  .prototype-scroll-story .scroll-reader-toolbar {
+    min-height: 3.35rem;
+    padding-right: max(1rem, 9vw);
+    padding-left: 1.2rem;
+    font-size: 0.78rem;
+  }
+
+  .prototype-scroll-story .scroll-reader-note {
+    text-align: left;
+  }
+
+  .prototype-scroll-story .scroll-practice-grid {
+    grid-template-columns: minmax(0, 0.95fr) minmax(24rem, 0.75fr);
+    align-items: start;
+    gap: clamp(5rem, 10vw, 10rem);
+  }
+
+  .prototype-scroll-story .scroll-practice-sticky {
+    top: 8svh;
+    min-height: 84svh;
+    align-content: center;
+    padding: 0;
+    background: transparent;
+  }
+
+  .prototype-scroll-story .scroll-practice-beat {
+    min-height: 76svh;
+  }
+
+  .prototype-scroll-story .scroll-footer {
+    padding-bottom: 4rem;
+  }
+}
+
+@media (min-width: 48rem) {
+  .prototype-scroll-story .scroll-reader-journey {
+    --journey-hero-height: clamp(43rem, calc(100svh - 5rem), 54.125rem);
+    --journey-reader-width: min(80vw, 72rem);
+    --journey-reader-start: translate3d(clamp(12.75rem, 24vw, 16rem), 0, 0)
+      scale(0.82);
+    --journey-reader-middle: translate3d(
+        clamp(11rem, 16vw, 13rem),
+        clamp(3.5rem, 8svh, 5rem),
+        0
+      )
+      scale(0.9);
+    --journey-reader-end: translate3d(
+        clamp(4rem, 8vw, 7rem),
+        clamp(5.5rem, 10svh, 7rem),
+        0
+      )
+      scale(0.92);
+    --journey-title-rise: clamp(6rem, 12svh, 8rem);
+    --journey-stage-top: 6.25rem;
+    --journey-stage-margin: 1.25rem;
+    position: relative;
+    z-index: 1;
+    display: grid;
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: var(--journey-hero-height) auto auto auto;
+    overflow: hidden;
+    overflow: clip;
+    border-radius: 0 0 clamp(2rem, 5vw, 4.5rem) clamp(2rem, 5vw, 4.5rem);
+    background: var(--scroll-bg);
+    isolation: isolate;
+  }
+
+  .prototype-scroll-story .scroll-reader-journey::before,
+  .prototype-scroll-story .scroll-reader-journey::after {
+    position: absolute;
+    inset: 0;
+    content: '';
+    pointer-events: none;
+  }
+
+  .prototype-scroll-story .scroll-reader-journey::before {
+    z-index: 1;
+    bottom: auto;
+    height: calc(var(--journey-hero-height) + 10rem);
+    background: linear-gradient(
+      90deg,
+      rgba(6, 8, 11, 0.9) 0%,
+      rgba(6, 8, 11, 0.28) 62%,
+      rgba(6, 8, 11, 0.54) 100%
+    );
+    opacity: 1;
+    transition: opacity 720ms cubic-bezier(0.77, 0, 0.175, 1);
+  }
+
+  .prototype-scroll-story .scroll-reader-journey::after {
+    z-index: 2;
+    background: var(--scroll-paper);
+    opacity: 0;
+    transition: opacity 760ms cubic-bezier(0.77, 0, 0.175, 1);
+  }
+
+  .prototype-scroll-story .scroll-reader-journey.mod-theme-active::before {
+    opacity: 0;
+  }
+
+  .prototype-scroll-story .scroll-reader-journey.mod-theme-active::after {
+    opacity: 1;
+  }
+
+  .prototype-scroll-story .scroll-hero,
+  .prototype-scroll-story .scroll-theme-chapter {
+    display: contents;
+  }
+
+  .prototype-scroll-story .scroll-hero::after {
+    display: none;
+  }
+
+  .prototype-scroll-story .scroll-hero-ambient {
+    z-index: 0;
+    top: -5rem;
+    right: -18vw;
+    bottom: auto;
+    left: -18vw;
+    width: calc(100% + 36vw);
+    height: calc(var(--journey-hero-height) + 10rem);
+  }
+
+  .prototype-scroll-story .scroll-hero-copy {
+    z-index: 3;
+    grid-column: 1;
+    grid-row: 1;
+    align-self: start;
+    justify-self: start;
+    width: clamp(18rem, 34vw, 31rem);
+    margin-top: 0;
+    margin-left: max(2rem, calc((100vw - 92rem) / 2));
+    align-self: center;
+  }
+
+  .prototype-scroll-story .scroll-reader-track {
+    position: relative;
+    z-index: 4;
+    display: block;
+    min-width: 0;
+    grid-column: 1;
+    grid-row: 1 / 4;
+    pointer-events: none;
+  }
+
+  .prototype-scroll-story .scroll-reader-stage {
+    position: sticky;
+    top: var(--journey-stage-top);
+    width: 100%;
+    margin: var(--journey-stage-margin) 0 0;
+    pointer-events: none;
+  }
+
+  .prototype-scroll-story .scroll-reader-motion {
+    display: block;
+    width: var(--journey-reader-width);
+    margin: 0 auto;
+    pointer-events: auto;
+    transform: var(--journey-reader-start);
+    transform-origin: center center;
+    transition: transform 760ms cubic-bezier(0.77, 0, 0.175, 1);
+  }
+
+  .prototype-scroll-story .scroll-reader-journey.mod-theme-active .scroll-reader-motion {
+    transform: var(--journey-reader-end);
+  }
+
+  .prototype-scroll-story .scroll-reader-journey.mod-theme-active .scroll-reader-stack {
+    transform: none;
+  }
+
+  .prototype-scroll-story .scroll-reader-note {
+    transition:
+      color 420ms cubic-bezier(0.23, 1, 0.32, 1),
+      opacity 320ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+
+  .prototype-scroll-story .scroll-reader-journey.mod-theme-active .scroll-reader-note {
+    color: var(--scroll-paper-muted);
+    opacity: 0;
+  }
+
+  .prototype-scroll-story .scroll-reader-journey.mod-theme-active .scroll-reader-frame {
+    background: #e9e9e6;
+    box-shadow: 0 3.5rem 7rem -3.5rem rgba(21, 23, 20, 0.44),
+      0 0 0 1px rgba(89, 118, 164, 0.14), var(--scroll-frame-glow);
+  }
+
+  .prototype-scroll-story .scroll-reader-journey.mod-theme-active .scroll-reader-toolbar {
+    border-color: rgba(17, 18, 16, 0.16);
+    background: #eceeec;
+    color: rgba(17, 18, 16, 0.66);
+  }
+
+  .prototype-scroll-story .scroll-reader-journey.mod-theme-active .scroll-reader-toolbar a {
+    color: #2765c7;
+  }
+
+  .prototype-scroll-story .scroll-theme-copy {
+    position: relative;
+    z-index: 3;
+    width: min(calc(100% - 4rem), 72rem);
+    grid-column: 1;
+    grid-row: 2;
+    align-self: center;
+    justify-self: center;
+    justify-items: center;
+    margin: 0;
+    padding: clamp(4rem, 7svh, 5rem) 0 clamp(3rem, 5svh, 4rem);
+    color: var(--scroll-paper-text);
+    text-align: center;
+    clip-path: inset(0 0 100% 0);
+    transform: translate3d(0, var(--journey-title-rise), 0);
+    transition:
+      clip-path 360ms cubic-bezier(0.23, 1, 0.32, 1) 180ms,
+      transform 760ms cubic-bezier(0.77, 0, 0.175, 1) 180ms;
+  }
+
+  .prototype-scroll-story .scroll-reader-journey.mod-theme-active .scroll-theme-copy {
+    clip-path: inset(0);
+    transform: none;
+  }
+
+  .prototype-scroll-story .scroll-theme-copy h2 {
+    max-width: none;
+    font-size: clamp(3.5rem, 7vw, 5.75rem);
+  }
+
+  .prototype-scroll-story .scroll-theme-copy p {
+    max-width: 38rem;
+  }
+
+  .prototype-scroll-story .scroll-theme-reader-space {
+    z-index: 3;
+    width: var(--journey-reader-width);
+    max-width: none;
+    aspect-ratio: 100 / 90;
+    grid-column: 1;
+    grid-row: 3;
+    justify-self: center;
+    margin: 0;
+  }
+
+  .prototype-scroll-story .scroll-theme-footer {
+    position: relative;
+    z-index: 5;
+    box-sizing: border-box;
+    width: min(calc(100% - 4rem), 64rem);
+    max-width: none;
+    grid-column: 1;
+    grid-row: 4;
+    justify-self: center;
+    margin: clamp(2.5rem, 5vw, 4rem) 0 0;
+    padding-bottom: clamp(3.5rem, 6vw, 5rem);
+  }
+
+  @media (min-width: 64rem) {
+    .prototype-scroll-story .scroll-reader-journey {
+      --journey-reader-start: translate3d(clamp(15.5rem, 19vw, 17rem), 0, 0)
+        scale(0.84);
+    }
+
+    .prototype-scroll-story .scroll-reader-stack {
+      --reader-rest: perspective(100rem) rotateX(1.8deg) rotateY(-5.4deg) rotateZ(-1deg);
+    }
+  }
+}
+
+@media (min-width: 48rem) and (max-height: 32rem) and (orientation: landscape) {
+  .prototype-scroll-story .scroll-header {
+    min-height: 3.75rem;
+    margin-top: 0.5rem;
+  }
+
+  .prototype-scroll-story .scroll-brand-copy small {
+    display: none;
+  }
+
+  .prototype-scroll-story .scroll-nav {
+    gap: 0.95rem;
+  }
+
+  .prototype-scroll-story .scroll-nav-link {
+    font-size: 0.76rem;
+  }
+
+  .prototype-scroll-story .scroll-open-reader {
+    min-height: 2.75rem;
+    padding: 0.6rem 0.82rem;
+    font-size: 0.76rem;
+  }
+
+  .prototype-scroll-story .scroll-hero {
+    grid-template-columns: minmax(18rem, 0.8fr) minmax(26rem, 1.2fr);
+    min-height: calc(100svh - 4.25rem);
+    align-items: center;
+    align-content: center;
+    gap: 1.5rem;
+    padding: 0.25rem 0 0.5rem;
+  }
+
+  .prototype-scroll-story .scroll-hero-copy {
+    max-width: 25rem;
+  }
+
+  .prototype-scroll-story .scroll-hero h1 {
+    font-size: clamp(3.15rem, 6.3vw, 3.6rem);
+  }
+
+  .prototype-scroll-story .scroll-hero-byline {
+    margin-top: 0.75rem;
+    font-size: 0.72rem;
+    line-height: 1.3;
+  }
+
+  .prototype-scroll-story .scroll-hero-lede {
+    margin-top: 0.55rem;
+    font-size: 0.86rem;
+    line-height: 1.45;
+  }
+
+  .prototype-scroll-story .scroll-hero-actions {
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    margin-top: 0.9rem;
+  }
+
+  .prototype-scroll-story .scroll-primary-action {
+    min-width: 8rem;
+    min-height: 2.75rem;
+    border-radius: var(--scroll-control-radius);
+    padding: 0.6rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  .prototype-scroll-story .scroll-text-action {
+    min-height: 2.75rem;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  .prototype-scroll-story .scroll-reader-stage {
+    top: 0;
+    width: 100%;
+    margin-right: 0;
+    margin-left: 0;
+  }
+
+  .prototype-scroll-story .scroll-reader-stack {
+    --reader-rest: perspective(90rem) rotateX(0.8deg) rotateY(-2.8deg) rotateZ(-0.5deg);
+  }
+
+  .prototype-scroll-story .scroll-reader-toolbar {
+    height: 2.75rem;
+    min-height: 2.75rem;
+    padding: 0 0.8rem;
+  }
+
+  .prototype-scroll-story .scroll-reader-viewport {
+    aspect-ratio: 16 / 9;
+  }
+
+  .prototype-scroll-story .scroll-reader-note {
+    display: none;
+  }
+
+  .prototype-scroll-story .scroll-practice {
+    padding: 4rem 0;
+  }
+
+  .prototype-scroll-story .scroll-practice-intro {
+    margin-bottom: 2.75rem;
+  }
+
+  .prototype-scroll-story .scroll-practice h2,
+  .prototype-scroll-story .scroll-theme-copy h2,
+  .prototype-scroll-story .scroll-readings-heading h2,
+  .prototype-scroll-story .scroll-project-note h2 {
+    font-size: 3.5rem;
+  }
+
+  .prototype-scroll-story .scroll-practice-grid {
+    grid-template-columns: minmax(0, 1.05fr) minmax(16rem, 0.72fr);
+    align-items: start;
+    gap: 3rem;
+  }
+
+  .prototype-scroll-story .scroll-practice-sticky {
+    top: 0.5rem;
+    min-height: calc(100svh - 1rem);
+    align-content: center;
+    padding: 0;
+    background: transparent;
+  }
+
+  .prototype-scroll-story .scroll-practice-visual {
+    min-height: 16rem;
+  }
+
+  .prototype-scroll-story .scroll-practice-beat {
+    min-height: 88svh;
+    padding: 2.75rem 0;
+  }
+
+  .prototype-scroll-story .scroll-practice-beat h3 {
+    font-size: 2.55rem;
+  }
+
+  .prototype-scroll-story .scroll-practice-beat p {
+    margin-top: 0.9rem;
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+
+  .prototype-scroll-story .scroll-theme-chapter {
+    padding-top: 4.5rem;
+    padding-bottom: 4.5rem;
+  }
+
+  .prototype-scroll-story .scroll-reader-journey {
+    --journey-hero-height: calc(100svh - 4.25rem);
+    --journey-reader-width: min(58vw, 35rem);
+    --journey-reader-start: translate3d(18vw, 0, 0) scale(0.9);
+    --journey-reader-middle: translate3d(10vw, 3rem, 0) scale(0.94);
+    --journey-reader-end: translate3d(clamp(4rem, 10vw, 8rem), 4rem, 0) scale(0.96);
+    --journey-stage-top: 4.25rem;
+    --journey-stage-margin: 0;
+  }
+
+  .prototype-scroll-story .scroll-hero-copy {
+    align-self: center;
+    width: min(47vw, 25rem);
+    margin-top: 0;
+  }
+
+  .prototype-scroll-story .scroll-reader-stage {
+    top: var(--journey-stage-top);
+    margin: var(--journey-stage-margin) 0 0;
+  }
+
+  .prototype-scroll-story .scroll-reader-stack {
+    --reader-rest: perspective(90rem) rotateX(0.8deg) rotateY(-2.8deg) rotateZ(-0.5deg);
+  }
+
+  .prototype-scroll-story .scroll-theme-copy {
+    padding-top: 3rem;
+    padding-bottom: 2rem;
+  }
+
+  .prototype-scroll-story .scroll-theme-reader-space {
+    aspect-ratio: 100 / 72;
+  }
+}
+
+@supports (animation-timeline: scroll()) {
+  @media (min-width: 48rem) {
+    .prototype-scroll-story .scroll-reader-motion {
+      animation: scroll-reader-travel linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0 105svh;
+    }
+
+    .prototype-scroll-story .scroll-reader-stack {
+      animation: scroll-reader-level linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 8svh 105svh;
+    }
+
+    .prototype-scroll-story .scroll-theme-copy {
+      animation: scroll-theme-copy-rise linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0 105svh;
+    }
+
+    .prototype-scroll-story .scroll-reader-journey::before {
+      animation: scroll-reading-space-depart linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 12svh 92svh;
+    }
+
+    .prototype-scroll-story .scroll-reader-journey::after {
+      animation: scroll-paper-arrive linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 12svh 92svh;
+    }
+
+    .prototype-scroll-story .scroll-reader-note {
+      animation: scroll-reader-note-depart linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0 48svh;
+    }
+  }
+
+  .prototype-scroll-story .scroll-hero-ambient {
+    animation: scroll-ambient-drift linear both;
+    animation-timeline: scroll(root block);
+    animation-range: 0 110svh;
+  }
+
+}
+
+@supports (animation-timeline: view()) {
+  .prototype-scroll-story .scroll-practice-beat {
+    animation: scroll-beat-focus linear both;
+    animation-timeline: view(block);
+    animation-range: entry 8% cover 48%;
+  }
+
+  .prototype-scroll-story .scroll-theme-footer,
+  .prototype-scroll-story .scroll-readings-heading,
+  .prototype-scroll-story .scroll-readings-grid,
+  .prototype-scroll-story .scroll-project-note {
+    animation: scroll-section-reveal linear both;
+    animation-timeline: view(block);
+    animation-range: entry 6% cover 34%;
+  }
+
+  @media (max-width: 47.999rem) {
+    .prototype-scroll-story .scroll-practice-beat {
+      animation: none;
+    }
+
+    .prototype-scroll-story
+      .scroll-practice-beat[data-beat='1']
+      .scroll-torah-line
+      span.mod-highlighted {
+      animation: scroll-word-cue linear both;
+      animation-timeline: view(block);
+      animation-range: entry 8% cover 34%;
+    }
+
+    .prototype-scroll-story .scroll-practice-beat[data-beat='1'] .scroll-playback span {
+      animation: scroll-playback-arrive linear both;
+      animation-timeline: view(block);
+      animation-range: entry 8% cover 38%;
+    }
+
+    .prototype-scroll-story .scroll-practice-beat[data-beat='2'] .scroll-continue-prompt {
+      animation: scroll-continue-arrive linear both;
+      animation-timeline: view(block);
+      animation-range: entry 10% cover 36%;
+    }
+  }
+}
+
+@keyframes scroll-copy-arrive {
+  from {
+    opacity: 0.72;
+    transform: translateY(1.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scroll-reader-travel {
+  from {
+    transform: var(--journey-reader-start);
+  }
+  64% {
+    transform: var(--journey-reader-middle);
+  }
+  to {
+    transform: var(--journey-reader-end);
+  }
+}
+
+@keyframes scroll-theme-copy-rise {
+  0%,
+  64% {
+    clip-path: inset(0 0 100% 0);
+    transform: translate3d(0, var(--journey-title-rise), 0);
+  }
+
+  72% {
+    clip-path: inset(0);
+    transform: translate3d(0, clamp(4.5rem, 8.5svh, 5.75rem), 0);
+  }
+
+  100% {
+    clip-path: inset(0);
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes scroll-reader-level {
+  from {
+    transform: var(--reader-rest);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes scroll-reading-space-depart {
+  0%,
+  18% {
+    opacity: 1;
+  }
+  78%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes scroll-paper-arrive {
+  0%,
+  18% {
+    opacity: 0;
+  }
+  78%,
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes scroll-reader-note-depart {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes scroll-ambient-drift {
+  from {
+    transform: translateY(0) scale(1.035);
+  }
+  to {
+    transform: translateY(-3.5rem) scale(1);
+  }
+}
+
+@keyframes scroll-status-change {
+  from {
+    opacity: 0.15;
+    transform: translateY(0.45rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scroll-scene-change {
+  from {
+    opacity: 0.18;
+    transform: translateY(0.7rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scroll-contents-open {
+  from {
+    opacity: 0;
+    transform: translateY(-0.45rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scroll-word-cue {
+  from {
+    background: transparent;
+    color: rgba(255, 255, 255, 0.34);
+    text-shadow: none;
+  }
+  to {
+    background: rgba(255, 215, 0, 0.15);
+    color: #fff7c1;
+    text-shadow: 0 0.55rem 1.5rem rgba(255, 209, 52, 0.18);
+  }
+}
+
+@keyframes scroll-playback-arrive {
+  from {
+    transform: scaleX(0.08);
+    transform-origin: left center;
+  }
+  to {
+    transform: scaleX(1);
+    transform-origin: left center;
+  }
+}
+
+@keyframes scroll-continue-arrive {
+  from {
+    opacity: 0.25;
+    transform: translateY(0.65rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scroll-beat-focus {
+  from {
+    transform: translateY(2rem);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes scroll-section-reveal {
+  from {
+    transform: translateY(2.4rem);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 22rem) {
+  .prototype-scroll-story .scroll-header {
+    width: calc(100% - 1.5rem);
+    gap: 0.65rem;
+  }
+
+  .prototype-scroll-story .scroll-brand {
+    gap: 0.52rem;
+  }
+
+  .prototype-scroll-story .scroll-brand-mark {
+    width: 2.35rem;
+    height: 2.35rem;
+    border-radius: 0.72rem;
+  }
+
+  .prototype-scroll-story .scroll-brand-copy strong {
+    font-size: 0.9rem;
+  }
+
+  .prototype-scroll-story .scroll-open-reader {
+    padding-right: 0.78rem;
+    padding-left: 0.78rem;
+    font-size: 0.76rem;
+  }
+
+  .prototype-scroll-story .scroll-hero-actions {
+    flex-wrap: wrap;
+  }
+
+  .prototype-scroll-story .scroll-primary-action,
+  .prototype-scroll-story .scroll-text-action {
+    flex: 1 0 100%;
+    width: 100%;
+    min-height: 3rem;
+  }
+
+  .prototype-scroll-story .scroll-hero h1 {
+    font-size: 3.25rem;
+  }
+
+  .prototype-scroll-story .scroll-hero-byline {
+    font-size: 0.82rem;
+  }
+
+  .prototype-scroll-story .home-reading-bubbles {
+    gap: 0.35rem;
+  }
+
+  .prototype-scroll-story .home-aliyah-bubble {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prototype-scroll-story *,
+  .prototype-scroll-story *::before,
+  .prototype-scroll-story *::after {
+    scroll-behavior: auto !important;
+    animation: none !important;
+    transition-delay: 0s !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .prototype-scroll-story .scroll-reader-frame {
+    transform: none;
+  }
+
+  .prototype-scroll-story .scroll-reader-stack {
+    transform: var(--reader-rest);
+  }
+
+  @media (min-width: 48rem) {
+    .prototype-scroll-story .scroll-reader-motion {
+      opacity: 1;
+      transform: var(--journey-reader-start);
+    }
+
+    .prototype-scroll-story .scroll-reader-journey.mod-theme-active .scroll-reader-motion {
+      transform: var(--journey-reader-end);
+    }
+
+    .prototype-scroll-story .scroll-reader-journey.mod-theme-active .scroll-reader-stack {
+      transform: none;
+    }
+  }
+}

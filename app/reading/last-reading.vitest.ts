@@ -94,6 +94,54 @@ test('ignores invalid stored routes', () => {
   expect(storage.getItem('tikkun.last-reading.v1:quarantine')).not.toBeNull()
 })
 
+test('quarantines a grammar-valid checkpoint that is not routable', () => {
+  const storage = createStorage()
+  saveLastReading(
+    storage,
+    {
+      hash: '#/torah/parsha/noach/1-1-1',
+      parshaName: 'Noach',
+    },
+    now
+  )
+
+  expect(loadEligibleLastReading(storage, now, () => false)).toBeNull()
+  expect(storage.getItem('tikkun.last-reading.v1')).toBeNull()
+  expect(storage.getItem('tikkun.last-reading.v1:quarantine')).not.toBeNull()
+})
+
+test('quarantines an invalid saved timestamp', () => {
+  const storage = createStorage()
+  storage.setItem(
+    'tikkun.last-reading.v1',
+    JSON.stringify({
+      hash: '#/torah/parsha/noach',
+      parshaName: 'Noach',
+      savedAt: -1,
+    })
+  )
+
+  expect(loadEligibleLastReading(storage, now)).toBeNull()
+  expect(storage.getItem('tikkun.last-reading.v1')).toBeNull()
+  expect(storage.getItem('tikkun.last-reading.v1:quarantine')).not.toBeNull()
+})
+
+test('quarantines an impossible future timestamp instead of retaining it forever', () => {
+  const storage = createStorage()
+  storage.setItem(
+    'tikkun.last-reading.v1',
+    JSON.stringify({
+      hash: '#/torah/parsha/noach',
+      parshaName: 'Noach',
+      savedAt: now + 10 * 60 * 1000,
+    })
+  )
+
+  expect(loadEligibleLastReading(storage, now)).toBeNull()
+  expect(storage.getItem('tikkun.last-reading.v1')).toBeNull()
+  expect(storage.getItem('tikkun.last-reading.v1:quarantine')).not.toBeNull()
+})
+
 test('ignores the moving calendar default route', () => {
   const storage = createStorage()
   saveLastReading(

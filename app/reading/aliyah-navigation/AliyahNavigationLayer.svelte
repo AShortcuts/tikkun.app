@@ -648,14 +648,14 @@
         compactSnapshot?.active,
         item.target
       )
-        ? 'true'
+        ? 'location'
         : undefined}
       onclick={() => selectCompactSegment(item.target)}
     ></button>
   {/each}
 </nav>
 
-<div
+<nav
   bind:this={railElement}
   class="aliyah-rail"
   class:u-hidden={!desktopSnapshot}
@@ -683,16 +683,22 @@
         data-run-id={item.target.runId}
         data-aliyah-index={item.target.aliyahIndex}
         data-navigation-key={item.key}
-        data-cue-status={cueStatus(item)}
-        type="button"
-        title={`${item.label} · ${aliyahCueStatusLabel(cueStatus(item))}`}
-        onclick={() => selectWideItem(item.target)}
+      data-cue-status={cueStatus(item)}
+      type="button"
+      title={`${item.label} · ${aliyahCueStatusLabel(cueStatus(item))}`}
+      aria-current={isSameAliyahNavigationTarget(
+        desktopSnapshot.active,
+        item.target
+      )
+        ? 'location'
+        : undefined}
+      onclick={() => selectWideItem(item.target)}
       >
         {item.compactLabel}
       </button>
     {/each}
   {/if}
-</div>
+</nav>
 
 <div
   bind:this={pickerElement}
@@ -765,6 +771,12 @@
             data-aliyah-index={item.target.aliyahIndex}
             type="button"
             aria-label={`Go to ${item.label}`}
+            aria-current={isSameAliyahNavigationTarget(
+              compactSnapshot?.active,
+              item.target
+            )
+              ? 'location'
+              : undefined}
             onclick={() => selectCompactCard(item.target)}
           >
             <span class="mobile-aliyah-card-label">{item.label}</span>
@@ -793,6 +805,7 @@
               type="button"
               title={compactPlayLabel(item, compactPlayback())}
               aria-label={compactPlayLabel(item, compactPlayback())}
+              aria-pressed={isPlaying(compactPlayback(), item.target)}
               onclick={() => playCompactItem(item.target)}
             >
               <UiIcon

@@ -4,6 +4,7 @@ import {
   readStorageItem,
   writeStorageItem,
 } from '../persistence/persisted-state.ts'
+import { isReaderHash } from '../view-model/navigation/reader-hash.ts'
 
 export const BOOKMARKS_STORAGE_KEY = 'tikkun.bookmarks.v1'
 
@@ -39,33 +40,38 @@ export function createBookmark({
   }
 }
 
-function isReaderHash(hash: string) {
-  return (
-    hash.startsWith('#/run/') ||
-    hash.startsWith('#/torah/') ||
-    hash.startsWith('#/esther/') ||
-    hash.startsWith('#/r/')
-  )
-}
-
-function isReaderBookmark(value: unknown): value is ReaderBookmark {
+function isReaderBookmark(
+  value: unknown,
+  validateHash: (hash: string) => boolean = isReaderHash
+): value is ReaderBookmark {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<ReaderBookmark>
   return (
     typeof candidate.id === 'string' &&
+    candidate.id.length > 0 &&
     typeof candidate.hash === 'string' &&
     isReaderHash(candidate.hash) &&
+    validateHash(candidate.hash) &&
     typeof candidate.label === 'string' &&
+    candidate.label.trim().length > 0 &&
     typeof candidate.tokenKey === 'string' &&
     isValidTokenKey(candidate.tokenKey) &&
     typeof candidate.createdAt === 'number' &&
-    Number.isFinite(candidate.createdAt) &&
+    Number.isSafeInteger(candidate.createdAt) &&
+    candidate.createdAt >= 0 &&
+    (candidate.audioId === undefined ||
+      (typeof candidate.audioId === 'string' && candidate.audioId.length > 0)) &&
     (candidate.timeStart === undefined ||
-      (typeof candidate.timeStart === 'number' && Number.isFinite(candidate.timeStart)))
+      (typeof candidate.timeStart === 'number' &&
+        Number.isFinite(candidate.timeStart) &&
+        candidate.timeStart >= 0))
   )
 }
 
-export function loadBookmarks(storage: Storage | null) {
+export function loadBookmarks(
+  storage: Storage | null,
+  validateHash: (hash: string) => boolean = isReaderHash
+) {
   let raw: string | null
   try {
     raw = readStorageItem(storage, BOOKMARKS_STORAGE_KEY)
@@ -86,7 +92,9 @@ export function loadBookmarks(storage: Storage | null) {
       return []
     }
     const bookmarks = parsed
-      .filter(isReaderBookmark)
+      .filter((value): value is ReaderBookmark =>
+        isReaderBookmark(value, validateHash)
+      )
       .sort((a, b) => b.createdAt - a.createdAt)
     if (bookmarks.length !== parsed.length) {
       quarantineStorageItem({

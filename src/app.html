@@ -27,10 +27,10 @@
       ;(() => {
         const storageKey = 'tikkun.reader-preferences.v3'
         const validThemes = new Set(['automatic', 'light', 'sepia', 'dark'])
-        const raw = window.localStorage.getItem(storageKey)
-        if (!raw) return
 
         try {
+          const raw = window.localStorage.getItem(storageKey)
+          if (!raw) return
           const themeMode = JSON.parse(raw)?.themeMode
           if (validThemes.has(themeMode)) {
             document.documentElement.dataset.readerTheme = themeMode

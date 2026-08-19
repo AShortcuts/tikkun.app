@@ -1,11 +1,9 @@
 <script lang="ts">
   import { flushSync, onMount } from 'svelte'
-  import UiIcon from '../components/UiIcon.svelte'
-  import {
-    filterNavigationActions,
-    type NavigationAction,
-    type NavigationActionGroup,
-  } from './actions.ts'
+  import ReaderSearchBar from '../search/ReaderSearchBar.svelte'
+  import type { ReaderSearchBarController } from '../search/reader-search-bar.ts'
+  import { listReadingSearchLeinings } from '../search/reading-catalog.ts'
+  import { createReaderSearch } from '../search/reader-search.ts'
   import type {
     CommandPalette,
     CommandPaletteComponentProps,
@@ -13,105 +11,63 @@
 
   let {
     getActions,
+    createGenerator,
     restoreFocus,
     isBookmarkAction,
     formatBadge,
     connect,
   }: CommandPaletteComponentProps = $props()
 
-  const groupLabels: Record<NavigationActionGroup, string> = {
-    reading: 'Reading',
-    page: 'Page',
-    resume: 'Resume',
-    checkpoint: 'Checkpoint',
-    tools: 'Tool',
-    admin: 'Admin',
+  let openState = $state(false)
+  let searchBar: ReaderSearchBarController | null = null
+  let hasOpened = false
+
+  function createSearch() {
+    const readings = createGenerator
+      ? listReadingSearchLeinings(createGenerator())
+      : []
+    return createReaderSearch(readings, getActions())
   }
 
-  let actions = $state<NavigationAction[]>([])
-  let query = $state('')
-  let activeIndex = $state(0)
-  let openState = $state(false)
-  let input: HTMLInputElement
-  const matches = $derived(filterNavigationActions(actions, query))
-
-  function close() {
-    openState = false
+  function close({ restore = false }: { restore?: boolean } = {}) {
+    if (!openState) return
+    flushSync(() => {
+      openState = false
+    })
+    if (restore) restoreFocus()
   }
 
   function refresh() {
-    if (!openState) return
-    const nextActions = getActions()
-    const nextMatches = filterNavigationActions(nextActions, query)
-    flushSync(() => {
-      actions = nextActions
-      activeIndex = Math.min(
-        activeIndex,
-        Math.max(nextMatches.length - 1, 0)
-      )
-    })
+    searchBar?.refresh()
   }
 
   function open() {
+    if (openState) {
+      searchBar?.focus({ select: true })
+      return
+    }
     flushSync(() => {
-      actions = getActions()
-      query = ''
-      activeIndex = 0
       openState = true
     })
-    input.focus({ preventScroll: true })
+    if (hasOpened) searchBar?.refresh({ resetQuery: true })
+    else searchBar?.reset()
+    hasOpened = true
+    searchBar?.focus()
   }
 
   function toggle() {
-    if (openState) {
-      close()
-      restoreFocus()
-      return
-    }
-    open()
-  }
-
-  function run(action: NavigationAction) {
-    close()
-    void action.run()
-  }
-
-  function handleInput(event: Event) {
-    flushSync(() => {
-      query = (event.currentTarget as HTMLInputElement).value
-      activeIndex = 0
-    })
-  }
-
-  function handleKeydown(event: KeyboardEvent) {
-    if (event.key === 'ArrowDown') {
-      event.preventDefault()
-      activeIndex = Math.min(
-        activeIndex + 1,
-        Math.max(matches.length - 1, 0)
-      )
-      return
-    }
-    if (event.key === 'ArrowUp') {
-      event.preventDefault()
-      activeIndex = Math.max(activeIndex - 1, 0)
-      return
-    }
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      const action = matches[activeIndex]
-      if (action) run(action)
-      return
-    }
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      close()
-      restoreFocus()
-    }
+    if (openState) close({ restore: true })
+    else open()
   }
 
   function handleBackdropPointer(event: PointerEvent) {
-    if (event.target === event.currentTarget) close()
+    if (event.target === event.currentTarget) close({ restore: true })
+  }
+
+  function handleDialogKeydown(event: KeyboardEvent) {
+    if (event.key !== 'Tab') return
+    event.preventDefault()
+    searchBar?.focus()
   }
 
   const palette: CommandPalette = {
@@ -124,10 +80,7 @@
 
   onMount(() => {
     connect(palette)
-    return () => {
-      actions = []
-      close()
-    }
+    return () => close()
   })
 </script>
 
@@ -137,57 +90,24 @@
   data-target-id="command-palette"
   role="dialog"
   aria-modal="true"
-  aria-label="Command palette"
+  aria-label="Search readings and commands"
   aria-hidden={!openState}
   onpointerdown={handleBackdropPointer}
+  onkeydown={handleDialogKeydown}
 >
   <div class="command-palette-panel">
-    <input
-      bind:this={input}
-      class="command-palette-input"
-      data-target-id="command-palette-input"
-      type="search"
-      autocomplete="off"
-      spellcheck="false"
-      placeholder="Jump to a reading, page, bookmark, or tool"
-      value={query}
-      oninput={handleInput}
-      onkeydown={handleKeydown}
+    <ReaderSearchBar
+      presentation="overlay"
+      {createSearch}
+      navigate={(href) => {
+        window.location.hash = href
+      }}
+      requestClose={() => close({ restore: true })}
+      resultActivated={() => close()}
+      queryChanged={() => undefined}
+      {isBookmarkAction}
+      {formatBadge}
+      connect={(controller) => (searchBar = controller)}
     />
-    <div
-      class="command-palette-results"
-      data-target-id="command-palette-results"
-    >
-      {#if matches.length}
-        {#each matches as action, index (action.id)}
-          <button
-            class="command-palette-result"
-            class:is-active={index === activeIndex}
-            data-action-id={action.id}
-            type="button"
-            onclick={() => run(action)}
-          >
-            <span class="command-palette-label">
-              {#if isBookmarkAction(action)}
-                <span class="command-palette-inline-icon">
-                  <UiIcon name="bookmarkFilled" />
-                </span>
-              {/if}
-              {action.label}
-              {#if action.badgeLabel}
-                <span class="command-palette-inline-badge">
-                  {formatBadge(action.badgeLabel)}
-                </span>
-              {/if}
-            </span>
-            <span class="command-palette-group">
-              {groupLabels[action.group]}
-            </span>
-          </button>
-        {/each}
-      {:else}
-        <div class="command-palette-empty">No matching command</div>
-      {/if}
-    </div>
   </div>
 </div>

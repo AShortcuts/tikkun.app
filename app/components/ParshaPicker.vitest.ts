@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
 import { LeiningGenerator } from '../calendar-model/generator.ts'
 import type { UserSettings } from '../calendar-model/user-settings.ts'
+import { createNavigationAction, type NavigationAction } from '../navigation/actions.ts'
 import ParshaPicker from './ParshaPicker.ts'
 
 const testSettings: UserSettings = {
@@ -101,9 +102,12 @@ test('opens a nested aliyah flyout for a double portion', () => {
 
   expect(
     document.querySelectorAll(
-      '.aliyah-selection-popup.mod-submenu [role="menuitem"]'
+      '.aliyah-selection-popup.mod-submenu .aliyah-selection-option'
     )
   ).toHaveLength(8)
+  expect(document.querySelector('[role="menu"]')).toBeNull()
+  expect(document.querySelector('[role="menuitem"]')).toBeNull()
+  expect(trigger.hasAttribute('aria-haspopup')).toBe(false)
   expect(document.querySelectorAll('.aliyah-selection-stack')).toHaveLength(1)
   expect(
     document.querySelectorAll('.aliyah-selection-stack .aliyah-selection-popup')
@@ -189,6 +193,77 @@ test('renders and changes the Israel calendar setting', () => {
   expect(onCalendarSettingsChange).toHaveBeenCalledWith({ israel: true })
 })
 
+test('keeps Quick Access closed until the unified search receives focus', () => {
+  const picker = mountPicker({
+    getActions: () => [
+      createNavigationAction({
+        id: 'tools.settings',
+        group: 'tools',
+        label: 'Reader Settings',
+        emptyPriority: 10,
+        run: vi.fn(),
+      }),
+    ],
+  })
+  const input = picker.querySelector<HTMLInputElement>('.search-input')!
+
+  expect(document.activeElement).not.toBe(input)
+  expect(picker.querySelector('[data-target-id="reader-search-results"]')).toBeNull()
+  expect(input.getAttribute('aria-expanded')).toBe('false')
+
+  input.focus()
+  expect(picker.querySelector('.reader-search-context')?.textContent).toContain(
+    'Quick access'
+  )
+  expect(input.getAttribute('aria-expanded')).toBe('true')
+
+  const result = picker.querySelector<HTMLButtonElement>('[data-action-id]')!
+  result.focus()
+  expect(picker.querySelector('[data-target-id="reader-search-results"]')).not.toBeNull()
+
+  const outside = document.createElement('button')
+  document.body.appendChild(outside)
+  outside.focus()
+  expect(picker.querySelector('[data-target-id="reader-search-results"]')).toBeNull()
+  expect(input.getAttribute('aria-expanded')).toBe('false')
+
+  input.focus()
+  expect(picker.querySelector('.reader-search-context')?.textContent).toContain(
+    'Quick access'
+  )
+})
+
+test('Cmd-K follows Escape by clearing before requesting the picker close', () => {
+  const requestClose = vi.fn()
+  const picker = mountPicker({ requestClose })
+  const input = picker.querySelector<HTMLInputElement>('.search-input')!
+
+  input.focus()
+  inputValue(input, 'Noach')
+  input.dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true })
+  )
+  expect(input.value).toBe('')
+  expect(requestClose).not.toHaveBeenCalled()
+
+  input.dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true })
+  )
+  expect(requestClose).toHaveBeenCalledOnce()
+})
+
+test('adds TOC entrance motion only when the opener requests it', () => {
+  const instantPicker = mountPicker()
+  const animatedPicker = mountPicker({ animateOnOpen: true })
+
+  expect(instantPicker.querySelector('.parsha-picker')?.classList).not.toContain(
+    'mod-animate-open'
+  )
+  expect(animatedPicker.querySelector('.parsha-picker')?.classList).toContain(
+    'mod-animate-open'
+  )
+})
+
 test('search keyboard selection does not reuse a cleared result', () => {
   const navigate = vi.fn()
   const picker = mountPicker({ navigate })
@@ -206,6 +281,89 @@ test('search keyboard selection does not reuse a cleared result', () => {
     new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
   )
   expect(navigate).toHaveBeenCalledOnce()
+})
+
+test('shows alias context and navigates structured search results', () => {
+  const navigate = vi.fn()
+  const picker = mountPicker({ navigate })
+  const input = picker.querySelector<HTMLInputElement>('.search-input')
+  if (!input) throw new Error('Expected the parsha search input')
+
+  expect(input.getAttribute('aria-label')).toBe('Search readings and commands')
+  inputValue(input, 'beresheet')
+  expect(
+    picker
+      .querySelector('.search-result-alias')
+      ?.textContent?.replace(/\s+/g, '')
+  ).toBe('Matched:beresheet')
+
+  inputValue(input, 'Noach 3')
+  const result = picker.querySelector<HTMLElement>(
+    '[data-result-source="reading"]'
+  )
+  expect(
+    result?.querySelector('.reader-search-label')?.textContent?.trim()
+  ).toBe('Parshat Noach')
+  expect(
+    result?.querySelector('.reader-search-secondary')?.textContent?.trim()
+  ).toBe('Aliyah 3 · נח')
+  expect(result?.textContent).not.toMatch(/shacharit|שחרית/i)
+  input.dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
+  )
+  expect(navigate).toHaveBeenLastCalledWith(
+    '#/torah/parsha/noach/1-7-17'
+  )
+
+  inputValue(input, 'Genesis 6:9')
+  input.dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
+  )
+  expect(navigate).toHaveBeenLastCalledWith('#/r/1-6-9')
+})
+
+test('inherits command behavior and keeps the Cmd-K hint in the search bar', () => {
+  const runSettings = vi.fn()
+  const picker = mountPicker({
+    getActions: () => [
+      createNavigationAction({
+        id: 'tools.settings',
+        group: 'tools',
+        label: 'Reader Settings',
+        aliases: ['Preferences'],
+        run: runSettings,
+      }),
+    ],
+  })
+  const input = picker.querySelector<HTMLInputElement>('.search-input')
+  if (!input) throw new Error('Expected the unified search input')
+
+  expect(picker.querySelector('.reader-search-shortcut')?.textContent).toBe('⌘K')
+  inputValue(input, 'preferences')
+  expect(picker.querySelector('[data-action-id="tools.settings"]')).not.toBeNull()
+  expect(picker.querySelector('.reader-search-alias strong')?.textContent).toBeTruthy()
+  input.dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
+  )
+  expect(runSettings).toHaveBeenCalledOnce()
+})
+
+test('tears down search interaction with the picker', () => {
+  const navigate = vi.fn()
+  const picker = mountPicker({ navigate })
+  const input = picker.querySelector<HTMLInputElement>('.search-input')
+  if (!input) throw new Error('Expected the parsha search input')
+  const mounted = mountedPickers.pop()
+  if (!mounted) throw new Error('Expected a mounted picker')
+
+  mounted.destroy()
+  inputValue(input, 'Noach 3')
+  input.dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
+  )
+
+  expect(input.isConnected).toBe(false)
+  expect(navigate).not.toHaveBeenCalled()
 })
 
 test('empty search results tolerate keyboard navigation', () => {
@@ -242,15 +400,24 @@ function inputValue(input: HTMLInputElement, value: string) {
 function mountPicker({
   navigate = vi.fn(),
   onCalendarSettingsChange = vi.fn(),
+  getActions = () => [],
+  animateOnOpen = false,
+  requestClose = vi.fn(),
 }: {
   navigate?: (hash: string) => void
   onCalendarSettingsChange?: (settings: { israel: boolean }) => void
+  getActions?: () => NavigationAction[]
+  animateOnOpen?: boolean
+  requestClose?: () => void
 } = {}) {
   const generator = new LeiningGenerator(testSettings)
   const mounted = ParshaPicker(generator, {
     calendarSettings: { israel: false },
     onCalendarSettingsChange,
     navigate,
+    getActions,
+    animateOnOpen,
+    requestClose,
   })
   mountedPickers.push(mounted)
   document.body.appendChild(mounted.node)

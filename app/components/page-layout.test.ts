@@ -22,6 +22,18 @@ const toggleCss = readFileSync(
   new URL('../../css/toggle.css', import.meta.url),
   'utf8'
 )
+const tooltipCss = readFileSync(
+  new URL('../../css/tooltip.css', import.meta.url),
+  'utf8'
+)
+const readerSearchCss = readFileSync(
+  new URL('../../css/reader-search.css', import.meta.url),
+  'utf8'
+)
+const parshaPickerCss = readFileSync(
+  new URL('../../css/parsha-picker.css', import.meta.url),
+  'utf8'
+)
 const lineComponent = readFileSync(new URL('./Line.ts', import.meta.url), 'utf8')
 const uiIconSource = readFileSync(
   new URL('./UiIcon.svelte', import.meta.url),
@@ -29,6 +41,10 @@ const uiIconSource = readFileSync(
 )
 const appSource = readFileSync(
   new URL('../reader/reader-runtime.ts', import.meta.url),
+  'utf8'
+)
+const readerRouteSource = readFileSync(
+  new URL('../reader/reader-route.ts', import.meta.url),
   'utf8'
 )
 const playbackTimelineSource = readFileSync(
@@ -315,7 +331,7 @@ test('draws the mobile aliyah picker focus indicator around its capsule', () => 
     /\.mobile-aliyah-picker-toggle:focus-visible\s*{[\s\S]*?outline:\s*none;[\s\S]*?}\s*\.mobile-aliyah-picker-toggle:focus-visible::before\s*{[\s\S]*?0 0 0 2px var\(--paper-color\),[\s\S]*?0 0 0 4px var\(--mobile-reader-blue\);/
   )
   expect(mobileReaderCss).toMatch(
-    /@media screen and \(max-width:\s*550px\) and \(forced-colors:\s*active\)\s*{[\s\S]*?\.mobile-aliyah-picker-toggle:focus-visible\s*{[\s\S]*?outline:\s*2px solid Highlight;/
+    /@media screen and \(max-width:\s*550px\) and \(forced-colors:\s*active\)\s*{[\s\S]*?\.mobile-aliyah-picker-toggle:focus-visible,[\s\S]*?{[\s\S]*?outline:\s*2px solid Highlight;/
   )
 })
 
@@ -372,9 +388,38 @@ test('centers a larger neutral parsha trigger between equal toolbar side columns
   )
 })
 
-test('keeps the parsha keyboard shortcut tip desktop-only', () => {
+test('uses motion-only polish across reader controls', () => {
+  expect(masterCss).toContain('--reader-control-press-scale: 0.97')
+  expect(masterCss).toContain('--reader-motion-fast: 140ms')
+  expect(masterCss).toContain('--reader-motion-color: 160ms')
+  expect(readerEnhancementsCss).toMatch(
+    /\.floating-player-button:not\(:disabled\):active,[\s\S]*?\.toolbar-button:not\(:disabled\):active,[\s\S]*?transform:\s*scale\(var\(--reader-control-press-scale\)\);/
+  )
+  expect(readerEnhancementsCss).toContain(
+    '@media (hover: hover) and (pointer: fine)'
+  )
+  expect(readerEnhancementsCss).toContain(
+    '@media (prefers-reduced-motion: reduce)'
+  )
+  expect(tooltipCss).toContain('opacity: 0')
+  expect(tooltipCss).toContain('scale(0.96)')
+  expect(tooltipCss).not.toContain('scale(0)')
+  expect(readerSearchCss).toContain(
+    '@media (hover: hover) and (pointer: fine)'
+  )
+  expect(readerSearchCss).toContain(
+    'transform: scale(var(--reader-control-press-scale))'
+  )
+  expect(readerSearchCss).toContain('@media (prefers-reduced-motion: reduce)')
+  expect(parshaPickerCss).not.toContain('@keyframes fade-in')
+  expect(parshaPickerCss).toContain('.parsha-picker.mod-animate-open')
+  expect(parshaPickerCss).toContain('@starting-style')
+  expect(appSource).toContain('togglePicker({ animate: true })')
+})
+
+test('keeps the working keyboard search shortcut tip desktop-only', () => {
   expect(readerShellComponentSource).toContain(
-    `data-tooltip='Tip: Press "/" to open quickly'`
+    'data-tooltip="Tip: Press Cmd/Ctrl+K to search"'
   )
   expect(mobileReaderCss).toMatch(
     /\.parsha-title\[data-tooltip\]::after\s*{\s*display:\s*none;/
@@ -446,7 +491,7 @@ test('shares pause-on-open behavior across both mobile aliyah picker entry point
     )
   )
 
-  expect(openPolicy).toContain('audioController.pause()')
+  expect(openPolicy).toContain('readerPlaybackGlobal?.pause()')
   expect(aliyahNavigationLayerSource).toContain(
     'syncPlayback(onBeforeCompactOpen())'
   )
@@ -487,7 +532,12 @@ test('preserves focus when overflow actions open and close reader overlays', () 
     'if (focusTarget) restoreFocus(focusTarget)'
   )
   expect(readerSettingsSource).toContain('mount(ReaderSettingsPane')
-  expect(appSource).toMatch(/if \(readerRouteGlobal\?\.snapshot\(\)\.pickerOpen\)\s*{[\s\S]*?readerRouteGlobal\.closePicker\(\)[\s\S]*?getReaderShell\(\)\.focusTitle\(\)/)
+  expect(appSource).toMatch(
+    /if \(readerRouteGlobal\?\.snapshot\(\)\.pickerOpen\)\s*{[\s\S]*?readerRouteGlobal\.closePicker\(\)/
+  )
+  expect(readerRouteSource).toMatch(
+    /returnFocus\?\.focus\(\{ preventScroll: true \}\)[\s\S]*?document\.activeElement !== returnFocus[\s\S]*?shell\.focusTitle\(\)/
+  )
 })
 
 test('shows mobile word progress without changing the centered playback controls', () => {

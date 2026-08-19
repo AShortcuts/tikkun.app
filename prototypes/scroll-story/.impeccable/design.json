@@ -1,0 +1,233 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-09T17:26:44Z",
+  "title": "Design System: Tikkun Reader Scroll Story",
+  "extensions": {
+    "colorMeta": {
+      "reading-space": { "role": "neutral", "displayName": "Reading Space" },
+      "reader-surface": { "role": "neutral", "displayName": "Reader Surface" },
+      "toolbar-surface": { "role": "neutral", "displayName": "Reader Toolbar" },
+      "reading-text": { "role": "neutral", "displayName": "Reading Text" },
+      "reading-muted": { "role": "neutral", "displayName": "Reading Muted" },
+      "hairline": { "role": "neutral", "displayName": "Hairline" },
+      "hairline-strong": { "role": "neutral", "displayName": "Strong Hairline" },
+      "action-blue": { "role": "primary", "displayName": "Practice Blue" },
+      "action-blue-hover": { "role": "primary", "displayName": "Practice Blue Hover" },
+      "action-blue-soft": { "role": "primary", "displayName": "Soft Reader Blue" },
+      "focus-blue": { "role": "primary", "displayName": "Focus Blue" },
+      "synced-green": { "role": "secondary", "displayName": "Synced Green" },
+      "draft-blue": { "role": "secondary", "displayName": "Draft Blue" },
+      "needs-timing-yellow": { "role": "secondary", "displayName": "Needs Timing Yellow" },
+      "paper": { "role": "neutral", "displayName": "Paper" },
+      "paper-ink": { "role": "neutral", "displayName": "Paper Ink" },
+      "paper-muted": { "role": "neutral", "displayName": "Paper Muted" },
+      "hebrew-highlight": { "role": "tertiary", "displayName": "Torah Highlight Wash" },
+      "hebrew-highlight-text": { "role": "tertiary", "displayName": "Torah Highlight Ink" },
+      "white": { "role": "neutral", "displayName": "White" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The short first-viewport promise." },
+      "headline": { "displayName": "Headline", "purpose": "Major story and paper-chapter headings." },
+      "title": { "displayName": "Title", "purpose": "Individual scroll-practice beats." },
+      "body": { "displayName": "Body", "purpose": "Narrative explanation and supporting copy." },
+      "action": { "displayName": "Action", "purpose": "Primary practice calls to action." },
+      "label": { "displayName": "Label", "purpose": "Navigation, statuses, controls, and metadata." },
+      "hebrew": { "displayName": "Torah", "purpose": "The Hebrew active-word demonstration." }
+    },
+    "shadows": [
+      {
+        "name": "action-glow",
+        "value": "0 1.25rem 3rem -1.8rem rgba(57, 132, 255, 0.88)",
+        "purpose": "Soft emphasis under filled actions that enter the reader."
+      },
+      {
+        "name": "reader-weight",
+        "value": "0 3.2rem 7rem -3rem rgba(0, 0, 0, 0.96), 0 1.3rem 5rem -3rem rgba(65, 126, 241, 0.7)",
+        "purpose": "Black weight and cool reflected light beneath the angled live reader."
+      },
+      {
+        "name": "paper-preview-lift",
+        "value": "0 3.5rem 7rem -3.5rem rgba(21, 23, 20, 0.48)",
+        "purpose": "Ambient separation for the reader preview on the paper chapter."
+      },
+      {
+        "name": "playback-glow",
+        "value": "0 0.4rem 1.2rem rgba(57, 132, 255, 0.65)",
+        "purpose": "A small glow around the two-pixel playback progress line."
+      }
+    ],
+    "motion": [
+      {
+        "name": "navigation-color",
+        "value": "140ms ease",
+        "purpose": "Quiet color feedback on header links."
+      },
+      {
+        "name": "action-state",
+        "value": "150ms ease",
+        "purpose": "Hover and press feedback for filled actions and aliyah links."
+      },
+      {
+        "name": "reader-fade",
+        "value": "220ms cubic-bezier(0.2, 0.75, 0.25, 1)",
+        "purpose": "Live-reader and theme-preview state changes."
+      },
+      {
+        "name": "highlight-state",
+        "value": "260ms cubic-bezier(0.2, 0.75, 0.25, 1)",
+        "purpose": "Active Torah word color, background, and glow."
+      },
+      {
+        "name": "sequence-settle",
+        "value": "900ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Playback progress entering only with the listening beat."
+      },
+      {
+        "name": "copy-arrival",
+        "value": "640ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "The initial hero-copy arrival."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "0.01ms",
+        "purpose": "Transition duration under prefers-reduced-motion; animations are disabled."
+      }
+    ],
+    "breakpoints": [
+      { "name": "compact", "value": "22rem" },
+      { "name": "brand-detail", "value": "34rem" },
+      { "name": "tablet", "value": "48rem" },
+      { "name": "desktop", "value": "64rem" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Action",
+      "kind": "button",
+      "refersTo": "primary-action",
+      "description": "The dominant path from explanation into Torah practice.",
+      "html": "<a class=\"ds-primary-action\" href=\"#\">Start practicing</a>",
+      "css": ".ds-primary-action { display: inline-flex; min-width: 12.5rem; min-height: 3.45rem; align-items: center; justify-content: center; border: 0; border-radius: 1rem; padding: 0.82rem 1.35rem; background: #3984ff; box-shadow: 0 1.25rem 3rem -1.8rem rgba(57, 132, 255, 0.88); color: #fff; font-family: 'Noto Sans Hebrew', sans-serif; font-size: 0.98rem; font-weight: 720; text-decoration: none; transition: background-color 150ms ease, transform 150ms ease; } .ds-primary-action:hover { background: #4b90ff; transform: translateY(-1px); } .ds-primary-action:active { transform: scale(0.98); } .ds-primary-action:focus-visible { outline: 3px solid rgba(95, 157, 255, 0.95); outline-offset: 4px; }"
+    },
+    {
+      "name": "Text Action",
+      "kind": "button",
+      "refersTo": "text-action",
+      "description": "A low-emphasis path to explanation or coverage without another filled control.",
+      "html": "<a class=\"ds-text-action\" href=\"#\">See how it works</a>",
+      "css": ".ds-text-action { display: inline-flex; min-height: 2.75rem; align-items: center; color: rgba(235, 240, 247, 0.82); font-family: 'Noto Sans Hebrew', sans-serif; font-size: 0.9rem; text-underline-offset: 0.28rem; } .ds-text-action:hover { color: #fff; } .ds-text-action:focus-visible { outline: 3px solid rgba(95, 157, 255, 0.95); outline-offset: 4px; }"
+    },
+    {
+      "name": "Header Navigation",
+      "kind": "nav",
+      "refersTo": "header-navigation",
+      "description": "A compact brand-and-links header that keeps the reader action present on every width.",
+      "html": "<header class=\"ds-header\"><a class=\"ds-header-brand\" href=\"#\"><strong>Tikkun Reader</strong><small>A Torah-reading companion by Ocean of Torah</small></a><nav class=\"ds-header-links\" aria-label=\"Primary navigation\"><a class=\"ds-header-link\" href=\"#\">Readings &amp; coverage</a><a class=\"ds-header-link\" href=\"#\">About</a><a class=\"ds-header-open\" href=\"#\">Open reader</a></nav></header>",
+      "css": ".ds-header { display: flex; min-height: 5rem; align-items: center; justify-content: space-between; gap: 1rem; background: #06080b; color: #f6f7f9; font-family: 'Noto Sans Hebrew', sans-serif; } .ds-header-brand { display: grid; min-width: 0; gap: 0.14rem; color: #f6f7f9; text-decoration: none; } .ds-header-brand strong { font-size: 0.98rem; font-weight: 720; letter-spacing: -0.02em; } .ds-header-brand small { display: none; color: rgba(236, 240, 246, 0.68); font-size: 0.66rem; font-weight: 500; line-height: 1.2; } .ds-header-links { display: flex; align-items: center; gap: 1.25rem; } .ds-header-link { display: none; min-height: 2.75rem; align-items: center; color: rgba(236, 240, 246, 0.68); font-size: 0.84rem; text-decoration: none; transition: color 140ms ease; } .ds-header-link:hover { color: #f6f7f9; } .ds-header-open { display: inline-flex; min-height: 2.8rem; align-items: center; justify-content: center; border-radius: 0.85rem; padding: 0.68rem 0.95rem; background: #3984ff; box-shadow: 0 1.25rem 3rem -1.8rem rgba(57, 132, 255, 0.88); color: #fff; font-size: 0.82rem; font-weight: 720; text-decoration: none; transition: background-color 150ms ease, transform 150ms ease; } .ds-header-open:hover { background: #4b90ff; transform: translateY(-1px); } .ds-header-open:active { transform: scale(0.98); } .ds-header a:focus-visible { outline: 3px solid rgba(95, 157, 255, 0.95); outline-offset: 4px; } @media (min-width: 34rem) { .ds-header-brand small { display: block; } } @media (min-width: 48rem) { .ds-header-link { display: inline-flex; } } @media (min-width: 64rem) { .ds-header { min-height: 6.25rem; } }"
+    },
+    {
+      "name": "Live Reader Frame",
+      "kind": "custom",
+      "refersTo": "live-reader-frame",
+      "description": "The functional Beresheet proof, framed as a weighted object rather than a generic screenshot card.",
+      "html": "<div class=\"ds-reader-frame\"><div class=\"ds-reader-toolbar\"><span>Live Beresheet reader</span><a href=\"#\">Open full reader<svg viewBox=\"0 0 20 20\" aria-hidden=\"true\"><path d=\"M6 14 14 6M8 6h6v6\" /></svg></a></div><div class=\"ds-reader-viewport\"><iframe src=\"/reader/#/torah/parsha/beresheet\" title=\"Interactive Beresheet Torah reader\"></iframe></div></div>",
+      "css": ".ds-reader-frame { overflow: hidden; border-radius: 1.1rem; background: #0b0e13; box-shadow: 0 3.2rem 7rem -3rem rgba(0, 0, 0, 0.96), 0 1.3rem 5rem -3rem rgba(65, 126, 241, 0.7); transform: perspective(90rem) rotateX(1deg) rotateY(-2.4deg) rotateZ(-0.65deg); transform-origin: center left; } .ds-reader-toolbar { display: flex; min-height: 3rem; align-items: center; justify-content: space-between; gap: 0.8rem; border-bottom: 1px solid rgba(255, 255, 255, 0.12); padding: 0.62rem 0.75rem 0.62rem 1rem; background: #11161d; color: rgba(245, 247, 250, 0.7); font-family: 'Noto Sans Hebrew', sans-serif; font-size: 0.72rem; } .ds-reader-toolbar a { display: flex; min-height: 2rem; align-items: center; gap: 0.35rem; color: #9fc2ff; font-weight: 680; text-decoration: none; } .ds-reader-toolbar a:hover { color: #fff; } .ds-reader-toolbar svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; } .ds-reader-viewport { position: relative; aspect-ratio: 100 / 67; overflow: hidden; background: #e8e5dd; } .ds-reader-viewport::after { position: absolute; inset: 0; border: 3px solid rgba(95, 157, 255, 0.98); opacity: 0; content: ''; pointer-events: none; transition: opacity 120ms ease; } .ds-reader-viewport:focus-within::after { opacity: 1; } .ds-reader-viewport iframe { display: block; width: 100%; height: 100%; border: 0; background: #fff; } .ds-reader-toolbar a:focus-visible { outline: 3px solid rgba(95, 157, 255, 0.95); outline-offset: 4px; }"
+    },
+    {
+      "name": "Theme Selector",
+      "kind": "custom",
+      "refersTo": "theme-selector",
+      "description": "A paper-surface segmented chooser controlling a live same-origin reader, with Light selected in this section only.",
+      "html": "<div class=\"ds-theme-selector\" aria-label=\"Reader preview theme\"><button type=\"button\" aria-pressed=\"true\"><strong>Light</strong><span>Clear white paper</span></button><button type=\"button\" aria-pressed=\"false\"><strong>Sepia</strong><span>Warm reading paper</span></button><button type=\"button\" aria-pressed=\"false\"><strong>Dark</strong><span>For low light</span></button><button type=\"button\" aria-pressed=\"false\"><strong>System</strong><span>Follows your device</span></button></div>",
+      "css": ".ds-theme-selector { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; border: 1px solid rgba(17, 18, 16, 0.18); border-radius: 0.95rem; background: #f6f5f1; } .ds-theme-selector button { display: grid; min-width: 0; min-height: 4.8rem; align-content: center; gap: 0.18rem; border: 0; border-right: 1px solid rgba(17, 18, 16, 0.16); border-bottom: 1px solid rgba(17, 18, 16, 0.16); padding: 0.75rem 0.85rem; background: transparent; color: #111210; cursor: pointer; font-family: 'Noto Sans Hebrew', sans-serif; text-align: left; transition: background-color 160ms ease, color 160ms ease, transform 150ms ease; } .ds-theme-selector button:nth-child(2n) { border-right: 0; } .ds-theme-selector button:nth-last-child(-n + 2) { border-bottom: 0; } .ds-theme-selector button[aria-pressed='true'] { background: #10110f; color: #fff; } .ds-theme-selector button:hover:not([aria-pressed='true']) { background: rgba(17, 18, 16, 0.055); } .ds-theme-selector button:active { transform: scale(0.98); } .ds-theme-selector button:focus-visible { position: relative; z-index: 1; outline: 3px solid #276fe6; outline-offset: -4px; } .ds-theme-selector strong { overflow: hidden; font-size: 0.9rem; text-overflow: ellipsis; white-space: nowrap; } .ds-theme-selector span { overflow: hidden; font-size: 0.68rem; line-height: 1.35; opacity: 0.72; text-overflow: ellipsis; white-space: nowrap; } @media (min-width: 48rem) { .ds-theme-selector { grid-template-columns: repeat(4, minmax(0, 1fr)); } .ds-theme-selector button, .ds-theme-selector button:nth-child(2n) { border-right: 1px solid rgba(17, 18, 16, 0.16); border-bottom: 0; } .ds-theme-selector button:last-child { border-right: 0; } }"
+    },
+    {
+      "name": "Reading Row",
+      "kind": "card",
+      "refersTo": "reading-row",
+      "description": "A flat hairline row connecting a parsha, its aliyah links, and the full-reading action.",
+      "html": "<article class=\"ds-reading-row\"><header class=\"ds-reading-header\"><a class=\"ds-reading-title\" href=\"#\"><strong>Beresheet</strong></a><span class=\"ds-reading-status\">Word timing ready</span></header><nav class=\"ds-reading-bubbles\" aria-label=\"Beresheet aliyot\"><a href=\"#\">א</a><a href=\"#\">ב</a><a href=\"#\">ג</a></nav><a class=\"ds-reading-open\" href=\"#\">Open full reading</a></article>",
+      "css": ".ds-reading-row { display: grid; gap: 1.25rem; border-top: 1px solid rgba(255, 255, 255, 0.12); padding: 1.6rem 0; background: #06080b; color: #f6f7f9; font-family: 'Lora', Georgia, serif; } .ds-reading-header, .ds-reading-bubbles, .ds-reading-open { display: flex; align-items: center; } .ds-reading-header { justify-content: space-between; gap: 1rem; } .ds-reading-title { min-width: 0; color: #f6f7f9; font-size: clamp(1.25rem, 5vw, 1.65rem); text-decoration: none; } .ds-reading-title:hover { color: #a9c9ff; } .ds-reading-title strong { font-weight: 400; } .ds-reading-status { color: rgba(236, 240, 246, 0.68); font-family: 'Noto Sans Hebrew', sans-serif; font-size: 0.7rem; } .ds-reading-bubbles { flex-wrap: wrap; gap: 0.45rem; } .ds-reading-bubbles a { display: inline-grid; width: 2.54rem; height: 2.54rem; place-items: center; border: 1px solid rgba(104, 196, 123, 0.48); border-radius: 50%; background: rgba(48, 116, 65, 0.58); color: #e8ffed; font-family: 'Noto Sans Hebrew', sans-serif; text-decoration: none; } .ds-reading-open { width: fit-content; min-height: 2.75rem; color: #9fc2ff; font-family: 'Noto Sans Hebrew', sans-serif; font-size: 0.82rem; font-weight: 680; text-underline-offset: 0.25rem; } .ds-reading-open:hover { color: #fff; } .ds-reading-row a:focus-visible { outline: 3px solid rgba(95, 157, 255, 0.95); outline-offset: 4px; } @media (min-width: 48rem) { .ds-reading-row { grid-template-columns: minmax(13rem, 0.75fr) minmax(18rem, 1.25fr) auto; align-items: center; gap: 2rem; padding: 1.75rem 0; } .ds-reading-bubbles { gap: 0.82rem; } .ds-reading-bubbles a { width: 2.7rem; height: 2.7rem; } .ds-reading-open { justify-self: end; } }"
+    },
+    {
+      "name": "Aliyah Status Bubbles",
+      "kind": "chip",
+      "refersTo": "aliyah-status-bubble",
+      "description": "Circular deep links that preserve the implemented synced, draft, and needs-timing meanings.",
+      "html": "<nav class=\"ds-aliyah-bubbles\" aria-label=\"Beresheet aliyot\"><a class=\"ds-aliyah-bubble ds-cued\" href=\"#\" aria-label=\"Aliyah 1: word timing ready\">א</a><a class=\"ds-aliyah-bubble ds-draft\" href=\"#\" aria-label=\"Aliyah 2: draft timing\">ב</a><a class=\"ds-aliyah-bubble ds-missing\" href=\"#\" aria-label=\"Aliyah 3: audio available, timing not started\">ג</a></nav>",
+      "css": ".ds-aliyah-bubbles { display: flex; align-items: center; flex-wrap: wrap; gap: 0.45rem; background: #06080b; } .ds-aliyah-bubble { display: inline-grid; width: 2.54rem; height: 2.54rem; place-items: center; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 50%; background: rgba(255, 255, 255, 0.045); color: rgba(255, 255, 255, 0.4); font-family: 'Noto Sans Hebrew', sans-serif; font-size: 1rem; text-decoration: none; transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease, transform 150ms ease; } .ds-aliyah-bubble.ds-cued { border-color: rgba(104, 196, 123, 0.48); background: rgba(48, 116, 65, 0.58); color: #e8ffed; } .ds-aliyah-bubble.ds-draft { border-color: rgba(91, 156, 255, 0.54); background: rgba(43, 93, 166, 0.68); color: #eff6ff; } .ds-aliyah-bubble.ds-missing { border-color: rgba(224, 184, 79, 0.58); background: rgba(133, 101, 20, 0.62); color: #fff4c5; } .ds-aliyah-bubble:hover { border-color: currentColor; transform: translateY(-2px); } .ds-aliyah-bubble:active { transform: translateY(0) scale(0.96); } .ds-aliyah-bubble:focus-visible { outline: 3px solid rgba(95, 157, 255, 0.95); outline-offset: 4px; } @media (min-width: 48rem) { .ds-aliyah-bubbles { gap: 0.82rem; } .ds-aliyah-bubble { width: 2.7rem; height: 2.7rem; } }"
+    },
+    {
+      "name": "Torah Highlight Row",
+      "kind": "custom",
+      "refersTo": "torah-highlight-row",
+      "description": "The listening-only active-word demonstration that keeps Hebrew text, timing, and place visibly connected.",
+      "html": "<div class=\"ds-torah-stage\"><p class=\"ds-torah-line\" dir=\"rtl\" lang=\"he\"><span>בְּרֵאשִׁית</span><span>בָּרָא</span><span class=\"ds-highlighted\">אֱלֹהִים</span><span class=\"ds-highlighted\">אֵת</span><span class=\"ds-highlighted\">הַשָּׁמַיִם</span></p><div class=\"ds-playback\" aria-hidden=\"true\"><span></span></div><p class=\"ds-beat-status\">Hear the recording while the active phrase stays in view.</p></div>",
+      "css": ".ds-torah-stage { border-top: 1px solid rgba(255, 255, 255, 0.22); border-bottom: 1px solid rgba(255, 255, 255, 0.22); padding: clamp(1.35rem, 4vw, 2rem) 0; background: #06080b; } .ds-torah-line { display: flex; min-height: 6.2rem; flex-wrap: wrap; align-content: center; justify-content: center; gap: 0.45rem 0.7rem; margin: 0; color: rgba(255, 255, 255, 0.34); font-family: 'ShlomosemiStam', serif; font-size: clamp(1.45rem, 6vw, 2.35rem); line-height: 1.8; } .ds-torah-line span { border-radius: 0.35rem; padding: 0.02em 0.12em; transition: background-color 260ms cubic-bezier(0.2, 0.75, 0.25, 1), color 260ms cubic-bezier(0.2, 0.75, 0.25, 1), text-shadow 260ms cubic-bezier(0.2, 0.75, 0.25, 1); } .ds-torah-line .ds-highlighted { background: rgba(255, 215, 0, 0.15); color: #fff7c1; text-shadow: 0 0.55rem 1.5rem rgba(255, 209, 52, 0.18); } .ds-playback { height: 2px; margin-top: 1.35rem; overflow: hidden; background: rgba(255, 255, 255, 0.1); } .ds-playback span { display: block; width: 33.333%; height: 100%; background: #3984ff; box-shadow: 0 0.4rem 1.2rem rgba(57, 132, 255, 0.65); transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-beat-status { margin: 0.95rem 0 0; color: #a8c7ff; font-family: 'Noto Sans Hebrew', sans-serif; font-size: 0.8rem; line-height: 1.45; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Connected Torah Page",
+    "overview": "The scroll story is a near-black reading space in which practice never separates from the Torah page. Editorial Lora copy explains the workflow while a functional, angled Beresheet reader supplies the proof; blue actions lead into practice, and fine hairlines organize the story without turning it into a collection of feature cards.\n\nThe world stays restrained until one rounded white paper chapter introduces the reader themes, then returns to the dark readings index and its status-coded aliyah links. This record is scoped to the shipped isolated prototype: a user-pinned, preserve-led scroll story with seed key PINNED-SCROLL-STORY-2026-08-09, not a replacement for the public product design.",
+    "keyCharacteristics": [
+      "A near-black reading space structured by fine light hairlines.",
+      "Lora editorial display type paired with Noto Sans Hebrew for controls.",
+      "Blue actions reserved for paths into practice and the live reader.",
+      "A clipped, angled Beresheet reader that remains functional.",
+      "One rounded white paper chapter with a second live reader, Light by default, before returning to readings.",
+      "Status-coded circular aliyah deep links.",
+      "Three product-real scroll scenes for contents, playback, and Continue."
+    ],
+    "rules": [
+      {
+        "name": "The Blue Path Rule",
+        "body": "Use Practice Blue for actions that open or advance practice; keep informational structure neutral.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Paper Chapter Rule",
+        "body": "Reserve Paper for the theme chapter; the surrounding scroll story remains Reading Space.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two-Voice Rule",
+        "body": "Lora carries narrative explanation, while Noto Sans Hebrew carries controls, navigation, status, and metadata.",
+        "section": "typography"
+      },
+      {
+        "name": "The Text Is the Artifact Rule",
+        "body": "Use ShlomosemiStam only where the Torah text itself is being demonstrated.",
+        "section": "typography"
+      },
+      {
+        "name": "The Reader Leads Rule",
+        "body": "On wide screens, preserve the live reader's oversized right-edge crop instead of containing it beneath centered copy.",
+        "section": "layout"
+      },
+      {
+        "name": "The Proof Has Weight Rule",
+        "body": "Shadows lift the live reader, actionable progress, and paper preview only; ordinary content rows stay flat and divided by hairlines.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Circle Means Aliyah Rule",
+        "body": "Reserve circular controls for aliyah status links; actions and selectors remain rounded rectangles.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "Do keep practice copy and reader proof together in the first viewport.",
+      "Do use hairline borders to group sections and reading rows.",
+      "Do preserve circular aliyah links and their green, blue, and yellow status meanings.",
+      "Do let the white theme chapter act as the only major tonal interruption.",
+      "Do honor prefers-reduced-motion by removing animations and shortening transitions."
+    ],
+    "donts": [
+      "Don't replace the reader with generic feature cards or a detached transcript.",
+      "Don't spread paper surfaces throughout the dark story.",
+      "Don't use blue for decoration unrelated to reader or practice actions.",
+      "Don't flatten the desktop hero into centered copy above a contained screenshot.",
+      "Don't change theme controls into global reader preference writes."
+    ]
+  }
+}

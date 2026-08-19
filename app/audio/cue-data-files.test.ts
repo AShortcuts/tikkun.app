@@ -4,7 +4,7 @@ import {
   parseCueExportPayload,
 } from './cue-validation.ts'
 import { audioRecordings } from '../data/audio-catalog.ts'
-import { TOKENIZATION_VERSION } from '../reader-preferences.ts'
+import { TOKENIZATION_VERSION } from './cue-schema.ts'
 import { cuePayloadPathForRecording } from './cue-data.ts'
 
 const publishedCuePayloads = import.meta.glob<unknown>('../../audio-cues/**/*.json', {

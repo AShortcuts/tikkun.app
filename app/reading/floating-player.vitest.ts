@@ -67,6 +67,8 @@ test('owns player presentation behind one connected interface', () => {
   expect(root.classList.contains('u-hidden')).toBe(false)
   expect(root.classList.contains('is-playing')).toBe(true)
   expect(root.classList.contains('is-expanded')).toBe(true)
+  expect(root.getAttribute('role')).toBe('dialog')
+  expect(root.getAttribute('aria-modal')).toBe('true')
   expect(root.dataset.cueMode).toBe('timed')
   expect(root.style.getPropertyValue('--audio-progress-ratio')).toBe('0.25')
   expect(root.style.getPropertyValue('--cue-progress-ratio')).toBe('0.5')
@@ -97,6 +99,39 @@ test('owns player presentation behind one connected interface', () => {
   expect(speedToggle.getAttribute('aria-expanded')).toBe('true')
   player!.closeSpeedPopover()
   expect(speedToggle.getAttribute('aria-expanded')).toBe('false')
+
+  player!.focusMobileClose()
+  expect(document.activeElement).toBe(
+    required('[data-target-id="floating-mobile-close"]')
+  )
+  const focusable = [
+    ...root.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), input:not(:disabled), a[href]:not([aria-disabled="true"]), [tabindex]:not([tabindex="-1"])'
+    ),
+  ].filter(
+    (element) =>
+      element.offsetParent !== null && !element.closest('.u-hidden')
+  )
+  const firstFocusable = focusable[0]
+  const lastFocusable = focusable[focusable.length - 1]
+  if (!firstFocusable || !lastFocusable) {
+    throw new Error('Expected focusable expanded-player controls')
+  }
+  lastFocusable.focus()
+  lastFocusable.dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })
+  )
+  expect(document.activeElement).toBe(firstFocusable)
+
+  root.dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
+  )
+  expect(actions).toContainEqual({
+    type: 'set-expanded',
+    expanded: false,
+    source: 'close',
+    returnFocus: null,
+  })
 
   destroy()
   destroy = null

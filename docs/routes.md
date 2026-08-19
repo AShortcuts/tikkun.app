@@ -33,8 +33,8 @@ The Reader owns only the hash after `/reader/`.
 Examples:
 
 ```text
-http://localhost:5173/reader/#/torah/parsha/noach
-http://localhost:5173/reader/#/torah/parsha/noach/1-6-9
+http://localhost:5176/reader/#/torah/parsha/noach
+http://localhost:5176/reader/#/torah/parsha/noach/1-6-9
 ```
 
 ## Torah Page Routes

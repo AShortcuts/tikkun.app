@@ -8,6 +8,8 @@ Tikkun is a browser-first, static web app for preparing Torah readings. The core
 
 SvelteKit owns the static public shell and clean pathname routes. The Reader keeps its mature TypeScript modules, Svelte feature mounts, and browser-local hash router behind the `/reader/` boundary. No server or global store is required.
 
+Durable trade-offs live in [`docs/adr/`](adr/): static delivery, Reader hash routing, incremental Svelte adoption, explicit offline media, and Cue Authoring trust semantics.
+
 ## Runtime Architecture
 
 - `src/app.html` owns shared metadata, the PWA manifest link, and the early Reader theme bootstrap.
@@ -19,12 +21,13 @@ SvelteKit owns the static public shell and clean pathname routes. The Reader kee
 - `app/reader/reader-shell.ts` mounts `app/reader/ReaderShell.svelte` before the rest of Reader Runtime. Reader Shell owns the stable reader frame and presents title, progress, route and Parsha Picker visibility, annotations, static chrome icons, and the empty targets used by nested reader features.
 - `app/reading/aliyah-navigation/aliyah-navigation.ts` is the public Interface for the Aliyah Navigation Module. Its two Svelte views own the toolbar capsule, compact segments and sheet, wide rail, local focus and reveal state, async presentation data, and cleanup. Reader Runtime supplies typed snapshots and actions while keeping routing, page scrolling, playback, recording lookup, and Cue Data policy outside Svelte.
 - `app/reading/reader-playback.ts` is the Reader Playback Module. It owns construction, cross-wiring, route reset, and teardown for the Audio Controller, Highlight Controller, Recording Session, and Playback Timeline while accepting page, network, preference, Cue Authoring, and presentation Adapters from Reader Runtime.
+- `app/reader/reader-presentation-scheduler.ts` is the Reader Presentation Module. Its small invalidation Interface coalesces scroll, Reader Viewport, resize, and playback presentation work into at most one presentation callback per animation frame; immutable diagnostics expose requested, coalesced, scheduled, and completed work.
 - `app/reading/recording-session.ts` owns the Recording Session: narrator-aware recording lookup, page-token caching, Cue Data loading, playback-plan installation, cancellation, and transitions into and out of authoring.
 - `app/reading/playback-timeline.ts` owns Playback Timeline behavior: playback commands, seeking policy, speed policy, cue progress, highlight synchronization, responsive policy, and cleanup. `app/reading/floating-player.ts` mounts `app/reading/FloatingPlayer.svelte`, whose connected Interface owns player markup, visual state, focusable controls, pointer mechanics, and icon presentation without selector-driven updates from Playback Timeline.
 - `app/reader/lazy-reader-settings.ts` keeps the settings launcher ready immediately and imports `app/reader/reader-settings.ts` only on first use. The mount bridge and `app/reader/ReaderSettings.svelte` then own presentation, dialog state, focus return, theme-transition timing, preference events, and playback-rate handoff.
 - `app/reader/reader-controls.ts` is the narrow mount bridge for `app/reader/ReaderControls.svelte`, which owns the wide bookmark and command buttons plus the compact Reader Controls menu. Both presentations use the same state and action callbacks while CSS decides which controls are visible.
-- `app/navigation/lazy-command-palette.ts` preserves the Command Palette Interface while importing `app/navigation/command-palette.ts` only on first use. The mount bridge and `app/navigation/CommandPalette.svelte` own query and selection state, keyboard interaction, focus, rendering, and dismissal while the composition root supplies navigation actions.
-- `app/components/parsha-picker-model.ts` prepares calendar, search, route, and aliyah-choice data without rendering. `app/components/ParshaPicker.svelte` owns the Parsha Picker page and popup interaction behind the small adapter in `app/components/ParshaPicker.ts`.
+- `app/navigation/lazy-command-palette.ts` preserves the first-use overlay boundary while importing `app/navigation/command-palette.ts` only when needed. `app/navigation/CommandPalette.svelte` is now only an overlay and focus host for shared Reader search.
+- `app/components/parsha-picker-model.ts` prepares calendar, route, reading-catalog, and aliyah-choice data without rendering. `app/components/ParshaPicker.svelte` owns Reading Index and hosts the same shared search control behind `app/components/ParshaPicker.ts`.
 - `app/reader/last-reading-prompt.ts` and `app/reader/offline-recording-prompt.ts` own their focused reader tools and browser effects.
 - `app/admin/cue-authoring-loader.ts` and `app/components/cue-analytics-route.ts` keep Optional Features outside the core reader bundle until they are requested.
 - `app/admin/cue-authoring.ts` owns the Cue Authoring lifetime: access state, Cue Drafts, timing rules, microphone capture, issue rules, and export. `app/admin/cue-waveform.ts` owns Cue Waveform loading, caching, windows, markers, seeking, retry, and scheduling. The Svelte Panel, Cue List, Recording Issue dialog, and Cue Export Sheet own their focused presentation behind narrow TypeScript Interfaces.
@@ -41,12 +44,13 @@ SvelteKit owns the static public shell and clean pathname routes. The Reader kee
 - Reader Route owns the hash listener, Optional Feature abort controller, Parsha Picker import and instance, pending-intent cancellation, and stale-render checks. It keeps the current view visible until the picker is ready, and its cleanup runs before Reader Shell releases the roots it uses.
 - Aliyah Navigation mounts into those empty Reader Shell targets before Reader Controls. Its timers, resize listeners, focus work, async status requests, and framework instances are released before Reader Shell.
 - Reader Playback is mounted through the lifetime Seam. It creates the four playback Implementations once, owns their cross-wiring, and resets or releases them together.
+- Reader Presentation is mounted through the same lifetime Seam. It cancels its pending frame and layout-deferred invalidations on teardown, and reentrant invalidation moves to the next frame instead of being lost.
 - Cue Authoring is mounted through this Seam. The Svelte Cue Authoring Panel is mounted first and released last so its stable Cue List and Cue Waveform targets outlive their nested Implementations. Cue Waveform owns its lane listeners, retry handlers, resize listeners, animation frame, summary loaders, and caches; the parent lifetime releases it with object URLs, microphone capture, the Cue List, Recording Issue dialog, and Cue Export Sheet.
 - Playback Timeline is nested inside Reader Playback. Its media subscriptions, responsive expansion policy, drag position policy, and scheduled focus are released as one lifetime.
 - Floating Player is mounted and unmounted inside the Playback Timeline lifetime. Its Svelte Implementation owns control, pointer, focus, resize, and outside-dismiss mechanics, so a replacement runtime cannot retain old player markup or listeners.
 - Lazy Reader Settings owns the always-ready launcher, pending open intent, retryable import, and mount lifetime. Its form and document listeners, delayed focus, theme-transition timer, dialog state, and focus target are released together.
 - Reader Controls is mounted through the same seam. Its menu state, outside-dismiss listener, keyboard handling, and framework instance are released together.
-- Lazy Command Palette owns pending open intent, retryable import, and mount lifetime. Cleanup releases its document listeners, focus work, and framework instance. Reader Route destroys the active Parsha Picker, whose own cleanup releases popup state, focus work, and its Svelte instance.
+- The lazy search overlay owns pending open intent, retryable import, and mount lifetime. Reader Route owns the active Reading Index. Runtime coordination guarantees one active search placement: Cmd-K focuses embedded search when present, while opening Reading Index closes the overlay.
 - Mounting a replacement destroys the previous implementation first. Destroy functions are tied to their specific mount, so stale framework cleanup cannot tear down a newer remount.
 - DOM listeners should use the mount signal. Typed event subscriptions, timers, animation frames, controllers, and nested feature mounts should transfer their teardown to `scope.own(...)`.
 - Feature setup is synchronous. Async work may start inside a mount, but it must observe the signal before applying a result.
@@ -67,7 +71,7 @@ SvelteKit owns the static public shell and clean pathname routes. The Reader kee
 
 ### Framework and Native Migration Boundary
 
-- Svelte is the incremental presentation layer for Reader Shell, Aliyah Navigation, Reader Settings, Reader Controls, Command Palette, Parsha Picker, Floating Player, the Cue Authoring Panel, Cue List, Recording Issue dialog, and Cue Export Sheet. Domain rules, preference persistence, playback, Reader Route coordination, Cue Authoring timing, export transactions and persistence, page rendering, waveform rendering, and browser capabilities remain in TypeScript Modules behind narrow Interfaces.
+- Svelte is the incremental presentation layer for Reader Shell, Aliyah Navigation, Reader Settings, Reader Controls, shared Reader Search, Parsha Picker, Floating Player, the Cue Authoring Panel, Cue List, Recording Issue dialog, and Cue Export Sheet. Domain rules, preference persistence, playback, Reader Route coordination, Cue Authoring timing, export transactions and persistence, page rendering, waveform rendering, and browser capabilities remain in TypeScript Modules behind narrow Interfaces.
 - A Svelte Module owns only the descendants or anchored siblings created by its explicit mount. Its TypeScript bridge mounts and unmounts it through the existing lifetime scope so Svelte and imperative controllers never compete for the same DOM.
 - Reader Shell renders stable empty targets for nested Svelte and imperative features but never manages their contents. It updates classes, text, progress styles, and annotation state without conditionally replacing the `tikkun-book` reader root or optional-page outlet.
 - Add Svelte feature by feature. Prefer a pure model plus a small mount adapter when the feature has meaningful domain preparation, as Parsha Picker does. Do not introduce a global store simply to connect old and new UI.
@@ -79,10 +83,11 @@ SvelteKit owns the static public shell and clean pathname routes. The Reader kee
 
 - SvelteKit and `adapter-static` prerender the public pages and fixed Reader entry; Vite compiles the client bundles.
 - `site/` contains files copied unchanged by SvelteKit, including audio and install assets.
-- `dist/` is the deployable static output.
+- `dist/` is the portable static output. The Cloudflare release also deploys `functions/audio/`; a dist-only host remains functional but cannot claim verified byte-range media unless that host independently serves `206` responses.
 - `scripts/generate-torah-index.mjs` validates canonical `text/torah-toc.json` and writes the smaller `generated/torah-index.json` used at runtime. `predev` and the production build keep it current.
-- `npm run dev` renders routes on demand with hot reload. `npm run build` generates the Torah runtime index, prerenders the routes, and then generates `dist/service-worker.js`.
-- The project is suitable for static hosting; no app server is part of the production runtime.
+- `npm run dev` renders routes on demand with hot reload. `npm run build` generates authoritative reading data, prerenders the routes, derives CSP hashes from every built inline script, generates `dist/service-worker.js`, and enforces code plus host-asset size ceilings.
+- `site/_headers` supplies the static host's baseline browser headers. Postbuild replaces its source-script hash with the deterministic union from the actual HTML artifact. CSP remains report-only until the deployed release checklist confirms that every required route and asset works without a violation.
+- The product needs no application server. Cloudflare's narrow audio Function is a delivery adapter for reliable Range semantics, not an app backend.
 
 ## PWA Strategy
 
@@ -93,9 +98,9 @@ The app is treated as a PWA-capable static site rather than a native shell.
 - `scripts/generate-service-worker.mjs` creates a versioned cache after each build.
 - The generated service worker precaches the app shell, page chunks, and first-use core reader chunks, then uses cache-first behavior for requested same-origin assets.
 - Navigation requests use network-first behavior with an exact cached clean-route match, then the cached Home page as a final fallback.
-- Cue Data, Optional Feature bundles, the recording-only harness, and large media files are intentionally excluded from the initial precache so installation does not download content the reader has not requested.
-- Reader Settings, Command Palette, and Parsha Picker are deferred from the initial JavaScript execution but remain precached because they are core reader controls that must work offline.
-- Command Palette can read saved Cue Authoring access without importing Cue Authoring. The authoring Implementation loads only when an unlocked user opens it or invokes its dedicated shortcut.
+- Cue Data, prototype routes/assets, Optional Feature bundles, the recording-only harness, and large media files are intentionally excluded from the initial precache so installation does not download content the reader has not requested.
+- Reader Settings, the search overlay, and Reading Index are deferred from initial JavaScript execution but remain precached because they are core reader controls that must work offline.
+- Unified Reader search can read saved Cue Authoring access without importing Cue Authoring. The authoring implementation loads only when an unlocked user runs that action or invokes its dedicated shortcut.
 - Recording media should become available offline only through explicit user-requested offline downloads, not silent playback caching.
 
 If native app packaging is ever added, prefer treating Capacitor or another native wrapper as a packaging layer around the existing web build, not as a rewrite of the app architecture.
@@ -127,6 +132,17 @@ Public routing uses clean SvelteKit pathnames. Reader routing remains hash-based
 - Reader routes resolve to a `ScrollViewModel`.
 - Supported Reader route families include current/next reading, explicit run IDs, legacy references, parsha slugs, physical pages, and cue analytics.
 - Canonical parsha hashes are generated through the navigation view-model layer and applied once by Reader Route rather than directly in UI handlers.
+
+## Search
+
+Search is local, typed, and shared at the retrieval layer while remaining scoped by feature.
+
+- `app/search/normalize.ts`, `query-parser.ts`, and `search-index.ts` own Unicode-safe normalization, structured query parsing, Fuse.js candidate retrieval, deterministic rank bands, range mapping, deduplication, and stable limits.
+- `app/search/reading-search.ts` adapts generated leinings; `app/search/action-search.ts` adapts runnable Reader actions through an external ID map; and `app/search/reader-search.ts` merges both under one ranking and deduplication contract. `app/search/ReaderSearchBar.svelte` renders that contract identically in Reading Index and the overlay. `src/routes/(site)/readings/reading-coverage-search.ts` separately adapts public coverage data and coverage filters.
+- `app/view-model/navigation/parsha-route-catalog.ts` is the lightweight canonical alias source. Calendar-backed route resolution imports that catalog, while public search can reuse it without importing Hebcal generation.
+- Each active Reader host builds one combined index on open and rebuilds only on refresh or calendar-setting reconstruction; the public coverage page builds one index at component initialization. Keystrokes only query an existing index.
+- The homepage does not import the search engine. Reading Index and the overlay remain lazy; their shared search chunks are available offline through the app-shell cache.
+- Relevance behavior is locked by `app/search/golden-queries.ts` and adapter/browser tests. See `docs/search.md` for ranking, lifecycle, bundle, timing, and cache details.
 
 ## Rendering and Scrolling
 
@@ -194,15 +210,16 @@ Reader preferences are local, explicit, and CSS-variable driven.
 
 ## Testing Strategy
 
-The project uses Vitest in two complementary workspaces.
+The project uses three Vitest 4 projects across Node and two browser engines.
 
 - `*.test.ts` files run as Node-oriented unit tests.
-- `*.vitest.ts` files run in a headless Chromium browser through `vitest.workspace.ts`.
+- `*.vitest.ts` files run as the full headless Chromium project through `vitest.config.ts`; playback, shell, and real-app smoke paths also run in the limited WebKit project.
 - Prefer focused tests around pure model/view-model logic, parsing, generated-data helpers, cue/highlight behavior, and DOM rendering boundaries.
 - Floating Player and Playback Timeline browser tests cover their connected Interface, replacement mounts, timed and untimed controls, compact expansion, speed synchronization, pointer mechanics, and teardown ownership.
 - Reader Playback browser tests cover Implementation ownership, event translation, route reset, and teardown.
+- Reader Presentation unit tests cover deterministic invalidation ordering, same-frame coalescing, reentrant work, layout deferral, immutable snapshots, diagnostics, and teardown.
 - Parsha Picker unit and browser tests cover model rules, canonical search, Torah references, calendar settings, nested aliyah choices, compact subviews, cleanup, pending-load cancellation, failure restoration, and retry.
-- Command Palette browser tests cover filtering, keyboard selection, action refresh, focus, dismissal, replacement mounts, first-use loading, pending cancellation, retry, and cleanup.
+- Shared Reader search browser tests cover mixed reading/action results, bold label and alias ranges, both hosts, keyboard selection, query-first Escape, repeated Cmd-K focus, action refresh, dismissal, replacement mounts, first-use loading, pending cancellation, retry, and cleanup.
 - Reader Settings browser tests cover replacement mounts, first-click loading, pending cancellation, retry, focus return, outside dismissal, form synchronization, playback-rate handoff, and scheduled-effect cleanup.
 - Reader Controls browser tests cover shared wide and compact actions, synchronized labels, disabled states, dismissal, focus return, replacement mounts, and teardown ownership.
 - Reader Shell browser tests cover synchronous presentation updates, stable reader and feature-target identity, externally mounted reader content, action ownership, replacement mounts, and teardown ordering.
@@ -212,8 +229,8 @@ The project uses Vitest in two complementary workspaces.
 - Cue Authoring browser tests cover deferred loading, locked access, Panel snapshots and semantic actions, stable nested targets and progress updates, Cue List control actions and disabled states, row semantics and keyed updates, selection, focus, timing edits, list following, Recording Issue dialog form ownership, Cue Export Sheet downloads and text selection, payload and clipboard outcomes, object URL replacement and revocation, persistence failure, retry, and cleanup. Cue Waveform tests separately cover visible windows, sampled bars, loading and retry, seeking, resizing, and teardown.
 - Recording Harness browser tests cover its external Interface, deterministic render delegation, duplicate-mount protection, and teardown.
 - Optional Feature tests cover deferred mounting, aborted routes, keyboard loading, saved-open restoration, and retry after a failed import.
-- The full-app browser smoke test loads the real `/reader/` entry and bootstrap in an isolated same-origin frame, then verifies the initial Reader, Parsha Picker, first-use Reader Settings, and first-use Cue Authoring shortcut.
-- `npm run check` runs typecheck and lint.
+- The full-app browser smoke test loads the real `/reader/` entry and bootstrap in an isolated same-origin frame, verifies Cmd-K focuses embedded search without opening the overlay, verifies Cmd-K opens the overlay when Reading Index is closed, confirms the toolbar entry is absent, then exercises first-use Reader Settings and Cue Authoring.
+- `npm run verify` is the release gate: typecheck, lint, Node tests, the full Chromium suite, the WebKit critical path, deterministic generation, static build, and bundle budgets. Deployed behavior still follows `docs/release-checklist.md` because static checks cannot prove CDN range responses, CSP delivery, PWA upgrades, or real-device safe areas.
 
 ## Architectural Preferences
 

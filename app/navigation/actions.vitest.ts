@@ -3,9 +3,9 @@ import {
   createAliyahNavigationActions,
   createNavigationAction,
   createPageNavigationActions,
-  filterNavigationActions,
-  normalizeActionQuery,
+  type NavigationAction,
 } from './actions.ts'
+import { createActionSearch } from '../search/action-search.ts'
 import {
   LeiningInstanceId,
   LeiningRunType,
@@ -14,9 +14,15 @@ import {
   type LeiningRun,
 } from '../calendar-model/model-types.ts'
 
-test('normalizes action queries for fuzzy command matching', () => {
-  expect(normalizeActionQuery('  Beresheet   Page 12  ')).toBe('beresheet page 12')
-})
+function searchActions(
+  actions: readonly NavigationAction[],
+  query: string,
+  limit = 12
+) {
+  return createActionSearch(actions)
+    .search(query, { limit })
+    .map(({ action }) => action)
+}
 
 test('filters and ranks exact label matches ahead of keyword matches', () => {
   const actions = [
@@ -36,7 +42,7 @@ test('filters and ranks exact label matches ahead of keyword matches', () => {
     }),
   ]
 
-  const [first, second] = filterNavigationActions(actions, 'cue analytics')
+  const [first, second] = searchActions(actions, 'cue analytics')
 
   expect(first?.id).toBe('tools.analytics')
   expect(second?.id).toBe('reading.noach-3')
@@ -54,7 +60,7 @@ test('ignores unavailable command palette actions', () => {
     }),
   ]
 
-  expect(filterNavigationActions(actions, 'issue')).toEqual([])
+  expect(searchActions(actions, 'issue')).toEqual([])
 })
 
 test('hides search-only command palette actions until a query is typed', () => {
@@ -69,8 +75,8 @@ test('hides search-only command palette actions until a query is typed', () => {
     }),
   ]
 
-  expect(filterNavigationActions(actions, '')).toEqual([])
-  expect(filterNavigationActions(actions, 'Noah 3')[0]?.id).toBe(
+  expect(searchActions(actions, '')).toEqual([])
+  expect(searchActions(actions, 'Noah 3')[0]?.id).toBe(
     'reading.noach.catalog'
   )
 })
@@ -95,7 +101,7 @@ test('deduplicates visible command palette labels after ranking', () => {
     }),
   ]
 
-  expect(filterNavigationActions(actions, 'Noach 7').map((action) => action.id)).toEqual([
+  expect(searchActions(actions, 'Noach 7').map((action) => action.id)).toEqual([
     'reading.noach.active',
   ])
 })
@@ -120,7 +126,7 @@ test('deduplicates equivalent command palette targets with different labels', ()
     }),
   ]
 
-  expect(filterNavigationActions(actions, 'Noah 3').map((action) => action.id)).toEqual([
+  expect(searchActions(actions, 'Noah 3').map((action) => action.id)).toEqual([
     'reading.noach.catalog',
   ])
 })
@@ -134,10 +140,10 @@ test('creates exact aliyah navigation actions for seventh aliyah and Maftir', ()
     navigate: (hash) => navigated.push(hash),
   })
 
-  const seventh = filterNavigationActions(actions, 'Noach 7')[0]
-  const seventhByAlias = filterNavigationActions(actions, 'Noah 7')[0]
-  const maftirByLetter = filterNavigationActions(actions, 'Noach M')[0]
-  const maftirByName = filterNavigationActions(actions, 'Noach Maftir')[0]
+  const seventh = searchActions(actions, 'Noach 7')[0]
+  const seventhByAlias = searchActions(actions, 'Noah 7')[0]
+  const maftirByLetter = searchActions(actions, 'Noach M')[0]
+  const maftirByName = searchActions(actions, 'Noach Maftir')[0]
 
   expect(seventh?.label).toBe('Noach Aliyah 7')
   expect(seventhByAlias?.id).toBe(seventh?.id)
@@ -162,7 +168,7 @@ test('creates holiday aliyah navigation actions with holiday aliases', () => {
     navigate: (hash) => navigated.push(hash),
   })
 
-  const third = filterNavigationActions(actions, 'Tishah B’Av 3')[0]
+  const third = searchActions(actions, 'Tishah B’Av 3')[0]
 
   expect(third?.label).toBe('תשעה באב Aliyah 3')
 
@@ -177,14 +183,13 @@ test('creates searchable Torah page command actions', () => {
     navigateToPage: (scroll, page) => navigated.push(`${scroll}:${page}`),
   })
 
-  expect(filterNavigationActions(actions, '')).toEqual([])
-  expect(filterNavigationActions(actions, 'page 12')[0]?.id).toBe('page.torah.12')
-  expect(filterNavigationActions(actions, 'torah page 12')[0]?.id).toBe(
+  expect(searchActions(actions, '')).toEqual([])
+  expect(searchActions(actions, 'page 12')[0]?.id).toBe('page.torah.12')
+  expect(searchActions(actions, 'torah page 12')[0]?.id).toBe(
     'page.torah.12'
   )
-  expect(filterNavigationActions(actions, 'beresheet page 12')).toEqual([])
 
-  filterNavigationActions(actions, 'page 12')[0]?.run()
+  searchActions(actions, 'page 12')[0]?.run()
 
   expect(navigated).toEqual(['torah:12'])
 })
@@ -195,14 +200,14 @@ test('creates searchable Esther page command actions', () => {
     navigateToPage: (scroll, page) => navigated.push(`${scroll}:${page}`),
   })
 
-  expect(filterNavigationActions(actions, 'esther page 3')[0]?.id).toBe(
+  expect(searchActions(actions, 'esther page 3')[0]?.id).toBe(
     'page.esther.3'
   )
-  expect(filterNavigationActions(actions, 'megillah page 3')[0]?.id).toBe(
+  expect(searchActions(actions, 'megillah page 3')[0]?.id).toBe(
     'page.esther.3'
   )
 
-  filterNavigationActions(actions, 'esther page 3')[0]?.run()
+  searchActions(actions, 'esther page 3')[0]?.run()
 
   expect(navigated).toEqual(['esther:3'])
 })
@@ -212,8 +217,8 @@ test('does not create out-of-range page command actions', () => {
     navigateToPage: () => undefined,
   })
 
-  expect(filterNavigationActions(actions, 'torah page 246')).toEqual([])
-  expect(filterNavigationActions(actions, 'esther page 18')).toEqual([])
+  expect(searchActions(actions, 'torah page 246')).toEqual([])
+  expect(searchActions(actions, 'esther page 18')).toEqual([])
 })
 
 function createRunFixture(): LeiningRun {

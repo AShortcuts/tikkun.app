@@ -27,6 +27,6 @@
     "./scripts/**/*.ts",
     "./src/**/*",
     "./vite.config.ts",
-    "./vitest.workspace.ts"
+    "./vitest.config.ts"
   ]
 }

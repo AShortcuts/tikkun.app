@@ -49,10 +49,12 @@ test('synchronizes wide and compact controls through one action interface', () =
   bookmark.click()
   expect(actions.toggleBookmark).toHaveBeenCalledOnce()
 
-  required<HTMLButtonElement>(
-    '[data-target-id="command-palette-open"]'
-  ).click()
-  expect(actions.openCommandPalette).toHaveBeenCalledOnce()
+  expect(
+    fixture.querySelector('[data-target-id="command-palette-open"]')
+  ).toBeNull()
+  expect(
+    fixture.querySelector('[data-toolbar-overflow-action="command"]')
+  ).toBeNull()
 
   const toggle = required<HTMLButtonElement>(
     '[data-target-id="toolbar-overflow-toggle"]'
@@ -62,6 +64,9 @@ test('synchronizes wide and compact controls through one action interface', () =
   )
   toggle.click()
   expect(toggle.getAttribute('aria-expanded')).toBe('true')
+  expect(toggle.hasAttribute('aria-haspopup')).toBe(false)
+  expect(menu.getAttribute('role')).toBe('group')
+  expect(menu.querySelector('[role="menuitem"]')).toBeNull()
   expect(menu.classList.contains('u-hidden')).toBe(false)
   expect(
     required('[data-target-id="toolbar-overflow-annotations-label"]')
@@ -154,11 +159,12 @@ test('owns menu focus, outside dismissal, and replacement cleanup', () => {
   expect(menu.classList.contains('u-hidden')).toBe(true)
 
   staleDestroy()
+  toggle.click()
   required<HTMLButtonElement>(
-    '[data-target-id="command-palette-open"]'
+    '[data-toolbar-overflow-action="annotations"]'
   ).click()
-  expect(firstActions.openCommandPalette).not.toHaveBeenCalled()
-  expect(secondActions.openCommandPalette).toHaveBeenCalledOnce()
+  expect(firstActions.toggleAnnotations).not.toHaveBeenCalled()
+  expect(secondActions.toggleAnnotations).toHaveBeenCalledOnce()
 
   destroy()
   destroy = null
@@ -169,7 +175,6 @@ test('owns menu focus, outside dismissal, and replacement cleanup', () => {
 
 function createActions() {
   return {
-    openCommandPalette: vi.fn(),
     toggleBookmark: vi.fn(),
     openAliyahNavigation: vi.fn(),
     showAliyahStarts: vi.fn(),

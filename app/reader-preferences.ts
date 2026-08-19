@@ -1,14 +1,11 @@
 import { setReaderFocalPointMode, type ReaderFocalPointMode } from './reader-scroll.ts'
 import {
   getBrowserStorage,
-  quarantineStorageItem,
-  readStorageItem,
+  readPersistedJson,
   writeStorageItem,
 } from './persistence/persisted-state.ts'
 
 const STORAGE_KEY = 'tikkun.reader-preferences.v3'
-
-export const TOKENIZATION_VERSION = 'v2'
 
 export const themeModes = ['automatic', 'light', 'sepia', 'dark'] as const
 export const readerFocalPointModes = ['browser', 'reader'] as const
@@ -203,42 +200,25 @@ function normalizeReaderPreferences(
 
 export function loadReaderPreferences(): ReaderPreferences {
   const defaults = getDefaultReaderPreferences()
-  const storage = getBrowserStorage('local')
-  let raw: string | null
-  try {
-    raw = readStorageItem(storage, STORAGE_KEY)
-  } catch (error) {
-    console.error('Failed to read reader preferences', error)
+  const result = readPersistedJson({
+    storage: getBrowserStorage('local'),
+    key: STORAGE_KEY,
+    validate: isRecord,
+  })
+  if (result.status === 'unavailable') {
+    console.error('Failed to read reader preferences', result.error)
     return { ...defaults }
   }
-  if (!raw) return { ...defaults }
-
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(raw) as unknown
-  } catch (error) {
-    console.error('Failed to parse reader preferences', error)
-    quarantineStorageItem({
-      storage,
-      key: STORAGE_KEY,
-      rawValue: raw,
-      reason: 'reader preferences are not valid JSON',
-    })
+  if (result.status === 'invalid') {
+    if (result.reason === 'invalid-json') {
+      console.error('Failed to parse reader preferences', result.error)
+    }
     return { ...defaults }
   }
-
-  if (!isRecord(parsed)) {
-    quarantineStorageItem({
-      storage,
-      key: STORAGE_KEY,
-      rawValue: raw,
-      reason: 'reader preferences have an invalid shape',
-    })
-    return { ...defaults }
-  }
+  if (result.status === 'missing') return { ...defaults }
 
   return {
-    ...normalizeReaderPreferences(parsed, defaults),
+    ...normalizeReaderPreferences(result.value, defaults),
     playbackRate: defaults.playbackRate,
   }
 }

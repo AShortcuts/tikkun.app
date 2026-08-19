@@ -1,4 +1,5 @@
 import { flushSync, mount, unmount } from 'svelte'
+import type { LeiningGenerator } from '../calendar-model/generator.ts'
 import type { MountScope } from '../lifecycle/mount.ts'
 import type { NavigationAction } from './actions.ts'
 import CommandPaletteView from './CommandPalette.svelte'
@@ -6,6 +7,7 @@ import CommandPaletteView from './CommandPalette.svelte'
 export interface CommandPaletteOptions {
   document: Document
   getActions(): NavigationAction[]
+  createGenerator?(): LeiningGenerator
   restoreFocus(): void
   isBookmarkAction(action: NavigationAction): boolean
   formatBadge(label: string): string
@@ -42,6 +44,7 @@ export function createCommandPalette(
     target,
     props: {
       getActions: options.getActions,
+      createGenerator: options.createGenerator,
       restoreFocus: options.restoreFocus,
       isBookmarkAction: options.isBookmarkAction,
       formatBadge: options.formatBadge,

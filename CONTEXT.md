@@ -44,6 +44,10 @@ _Avoid_: Mobile device, desktop device, Capacitor mode
 A browser or native service that is actually available in the current runtime, such as filesystem access or a registered Capacitor plugin. It does not select responsive layout.
 _Avoid_: Mobile layout, compact viewport
 
+**Persisted State**:
+The shared browser-storage Module that owns read, write, remove, validated JSON loading, and invalid-value quarantine mechanics. Domain Modules retain their own schemas, migration rules, and user-facing recovery policy.
+_Avoid_: Global state, domain model, silent fallback
+
 **Aliyah Navigation**:
 The Svelte-rendered reader feature for identifying, selecting, and playing an aliyah. One Module owns the toolbar capsule, compact sheet, segments, and wide rail behind a small TypeScript Interface; Reader Runtime still owns routing, scrolling, playback, recording lookup, and Cue Data.
 _Avoid_: Mobile aliyah logic, desktop aliyah state
@@ -59,6 +63,10 @@ _Avoid_: Audio element, page renderer
 **Reader Playback**:
 The TypeScript Module that owns the active Audio Controller, Highlight Controller, Recording Session, and Playback Timeline lifetimes and their cross-wiring. Reader Runtime supplies page, network, preference, Cue Authoring, and presentation Adapters.
 _Avoid_: Playback Timeline, Audio Controller, global playback state
+
+**Reader Presentation**:
+The animation-frame scheduler that coalesces Reader Viewport title, reader position, inline audio, and playback-state invalidations into one immutable presentation frame. Reader Runtime owns its Adapter and applies only invalidated work.
+_Avoid_: Global reader state, animation loop, Reader Shell
 
 **Reader Settings**:
 The first-use Svelte dialog that presents preferences and owns its form, focus, and browser lifetime behind a small TypeScript mount interface. Its launcher remains ready before the dialog code loads. Reader Runtime still owns the canonical preference state and cross-feature effects.

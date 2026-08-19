@@ -82,12 +82,23 @@ test('renders both navigation presentations behind one typed interface', async (
   await flushPromises()
 
   expect(requiredAll('.aliyah-rail-button')).toHaveLength(2)
+  expect(required('[data-target-id="aliyah-rail"]').tagName).toBe('NAV')
   expect(requiredAll('.mobile-aliyah-segment')).toHaveLength(2)
   expect(requiredAll('.mobile-aliyah-card')).toHaveLength(2)
   expect(requiredAll('.mobile-aliyah-play')).toHaveLength(1)
   expect(
     required<HTMLElement>('.aliyah-rail-button').dataset.cueStatus
   ).toBe('published')
+  expect(
+    requiredAll<HTMLButtonElement>('.aliyah-rail-button')[1].getAttribute(
+      'aria-current'
+    )
+  ).toBe('location')
+  expect(
+    requiredAll<HTMLButtonElement>('.mobile-aliyah-card-main')[1].getAttribute(
+      'aria-current'
+    )
+  ).toBe('location')
   expect(
     required<HTMLElement>('.mobile-aliyah-card-status').dataset.durationLabel
   ).toBe('2:05')
@@ -604,8 +615,8 @@ function required<T extends Element = HTMLElement>(selector: string): T {
   return element
 }
 
-function requiredAll(selector: string) {
-  return [...(fixture?.querySelectorAll(selector) ?? [])]
+function requiredAll<T extends Element = HTMLElement>(selector: string): T[] {
+  return [...(fixture?.querySelectorAll<T>(selector) ?? [])]
 }
 
 function deferred<T>() {

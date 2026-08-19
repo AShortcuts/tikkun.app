@@ -109,7 +109,9 @@ test('renders absolute page numbers inside the page table decoration', async () 
 test('centers the first token for the starting line', async () => {
   // Use Noach for scroll-position regressions: Beresheet is clamped at
   // the top, so it cannot reveal playback-time scroll adjustments.
+  root.style.height = '1000px'
   await renderRun('2026-10-17:shacharis,main')
+  await expectInitialCenteringWithoutEdgeLoading()
 
   const startingLine = [...root.querySelectorAll<HTMLTableRowElement>('tr')].find(
     (line) => getAliyahLabel(line) === 'נח'
@@ -125,7 +127,9 @@ test('centers the first token for the starting line', async () => {
 })
 
 test('mounting the next Yitro page preserves the focal word exactly', async () => {
+  root.style.height = '1000px'
   const display = await renderRun('2026-02-07:shacharis,main')
+  await expectInitialCenteringWithoutEdgeLoading()
   const startingLine = [...root.querySelectorAll<HTMLTableRowElement>('tr')].find(
     (line) => getAliyahLabel(line) === 'יתרו'
   )
@@ -907,6 +911,18 @@ async function renderNoachFromLaterPage() {
   const sd = new ScrollDisplay(vm, root)
   await sd.scrolled
   return sd
+}
+
+function nextAnimationFrame() {
+  return new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+}
+
+async function expectInitialCenteringWithoutEdgeLoading() {
+  const fetchPreviousPage = vi.spyOn(vm, 'fetchPreviousPage')
+  const fetchNextPage = vi.spyOn(vm, 'fetchNextPage')
+  await nextAnimationFrame()
+  expect(fetchPreviousPage).not.toHaveBeenCalled()
+  expect(fetchNextPage).not.toHaveBeenCalled()
 }
 
 function getAliyahLabel(lineEl: HTMLTableRowElement | null) {

@@ -12,8 +12,7 @@ import {
   getCueProgressForRecording,
   listRecordings,
 } from '../audio/library.ts'
-import { loadAdminDraft, readAdminDraftSummary } from '../admin/draft-storage.ts'
-import { isParshaAudioRecording, type WordCue } from '../audio/types.ts'
+import { isParshaAudioRecording } from '../audio/types.ts'
 import { LeiningGenerator } from '../calendar-model/generator.ts'
 import hebrewNumeral from '../hebrew-numeral.ts'
 import {
@@ -93,10 +92,6 @@ function describeSelection(parshaName: string | null, aliyah: number | null) {
 function getPointDatasetValue(point: Element, key: string) {
   const value = point.getAttribute(`data-${key}`)
   return value ?? ''
-}
-
-function getSourceLabel(record: CueAnalyticsParshaRecord) {
-  return record.cueSource === 'draft' ? 'Local draft' : 'Published timing'
 }
 
 function describeThreshold(sample: CueIntervalSample) {
@@ -465,7 +460,7 @@ function renderAliyahAverages(summaries: CueAnalyticsAliyahSummary[], selectionL
 
 function renderCoverage(
   parshaSummaries: CueAnalyticsParshaSummary[],
-  draftAliyotByParsha: Map<string, number[]>,
+  unfinishedAliyotByParsha: Map<string, number[]>,
   completeAliyotByParsha: Map<string, number[]>,
   selectedParsha: string,
   selectedAliyah: number
@@ -480,7 +475,7 @@ function renderCoverage(
       <p>Every parsha with audio, which aliyot have timing, and which ones still need work.</p>
     </div>
     <div class="analytics-coverage-legend">
-      <span><i class="mod-draft"></i>Local draft active</span>
+      <span><i class="mod-incomplete"></i>Published timing incomplete</span>
       <span><i class="mod-cued"></i>Completed timing</span>
       <span><i class="mod-missing"></i>Timing missing</span>
       <span><i class="mod-empty"></i>No audio in this slot</span>
@@ -488,17 +483,20 @@ function renderCoverage(
     <div class="analytics-coverage-list">
       ${visibleSummaries
         .map((summary) => {
-          const draftAliyot = draftAliyotByParsha.get(summary.parshaSlug) ?? []
+          const unfinishedAliyot =
+            unfinishedAliyotByParsha.get(summary.parshaSlug) ?? []
           const completeAliyot = completeAliyotByParsha.get(summary.parshaSlug) ?? []
           const missingAliyot = summary.availableAliyot.filter(
-            (aliyah) => !completeAliyot.includes(aliyah) && !draftAliyot.includes(aliyah)
+            (aliyah) =>
+              !completeAliyot.includes(aliyah) &&
+              !unfinishedAliyot.includes(aliyah)
           )
           const selectedAliyahStatus =
             selectedAliyah <= 0
               ? ''
               : summary.availableAliyot.includes(selectedAliyah)
-                ? draftAliyot.includes(selectedAliyah)
-                  ? `Aliyah ${hebrewNumeral(selectedAliyah)} currently uses a local draft.`
+                ? unfinishedAliyot.includes(selectedAliyah)
+                  ? `Aliyah ${hebrewNumeral(selectedAliyah)} has incomplete published timing.`
                   : completeAliyot.includes(selectedAliyah)
                     ? `Aliyah ${hebrewNumeral(selectedAliyah)} already has timing.`
                     : `Aliyah ${hebrewNumeral(selectedAliyah)} has audio and still needs timing.`
@@ -509,7 +507,7 @@ function renderCoverage(
               <div class="analytics-coverage-header">
                 <div>
                   <h3>${summary.parshaName}</h3>
-                  <p>${completeAliyot.length} complete · ${draftAliyot.length} draft · ${missingAliyot.length} missing${selectedAliyahStatus ? ` · ${selectedAliyahStatus}` : ''}</p>
+                  <p>${completeAliyot.length} complete · ${unfinishedAliyot.length} incomplete · ${missingAliyot.length} missing${selectedAliyahStatus ? ` · ${selectedAliyahStatus}` : ''}</p>
                 </div>
                 <dl class="analytics-coverage-stats">
                   <div>
@@ -529,8 +527,8 @@ function renderCoverage(
               <div class="analytics-coverage-strip">
                 ${Array.from({ length: 7 }, (_, index) => index + 1)
                   .map((aliyah) => {
-                    const state = draftAliyot.includes(aliyah)
-                      ? 'mod-draft'
+                    const state = unfinishedAliyot.includes(aliyah)
+                      ? 'mod-incomplete'
                       : completeAliyot.includes(aliyah)
                         ? 'mod-cued'
                         : summary.availableAliyot.includes(aliyah)
@@ -593,7 +591,7 @@ function renderTransitionReview(records: CueAnalyticsParshaRecord[], selectionLa
             <article class="analytics-outlier-row">
               <div>
                 <p class="analytics-outlier-title">${record.recording.parshaName} · Aliyah ${hebrewNumeral(record.recording.aliyah)}</p>
-                <p class="analytics-outlier-copy">Word ${sample.previousCueNumber} ${transitionArrowMarkup} ${sample.cueNumber} · ${record.narratorName} · ${getSourceLabel(record)}</p>
+                <p class="analytics-outlier-copy">Word ${sample.previousCueNumber} ${transitionArrowMarkup} ${sample.cueNumber} · ${record.narratorName} · Published timing</p>
                 <p class="analytics-outlier-copy">${describeThreshold(sample)} · ${describeDeviation(sample)}</p>
               </div>
               <div class="analytics-outlier-metrics">
@@ -616,7 +614,7 @@ function renderRecordModule(record: CueAnalyticsParshaRecord) {
         <div>
           <p class="about-eyebrow">Aliyah ${hebrewNumeral(record.recording.aliyah)}</p>
           <h2>${record.recording.parshaName} · ${record.recording.title}</h2>
-          <p class="about-copy analytics-meta">${record.narratorName} · ${getSourceLabel(record)} · ${record.cueCount} Words · ${formatTimedSpan(record.totalDuration)} timed span · ${formatUpdatedAt(record.cueUpdatedAt)}</p>
+          <p class="about-copy analytics-meta">${record.narratorName} · Published timing · ${record.cueCount} Words · ${formatTimedSpan(record.totalDuration)} timed span · ${formatUpdatedAt(record.cueUpdatedAt)}</p>
         </div>
         <div class="analytics-module-callout">
           <span class="analytics-stat-label">Review transitions</span>
@@ -656,7 +654,7 @@ export default function CueAnalyticsPage() {
         </div>
         <h1 class="about-title analytics-title">A clear view of pacing across each aliyah.</h1>
         <p class="about-copy">
-          This page reads saved playback timing and local drafts. It shows pace,
+          This page reads published playback timing. It shows pace,
           timing issues worth checking, and recordings that still need work.
         </p>
         <section class="about-card analytics-filter-card">
@@ -685,7 +683,7 @@ export default function CueAnalyticsPage() {
       </div>
 
       <section class="about-card analytics-summary-card stack small" data-analytics-section="overview">
-        ${renderLoadingState('Loading timing and local drafts…')}
+        ${renderLoadingState('Loading published timing…')}
       </section>
       <section class="about-card stack small" data-analytics-section="coverage">
         ${renderLoadingState('Building the coverage view…')}
@@ -747,37 +745,19 @@ export async function mountCueAnalyticsPage(
   const availableRecordings = listRecordings()
     .filter(isParshaAudioRecording)
     .filter((entry) => entry.status === 'available')
-  const cueOverrides = new Map<string, WordCue[]>()
-  const cueSourceByAudioId = new Map<string, 'published' | 'draft'>()
-  const cueUpdatedAtByAudioId = new Map<string, number | null>()
-  const draftAliyotByParsha = new Map<string, number[]>()
+  const unfinishedAliyotByParsha = new Map<string, number[]>()
   const completeAliyotByParsha = new Map<string, number[]>()
 
   for (const recording of availableRecordings) {
     if (!isCurrent()) return
-    const draftSummary = readAdminDraftSummary(recording.id)
     const cueProgress = await getCueProgressForRecording(recording)
     if (!isCurrent()) return
 
-    if (draftSummary?.cueCount) {
-      const draft = loadAdminDraft(recording.id, draftSummary.tokenCount)
-      if (draft?.cues.length) {
-        cueOverrides.set(recording.id, draft.cues)
-        cueSourceByAudioId.set(recording.id, 'draft')
-        cueUpdatedAtByAudioId.set(recording.id, draft.updatedAt)
-      }
-
-      const targetMap = draftSummary.isIncomplete ? draftAliyotByParsha : completeAliyotByParsha
-      const existingAliyot = targetMap.get(recording.parshaSlug) ?? []
-      existingAliyot.push(recording.aliyah)
-      targetMap.set(recording.parshaSlug, existingAliyot)
-      continue
-    }
-
     if (cueProgress.isUnfinished) {
-      const existingAliyot = draftAliyotByParsha.get(recording.parshaSlug) ?? []
+      const existingAliyot =
+        unfinishedAliyotByParsha.get(recording.parshaSlug) ?? []
       existingAliyot.push(recording.aliyah)
-      draftAliyotByParsha.set(recording.parshaSlug, existingAliyot)
+      unfinishedAliyotByParsha.set(recording.parshaSlug, existingAliyot)
       continue
     }
 
@@ -788,11 +768,7 @@ export async function mountCueAnalyticsPage(
     }
   }
 
-  const allRecords = await listCueAnalyticsRecords({
-    cueOverrides,
-    cueSourceByAudioId,
-    cueUpdatedAtByAudioId,
-  })
+  const allRecords = await listCueAnalyticsRecords()
   if (!isCurrent()) return
   const parshaSummaries = getCueAnalyticsParshaSummaries(allRecords)
 
@@ -825,7 +801,7 @@ export async function mountCueAnalyticsPage(
     overviewSection.innerHTML = renderOverview(visibleAnalyticsRecords, selectionLabel)
     coverageSection.innerHTML = renderCoverage(
       parshaSummaries,
-      draftAliyotByParsha,
+      unfinishedAliyotByParsha,
       completeAliyotByParsha,
       selectedParsha,
       selectedAliyah

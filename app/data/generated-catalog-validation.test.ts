@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -38,6 +40,12 @@ function duplicateValues(values: string[]) {
   })
 }
 
+async function sha256(filePath: string) {
+  const hash = createHash('sha256')
+  for await (const chunk of createReadStream(filePath)) hash.update(chunk)
+  return hash.digest('hex')
+}
+
 test('generated audio and video catalogs have unique, internally consistent identities', async () => {
   expect(audioNarrators.length).toBeGreaterThan(0)
   expect(duplicateValues(audioNarrators.map((narrator) => narrator.id))).toEqual([])
@@ -68,6 +76,9 @@ test('generated audio and video catalogs have unique, internally consistent iden
         expect(recording.mediaIdentity.algorithm, recording.id).toBe('sha256')
         expect(recording.mediaIdentity.digest, recording.id).toMatch(/^[a-f0-9]{64}$/)
         expect(recording.mediaIdentity.byteLength, recording.id).toBe(mediaStat.size)
+        expect(await sha256(mediaPath), recording.id).toBe(
+          recording.mediaIdentity.digest
+        )
       }
     }
   }

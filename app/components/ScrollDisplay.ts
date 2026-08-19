@@ -71,6 +71,7 @@ export class ScrollDisplay {
   private disposed = false
   private accessCounter = 0
   private edgeLoadingReady = false
+  private pendingInitialCenterScrollTop: number | null = null
   private edgeLoadPromise: Promise<Element | null> | null = null
 
   constructor(readonly viewModel: ScrollViewModel, readonly root: HTMLElement) {
@@ -114,13 +115,15 @@ export class ScrollDisplay {
   destroy() {
     this.disposed = true
     this.edgeLoadingReady = false
+    this.pendingInitialCenterScrollTop = null
     this.root.removeEventListener('scroll', this.handleEdgeScroll)
   }
 
   private scrollTo({ element }: { element: HTMLElement }) {
     if (this.disposed) return
     const target = getFirstVisibleWord(element) ?? element
-    centerElementInScrollRoot(this.root, target)
+    const didScroll = centerElementInScrollRoot(this.root, target)
+    this.pendingInitialCenterScrollTop = didScroll ? this.root.scrollTop : null
     // Raise an event so that the title updates.
     this.root.dispatchEvent(new Event('scroll'))
   }
@@ -158,7 +161,9 @@ export class ScrollDisplay {
   }
 
   private readonly handleEdgeScroll = () => {
-    if (this.disposed || !this.edgeLoadingReady || this.edgeLoadPromise) return
+    if (this.disposed || !this.edgeLoadingReady) return
+    if (this.consumePendingInitialCenterScroll()) return
+    if (this.edgeLoadPromise) return
     const direction = this.getEdgeLoadDirection()
     if (!direction) return
 
@@ -171,6 +176,14 @@ export class ScrollDisplay {
       .finally(() => {
         if (this.edgeLoadPromise === request) this.edgeLoadPromise = null
       })
+  }
+
+  private consumePendingInitialCenterScroll() {
+    const expectedScrollTop = this.pendingInitialCenterScrollTop
+    if (expectedScrollTop === null) return false
+
+    this.pendingInitialCenterScrollTop = null
+    return Math.abs(this.root.scrollTop - expectedScrollTop) <= 0.5
   }
 
   private getEdgeLoadDirection(): EdgeLoadDirection | null {

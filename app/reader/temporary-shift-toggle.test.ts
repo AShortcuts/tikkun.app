@@ -13,6 +13,7 @@ const event = (
   metaKey: false,
   ctrlKey: type === 'up',
   altKey: false,
+  target: null,
   ...overrides,
 })
 
@@ -48,6 +49,23 @@ test('does not start the temporary toggle when another modifier is already held'
 
   toggle.handleKeyDown(event('down', { ctrlKey: true }))
   toggle.handleKeyUp(event('up'))
+
+  expect(setValue).not.toHaveBeenCalled()
+})
+
+test('does not toggle while the user is editing a control', () => {
+  const setValue = vi.fn()
+  const toggle = createTemporaryShiftToggle({
+    getValue: () => true,
+    setValue,
+    isDisabled: () => false,
+  })
+  const input = {
+    closest: (selector: string) => selector.includes('input'),
+  }
+
+  toggle.handleKeyDown(event('down', { target: input }))
+  toggle.handleKeyUp(event('up', { target: input }))
 
   expect(setValue).not.toHaveBeenCalled()
 })

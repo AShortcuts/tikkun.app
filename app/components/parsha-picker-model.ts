@@ -7,12 +7,11 @@ import {
   type LeiningInstance,
   type LeiningRun,
 } from '../calendar-model/model-types.ts'
-import fuzzy from '../fuzzy.ts'
-import { hasScrollData } from '../location.ts'
+import { listReadingSearchLeinings } from '../search/reading-catalog.ts'
+import { createReadingSearch } from '../search/reading-search.ts'
 import { isVezosHabracha } from '../view-model/scroll-view-model.ts'
 import { generateUrl } from '../view-model/navigation/url-parser.ts'
 import {
-  getParshaSearchTermsForLeining,
   semanticParshaUrlForLeining,
 } from '../view-model/navigation/parsha-routes.ts'
 import renderLeiningTitle from './render-leining-title.ts'
@@ -99,8 +98,51 @@ export type ParshaPickerSearchResult = {
   href: string
   hebrewLabel: string
   englishLabel: string
-  matchedField: number
+  matchedField: 0 | 1 | null
   matchedIndexes: number[]
+  matchedAlias: string | null
+}
+
+function indexesForRanges(ranges: readonly (readonly [number, number])[]) {
+  return ranges.flatMap(([start, end]) =>
+    Array.from({ length: end - start + 1 }, (_, index) => start + index)
+  )
+}
+
+function displayedSearchMatch({
+  hebrewLabel,
+  englishLabel,
+  matchedAlias,
+  match,
+}: ReturnType<ReturnType<typeof createReadingSearch>['search']>[number]) {
+  const matchedField = match?.matchedField
+  if (!matchedField) {
+    return { matchedField: null, matchedIndexes: [], matchedAlias }
+  }
+  if (matchedField.value === englishLabel) {
+    return {
+      matchedField: 1 as const,
+      matchedIndexes: indexesForRanges(matchedField.ranges),
+      matchedAlias: null,
+    }
+  }
+
+  const hebrewOffset = hebrewLabel.indexOf(matchedField.value)
+  if (hebrewOffset >= 0) {
+    return {
+      matchedField: 0 as const,
+      matchedIndexes: indexesForRanges(matchedField.ranges).map(
+        (index) => index + hebrewOffset
+      ),
+      matchedAlias: null,
+    }
+  }
+
+  return {
+    matchedField: null,
+    matchedIndexes: [],
+    matchedAlias,
+  }
 }
 
 export type ParshaPickerModel = {
@@ -108,6 +150,7 @@ export type ParshaPickerModel = {
   holidayColumns: ParshaPickerEntry[][]
   megillot: ParshaPickerEntry[]
   comingUp: ParshaPickerComingUpEntry[]
+  searchLeinings: LeiningInstance[]
   search(query: string): ParshaPickerSearchResult[]
 }
 
@@ -352,10 +395,8 @@ export function buildParshaPickerModel(
   now = new HDate(),
   today = new Date()
 ): ParshaPickerModel {
-  const leinings = generator
-    .forEntireChumash(now)
-    .flatMap((date) => date.leinings)
-    .filter((leining) => hasScrollData(firstRunOf(leining).scroll))
+  const leinings = listReadingSearchLeinings(generator, now)
+  const readingSearch = createReadingSearch(leinings)
   const choiceSources = collectParshaChoiceSourceLeinings(
     generator,
     leinings,
@@ -419,6 +460,7 @@ export function buildParshaPickerModel(
     .reverse()
 
   return {
+    searchLeinings: leinings,
     parshaBooks: parshaBooks.filter(Boolean),
     holidayColumns: groupHolidays(leinings).map((group) =>
       group.map((leining) => entryFor(leining))
@@ -428,20 +470,13 @@ export function buildParshaPickerModel(
       .map((leining) => entryFor(leining)),
     comingUp,
     search(query) {
-      return fuzzy(leinings, query, (leining) => [
-        leining.date.title.he,
-        leining.date.title.en,
-        ...getParshaSearchTermsForLeining(leining),
-      ])
-        .slice(0, 5)
-        .map(({ item, match }) => ({
-          id: leiningKey(item),
-          href: navigationHrefForLeining(item),
-          hebrewLabel: `${renderLeiningTitle(item)}: ${item.id}`,
-          englishLabel: item.date.title.en,
-          matchedField: match.index === 0 ? 0 : 1,
-          matchedIndexes: match.index < 2 ? match.indexes : [],
-        }))
+      return readingSearch.search(query, 5).map((result) => ({
+        id: result.id,
+        href: result.href,
+        hebrewLabel: result.hebrewLabel,
+        englishLabel: result.englishLabel,
+        ...displayedSearchMatch(result),
+      }))
     },
   }
 }

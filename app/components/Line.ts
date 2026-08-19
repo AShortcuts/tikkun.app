@@ -3,6 +3,7 @@ import type { RenderedLineInfo } from '../view-model/scroll-view-model.ts'
 import displayRange from '../display-range.ts'
 import hebrewNumeralFromInteger from '../hebrew-numeral.ts'
 import { createLastReadingHash } from '../reading/last-reading.ts'
+import { tokenizeReaderWords } from '../reader/word-tokenization.ts'
 import { createSpecialLetterRenderer } from '../special-letters.ts'
 import textFilter from '../text-filter.ts'
 import { iconMarkup } from './icons.ts'
@@ -10,42 +11,12 @@ import { iconMarkup } from './icons.ts'
 const petuchaClass = (isPetucha: boolean) => (isPetucha ? 'mod-petucha' : '')
 const setumaClass = (column: unknown[]) =>
   column.length > 1 ? 'mod-setuma' : ''
-const inlineWordJoiners = new Set(['׀'])
-
-const stripKriMarkers = (word: string) => word.replace(/[{}]/g, '')
-
 const escapeAttribute = (value: string) =>
   value
     .replace(/&/g, '&amp;')
     .replace(/"/g, '&quot;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-
-const tokenizeWords = (text: string) =>
-  text
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .reduce<{ text: string; isKri: boolean }[]>(
-      (words, rawWord) => {
-        const word = stripKriMarkers(rawWord)
-
-        if (inlineWordJoiners.has(word) && words.length) {
-          words[words.length - 1] = {
-            ...words[words.length - 1],
-            text: `${words[words.length - 1].text} ${word}`,
-          }
-          return words
-        }
-
-        words.push({
-          text: word,
-          isKri: /[{}]/.test(rawWord),
-        })
-        return words
-      },
-      []
-    )
 
 const renderWords = ({
   annotatedText,
@@ -66,8 +37,8 @@ const renderWords = ({
   renderAnnotatedSpecialLetters: (text: string) => string
   renderUnannotatedSpecialLetters: (text: string) => string
 }) => {
-  const annotatedWords = tokenizeWords(annotatedText)
-  const unannotatedWords = tokenizeWords(unannotatedText)
+  const annotatedWords = tokenizeReaderWords(annotatedText)
+  const unannotatedWords = tokenizeReaderWords(unannotatedText)
   const wordCount = Math.max(annotatedWords.length, unannotatedWords.length)
 
   return Array.from({ length: wordCount }, (_, wordIndex) => {

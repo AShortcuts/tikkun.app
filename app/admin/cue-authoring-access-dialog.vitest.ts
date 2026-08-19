@@ -41,7 +41,7 @@ function required<ElementType extends Element>(selector: string) {
   return element
 }
 
-function enterPassword(value: string) {
+function enterUnlockCode(value: string) {
   const input = required<HTMLInputElement>(
     '[data-target-id="admin-access-password"]'
   )
@@ -50,7 +50,7 @@ function enterPassword(value: string) {
   return input
 }
 
-test('keeps access locked after a rejected password and clears the secret after success', () => {
+test('presents an honest local gate and clears the code after success', () => {
   const submit = vi.fn((candidate: string) => candidate === 'admin')
   const dialog = mountDialog(submit)
   const returnFocus = required<HTMLButtonElement>(
@@ -59,7 +59,10 @@ test('keeps access locked after a rejected password and clears the secret after 
   returnFocus.focus()
 
   dialog.open()
-  const input = enterPassword('wrong')
+  expect(required('[data-target-id="admin-access-dialog"]').textContent).toContain(
+    'not a security control'
+  )
+  const input = enterUnlockCode('wrong')
   expect(document.activeElement).toBe(input)
   required<HTMLButtonElement>('[data-target-id="admin-access-submit"]').click()
 
@@ -68,10 +71,10 @@ test('keeps access locked after a rejected password and clears the secret after 
   expect(input.getAttribute('aria-invalid')).toBe('true')
   expect(
     required('[data-target-id="admin-access-error"]').textContent
-  ).toContain("password isn't correct")
+  ).toContain("unlock code isn't correct")
   expect(document.activeElement).toBe(input)
 
-  enterPassword('admin')
+  enterUnlockCode('admin')
   expect(input.getAttribute('aria-invalid')).toBe('false')
   expect(
     required('[data-target-id="admin-access-error"]').textContent

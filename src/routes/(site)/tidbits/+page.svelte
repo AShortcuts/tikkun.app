@@ -11,28 +11,30 @@
 <main class="site-content-page">
   <section class="site-page-hero" aria-labelledby="tidbits-title">
     <div>
-      <p class="site-page-kicker">Tidbits</p>
       <h1 class="site-page-title" id="tidbits-title">Tidbits</h1>
     </div>
-    {#if tidbits.length === 0}
-      <p class="site-page-intro">No tidbits published yet.</p>
-    {/if}
+    <p class="site-page-intro">
+      Short notes about the text, reading practice, and the work behind the reader.
+    </p>
   </section>
 
-  {#if tidbits.length > 0}
+  {#if tidbits.length === 0}
+    <section class="site-section site-empty-section" aria-labelledby="tidbits-empty-title">
+      <div class="site-empty-state">
+        <h2 id="tidbits-empty-title">No tidbits published yet.</h2>
+        <p>See which readings are ready to practice in the meantime.</p>
+        <a class="site-inline-action" href={resolve('/readings/')}>View available readings</a>
+      </div>
+    </section>
+  {:else}
     <section class="site-section" aria-label="Published tidbits">
-      <div class="coverage-list" role="list">
+      <div class="tidbit-list" role="list">
         {#each tidbits as tidbit (tidbit.slug)}
-          <article class="coverage-row" role="listitem">
-            <time class="coverage-number" datetime={tidbit.published}>
-              {tidbit.published}
-            </time>
-            <strong class="coverage-name">{tidbit.title}</strong>
-            <span class="coverage-aliyot">{tidbit.summary}</span>
-            <a
-              class="coverage-open"
-              href={resolve(`/tidbits/${tidbit.slug}/`)}
-            >Read</a>
+          <article class="tidbit-card" role="listitem">
+            <time datetime={tidbit.published}>{tidbit.published}</time>
+            <h2>{tidbit.title}</h2>
+            <p>{tidbit.summary}</p>
+            <a href={resolve(`/tidbits/${tidbit.slug}/`)}>Read note</a>
           </article>
         {/each}
       </div>

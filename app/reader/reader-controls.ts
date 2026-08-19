@@ -12,7 +12,6 @@ export interface ReaderControlsState {
 export interface ReaderControlsOptions {
   document: Document
   getState(): ReaderControlsState
-  openCommandPalette(): void
   toggleBookmark(): void
   openAliyahNavigation(returnFocus: HTMLElement): void
   showAliyahStarts(): void

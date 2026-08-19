@@ -536,21 +536,32 @@ html[data-highlight-rendering='legacy-rectangle'] .word.is-active-word::before {
   font: inherit;
   opacity: 0;
   transition:
-    opacity 0.15s ease,
-    color 0.15s ease,
-    background-color 0.15s ease;
+    background-color var(--reader-motion-color) var(--reader-ease-standard),
+    color var(--reader-motion-color) var(--reader-ease-standard),
+    opacity var(--reader-motion-color) var(--reader-ease-standard),
+    transform var(--reader-motion-fast) var(--reader-ease-out);
 }
 
-.aliyah-badge:hover .aliyah-link,
 .aliyah-badge:focus-within .aliyah-link {
   opacity: 0.62;
 }
 
-.aliyah-link:hover,
 .aliyah-link:focus-visible {
   color: currentColor;
   background: color-mix(in srgb, currentColor 10%, transparent);
   opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .aliyah-badge:hover .aliyah-link {
+    opacity: 0.62;
+  }
+
+  .aliyah-link:hover {
+    color: currentColor;
+    background: color-mix(in srgb, currentColor 10%, transparent);
+    opacity: 1;
+  }
 }
 
 .aliyah-link[data-copy-state='copied'] {
@@ -613,10 +624,6 @@ html[data-highlight-rendering='legacy-rectangle'] .word.is-active-word::before {
   cursor: not-allowed;
 }
 
-.aliyah-audio-button:hover {
-  background: color-mix(in srgb, dodgerblue 20%, transparent);
-}
-
 html[data-reader-mode='admin-authoring']
   .aliyah-audio-button.is-missing-audio {
   background: color-mix(
@@ -625,15 +632,6 @@ html[data-reader-mode='admin-authoring']
     transparent
   );
   color: var(--admin-missing-audio-color);
-}
-
-html[data-reader-mode='admin-authoring']
-  .aliyah-audio-button.is-missing-audio:hover {
-  background: color-mix(
-    in srgb,
-    var(--admin-missing-audio-color) 22%,
-    transparent
-  );
 }
 
 .aliyah-audio-button.is-cue-incomplete:not(.is-missing-audio) {
@@ -645,17 +643,32 @@ html[data-reader-mode='admin-authoring']
   color: var(--admin-cue-incomplete-color);
 }
 
-.aliyah-audio-button.is-cue-incomplete:not(.is-missing-audio):hover {
-  background: color-mix(
-    in srgb,
-    var(--admin-cue-incomplete-color) 22%,
-    transparent
-  );
-}
-
 .aliyah-audio-button.is-active {
   color: hsl(42, 82%, 42%);
   background: color-mix(in srgb, hsl(48, 100%, 62%) 18%, transparent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .aliyah-audio-button:hover {
+    background: color-mix(in srgb, dodgerblue 20%, transparent);
+  }
+
+  html[data-reader-mode='admin-authoring']
+    .aliyah-audio-button.is-missing-audio:hover {
+    background: color-mix(
+      in srgb,
+      var(--admin-missing-audio-color) 22%,
+      transparent
+    );
+  }
+
+  .aliyah-audio-button.is-cue-incomplete:not(.is-missing-audio):hover {
+    background: color-mix(
+      in srgb,
+      var(--admin-cue-incomplete-color) 22%,
+      transparent
+    );
+  }
 }
 
 @media screen and (max-width: 550px) {
@@ -762,9 +775,9 @@ html[data-reader-mode='admin-authoring']
     backdrop-filter: blur(5px) saturate(120%);
     transform: translateX(-50%);
     transition:
-      opacity 120ms ease-out,
-      transform 120ms ease-out,
-      border-color 120ms ease-out;
+      border-color var(--reader-motion-color) var(--reader-ease-standard),
+      opacity var(--reader-motion-color) var(--reader-ease-standard),
+      transform var(--reader-motion-fast) var(--reader-ease-out);
   }
 
   .aliyah-start-chevron {
@@ -776,8 +789,8 @@ html[data-reader-mode='admin-authoring']
     filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--paper-color) 76%, transparent));
     transform: translateX(-50%);
     transition:
-      opacity 120ms ease-out,
-      transform 120ms ease-out;
+      opacity var(--reader-motion-color) var(--reader-ease-standard),
+      transform var(--reader-motion-fast) var(--reader-ease-out);
   }
 
   .aliyah-start-chevron .ui-icon {
@@ -786,14 +799,22 @@ html[data-reader-mode='admin-authoring']
     stroke-width: 3.5;
   }
 
-  .aliyah-start-marker:hover .aliyah-start-marker-capsule,
   .aliyah-start-marker:focus-visible .aliyah-start-marker-capsule {
     border-color: color-mix(in srgb, var(--aliyah-start-accent) 62%, transparent);
   }
 
-  .aliyah-start-marker:hover .aliyah-start-chevron,
   .aliyah-start-marker:focus-visible .aliyah-start-chevron {
     transform: translate(-50%, 1px);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .aliyah-start-marker:hover .aliyah-start-marker-capsule {
+      border-color: color-mix(in srgb, var(--aliyah-start-accent) 62%, transparent);
+    }
+
+    .aliyah-start-marker:hover .aliyah-start-chevron {
+      transform: translate(-50%, 1px);
+    }
   }
 
   .aliyah-start-marker:focus-visible {
@@ -808,7 +829,7 @@ html[data-reader-mode='admin-authoring']
 
   .aliyah-start-marker:active .aliyah-start-marker-capsule {
     opacity: 0.66;
-    transform: translateX(-50%) scale(0.94);
+    transform: translateX(-50%) scale(var(--reader-control-press-scale));
   }
 
   .aliyah-start-marker:active .aliyah-start-chevron {
@@ -820,6 +841,10 @@ html[data-reader-mode='admin-authoring']
     .aliyah-start-marker-capsule,
     .aliyah-start-chevron {
       transition: none;
+    }
+
+    .aliyah-start-marker:active .aliyah-start-marker-capsule {
+      transform: translateX(-50%);
     }
   }
 }

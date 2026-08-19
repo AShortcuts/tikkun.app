@@ -2,6 +2,8 @@ node_modules
 .svelte-kit
 app/__screenshots__
 cypress/screenshots
+.playwright-cli/
+.vitest-attachments/
 .DS_Store
 download
 dist

@@ -1,6 +1,6 @@
 import '/css/master.css'
 
-import { page } from '@vitest/browser/context'
+import { page } from 'vitest/browser'
 import {
   afterEach,
   beforeAll,

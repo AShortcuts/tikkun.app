@@ -1,62 +1,75 @@
 {
   "name": "tikkun.io",
   "version": "1.0.0",
+  "private": true,
   "description": "The online tikkun you always wanted, but never had.",
-  "main": "index.js",
   "type": "module",
+  "packageManager": "npm@11.19.0",
+  "engines": {
+    "node": ">=22.13",
+    "npm": ">=10"
+  },
   "scripts": {
     "audio:sync": "node scripts/generate-audio-manifest.mjs",
+    "reading:manifest": "node --import tsx scripts/generate-public-reading-manifest.mjs",
+    "search:measure": "node --import tsx scripts/measure-search-performance.ts",
     "torah:index": "node scripts/generate-torah-index.mjs",
     "video:manifest": "node scripts/generate-video-manifest.mjs",
     "video:record": "node scripts/record-aliyah-videos.mjs",
     "video:calibrate": "node scripts/record-aliyah-videos.mjs calibrate",
     "video:cleanup": "node scripts/record-aliyah-videos.mjs cleanup",
-    "video:shut-down": "pkill -f record-aliyah-videos || true; pkill -f \"Brave Browser\" || true; pkill -f vite || true; npm run video:cleanup",
-    "test": "vitest run",
-    "vitest": "vitest",
-    "test:watch": "vitest",
-    "predev": "npm run torah:index && svelte-kit sync",
+    "video:shut-down": "node scripts/record-aliyah-videos.mjs shutdown",
+    "test": "npm run test:node",
+    "test:node": "vitest run --project=node",
+    "test:watch": "vitest --project=node",
+    "predev": "npm run torah:index && npm run reading:manifest && svelte-kit sync",
     "dev": "vite",
-    "build": "npm run torah:index && vite build && node scripts/generate-service-worker.mjs",
+    "build": "npm run torah:index && npm run reading:manifest && vite build && node scripts/finalize-security-headers.mjs && node scripts/generate-service-worker.mjs && node scripts/check-build-budgets.mjs",
     "preview": "vite preview",
     "clean": "rm -rf dist .svelte-kit",
-    "lint": "eslint app functions src scripts/*.mjs vite.config.ts svelte.config.js",
+    "lint": "eslint app functions src scripts vite.config.ts vitest.config.ts svelte.config.js",
     "typecheck": "svelte-kit sync && tsc --noEmit && svelte-check --tsconfig ./tsconfig.json",
     "check": "npm run typecheck && npm run lint",
-    "test:browser": "vitest --workspace=vitest.workspace.ts"
+    "test:browser": "vitest run --project=browser",
+    "test:browser:webkit": "vitest run --project=webkit",
+    "verify:quick": "npm run check && npm run test:node",
+    "verify": "npm run verify:quick && npm run test:browser && npm run test:browser:webkit && npm run build"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/akivajgordon/tikkun.io.git"
+    "url": "git+https://github.com/AShortcuts/tikkun.app.git"
   },
   "author": "Akiva Gordon <akivag29@gmail.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/akivajgordon/tikkun.io/issues"
+    "url": "https://github.com/AShortcuts/tikkun.app/issues"
   },
-  "homepage": "https://github.com/akivajgordon/tikkun.io#readme",
+  "homepage": "https://github.com/AShortcuts/tikkun.app#readme",
   "dependencies": {
     "@hebcal/core": "^5.7.7",
     "@hebcal/hdate": "^0.12.0",
     "@hebcal/leyning": "^9.0.1",
+    "fuse.js": "^7.5.0",
     "normalize.css": "^8.0.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.11.1",
     "@sveltejs/adapter-static": "^3.0.10",
-    "@sveltejs/kit": "^2.70.2",
-    "@sveltejs/vite-plugin-svelte": "^4.0.4",
+    "@sveltejs/kit": "2.70.3",
+    "@sveltejs/vite-plugin-svelte": "7.3.0",
     "@types/node": "^25.5.0",
-    "@vitest/browser": "^2.1.9",
+    "@vitest/browser": "4.1.11",
+    "@vitest/browser-playwright": "4.1.11",
     "eslint": "^10.1.0",
     "eslint-plugin-svelte": "^3.22.0",
     "globals": "^15.9.0",
     "playwright": "^1.58.2",
-    "svelte": "^5.56.8",
+    "svelte": "5.56.9",
     "svelte-check": "^4.7.4",
+    "tsx": "4.23.12",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.57.2",
-    "vite": "^5.4.21",
-    "vitest": "^2.1.9"
+    "vite": "8.2.1",
+    "vitest": "4.1.11"
   }
 }

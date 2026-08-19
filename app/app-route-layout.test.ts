@@ -94,6 +94,10 @@ test('delegates reader shell presentation without replacing reader roots', () =>
 test('delegates aliyah presentation to one Svelte navigation module', () => {
   expect(indexSource).toContain('createAliyahNavigation(scope, {')
   expect(indexSource).toContain(
+    'function mountAliyahNavigation(scope: MountScope)'
+  )
+  expect(indexSource).toContain('mountAliyahNavigation(scope)')
+  expect(indexSource).not.toContain(
     'mountAliyahNavigation(scope, audioController, highlightController)'
   )
   expect(indexSource).not.toContain('createDesktopAliyahRail')
@@ -131,6 +135,24 @@ test('delegates playback implementation ownership to Reader Playback', () => {
   expect(readerPlaybackSource).toContain('createPlaybackTimeline(scope, {')
 })
 
+test('revalidates local cue status when the active playback session changes', () => {
+  expect(indexSource).toMatch(
+    /change\.type === 'session-loaded'[\s\S]*?invalidateAliyahCueStatuses\(\)[\s\S]*?syncAliyahNavigationContent\(\)/
+  )
+  expect(indexSource).toMatch(
+    /function invalidateAliyahCueStatuses\(\) \{[\s\S]*?resolvedAliyahCueStatuses\.clear\(\)[\s\S]*?aliyahNavigationGlobal\?\.invalidate\(\)/
+  )
+})
+
+test('surfaces playback failures through an assertive reader notice', () => {
+  expect(indexSource).toMatch(
+    /change\.type === 'playback-error'[\s\S]*?showReaderNotice\([\s\S]*?This recording could not play[\s\S]*?assertive: true/
+  )
+  expect(indexSource).toContain(
+    "toast.setAttribute('role', assertive ? 'alert' : 'status')"
+  )
+})
+
 test('delegates recording issue dialog presentation to Cue Authoring Svelte', () => {
   expect(readerAppSource).toContain(
     'data-target-id="recording-issue-dialog-root"'
@@ -147,7 +169,7 @@ test('delegates recording issue dialog presentation to Cue Authoring Svelte', ()
   )
 })
 
-test('delegates admin access to a theme-aware Svelte dialog', () => {
+test('delegates the local authoring unlock to a theme-aware Svelte dialog', () => {
   expect(readerAppSource).toContain(
     'data-target-id="cue-authoring-access-dialog-root"'
   )
@@ -165,6 +187,8 @@ test('delegates admin access to a theme-aware Svelte dialog', () => {
     'data-target-id="admin-access-password"'
   )
   expect(cueAuthoringAccessDialogSource).toContain('aria-modal="true"')
+  expect(cueAuthoringAccessDialogSource).toContain('not a security control')
+  expect(cueAuthoringAccessDialogSource).not.toContain('Admin Access')
 })
 
 test('delegates cue list presentation to Cue Authoring Svelte', () => {

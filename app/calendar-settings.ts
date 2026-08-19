@@ -1,8 +1,7 @@
 import type { UserSettings } from './calendar-model/user-settings.ts'
 import {
   getBrowserStorage,
-  quarantineStorageItem,
-  readStorageItem,
+  readPersistedJson,
   writeStorageItem,
 } from './persistence/persisted-state.ts'
 
@@ -26,45 +25,35 @@ export function userSettingsFromCalendarSettings(
   }
 }
 
+function isCalendarSettingsPayload(
+  value: unknown
+): value is Partial<CalendarSettings> {
+  return Boolean(
+    value &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      (!('israel' in value) || typeof value.israel === 'boolean')
+  )
+}
+
 export function loadCalendarSettings(
   storage?: Storage | null
 ): CalendarSettings {
   const target = storage === undefined ? getBrowserStorage('local') : storage
-  let raw: string | null = null
-  try {
-    raw = readStorageItem(target, CALENDAR_SETTINGS_STORAGE_KEY)
-    if (!raw) return DEFAULT_CALENDAR_SETTINGS
-
-    const parsed = JSON.parse(raw) as unknown
-    if (
-      !parsed ||
-      typeof parsed !== 'object' ||
-      Array.isArray(parsed) ||
-      ('israel' in parsed && typeof parsed.israel !== 'boolean')
-    ) {
-      quarantineStorageItem({
-        storage: target,
-        key: CALENDAR_SETTINGS_STORAGE_KEY,
-        rawValue: raw,
-        reason: 'calendar settings have an invalid shape',
-      })
-      return DEFAULT_CALENDAR_SETTINGS
-    }
-    return {
-      israel: 'israel' in parsed && parsed.israel === true,
-    }
-  } catch (error) {
-    console.error('Failed to load calendar settings', error)
-    if (raw) {
-      quarantineStorageItem({
-        storage: target,
-        key: CALENDAR_SETTINGS_STORAGE_KEY,
-        rawValue: raw,
-        reason: 'calendar settings are not valid JSON',
-      })
-    }
-    return DEFAULT_CALENDAR_SETTINGS
+  const result = readPersistedJson({
+    storage: target,
+    key: CALENDAR_SETTINGS_STORAGE_KEY,
+    validate: isCalendarSettingsPayload,
+  })
+  if (result.status === 'ready') {
+    return { israel: result.value.israel === true }
   }
+  if (result.status === 'unavailable') {
+    console.error('Failed to load calendar settings', result.error)
+  } else if (result.status === 'invalid' && result.reason === 'invalid-json') {
+    console.error('Failed to load calendar settings', result.error)
+  }
+  return DEFAULT_CALENDAR_SETTINGS
 }
 
 export function saveCalendarSettings(

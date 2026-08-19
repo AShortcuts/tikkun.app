@@ -76,19 +76,29 @@ test('updates shell presentation without replacing stable reader targets', () =>
   expect(required('[data-target-id="parsha-title"]').textContent?.trim()).toBe(
     'Beresheet'
   )
-  expect(required<HTMLElement>('[data-target-id="reader-progress-fill"]').style.height).toBe(
-    '42%'
+  expect(
+    required<HTMLElement>('[data-target-id="reader-progress-fill"]').style.getPropertyValue(
+      '--reader-progress-ratio'
+    )
+  ).toBe(
+    '0.42'
   )
   expect(
-    required<HTMLElement>('[data-target-id="reader-progress-mobile-fill"]').style
-      .width
-  ).toBe('42%')
+    required<HTMLElement>(
+      '[data-target-id="reader-progress-mobile-fill"]'
+    ).style.getPropertyValue('--reader-progress-ratio')
+  ).toBe('0.42')
   expect(
     required('[data-target-id="reader-progress-percent"]').textContent?.trim()
   ).toBe('42%')
   expect(required('[data-target-id="reader-progress-label"]').textContent?.trim()).toBe(
     'שני'
   )
+  const progress = required<HTMLElement>('[data-target-id="reader-progress"]')
+  expect(progress.getAttribute('role')).toBe('progressbar')
+  expect(progress.getAttribute('aria-valuenow')).toBe('42')
+  expect(progress.getAttribute('aria-valuetext')).toBe('שני, 42%')
+  expect(reader.tagName).toBe('MAIN')
 
   shell.setPickerOpen(true)
   expect(book.classList.contains('u-hidden')).toBe(true)
@@ -134,13 +144,21 @@ test('updates shell presentation without replacing stable reader targets', () =>
   required<HTMLButtonElement>('[data-target-id="mobile-library"]').click()
   expect(aboutClicks).toBe(2)
 
-  const annotations = required<HTMLInputElement>(
-    '[data-target-id="annotations-toggle"]'
+  const annotations = required<HTMLButtonElement>(
+    '[data-test-id="annotations-toggle"]'
   )
-  annotations.checked = false
-  annotations.dispatchEvent(new Event('change', { bubbles: true }))
+  expect(annotations.querySelector('input')).toBeNull()
+  expect(annotations.getAttribute('aria-pressed')).toBe('true')
+  expect(annotations.getAttribute('aria-label')).toBe(
+    'Hide vowels and cantillation marks'
+  )
+  annotations.click()
   flushSync()
   expect(annotationChanges).toBe(1)
+  expect(annotations.getAttribute('aria-pressed')).toBe('false')
+  expect(annotations.getAttribute('aria-label')).toBe(
+    'Show vowels and cantillation marks'
+  )
   expect(book.classList.contains('mod-annotations-off')).toBe(true)
 
   destroy()

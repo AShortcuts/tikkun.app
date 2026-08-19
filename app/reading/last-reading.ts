@@ -1,10 +1,11 @@
 import type { LeiningRun } from '../calendar-model/model-types.ts'
 import type { RefWithScroll } from '../ref.ts'
 import { semanticParshaUrlForLeining } from '../view-model/navigation/parsha-routes.ts'
+import { isReaderHash } from '../view-model/navigation/reader-hash.ts'
 import { generateUrl } from '../view-model/navigation/url-parser.ts'
 import {
-  quarantineStorageItem,
-  readStorageItem,
+  isPlausiblePersistedTimestamp,
+  readPersistedJson,
   removeStorageItem,
   writeStorageItem,
 } from '../persistence/persisted-state.ts'
@@ -26,7 +27,7 @@ export function createLastReadingHash(run: LeiningRun, initialRef?: RefWithScrol
     generateUrl(run, initialRef)
 }
 
-function isValidLastReading(value: unknown): value is LastReading {
+function isValidLastReading(value: unknown, now: number): value is LastReading {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<LastReading>
   return (
@@ -36,16 +37,8 @@ function isValidLastReading(value: unknown): value is LastReading {
     candidate.parshaName.trim().length > 0 &&
     (candidate.aliyahLabel === undefined ||
       typeof candidate.aliyahLabel === 'string') &&
-    typeof candidate.savedAt === 'number' &&
-    Number.isFinite(candidate.savedAt)
+    isPlausiblePersistedTimestamp(candidate.savedAt, { now })
   )
-}
-
-function isReaderHash(hash: string) {
-  return hash.startsWith('#/run/') ||
-    hash.startsWith('#/torah/') ||
-    hash.startsWith('#/esther/') ||
-    hash.startsWith('#/r/')
 }
 
 export function saveLastReading(
@@ -72,46 +65,33 @@ export function saveLastReading(
 
 export function loadEligibleLastReading(
   storage: Storage | null,
-  now = Date.now()
+  now = Date.now(),
+  validateHash: (hash: string) => boolean = isReaderHash
 ): LastReading | null {
-  let raw: string | null
-  try {
-    raw = readStorageItem(storage, LAST_READING_STORAGE_KEY)
-  } catch (error) {
-    console.error('Failed to read the last-reading checkpoint', error)
+  const result = readPersistedJson({
+    storage,
+    key: LAST_READING_STORAGE_KEY,
+    validate: (value): value is LastReading =>
+      isValidLastReading(value, now) && validateHash(value.hash),
+  })
+  if (result.status === 'unavailable') {
+    console.error('Failed to read the last-reading checkpoint', result.error)
     return null
   }
-  if (!raw) return null
+  if (result.status === 'invalid') {
+    if (result.reason === 'invalid-json') {
+      console.error('Failed to parse the last-reading checkpoint', result.error)
+    }
+    return null
+  }
+  if (result.status === 'missing') return null
 
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(raw)
-  } catch (error) {
-    console.error('Failed to parse the last-reading checkpoint', error)
-    quarantineStorageItem({
-      storage,
-      key: LAST_READING_STORAGE_KEY,
-      rawValue: raw,
-      reason: 'last-reading checkpoint is not valid JSON',
-    })
-    return null
-  }
-
-  if (!isValidLastReading(parsed)) {
-    quarantineStorageItem({
-      storage,
-      key: LAST_READING_STORAGE_KEY,
-      rawValue: raw,
-      reason: 'last-reading checkpoint has an invalid shape',
-    })
-    return null
-  }
-  if (now - parsed.savedAt > LAST_READING_MAX_AGE_MS) {
+  if (now - result.value.savedAt > LAST_READING_MAX_AGE_MS) {
     discardExpiredLastReading(storage)
     return null
   }
 
-  return parsed
+  return result.value
 }
 
 function discardExpiredLastReading(storage: Storage | null) {

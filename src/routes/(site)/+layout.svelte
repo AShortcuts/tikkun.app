@@ -7,22 +7,41 @@
 
   let { children } = $props()
   let mobileMenu: HTMLDetailsElement
+  let mobileMenuOpen = $state(false)
 
   function closeMobileMenu() {
-    mobileMenu?.removeAttribute('open')
+    mobileMenuOpen = false
+  }
+
+  function handleDocumentPointerDown(event: PointerEvent) {
+    if (!mobileMenuOpen || !(event.target instanceof Node)) return
+    if (!mobileMenu.contains(event.target)) closeMobileMenu()
+  }
+
+  function handleDocumentKeydown(event: KeyboardEvent) {
+    if (event.key !== 'Escape' || !mobileMenuOpen) return
+    closeMobileMenu()
+    mobileMenu.querySelector<HTMLElement>('summary')?.focus({ preventScroll: true })
   }
 
   onMount(() => {
-    const rootPath = resolve('/')
-    if (window.location.pathname !== rootPath) return
-    const hashPath = window.location.hash.split('?', 1)[0]
-    if (!hashPath.startsWith('#/')) return
+    document.addEventListener('pointerdown', handleDocumentPointerDown)
+    document.addEventListener('keydown', handleDocumentKeydown)
 
-    if (hashPath === '#/about') {
-      window.location.replace(resolve('/about/'))
-      return
+    const rootPath = resolve('/')
+    if (window.location.pathname === rootPath) {
+      const hashPath = window.location.hash.split('?', 1)[0]
+      if (hashPath === '#/about') {
+        window.location.replace(resolve('/about/'))
+      } else if (hashPath.startsWith('#/')) {
+        window.location.replace(`${resolve('/reader/')}${window.location.hash}`)
+      }
     }
-    window.location.replace(`${resolve('/reader/')}${window.location.hash}`)
+
+    return () => {
+      document.removeEventListener('pointerdown', handleDocumentPointerDown)
+      document.removeEventListener('keydown', handleDocumentKeydown)
+    }
   })
 </script>
 
@@ -63,12 +82,27 @@
         href={resolve('/about/')}
         aria-current={page.url.pathname.startsWith(resolve('/about/')) ? 'page' : undefined}
       >About</a>
-      <details class="site-mobile-menu" bind:this={mobileMenu}>
-        <summary aria-label="Open navigation menu">Menu</summary>
+      <details class="site-mobile-menu" bind:this={mobileMenu} bind:open={mobileMenuOpen}>
+        <summary
+          aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+          aria-expanded={mobileMenuOpen}
+        >{mobileMenuOpen ? 'Close' : 'Menu'}</summary>
         <nav aria-label="Mobile navigation">
-          <a href={resolve('/readings/')} onclick={closeMobileMenu}>Readings & coverage</a>
-          <a href={resolve('/tidbits/')} onclick={closeMobileMenu}>Tidbits</a>
-          <a href={resolve('/about/')} onclick={closeMobileMenu}>About</a>
+          <a
+            href={resolve('/readings/')}
+            aria-current={page.url.pathname.startsWith(resolve('/readings/')) ? 'page' : undefined}
+            onclick={closeMobileMenu}
+          >Readings & coverage</a>
+          <a
+            href={resolve('/tidbits/')}
+            aria-current={page.url.pathname.startsWith(resolve('/tidbits/')) ? 'page' : undefined}
+            onclick={closeMobileMenu}
+          >Tidbits</a>
+          <a
+            href={resolve('/about/')}
+            aria-current={page.url.pathname.startsWith(resolve('/about/')) ? 'page' : undefined}
+            onclick={closeMobileMenu}
+          >About</a>
           <a href={resolve('/reader/#/next')} data-sveltekit-reload>Open reader</a>
         </nav>
       </details>
@@ -86,7 +120,7 @@
       <a href={resolve('/readings/')}>Readings & coverage</a>
       <a href={resolve('/tidbits/')}>Tidbits</a>
       <a href={resolve('/about/')}>About</a>
-      <a href="https://github.com/akivajgordon/tikkun.io" rel="noreferrer">Source</a>
+      <a href="https://github.com/AShortcuts/tikkun.app" rel="noreferrer">Source</a>
     </nav>
   </footer>
 </div>

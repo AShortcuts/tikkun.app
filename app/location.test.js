@@ -1,9 +1,11 @@
 import { expect, test } from 'vitest'
-import { hasScrollData, loadScroll } from './location.ts'
+import { getScrollPageCount, hasScrollData, loadScroll } from './location.ts'
 
 test('page count for torah', async () => {
   const resolver = await loadScroll('torah')
   expect(resolver.getPageCount()).toBe(245)
+  expect(getScrollPageCount('torah')).toBe(245)
+  expect(getScrollPageCount('esther')).toBe(17)
 })
 
 test('Beresheet 1:1 starts on { page 1, line 1 }', async () => {

@@ -1,11 +1,31 @@
 import { expect, test, vi } from 'vitest'
 import {
+  PERSISTED_TIMESTAMP_FUTURE_TOLERANCE_MS,
   PersistedStateStorageError,
+  isPlausiblePersistedTimestamp,
   quarantineStorageItem,
+  readPersistedJson,
   readStorageItem,
   removeStorageItem,
   writeStorageItem,
 } from './persisted-state.ts'
+
+test('accepts bounded timestamps and rejects impossible future values', () => {
+  const now = 1_000_000
+  expect(isPlausiblePersistedTimestamp(now, { now })).toBe(true)
+  expect(
+    isPlausiblePersistedTimestamp(
+      now + PERSISTED_TIMESTAMP_FUTURE_TOLERANCE_MS,
+      { now }
+    )
+  ).toBe(true)
+  expect(
+    isPlausiblePersistedTimestamp(
+      now + PERSISTED_TIMESTAMP_FUTURE_TOLERANCE_MS + 1,
+      { now }
+    )
+  ).toBe(false)
+})
 
 function memoryStorage() {
   const values = new Map<string, string>()
@@ -112,4 +132,53 @@ test('contains quarantine failures without masking the original recovery path', 
   })).toBe(false)
   expect(log).toHaveBeenCalledOnce()
   log.mockRestore()
+})
+
+test('reads validated JSON through one persistence contract', () => {
+  const storage = memoryStorage()
+  storage.setItem('reader', JSON.stringify({ version: 1, value: 'ready' }))
+
+  const result = readPersistedJson({
+    storage,
+    key: 'reader',
+    validate: (value): value is { version: number; value: string } =>
+      Boolean(
+        value &&
+          typeof value === 'object' &&
+          (value as { version?: unknown }).version === 1 &&
+          typeof (value as { value?: unknown }).value === 'string'
+      ),
+  })
+
+  expect(result).toEqual({
+    status: 'ready',
+    value: { version: 1, value: 'ready' },
+  })
+})
+
+test('distinguishes missing, unavailable, malformed, and invalid persisted JSON', () => {
+  const storage = memoryStorage()
+  const validate = (value: unknown): value is { valid: true } =>
+    Boolean(value && typeof value === 'object' && (value as { valid?: unknown }).valid === true)
+
+  expect(readPersistedJson({ storage, key: 'missing', validate })).toEqual({
+    status: 'missing',
+  })
+  expect(readPersistedJson({ storage: null, key: 'reader', validate })).toMatchObject({
+    status: 'unavailable',
+  })
+
+  storage.setItem('reader', '{bad json')
+  expect(readPersistedJson({ storage, key: 'reader', validate })).toMatchObject({
+    status: 'invalid',
+    reason: 'invalid-json',
+  })
+  expect(storage.getItem('reader:quarantine')).not.toBeNull()
+
+  storage.setItem('reader', JSON.stringify({ valid: false }))
+  expect(readPersistedJson({ storage, key: 'reader', validate })).toEqual({
+    status: 'invalid',
+    reason: 'invalid-value',
+  })
+  expect(storage.getItem('reader')).toBeNull()
 })

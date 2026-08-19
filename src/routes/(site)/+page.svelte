@@ -25,13 +25,22 @@
       <p class="home-lede">
         Choose the reading, press play, and follow every word where it appears in the Torah.
       </p>
-      <a
-        class="home-primary-action"
-        href={resolve(`/reader/#/torah/parsha/${featuredReading.parshaSlug}`)}
-        data-sveltekit-reload
-      >
-        Start practicing
-      </a>
+      <div class="home-hero-actions">
+        <a
+          class="home-primary-action"
+          href={resolve(`/reader/#/torah/parsha/${featuredReading.parshaSlug}`)}
+          data-sveltekit-reload
+        >
+          Start practicing
+        </a>
+        <a
+          class="home-experiment-action"
+          href={resolve('/prototypes/apple-sentient/')}
+          data-sveltekit-reload
+        >
+          View experimental redesign
+        </a>
+      </div>
     </div>
 
     <a
@@ -52,7 +61,10 @@
       <span class="home-reader-dock">
         <strong>{featuredReading.parshaName}</strong>
         <span class="home-reader-dock-bubbles" aria-label="All seven aliyot available">
-          <AliyahBubbles availableAliyot={featuredReading.availableAliyot} />
+          <AliyahBubbles
+            aliyot={featuredReading.aliyot}
+            readingName={featuredReading.parshaName}
+          />
         </span>
         <span>All aliyot ready</span>
       </span>
@@ -92,7 +104,7 @@
         <p class="home-section-kicker">Practice now</p>
         <h2 id="home-readings-title">Available readings</h2>
       </div>
-      <p>Each bubble shows an aliyah with an available recording.</p>
+      <p>Choose any bubble to open that aliyah. Green is synced, blue is a draft, and yellow still needs timing.</p>
     </div>
     <div class="home-readings-grid">
       {#each availableReadings as reading (reading.parshaSlug)}
@@ -109,7 +121,6 @@
     </p>
     <a class="home-secondary-link" href={resolve('/readings/')}>
       View readings & coverage
-      <span aria-hidden="true">→</span>
     </a>
   </section>
 </main>

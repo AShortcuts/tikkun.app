@@ -6,13 +6,6 @@ function endsWithSofPasuk(words: HTMLElement[]) {
 const annotatedText = (word: HTMLElement | undefined) =>
   word?.dataset.annotationsOnText ?? word?.textContent ?? ''
 
-function firstWordAfterSofPasuk(words: HTMLElement[], startingAt = 0) {
-  const sofPasukIndex = words.findIndex(
-    (word, index) => index >= startingAt && annotatedText(word).includes('׃')
-  )
-  return sofPasukIndex < 0 ? words.length : sofPasukIndex + 1
-}
-
 export function verseStartWordIndex({
   currentLineWords,
   previousLineWords,
@@ -22,16 +15,17 @@ export function verseStartWordIndex({
   previousLineWords: HTMLElement[]
   verseOrdinal: number
 }) {
-  let startIndex =
-    previousLineWords.length && !endsWithSofPasuk(previousLineWords)
-      ? firstWordAfterSofPasuk(currentLineWords)
-      : 0
-
-  for (let ordinal = 0; ordinal < verseOrdinal; ordinal++) {
-    startIndex = firstWordAfterSofPasuk(currentLineWords, startIndex)
-  }
-  return startIndex
+  return verseStartSequenceIndex({
+    currentLineWords: currentLineWords.map(toSequencedWord),
+    previousLineWords: previousLineWords.map(toSequencedWord),
+    verseOrdinal,
+  })
 }
+
+const toSequencedWord = (word: HTMLElement): SequencedWord => ({
+  tokenKey: word.dataset.tokenKey ?? '',
+  annotatedText: annotatedText(word),
+})
 
 const annotatedWordsIn = (node: ParentNode) =>
   [...node.querySelectorAll<HTMLElement>('.fragment .word')].filter(
@@ -184,45 +178,18 @@ export function collectTokenKeysForExactAliyahRange({
   endLine: HTMLElement
   endVerseOrdinal: number
 }) {
-  const startContext = exactAliyahStartContext({
-    book,
-    startLine,
-    startVerseOrdinal,
-  })
-  if (!startContext) return []
-
-  const { lines, startLineIndex, startWordIndex, wordsByLine } = startContext
+  const lines = [...book.querySelectorAll<HTMLElement>('[data-class="line"]')]
+  const startLineIndex = lines.indexOf(startLine)
   const endLineIndex = lines.indexOf(endLine)
-  if (
-    endLineIndex < startLineIndex ||
-    endVerseOrdinal < 0
-  ) {
-    return []
-  }
+  const wordsByLine = lines.map((line) => annotatedWordsIn(line).map(toSequencedWord))
 
-  const endWords = wordsByLine[endLineIndex]
-  const endVerseStartIndex = verseStartWordIndex({
-    currentLineWords: endWords,
-    previousLineWords: wordsByLine[endLineIndex - 1] ?? [],
-    verseOrdinal: endVerseOrdinal,
+  return collectExactTokenRange({
+    wordsByLine,
+    startLineIndex,
+    startVerseOrdinal,
+    endLineIndex,
+    endVerseOrdinal,
   })
-
-  const flattenedWords = wordsByLine.flat()
-  const lineOffsets = wordsByLine.reduce<number[]>((offsets, _words, index) => {
-    offsets[index] = index ? offsets[index - 1] + wordsByLine[index - 1].length : 0
-    return offsets
-  }, [])
-  const startOffset = lineOffsets[startLineIndex] + startWordIndex
-  const endVerseOffset = lineOffsets[endLineIndex] + endVerseStartIndex
-  const endOffset = flattenedWords.findIndex(
-    (word, index) => index >= endVerseOffset && annotatedText(word).includes('׃')
-  )
-  const inclusiveEndOffset = endOffset < 0 ? flattenedWords.length : endOffset + 1
-
-  return flattenedWords
-    .slice(startOffset, inclusiveEndOffset)
-    .map((word) => word.dataset.tokenKey)
-    .filter((key): key is string => Boolean(key))
 }
 
 export function collectStartingLineTokenKeys({
@@ -243,3 +210,8 @@ export function collectStartingLineTokenKeys({
     .map((word) => word.dataset.tokenKey)
     .filter((key): key is string => Boolean(key))
 }
+import {
+  collectExactTokenRange,
+  verseStartSequenceIndex,
+  type SequencedWord,
+} from './exact-token-range.ts'

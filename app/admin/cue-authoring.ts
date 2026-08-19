@@ -1,5 +1,10 @@
 import { cueFileRelativePath, formatCueFileJson } from '../audio/cue-file.ts'
 import {
+  createCueDraftPayload,
+  type CueDraftPayload,
+} from '../audio/cue-draft.ts'
+import { TOKENIZATION_VERSION } from '../audio/cue-schema.ts'
+import {
   getCueDataResolutionForRecording,
   retryCueDataResolutionForRecording,
 } from '../audio/library.ts'
@@ -23,7 +28,6 @@ import type { MountScope } from '../lifecycle/mount.ts'
 import {
   writeStorageItem,
 } from '../persistence/persisted-state.ts'
-import { TOKENIZATION_VERSION } from '../reader-preferences.ts'
 import { formatTokenKey, parseTokenKey } from '../reader/token-position.ts'
 import type {
   ActiveAudioSession,
@@ -36,7 +40,7 @@ import {
   CUE_AUTHORING_UNLOCKED_KEY,
   isCueAuthoringToggleShortcut,
   readCueAuthoringAccessState,
-  verifyAdminPassword,
+  verifyCueAuthoringUnlockCode,
 } from './access.ts'
 import {
   createCueAuthoringAccessDialog,
@@ -55,9 +59,12 @@ import { areCueDraftsEquivalent } from './draft-cue-comparison.ts'
 import {
   AdminDraftConflictError,
   AdminDraftStorageError,
-  loadAdminDraft,
+  createAdminDraftWriterToken,
+  loadAdminDraftResult,
+  preserveAdminDraftSnapshot,
+  readAdminDraftRecoveries,
   saveAdminDraftPayload,
-  type AdminDraftPayload,
+  type AdminDraftRevision,
 } from './draft-storage.ts'
 import {
   MicrophoneCapture,
@@ -154,6 +161,9 @@ type CueAuthoringState = {
   sourceCues: WordCue[]
   draftOrigin: 'none' | 'published' | 'local'
   draftSavedAt: number | null
+  draftRecoveryCount: number
+  draftRecoveryFailure: { rawValue: string; reason: string } | null
+  volatileDraftRecovery: { rawValue: string; reason: string } | null
   draftSaveError: string | null
   recordingIssueSaveError: string | null
   cueDataResolution: CueDataResolution | null
@@ -185,6 +195,9 @@ export function createCueAuthoring(
     sourceCues: [],
     draftOrigin: 'none',
     draftSavedAt: null,
+    draftRecoveryCount: 0,
+    draftRecoveryFailure: null,
+    volatileDraftRecovery: null,
     draftSaveError: null,
     recordingIssueSaveError: null,
     cueDataResolution: null,
@@ -200,8 +213,19 @@ export function createCueAuthoring(
     resolve: getCueDataResolutionForRecording,
     retry: retryCueDataResolutionForRecording,
   }
+  const draftWriterToken = createAdminDraftWriterToken()
+  const volatileDraftRecoveries = new Map<
+    string,
+    { rawValue: string; reason: string }
+  >()
+  const forgetVolatileDraftRecovery = (audioId: string, rawValue: string) => {
+    if (volatileDraftRecoveries.get(audioId)?.rawValue === rawValue) {
+      volatileDraftRecoveries.delete(audioId)
+    }
+  }
   let exportDownloadUrl: string | null = null
   let exportAudioDownloadUrl: string | null = null
+  let draftRecoveryDownloadUrl: string | null = null
   let exportPresentationRevision = 0
   let microphoneAudioId: string | null = null
   let capturedAudio: {
@@ -298,38 +322,124 @@ export function createCueAuthoring(
     exportSheet?.clearDownloads()
   }
 
+  const resetDraftRecoveryDownloadLink = () => {
+    if (!draftRecoveryDownloadUrl) return
+    URL.revokeObjectURL(draftRecoveryDownloadUrl)
+    draftRecoveryDownloadUrl = null
+  }
+
   const hideExport = () => {
     exportSheet?.close()
     resetExportDownloadLinks()
   }
 
-  const saveDraft = () => {
+  let draftTimestampFloor = 0
+  let draftRevision: AdminDraftRevision = null
+  const saveDraft = async () => {
     const session = getSession()
     if (!session) return false
+    const bindingGeneration = sessionBindingGeneration
 
-    const updatedAt = Date.now()
-    const payload: AdminDraftPayload = {
-      audioId: session.recording.id,
-      tokenCount: session.tokenKeys.length,
-      tokenPointer: state.tokenPointer,
-      tokenizationVersion: TOKENIZATION_VERSION,
-      updatedAt,
-      cues: cloneCues(state.cues),
-    }
-
+    const updatedAt = Math.max(Date.now(), draftTimestampFloor + 1)
+    draftTimestampFloor = updatedAt
+    let payload: CueDraftPayload | null = null
     try {
-      saveAdminDraftPayload(payload)
+      payload = createCueDraftPayload({
+        recording: session.recording,
+        tokenCount: session.tokenKeys.length,
+        tokenKeys: session.tokenKeys,
+        tokenPointer: state.tokenPointer,
+        updatedAt,
+        cues: cloneCues(state.cues),
+      })
+      const savedDraft = await saveAdminDraftPayload(
+        payload,
+        session.recording,
+        session.tokenKeys,
+        {
+          writerToken: draftWriterToken,
+          expectedRevision: draftRevision,
+        }
+      )
+      const serializedPayload = JSON.stringify(payload)
+      forgetVolatileDraftRecovery(session.recording.id, serializedPayload)
+      if (
+        bindingGeneration !== sessionBindingGeneration ||
+        getSession() !== session
+      ) {
+        return true
+      }
+      draftRevision = savedDraft.revision
+      state.draftRecoveryCount = readAdminDraftRecoveries(
+        session.recording.id
+      ).length
+      state.draftRecoveryFailure = null
+      state.volatileDraftRecovery =
+        volatileDraftRecoveries.get(session.recording.id) ?? null
     } catch (error) {
-      state.draftSaveError =
-        error instanceof AdminDraftConflictError
-          ? 'A newer local draft exists in another tab. Reload this recording before saving more changes.'
-          : error instanceof AdminDraftStorageError
-            ? 'This draft could not be saved in browser storage. Export it before leaving this recording.'
-            : 'This draft could not be saved. Export it before leaving this recording.'
       console.error(
         `Failed to save admin draft for ${session.recording.id}`,
         error
       )
+
+      const sessionChanged =
+        bindingGeneration !== sessionBindingGeneration ||
+        getSession() !== session
+      const snapshotPayload = payload
+      const shouldPreserveSnapshot =
+        snapshotPayload !== null &&
+        (sessionChanged || error instanceof AdminDraftConflictError)
+      const snapshotPreserved = shouldPreserveSnapshot
+        ? await preserveAdminDraftSnapshot(
+            snapshotPayload,
+            error instanceof AdminDraftConflictError
+              ? 'conflicting local cue draft rejected during save'
+              : 'local cue draft failed after the active recording changed'
+          )
+        : false
+      if (snapshotPayload && shouldPreserveSnapshot) {
+        const serializedPayload = JSON.stringify(snapshotPayload)
+        if (snapshotPreserved) {
+          forgetVolatileDraftRecovery(
+            session.recording.id,
+            serializedPayload
+          )
+        } else {
+          volatileDraftRecoveries.set(session.recording.id, {
+            rawValue: serializedPayload,
+            reason:
+              error instanceof AdminDraftConflictError
+                ? 'conflicting local cue draft could not be stored'
+                : 'late local cue draft failure could not be stored',
+          })
+        }
+      }
+
+      if (
+        bindingGeneration !== sessionBindingGeneration ||
+        getSession() !== session
+      ) {
+        options.showPersistenceNotice(
+          snapshotPreserved
+            ? `${session.recording.title} could not be saved after the recording changed. Its cues were preserved in local draft recoveries.`
+            : `${session.recording.title} could not be saved after the recording changed. Its cues remain only in this open Reader; return to that recording and download the unsaved snapshot before navigating away or closing this tab.`
+        )
+        return false
+      }
+
+      state.volatileDraftRecovery =
+        volatileDraftRecoveries.get(session.recording.id) ?? null
+      state.draftRecoveryCount = readAdminDraftRecoveries(
+        session.recording.id
+      ).length
+      state.draftSaveError =
+        error instanceof AdminDraftConflictError
+          ? snapshotPreserved
+            ? 'This local draft changed in another tab. Your current cues were preserved in Recoveries. Download or export them, then reload this recording.'
+            : 'This local draft changed in another tab. Export your current cues before reloading this recording.'
+          : error instanceof AdminDraftStorageError
+            ? 'This draft could not be saved in browser storage. Export it before leaving this recording.'
+            : 'This draft could not be saved. Export it before leaving this recording.'
       syncPanel()
       return false
     }
@@ -337,6 +447,7 @@ export function createCueAuthoring(
     state.draftSaveError = null
     state.draftOrigin = 'local'
     state.draftSavedAt = updatedAt
+    syncPanel()
     options.onChange('draft')
     return true
   }
@@ -349,6 +460,11 @@ export function createCueAuthoring(
     state.recording = false
     state.draftOrigin = 'none'
     state.draftSavedAt = null
+    draftTimestampFloor = 0
+    draftRevision = null
+    state.draftRecoveryCount = 0
+    state.draftRecoveryFailure = null
+    state.volatileDraftRecovery = null
     state.draftSaveError = null
     state.recordingIssueSaveError = null
     state.cueDataResolution = null
@@ -366,16 +482,35 @@ export function createCueAuthoring(
     }
 
     const initialSourceCues = cloneCues(session.cues)
-    const storedDraft = loadAdminDraft(
-      session.recording.id,
+    const storedDraftResult = loadAdminDraftResult(
+      session.recording,
       session.tokenKeys
     )
+    const storedDraft = storedDraftResult.status === 'ready'
+      ? storedDraftResult.draft
+      : null
+    const draftRecoveryFailure = storedDraftResult.status === 'recovery-failed'
+      ? {
+          rawValue: storedDraftResult.rawValue,
+          reason: storedDraftResult.reason,
+        }
+      : null
+    const volatileDraftRecovery =
+      volatileDraftRecoveries.get(session.recording.id) ?? null
+    const draftRecoveryCount = readAdminDraftRecoveries(
+      session.recording.id
+    ).length
     state.sourceCues = []
     state.cues = []
     state.tokenPointer = -1
     state.recording = false
     state.draftOrigin = 'none'
     state.draftSavedAt = null
+    draftTimestampFloor = storedDraft?.updatedAt ?? 0
+    draftRevision = storedDraftResult.revision
+    state.draftRecoveryCount = draftRecoveryCount
+    state.draftRecoveryFailure = draftRecoveryFailure
+    state.volatileDraftRecovery = volatileDraftRecovery
     state.draftSaveError = null
     state.recordingIssueSaveError = null
     state.cueDataResolution = null
@@ -719,18 +854,82 @@ export function createCueAuthoring(
     state.cues.length > 0 &&
     !areCueDraftsEquivalent(state.cues, state.sourceCues)
 
-  const getCueDataProblems = (): CueAuthoringPanelSnapshot['problems'] => {
+  const getPanelProblems = (): CueAuthoringPanelSnapshot['problems'] => {
+    const problems: CueAuthoringPanelSnapshot['problems'] = []
+    if (state.draftRecoveryFailure) {
+      problems.push({
+        id: 'local-draft-recovery-failed',
+        tone: 'error',
+        title: 'Local draft needs immediate backup',
+        message:
+          'Browser storage could not preserve this incompatible draft. The original remains in place and was not loaded.',
+        details: [
+          'Download the raw draft now before clearing browser data or retrying authoring changes.',
+          `Reason: ${state.draftRecoveryFailure.reason}`,
+        ],
+        action: {
+          type: 'export-draft-recovery',
+          label: 'Download Raw Draft',
+          pendingLabel: 'Preparing Draft...',
+          pending: false,
+        },
+      })
+    }
+    if (state.volatileDraftRecovery) {
+      problems.push({
+        id: 'volatile-draft-recovery',
+        tone: 'error',
+        title: 'Unsaved cue snapshot needs download',
+        message:
+          'Browser recovery storage was unavailable. This exact cue snapshot exists only in this open Reader and was not loaded over the current draft.',
+        details: [
+          'Download it now before navigating away, closing this tab, clearing browser data, or retrying the recording.',
+          `Reason: ${state.volatileDraftRecovery.reason}`,
+        ],
+        action: {
+          type: 'export-draft-recovery',
+          label: 'Download Unsaved Snapshot',
+          pendingLabel: 'Preparing Snapshot...',
+          pending: false,
+        },
+      })
+    }
+    if (state.draftRecoveryCount > 0) {
+      const count = state.draftRecoveryCount
+      problems.push({
+        id: 'local-draft-recovery',
+        tone: 'warning',
+        title:
+          count === 1
+            ? 'Local draft recovery preserved'
+            : `${count} local draft recoveries preserved`,
+        message:
+          `${count === 1 ? 'This draft was' : 'These drafts were'} kept separate ` +
+          'because loading or replacing the current browser draft was not safe.',
+        details: [
+          'Recovery data stays in this browser and never becomes published cue data automatically.',
+          'Download it before clearing browser storage or attempting manual repair.',
+        ],
+        action: {
+          type: 'export-draft-recovery',
+          label: count === 1 ? 'Download Recovery' : 'Download Recoveries',
+          pendingLabel: 'Preparing Recovery...',
+          pending: false,
+        },
+      })
+    }
+
     const resolution = state.cueDataResolution
     if (
       !resolution ||
       resolution.status === 'ready' ||
       resolution.status === 'missing'
     ) {
-      return []
+      return problems
     }
 
     const filePath = resolution.path.replace(/^\.\.\/\.\.\//, '')
-    return [{
+    problems.push({
       id: 'published-cue-data',
       tone: resolution.status === 'invalid' ? 'warning' : 'error',
       title:
@@ -750,7 +949,8 @@ export function createCueAuthoring(
         pendingLabel: 'Checking Cue File...',
         pending: state.cueDataRetrying,
       },
-    }]
+    })
+    return problems
   }
 
   const getPanelSnapshot = (): CueAuthoringPanelSnapshot => {
@@ -869,7 +1069,7 @@ export function createCueAuthoring(
       visible: state.visible,
       cueCountText,
       statusText,
-      problems: getCueDataProblems(),
+      problems: getPanelProblems(),
       draftStatusText: getDraftStatusText(),
       syncNoteVisible: state.recording,
       captureAudio: {
@@ -986,7 +1186,7 @@ export function createCueAuthoring(
       highlightController.clear()
     }
     options.focusReader()
-    saveDraft()
+    void saveDraft()
     if (playSource) {
       await options.playNetworkRecording(() =>
         resetRecorder({ playSource, scrollBehavior })
@@ -1215,6 +1415,68 @@ export function createCueAuthoring(
     }
   }
 
+  const exportDraftRecoveries = () => {
+    const session = getSession()
+    if (!session) return
+    const recoveries = readAdminDraftRecoveries(session.recording.id)
+    state.draftRecoveryCount = recoveries.length
+    const unresolvedDraft = state.draftRecoveryFailure
+      ? {
+          sourceKey: `tikkun-admin-draft:${session.recording.id}`,
+          reason: state.draftRecoveryFailure.reason,
+          rawValue: state.draftRecoveryFailure.rawValue,
+        }
+      : null
+    const volatileDraft = state.volatileDraftRecovery
+      ? {
+          sourceKey: `tikkun-admin-draft:volatile:${session.recording.id}`,
+          reason: state.volatileDraftRecovery.reason,
+          rawValue: state.volatileDraftRecovery.rawValue,
+        }
+      : null
+    if (!recoveries.length && !unresolvedDraft && !volatileDraft) {
+      syncPanel()
+      options.showPersistenceNotice(
+        'No local draft recovery is available for this recording.'
+      )
+      return
+    }
+
+    try {
+      const serialized = `${JSON.stringify({
+        version: 1,
+        kind: 'tikkun-admin-draft-recovery-export',
+        audioId: session.recording.id,
+        exportedAt: new Date().toISOString(),
+        recoveries,
+        unresolvedDraft,
+        volatileDraft,
+      }, null, 2)}\n`
+      resetDraftRecoveryDownloadLink()
+      draftRecoveryDownloadUrl = URL.createObjectURL(
+        new Blob([serialized], { type: 'application/json' })
+      )
+      const download = document.createElement('a')
+      const safeAudioId = session.recording.id.replace(/[^a-z0-9._-]+/gi, '-')
+      download.href = draftRecoveryDownloadUrl
+      download.download = `${safeAudioId}-draft-recoveries.json`
+      download.hidden = true
+      document.body.append(download)
+      download.click()
+      download.remove()
+    } catch (error) {
+      console.error(
+        `Failed to export admin draft recoveries for ${session.recording.id}`,
+        error
+      )
+      options.showPersistenceNotice(
+        volatileDraft
+          ? 'The unsaved snapshot download could not be prepared. It remains only in this open Reader; retry before navigating away or closing this tab.'
+          : 'Recovery download could not be prepared. Recovery data remains in browser storage.'
+      )
+    }
+  }
+
   const getCueClockSeconds = (session: ActiveAudioSession) =>
     isMicrophoneRecordingForSession(session)
       ? microphoneCapture.elapsedSeconds
@@ -1245,7 +1507,7 @@ export function createCueAuthoring(
       session.tokenKeys.length - 1
     )
     void activateCueToken(tokenKey)
-    saveDraft()
+    void saveDraft()
     options.onChange('playback')
     syncPanel()
   }
@@ -1284,7 +1546,7 @@ export function createCueAuthoring(
           (session?.tokenKeys.length ?? 1) - 1
         )
       : -1
-    saveDraft()
+    void saveDraft()
     const tokenKey =
       session?.tokenKeys[state.tokenPointer] ??
       session?.tokenKeys[0] ??
@@ -1306,7 +1568,7 @@ export function createCueAuthoring(
       session.tokenKeys.length - 1
     )
     state.recording = false
-    saveDraft()
+    void saveDraft()
     void selectToken(state.tokenPointer, { seekToCue: false })
   }
 
@@ -1338,7 +1600,7 @@ export function createCueAuthoring(
     audioController.pause()
     audioController.seek(cue.timeStart)
     options.onCueNavigationChange(selectedCueIndex)
-    saveDraft()
+    void saveDraft()
     void highlightController.activateCue(cue, {
       scroll: options.getAutoScroll(),
     })
@@ -1500,7 +1762,7 @@ export function createCueAuthoring(
   }
 
   const unlockAccess = (candidate: string) => {
-    if (!verifyAdminPassword(candidate)) return false
+    if (!verifyCueAuthoringUnlockCode(candidate)) return false
     state.unlocked = true
     options.onChange('access')
     setVisible(true)
@@ -1664,6 +1926,9 @@ export function createCueAuthoring(
       case 'retry-cue-data':
         void retryPublishedCueData()
         break
+      case 'export-draft-recovery':
+        exportDraftRecoveries()
+        break
       case 'capture-audio':
         state.captureAudioRequested = action.requested
         microphoneCaptureError = null
@@ -1810,6 +2075,7 @@ export function createCueAuthoring(
 
   scope.own(() => {
     resetExportDownloadLinks()
+    resetDraftRecoveryDownloadLink()
     accessDialog?.close()
     closeIssueModal()
     if (isMicrophoneCaptureActive()) {

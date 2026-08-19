@@ -1,4 +1,5 @@
 import type { LeiningAliyah, LeiningRun } from '../calendar-model/model-types.ts'
+import { getScrollPageCount } from '../location.ts'
 import { createLastReadingHash } from '../reading/last-reading.ts'
 import type { ScrollName } from '../ref.ts'
 import { getParshaSearchTermsForLeining } from '../view-model/navigation/parsha-routes.ts'
@@ -12,15 +13,26 @@ export type NavigationActionGroup =
   | 'tools'
   | 'admin'
 
+export type NavigationActionSearchConstraint = {
+  kind: 'aliyah'
+  aliyah: NonNullable<LeiningAliyah['index']>
+  allowTerms?: readonly string[]
+}
+
 export interface NavigationAction {
   id: string
   group: NavigationActionGroup
   label: string
   badgeLabel?: string
+  aliases: string[]
   keywords: string[]
   available: boolean
   showWhenEmpty: boolean
+  emptyPriority: number | null
   dedupeKey: string
+  destinationId: string
+  searchConstraint?: NavigationActionSearchConstraint
+  href?: string
   run: () => void | Promise<void>
 }
 
@@ -29,77 +41,38 @@ export interface NavigationActionInput {
   group: NavigationActionGroup
   label: string
   badgeLabel?: string
+  aliases?: string[]
   keywords?: string[]
   available?: boolean
   showWhenEmpty?: boolean
+  emptyPriority?: number
   dedupeKey?: string
+  destinationId?: string
+  searchConstraint?: NavigationActionSearchConstraint
+  href?: string
   run: () => void | Promise<void>
 }
 
-export function normalizeActionQuery(value: string) {
-  return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase()
-}
-
 export function createNavigationAction(input: NavigationActionInput): NavigationAction {
+  const showWhenEmpty = input.showWhenEmpty ?? true
+  const dedupeKey = input.dedupeKey ?? input.label
   return {
     ...input,
+    aliases: input.aliases ?? [],
     keywords: input.keywords ?? [],
     available: input.available ?? true,
-    showWhenEmpty: input.showWhenEmpty ?? true,
-    dedupeKey: input.dedupeKey ?? input.label,
+    showWhenEmpty,
+    emptyPriority: showWhenEmpty ? (input.emptyPriority ?? 0) : null,
+    dedupeKey,
+    destinationId: input.destinationId ?? dedupeKey,
   }
 }
 
-function scoreAction(action: NavigationAction, query: string) {
-  const label = normalizeActionQuery(action.label)
-  const keywords = action.keywords.map(normalizeActionQuery)
-  if (!query) return action.showWhenEmpty ? 1 : 0
-  if (label === query) return 100
-  if (label.startsWith(query)) return 80
-  if (label.includes(query)) return 60
-
-  const keywordScore = keywords.reduce((best, keyword) => {
-    if (keyword === query) return Math.max(best, 50)
-    if (keyword.startsWith(query)) return Math.max(best, 40)
-    if (keyword.includes(query)) return Math.max(best, 30)
-    return best
-  }, 0)
-  if (keywordScore) return keywordScore
-
-  const queryWords = query.split(' ')
-  const searchable = [label, ...keywords].join(' ')
-  return queryWords.every((word) => searchable.includes(word)) ? 20 : 0
-}
-
-export function filterNavigationActions(
-  actions: NavigationAction[],
-  rawQuery: string,
-  limit = 12
-) {
-  const query = normalizeActionQuery(rawQuery)
-  const seenLabels = new Set<string>()
-  const filtered: NavigationAction[] = []
-
-  for (const { action } of actions
-    .filter((action) => action.available)
-    .map((action, index) => ({ action, index, score: scoreAction(action, query) }))
-    .filter(({ score }) => score > 0)
-    .sort((a, b) => b.score - a.score || a.index - b.index)) {
-    const labelKey = normalizeActionQuery(action.dedupeKey)
-    if (seenLabels.has(labelKey)) continue
-    seenLabels.add(labelKey)
-    filtered.push(action)
-    if (filtered.length >= limit) break
-  }
-
-  return filtered
-}
-
-function englishAliyahLabel(index: LeiningAliyah['index']) {
+function englishAliyahLabel(index: NonNullable<LeiningAliyah['index']>) {
   return index === 'Maftir' ? 'Maftir' : `Aliyah ${index}`
 }
 
-function aliyahKeywordAliases(index: LeiningAliyah['index']) {
+function aliyahKeywordAliases(index: NonNullable<LeiningAliyah['index']>) {
   if (index === 'Maftir') return ['m', 'maftir']
   return [`${index}`, `aliyah ${index}`]
 }
@@ -109,12 +82,14 @@ export function createAliyahNavigationActions({
   displayTitle,
   navigate,
   showWhenEmpty = true,
+  emptyPriority,
   dedupeKeyPrefix,
 }: {
   run: LeiningRun
   displayTitle: string
   navigate: (hash: string) => void
   showWhenEmpty?: boolean
+  emptyPriority?: number
   dedupeKeyPrefix?: string
 }) {
   const title = displayTitle.trim()
@@ -125,26 +100,34 @@ export function createAliyahNavigationActions({
       ? holidayLeiningKeywords(run.leining.date.title, `${run.leining.id}`)
       : []),
   ]
-  return run.aliyot
-    .filter((aliyah) => Boolean(aliyah.index && aliyah.start))
-    .map((aliyah) =>
+  return run.aliyot.flatMap((aliyah) => {
+    const aliyahIndex = aliyah.index
+    if (!aliyahIndex) return []
+    const href = createLastReadingHash(run, aliyah.start)
+    return [
       createNavigationAction({
-        id: `reading.${run.id}.${aliyah.index}`,
+        id: `reading.${run.id}.${aliyahIndex}`,
         group: 'reading',
-        label: `${title} ${englishAliyahLabel(aliyah.index)}`,
-        dedupeKey: `${dedupeKeyPrefix ?? `reading.${run.id}`}.${aliyah.index}`,
-        keywords: [
-          ...titleTerms,
-          ...titleTerms.flatMap((term) => [
-            `${term} ${aliyah.index}`,
-            `${term} ${englishAliyahLabel(aliyah.index)}`,
-          ]),
-          ...aliyahKeywordAliases(aliyah.index),
-        ],
+        label: `${title} ${englishAliyahLabel(aliyahIndex)}`,
+        dedupeKey: `${dedupeKeyPrefix ?? `reading.${run.id}`}.${aliyahIndex}`,
+        destinationId: href,
+        searchConstraint: {
+          kind: 'aliyah',
+          aliyah: aliyahIndex,
+          allowTerms: aliyahKeywordAliases(aliyahIndex),
+        },
+        href,
+        aliases: titleTerms.flatMap((term) => [
+          `${term} ${aliyahIndex}`,
+          `${term} ${englishAliyahLabel(aliyahIndex)}`,
+        ]),
+        keywords: [...titleTerms, ...aliyahKeywordAliases(aliyahIndex)],
         showWhenEmpty,
-        run: () => navigate(createLastReadingHash(run, aliyah.start)),
-      })
-    )
+        emptyPriority,
+        run: () => navigate(href),
+      }),
+    ]
+  })
 }
 
 export function createPageNavigationActions({
@@ -154,38 +137,40 @@ export function createPageNavigationActions({
 }) {
   const actions: NavigationAction[] = []
 
-  for (let page = 1; page <= 245; page += 1) {
+  for (let page = 1; page <= getScrollPageCount('torah'); page += 1) {
     actions.push(
       createNavigationAction({
         id: `page.torah.${page}`,
         group: 'page',
         label: `Torah page ${page}`,
-        keywords: [
+        aliases: [
           `${page}`,
           `page ${page}`,
           `torah ${page}`,
           `torah page ${page}`,
           `chumash page ${page}`,
         ],
+        keywords: ['page', 'torah', 'chumash'],
         showWhenEmpty: false,
         run: () => navigateToPage('torah', page),
       })
     )
   }
 
-  for (let page = 1; page <= 17; page += 1) {
+  for (let page = 1; page <= getScrollPageCount('esther'); page += 1) {
     actions.push(
       createNavigationAction({
         id: `page.esther.${page}`,
         group: 'page',
         label: `Esther page ${page}`,
-        keywords: [
+        aliases: [
           `esther ${page}`,
           `esther page ${page}`,
           `megillah ${page}`,
           `megillah page ${page}`,
           `megillat esther page ${page}`,
         ],
+        keywords: ['page', 'esther', 'megillah'],
         showWhenEmpty: false,
         run: () => navigateToPage('esther', page),
       })

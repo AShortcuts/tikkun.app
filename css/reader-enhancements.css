@@ -391,21 +391,47 @@
 .floating-player-button,
 .toolbar-button,
 .parsha-title,
+.toolbar-overflow-item,
+.aliyah-rail-button,
+.aliyah-link,
 .aliyah-audio-button,
-.floating-player-mobile-dash {
-  transition:
-    opacity 0.15s ease;
-}
-
-.floating-player-button,
-.toolbar-button,
-.parsha-title,
+.last-reading-button,
+.last-reading-dismiss,
+.annotations-toggle,
+.app-update-button,
+.app-update-dismiss,
+.settings-offline-button,
+.settings-segmented-option,
 .floating-player-mobile-dash,
 .aliyah-audio-button.is-active {
   transition:
-    background-color 0.15s ease,
-    color 0.15s ease,
-    opacity 0.15s ease;
+    background-color var(--reader-motion-color) var(--reader-ease-standard),
+    border-color var(--reader-motion-color) var(--reader-ease-standard),
+    color var(--reader-motion-color) var(--reader-ease-standard),
+    opacity var(--reader-motion-color) var(--reader-ease-standard),
+    transform var(--reader-motion-fast) var(--reader-ease-out);
+}
+
+.floating-player-button:focus-visible,
+.toolbar-button:focus-visible,
+.parsha-title:focus-visible,
+.toolbar-overflow-item:focus-visible,
+.aliyah-rail-button:focus-visible,
+.aliyah-link:focus-visible,
+.aliyah-audio-button:focus-visible,
+.last-reading-button:focus-visible,
+.last-reading-dismiss:focus-visible,
+.annotations-toggle:focus-visible,
+.app-update-button:focus-visible,
+.app-update-dismiss:focus-visible,
+.settings-offline-button:focus-visible,
+.settings-segmented-option:focus-visible {
+  outline: 2px solid var(--reader-focus-color);
+  outline-offset: 2px;
+}
+
+.toolbar-overflow-item:focus-visible {
+  transition-duration: 0ms;
 }
 
 .floating-player-button,
@@ -438,9 +464,44 @@
   cursor: pointer;
 }
 
-.floating-player-button:hover,
-.toolbar-button:hover {
-  background: var(--medium-accent-color);
+.floating-player-button:not(:disabled):active,
+.toolbar-button:not(:disabled):active,
+.parsha-title:active,
+.toolbar-overflow-item:not(:disabled):active,
+.aliyah-rail-button:not(:disabled):active,
+.last-reading-button:active,
+.last-reading-dismiss:active,
+.annotations-toggle:active,
+.app-update-button:active,
+.app-update-dismiss:active,
+.settings-offline-button:not(:disabled):active,
+.settings-segmented-option:active {
+  transform: scale(var(--reader-control-press-scale));
+}
+
+.toolbar-current-aliyah-audio:not(:disabled):active {
+  transform: scale(var(--reader-control-press-scale));
+}
+
+.aliyah-badge .aliyah-audio-button:not(:disabled):active {
+  transform: translateY(-50%) scale(var(--reader-control-press-scale));
+}
+
+.aliyah-link:active {
+  transform: translateY(-50%) scale(var(--reader-control-press-scale));
+}
+
+@media screen and (max-width: 870px) {
+  .aliyah-badge .aliyah-audio-button:not(:disabled):active {
+    transform: scale(var(--reader-control-press-scale));
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .floating-player-button:hover,
+  .toolbar-button:hover {
+    background: var(--medium-accent-color);
+  }
 }
 
 .floating-player-button.mod-download {
@@ -653,6 +714,11 @@
   pointer-events: none;
 }
 
+.toolbar-button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
 .reader-progress {
   position: sticky;
   top: 112px;
@@ -681,12 +747,14 @@
 
 .reader-progress-fill {
   width: 100%;
-  height: 0%;
+  height: 100%;
   background: linear-gradient(180deg,
       hsl(199, 100%, 82%),
       dodgerblue);
   border-radius: inherit;
-  transition: height 0.1s linear;
+  transform: scaleY(var(--reader-progress-ratio, 0));
+  transform-origin: top;
+  transition: transform 0.1s linear;
 }
 
 .reader-progress-percent {
@@ -966,8 +1034,9 @@
   letter-spacing: 0.01em;
   line-height: 1.1;
   transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease;
+    background-color var(--reader-motion-color) var(--reader-ease-standard),
+    border-color var(--reader-motion-color) var(--reader-ease-standard),
+    transform var(--reader-motion-fast) var(--reader-ease-out);
 }
 
 .settings-segmented-option small {
@@ -978,8 +1047,10 @@
   line-height: 1.15;
 }
 
-.settings-segmented-option:hover {
-  border-color: color-mix(in srgb, var(--text-color) 16%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .settings-segmented-option:hover {
+    border-color: color-mix(in srgb, var(--text-color) 16%, transparent);
+  }
 }
 
 .settings-segmented-option.is-active {
@@ -1973,7 +2044,7 @@
   border: 1px solid rgba(53, 145, 92, 0.38);
 }
 
-.analytics-coverage-legend i.mod-draft {
+.analytics-coverage-legend i.mod-incomplete {
   background: rgba(44, 96, 191, 0.16);
   border: 1px solid rgba(44, 96, 191, 0.34);
 }
@@ -2074,7 +2145,7 @@
   color: rgb(53, 145, 92);
 }
 
-.analytics-coverage-pill.mod-draft {
+.analytics-coverage-pill.mod-incomplete {
   background: rgba(44, 96, 191, 0.14);
   color: rgb(44, 96, 191);
 }
@@ -2503,10 +2574,12 @@
   }
 
   .reader-progress-mobile-fill {
-    width: 0%;
+    width: 100%;
     height: 100%;
     background: linear-gradient(90deg, hsl(199, 100%, 82%), dodgerblue);
-    transition: width 0.05s linear;
+    transform: scaleX(var(--reader-progress-ratio, 0));
+    transform-origin: left;
+    transition: transform 0.05s linear;
   }
 
   .floating-player {
@@ -3297,9 +3370,11 @@
     height: 1rem;
   }
 
-  .floating-player:not(.is-expanded) .floating-player-controls .floating-player-button:hover,
-  .floating-player:not(.is-expanded) .floating-player-button.mod-expand:hover {
-    background: var(--medium-accent-color);
+  @media (hover: hover) and (pointer: fine) {
+    .floating-player:not(.is-expanded) .floating-player-controls .floating-player-button:hover,
+    .floating-player:not(.is-expanded) .floating-player-button.mod-expand:hover {
+      background: var(--medium-accent-color);
+    }
   }
 
   .floating-player.is-expanded,
@@ -3350,7 +3425,7 @@
   }
 }
 
-@media screen and (min-width: 551px) {
+@media screen and (min-width: 551px) and (hover: hover) and (pointer: fine) {
   .floating-player.is-expanded
     .floating-player-controls
     .floating-player-button:not(:disabled):hover,
@@ -3363,5 +3438,83 @@
     [data-target-id='floating-play']:not(:disabled):hover {
     background: color-mix(in srgb, #0a84ff 86%, white);
     color: white;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floating-player-button,
+  .toolbar-button,
+  .parsha-title,
+  .toolbar-overflow-item,
+  .aliyah-rail-button,
+  .aliyah-link,
+  .aliyah-audio-button,
+  .last-reading-button,
+  .last-reading-dismiss,
+  .annotations-toggle,
+  .app-update-button,
+  .app-update-dismiss,
+  .settings-offline-button,
+  .settings-segmented-option,
+  .floating-player-mobile-dash {
+    transition-duration: 0.01ms;
+  }
+
+  .floating-player-button:not(:disabled):active,
+  .toolbar-button:not(:disabled):active,
+  .parsha-title:active,
+  .toolbar-overflow-item:not(:disabled):active,
+  .aliyah-rail-button:not(:disabled):active,
+  .last-reading-button:active,
+  .last-reading-dismiss:active,
+  .annotations-toggle:active,
+  .app-update-button:active,
+  .app-update-dismiss:active,
+  .settings-offline-button:not(:disabled):active,
+  .settings-segmented-option:active,
+  .toolbar-current-aliyah-audio:not(:disabled):active {
+    transform: none;
+  }
+
+  .aliyah-badge .aliyah-audio-button:not(:disabled):active,
+  .aliyah-link:active {
+    transform: translateY(-50%);
+  }
+}
+
+@media screen and (max-width: 870px) and (prefers-reduced-motion: reduce) {
+  .aliyah-badge .aliyah-audio-button:not(:disabled):active {
+    transform: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .floating-player-button:focus-visible,
+  .toolbar-button:focus-visible,
+  .parsha-title:focus-visible,
+  .toolbar-overflow-item:focus-visible,
+  .aliyah-rail-button:focus-visible,
+  .aliyah-link:focus-visible,
+  .aliyah-audio-button:focus-visible,
+  .last-reading-button:focus-visible,
+  .last-reading-dismiss:focus-visible,
+  .annotations-toggle:focus-visible,
+  .app-update-button:focus-visible,
+  .app-update-dismiss:focus-visible,
+  .settings-offline-button:focus-visible,
+  .settings-segmented-option:focus-visible {
+    outline-color: Highlight;
+  }
+
+  .aliyah-rail-button[aria-current='location'],
+  .toolbar-button[aria-pressed='true'],
+  .annotations-toggle[aria-pressed='true'] {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  .floating-player.is-playing [data-target-id='floating-play'] {
+    outline: 2px dashed CanvasText;
+    outline-offset: 2px;
   }
 }

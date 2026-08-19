@@ -160,3 +160,40 @@ The home, parsha, aliyah, and settings controls measured at least 44 px high. Al
 - Browser console warnings and errors: none.
 
 final result: passed
+
+## Scroll-story layered live reader follow-up
+
+- Desktop source visual truth: `/Users/adambh/Downloads/Codex Image Aug 5, 2026, 03_40_11 PM.png` (1487 x 1058 px) for reader scale and angle, plus `/var/folders/vl/qwh7jjjx6tv8wbcj2ffx404m0000gn/T/codex-clipboard-056daec6-a993-433f-b4af-f8d6b9525a8e.png` (1487 x 1058 px) for the bright rim and layered-reader treatment.
+- Desktop implementation: `prototypes/scroll-story/qa/implementation-desktop-post-fix-1487x1058.jpg` at a 1487 x 1058 CSS viewport and 1x capture density.
+- Desktop full comparison: `prototypes/scroll-story/qa/comparison-desktop-post-fix.png`.
+- Desktop focused reader comparison: `prototypes/scroll-story/qa/comparison-desktop-reader-post-fix.png`.
+- Mobile source visual truth: `/Users/adambh/Downloads/Codex Image Aug 7, 2026, 01_34_47 PM.png` (853 x 1844 px).
+- Mobile implementation: `prototypes/scroll-story/qa/implementation-mobile-light-post-fix-427x922.jpg` at a 427 x 922 CSS viewport and 1x capture density.
+- Mobile density normalization: the 853 x 1844 source was downsampled to 427 x 922 before comparison in `prototypes/scroll-story/qa/reference-mobile-normalized-427x922.png`.
+- Mobile full comparison: `prototypes/scroll-story/qa/comparison-mobile-post-fix.png`.
+- Mobile focused reader comparison: `prototypes/scroll-story/qa/comparison-mobile-reader-post-fix.png`.
+- State: desktop initial hero with an interactive Dark reader, noninteractive Light reader behind it, and no menu open; mobile initial hero with one interactive Light reader and the theme sheet visible at the viewport bottom. The Dark mobile state is recorded in `prototypes/scroll-story/qa/implementation-mobile-dark-post-fix-427x922.jpg`.
+
+The desktop comparison owns the angle, scale, clipping, rear-reader reveal, cool rim, and floor shine. The mobile comparison owns the upright device frame, real Torah content, and paper theme sheet rising over the lower edge. Both implementations use the existing same-origin reader rather than a raster mock, so the Torah text remains sharp and interactive.
+
+### Findings and iteration history
+
+- P0: none.
+- P1: none.
+- P2: none remaining.
+- First comparison: the Light reader was too concealed behind the front frame, the floor shine was too restrained, and the mobile paper sheet entered below the initial 427 x 922 viewport.
+- Fix: the rear reader moved higher and farther right, the front frame gained a cooler rim and broader floor bloom, and the mobile sheet moved into the bottom of the first viewport.
+- Runtime fix: hidden mobile desktop-only embeds were not mounted after breakpoint detection. Mobile now runs one real iframe, eliminating the zero-size reader progress errors without touching reader code.
+- Post-fix comparison: the supplied references and final renders were joined into full-view and focused comparison inputs, then reviewed at matching viewport dimensions.
+- P3 intentional differences: mobile remains Light by default per the approved prototype behavior, and the established Tikkun Reader branding, byline, live-reader toolbar, and existing reader controls remain product truth instead of copying invented reference details.
+
+### Functional and regression checks
+
+- Mobile Light and Dark theme buttons update the live hero iframe and their pressed state; the final handoff is restored to Light.
+- `See how it works` moves to the real workflow section and aligns `#how-it-works` at the viewport top.
+- The desktop hero loaded both the front and Light rear readers; mobile loaded only the visible front reader.
+- No horizontal overflow was observed at 1487 x 1058, 427 x 922, 320 x 568, or 844 x 390.
+- Browser console warnings and errors: none in the final desktop and mobile passes.
+- `npm run check` passed with 0 errors and 0 warnings; `npm test -- src/routes/prototype-isolation.test.ts` passed 3 tests; `npm run build` and `git diff --check` passed.
+
+final result: passed
