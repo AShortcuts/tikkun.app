@@ -649,8 +649,12 @@ html[data-reader-mode='admin-authoring']
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .aliyah-audio-button:hover {
+  .aliyah-audio-button:not(.is-active):hover {
     background: color-mix(in srgb, dodgerblue 20%, transparent);
+  }
+
+  .aliyah-audio-button.is-active:hover {
+    background: color-mix(in srgb, hsl(48, 100%, 62%) 26%, transparent);
   }
 
   html[data-reader-mode='admin-authoring']

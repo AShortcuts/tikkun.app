@@ -726,6 +726,13 @@ test('labels the automatic theme as System and keeps playing controls flat and n
 })
 
 test('uses a consistent pointer and hover treatment for playback controls', () => {
+  expect(pageCss).toMatch(
+    /\.aliyah-audio-button:not\(\.is-active\):hover\s*{[\s\S]*?background:\s*color-mix\(in srgb,\s*dodgerblue 20%,\s*transparent\);/
+  )
+  expect(pageCss).toMatch(
+    /\.aliyah-audio-button\.is-active:hover\s*{[\s\S]*?background:\s*color-mix\(in srgb,\s*hsl\(48, 100%, 62%\) 26%,\s*transparent\);/
+  )
+  expect(pageCss).not.toContain('.aliyah-audio-button:hover {')
   expect(readerEnhancementsCss).toMatch(
     /:where\([\s\S]*?\.aliyah-audio-button,[\s\S]*?\.mobile-aliyah-play,[\s\S]*?\[data-target-id='floating-play'\],[\s\S]*?\[data-target-id='admin-play-current'\][\s\S]*?\):not\(:disabled\)\s*{[\s\S]*?cursor:\s*pointer;/
   )
