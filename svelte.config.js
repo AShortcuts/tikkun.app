@@ -29,16 +29,13 @@ export default {
     },
     prerender: {
       handleMissingId: ({ path, id, message }) => {
-        // Reader fragments are routes owned by the legacy hash router, not DOM IDs.
+        // Reader fragments are routes owned by Reader Route, not DOM IDs.
         if (path.endsWith('/reader/') && id.startsWith('/')) return
         throw new Error(message)
       },
       handleUnseenRoutes: ({ routes, message }) => {
-        // The public and prototype Tidbit detail routes stay empty until the first article exists.
-        const intentionallyEmptyRoutes = new Set([
-          '/(site)/tidbits/[slug]',
-          '/prototypes/apple-sentient/tidbits/[slug]',
-        ])
+        // The public Tidbit detail route stays empty until the first article exists.
+        const intentionallyEmptyRoutes = new Set(['/(site)/tidbits/[slug]'])
         const unexpectedRoutes = routes.filter(
           (route) => !intentionallyEmptyRoutes.has(route)
         )

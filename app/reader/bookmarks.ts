@@ -1,12 +1,12 @@
 import { isValidTokenKey } from './checkpoints.ts'
 import {
-  quarantineStorageItem,
-  readStorageItem,
-  writeStorageItem,
+  createPersistedJsonStore,
+  requirePersistedJsonMutation,
+  type PersistedJsonRevision,
 } from '../persistence/persisted-state.ts'
 import { isReaderHash } from '../view-model/navigation/reader-hash.ts'
 
-export const BOOKMARKS_STORAGE_KEY = 'tikkun.bookmarks.v1'
+export const BOOKMARKS_STORAGE_KEY = 'tikkun.bookmarks'
 
 export interface ReaderBookmark {
   id: string
@@ -16,6 +16,11 @@ export interface ReaderBookmark {
   audioId?: string
   timeStart?: number
   createdAt: number
+}
+
+export interface LoadedBookmarks {
+  bookmarks: ReaderBookmark[]
+  revision: PersistedJsonRevision | null
 }
 
 export function createBookmark({
@@ -68,59 +73,55 @@ function isReaderBookmark(
   )
 }
 
+function createBookmarksStore(storage: Storage | null) {
+  return createPersistedJsonStore({
+    storage,
+    key: BOOKMARKS_STORAGE_KEY,
+    validate: (value): value is unknown[] => Array.isArray(value),
+  })
+}
+
 export function loadBookmarks(
   storage: Storage | null,
   validateHash: (hash: string) => boolean = isReaderHash
 ) {
-  let raw: string | null
-  try {
-    raw = readStorageItem(storage, BOOKMARKS_STORAGE_KEY)
-  } catch (error) {
-    console.error('Failed to read reader bookmarks', error)
-    return []
-  }
-  if (!raw) return []
-  try {
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) {
-      quarantineStorageItem({
-        storage,
-        key: BOOKMARKS_STORAGE_KEY,
-        rawValue: raw,
-        reason: 'bookmark payload is not an array',
-      })
-      return []
-    }
-    const bookmarks = parsed
-      .filter((value): value is ReaderBookmark =>
-        isReaderBookmark(value, validateHash)
-      )
-      .sort((a, b) => b.createdAt - a.createdAt)
-    if (bookmarks.length !== parsed.length) {
-      quarantineStorageItem({
-        storage,
-        key: BOOKMARKS_STORAGE_KEY,
-        rawValue: raw,
-        reason: 'bookmark payload contains invalid entries',
-        ...(bookmarks.length
-          ? { replacementValue: JSON.stringify(bookmarks) }
-          : {}),
-      })
-    }
-    return bookmarks
-  } catch (error) {
-    console.error('Failed to parse reader bookmarks', error)
-    quarantineStorageItem({
-      storage,
-      key: BOOKMARKS_STORAGE_KEY,
-      rawValue: raw,
-      reason: 'bookmark payload is not valid JSON',
-    })
-    return []
-  }
+  return loadBookmarksState(storage, validateHash).bookmarks
 }
 
-export function saveBookmarks(storage: Storage | null, bookmarks: ReaderBookmark[]) {
+export function loadBookmarksState(
+  storage: Storage | null,
+  validateHash: (hash: string) => boolean = isReaderHash
+): LoadedBookmarks {
+  const store = createBookmarksStore(storage)
+  const result = store.read()
+  if (result.status === 'unavailable') {
+    console.error('Failed to read reader bookmarks', result.error)
+    return { bookmarks: [], revision: null }
+  }
+  if (result.status === 'invalid') {
+    if (result.reason === 'invalid-json') {
+      console.error('Failed to parse reader bookmarks', result.error)
+    } else {
+      console.error('Invalid reader bookmarks')
+    }
+    return { bookmarks: [], revision: result.revision }
+  }
+  if (result.status === 'missing') {
+    return { bookmarks: [], revision: result.revision }
+  }
+  const bookmarks = result.value
+    .filter((value): value is ReaderBookmark =>
+      isReaderBookmark(value, validateHash)
+    )
+    .sort((a, b) => b.createdAt - a.createdAt)
+  return { bookmarks, revision: result.revision }
+}
+
+export function saveBookmarks(
+  storage: Storage | null,
+  bookmarks: ReaderBookmark[],
+  expectedRevision?: PersistedJsonRevision | null
+) {
   const bookmarkIds = new Set<string>()
   const tokenKeys = new Set<string>()
   if (bookmarks.some((bookmark) => {
@@ -136,11 +137,15 @@ export function saveBookmarks(storage: Storage | null, bookmarks: ReaderBookmark
     throw new TypeError('Cannot persist invalid or duplicate reader bookmarks')
   }
   try {
-    writeStorageItem(
-      storage,
-      BOOKMARKS_STORAGE_KEY,
-      JSON.stringify([...bookmarks].sort((a, b) => b.createdAt - a.createdAt))
-    )
+    const store = createBookmarksStore(storage)
+    const sorted = [...bookmarks].sort((a, b) => b.createdAt - a.createdAt)
+    let revision = expectedRevision
+    if (!revision) {
+      const current = store.read()
+      if (current.status === 'unavailable') throw current.error
+      revision = current.revision
+    }
+    return requirePersistedJsonMutation(store.write(sorted, revision))
   } catch (error) {
     throw new BookmarkStorageError(error)
   }

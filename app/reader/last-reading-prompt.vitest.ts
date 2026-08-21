@@ -20,7 +20,7 @@ afterEach(() => {
   fixture.remove()
 })
 
-test('shows, resumes, and permanently dismisses the current prompt', () => {
+test('shows and resumes a saved reading', () => {
   const onResume = vi.fn()
   const destroy = createMount()((scope) => {
     const prompt = createLastReadingPrompt(scope, {
@@ -41,6 +41,48 @@ test('shows, resumes, and permanently dismisses the current prompt', () => {
     .querySelector<HTMLButtonElement>('[data-target-id="last-reading-resume"]')!
     .click()
   expect(onResume).toHaveBeenCalledOnce()
+  expect(
+    fixture
+      .querySelector('[data-target-id="last-reading-prompt"]')
+      ?.classList.contains('u-hidden')
+  ).toBe(true)
+
+  destroy()
+})
+
+test('reuses the banner to return to a previous reading', () => {
+  const onResume = vi.fn()
+  let prompt!: ReturnType<typeof createLastReadingPrompt>
+  const destroy = createMount()((scope) => {
+    prompt = createLastReadingPrompt(scope, {
+      document,
+      disabled: false,
+      onResume,
+    })
+  })
+  const previousReading = {
+    hash: '#/torah/parsha/beresheet/1-1-1',
+    parshaName: 'Beresheet',
+    aliyahLabel: 'Aliyah 1',
+    savedAt: Date.now(),
+  }
+
+  prompt.dismiss()
+  prompt.show(previousReading, 'return')
+
+  expect(fixture.textContent).toContain('Return to Beresheet, Aliyah 1?')
+  const returnButton = fixture.querySelector<HTMLButtonElement>(
+    '[data-target-id="last-reading-resume"]'
+  )!
+  expect(returnButton.textContent).toBe('Return')
+  expect(
+    fixture
+      .querySelector('[data-target-id="last-reading-dismiss"]')
+      ?.getAttribute('aria-label')
+  ).toBe('Dismiss return prompt')
+
+  returnButton.click()
+  expect(onResume).toHaveBeenCalledWith(previousReading)
   expect(
     fixture
       .querySelector('[data-target-id="last-reading-prompt"]')

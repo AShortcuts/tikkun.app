@@ -7,7 +7,7 @@ import {
 } from '../audio/waveform-summary-loader.ts'
 import type { WordCue } from '../audio/types.ts'
 import type { MountScope } from '../lifecycle/mount.ts'
-import type { ActiveAudioSession } from '../reading/audio-controller.ts'
+import type { ReaderPlaybackCueAuthoringSessionSnapshot } from '../reading/reader-playback.ts'
 
 const WAVEFORM_SUMMARY_BUCKETS = 800
 const MAX_WAVEFORM_SUMMARY_CACHE_ENTRIES = 6
@@ -27,7 +27,7 @@ export interface CueWaveformWindow {
 }
 
 export interface CueWaveformSnapshot {
-  session: ActiveAudioSession | null
+  session: ReaderPlaybackCueAuthoringSessionSnapshot | null
   currentTime: number
   duration: number
   paused: boolean
@@ -183,7 +183,7 @@ export function createCueWaveform(
   let renderFrame = 0
   let contentRevision = 0
 
-  const summaryKey = (session: ActiveAudioSession) => {
+  const summaryKey = (session: ReaderPlaybackCueAuthoringSessionSnapshot) => {
     const mediaIdentity = session.recording.mediaIdentity
     const mediaVersion = mediaIdentity
       ? `${mediaIdentity.algorithm}:${mediaIdentity.digest}:${mediaIdentity.byteLength}`
@@ -191,7 +191,9 @@ export function createCueWaveform(
     return `${session.recording.id}:${mediaVersion}`
   }
 
-  const getSummaryLoader = (session: ActiveAudioSession) => {
+  const getSummaryLoader = (
+    session: ReaderPlaybackCueAuthoringSessionSnapshot
+  ) => {
     const key = summaryKey(session)
     const existing = summaryLoaders.get(key)
     if (existing) return existing
@@ -228,7 +230,7 @@ export function createCueWaveform(
   }
 
   const requestSummaryRender = (
-    session: ActiveAudioSession,
+    session: ReaderPlaybackCueAuthoringSessionSnapshot,
     { retry = false }: { retry?: boolean } = {}
   ) => {
     const key = summaryKey(session)

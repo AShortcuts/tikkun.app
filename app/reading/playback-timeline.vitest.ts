@@ -44,7 +44,7 @@ test('replacement mounts own one set of playback listeners and release them', as
     createPlaybackTimeline(
       scope,
       createOptions(audioController, highlightController, viewport, {
-        playNetworkRecording: firstPlay,
+        attemptPlayback: firstPlay,
       })
     )
   })
@@ -54,7 +54,7 @@ test('replacement mounts own one set of playback listeners and release them', as
     createPlaybackTimeline(
       scope,
       createOptions(audioController, highlightController, viewport, {
-        playNetworkRecording: secondPlay,
+        attemptPlayback: secondPlay,
       })
     )
   })
@@ -132,7 +132,7 @@ test('timed playback keeps controls, cue progress, highlighting, and speed in sy
 test('restart begins playback before asynchronous highlighting completes', async () => {
   const { audioController, highlightController } = createFixture()
   const viewport = createViewport()
-  const replayNetworkRecordingFromStart = vi.fn(async () => true)
+  const attemptReplayFromStart = vi.fn(async () => true)
   let finishHighlight!: () => void
   const highlightPending = new Promise<void>((resolve) => {
     finishHighlight = resolve
@@ -142,7 +142,7 @@ test('restart begins playback before asynchronous highlighting completes', async
     createPlaybackTimeline(
       scope,
       createOptions(audioController, highlightController, viewport, {
-        replayNetworkRecordingFromStart,
+        attemptReplayFromStart,
       })
     )
   })
@@ -154,7 +154,7 @@ test('restart begins playback before asynchronous highlighting completes', async
 
   required<HTMLButtonElement>('[data-target-id="floating-replay"]').click()
 
-  expect(replayNetworkRecordingFromStart).toHaveBeenCalledTimes(1)
+  expect(attemptReplayFromStart).toHaveBeenCalledTimes(1)
   finishHighlight()
   await flushPromises()
 })
@@ -270,8 +270,8 @@ function createOptions(
     onPlaybackRateChange: (rate) => {
       playbackRate.value = rate
     },
-    playNetworkRecording: async () => true,
-    replayNetworkRecordingFromStart: async () => true,
+    attemptPlayback: async () => true,
+    attemptReplayFromStart: async () => true,
     isCueAuthoringRecording: () => false,
     saveReadingPosition: () => {},
     focusReader: () => {},

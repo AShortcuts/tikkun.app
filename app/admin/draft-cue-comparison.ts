@@ -12,8 +12,8 @@ function normalizedCue(cue: WordCue) {
 }
 
 export function areCueDraftsEquivalent(
-  draftCues: WordCue[],
-  publishedCues: WordCue[]
+  draftCues: readonly Readonly<WordCue>[],
+  publishedCues: readonly Readonly<WordCue>[]
 ) {
   if (draftCues.length !== publishedCues.length) return false
 

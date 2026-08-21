@@ -20,7 +20,8 @@ This is a browser-first static site with one optional deployment adapter:
 
 ### Install
 
-Requires Node.js 22.13 or newer and npm 10 or newer.
+Requires the release toolchain pinned in `.nvmrc`: Node.js 22.23.2 and npm
+11.19.0.
 
 ```sh
 npm install
@@ -193,7 +194,15 @@ Cleanup temporary render files:
 npm run video:cleanup
 ```
 
-Force-cancel a stuck recording run, then clean temp files:
+Inspect an owned recording run without signaling or changing anything:
+
+```sh
+npm run video:status
+npm run video:shut-down -- --dry-run
+```
+
+After reviewing the exact owner and child identities, force-cancel a stuck
+recording run and clean its owned temporary files:
 
 ```sh
 npm run video:shut-down
@@ -219,13 +228,17 @@ npm run verify:quick
 npm run test:browser
 npm run test:browser:webkit
 npm run build
+npm run verify:release
 ```
 
-`npm run verify` runs that complete release gate and rejects checked-in generated
-manifest drift. The build regenerates authoritative data, authorizes every built
-inline script in the report-only CSP, and rejects code or static assets that
-exceed the checked-in size ceilings. See [`docs/release-checklist.md`](docs/release-checklist.md)
-for deployed media, security-header, offline, accessibility, and device checks.
+`npm run verify` runs deterministic product checks. `npm run verify:release`
+adds byte-for-byte post-generation drift detection, tracked-diff whitespace
+validation, and the live production-dependency audit. Existing unrelated dirty
+files are allowed; generator-owned files changed by verification are not. The
+build regenerates authoritative data, authorizes every built inline script in
+the report-only CSP, and rejects code or static assets that exceed the checked-in
+size ceilings. See [`docs/release-checklist.md`](docs/release-checklist.md) for
+deployed media, security-header, offline, accessibility, and device checks.
 
 ## License
 

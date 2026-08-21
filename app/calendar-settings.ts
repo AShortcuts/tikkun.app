@@ -1,18 +1,24 @@
 import type { UserSettings } from './calendar-model/user-settings.ts'
 import {
+  createPersistedJsonStore,
   getBrowserStorage,
-  readPersistedJson,
-  writeStorageItem,
+  requirePersistedJsonMutation,
+  type PersistedJsonRevision,
 } from './persistence/persisted-state.ts'
 
 export type CalendarSettings = {
   israel: boolean
 }
 
-export const CALENDAR_SETTINGS_STORAGE_KEY = 'tikkun.calendar-settings.v1'
+export const CALENDAR_SETTINGS_STORAGE_KEY = 'tikkun.calendar-settings'
 
 export const DEFAULT_CALENDAR_SETTINGS: CalendarSettings = {
   israel: false,
+}
+
+export interface LoadedCalendarSettings {
+  settings: CalendarSettings
+  revision: PersistedJsonRevision | null
 }
 
 export function userSettingsFromCalendarSettings(
@@ -36,33 +42,60 @@ function isCalendarSettingsPayload(
   )
 }
 
-export function loadCalendarSettings(
-  storage?: Storage | null
-): CalendarSettings {
-  const target = storage === undefined ? getBrowserStorage('local') : storage
-  const result = readPersistedJson({
-    storage: target,
+function createCalendarSettingsStore(storage: Storage | null) {
+  return createPersistedJsonStore({
+    storage,
     key: CALENDAR_SETTINGS_STORAGE_KEY,
     validate: isCalendarSettingsPayload,
   })
+}
+
+export function loadCalendarSettings(
+  storage?: Storage | null
+): CalendarSettings {
+  return loadCalendarSettingsState(storage).settings
+}
+
+export function loadCalendarSettingsState(
+  storage?: Storage | null
+): LoadedCalendarSettings {
+  const target = storage === undefined ? getBrowserStorage('local') : storage
+  const store = createCalendarSettingsStore(target)
+  const result = store.read()
   if (result.status === 'ready') {
-    return { israel: result.value.israel === true }
+    const settings = { israel: result.value.israel === true }
+    return { settings, revision: result.revision }
   }
   if (result.status === 'unavailable') {
     console.error('Failed to load calendar settings', result.error)
-  } else if (result.status === 'invalid' && result.reason === 'invalid-json') {
-    console.error('Failed to load calendar settings', result.error)
+    return { settings: DEFAULT_CALENDAR_SETTINGS, revision: null }
   }
-  return DEFAULT_CALENDAR_SETTINGS
+  if (result.status === 'missing') {
+    return { settings: DEFAULT_CALENDAR_SETTINGS, revision: result.revision }
+  }
+  if (result.reason === 'invalid-json') {
+    console.error('Failed to load calendar settings', result.error)
+  } else {
+    console.error('Invalid calendar settings')
+  }
+  return { settings: DEFAULT_CALENDAR_SETTINGS, revision: result.revision }
 }
 
 export function saveCalendarSettings(
   settings: CalendarSettings,
-  storage?: Storage | null
+  storage?: Storage | null,
+  expectedRevision?: PersistedJsonRevision | null
 ) {
   try {
     const target = storage === undefined ? getBrowserStorage('local') : storage
-    writeStorageItem(target, CALENDAR_SETTINGS_STORAGE_KEY, JSON.stringify(settings))
+    const store = createCalendarSettingsStore(target)
+    let revision = expectedRevision
+    if (!revision) {
+      const current = store.read()
+      if (current.status === 'unavailable') throw current.error
+      revision = current.revision
+    }
+    return requirePersistedJsonMutation(store.write(settings, revision))
   } catch (error) {
     if (error instanceof CalendarSettingsStorageError) throw error
     throw new CalendarSettingsStorageError(error)

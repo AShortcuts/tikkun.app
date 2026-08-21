@@ -3,7 +3,7 @@
   import { page } from '$app/state'
   import { onMount } from 'svelte'
   import '../../../css/site.css'
-  import '../../../css/home.css'
+  import '../../../css/site-shell.css'
 
   let { children } = $props()
   let mobileMenu: HTMLDetailsElement
@@ -28,16 +28,6 @@
     document.addEventListener('pointerdown', handleDocumentPointerDown)
     document.addEventListener('keydown', handleDocumentKeydown)
 
-    const rootPath = resolve('/')
-    if (window.location.pathname === rootPath) {
-      const hashPath = window.location.hash.split('?', 1)[0]
-      if (hashPath === '#/about') {
-        window.location.replace(resolve('/about/'))
-      } else if (hashPath.startsWith('#/')) {
-        window.location.replace(`${resolve('/reader/')}${window.location.hash}`)
-      }
-    }
-
     return () => {
       document.removeEventListener('pointerdown', handleDocumentPointerDown)
       document.removeEventListener('keydown', handleDocumentKeydown)
@@ -51,7 +41,7 @@
 
 <div
   class="home-page"
-  style={`--home-background-image: url("${asset('/assets/images/home-ambient.jpg')}")`}
+  style={`background-image: url("${asset('/assets/images/home-ambient.jpg')}")`}
 >
   <header class="home-header" aria-label="Site navigation">
     <a class="home-brand site-brand-link" href={resolve('/')} aria-label="Tikkun Korim home">

@@ -8,14 +8,15 @@ type PendingRetry = {
 export interface OfflineRecordingPromptOptions {
   document: Document
   view: Window
-  isOnline(): boolean
   onRetryError(error: unknown): void
 }
 
 export interface OfflineRecordingPrompt {
-  canUseNetwork(retry?: () => Promise<void>, isCurrent?: () => boolean): boolean
-  setPendingRetry(retry?: () => Promise<void>, isCurrent?: () => boolean): void
-  show(options?: { force?: boolean }): void
+  recordPlaybackFailure(
+    retry: () => Promise<void>,
+    isCurrent?: () => boolean
+  ): void
+  clearPlaybackFailure(): void
   hide(): void
 }
 
@@ -41,21 +42,17 @@ export function createOfflineRecordingPrompt(
     prompt?.classList.add('u-hidden')
   }
 
-  const setPendingRetry = (
-    retry?: () => Promise<void>,
+  const recordPlaybackFailure = (
+    retry: () => Promise<void>,
     isCurrent?: () => boolean
   ) => {
-    pendingRetry = retry ? { retry, isCurrent } : null
+    pendingRetry = { retry, isCurrent }
+    show({ force: true })
   }
 
-  const canUseNetwork = (
-    retry?: () => Promise<void>,
-    isCurrent?: () => boolean
-  ) => {
-    if (options.isOnline()) return true
-    setPendingRetry(retry, isCurrent)
-    show({ force: true })
-    return false
+  const clearPlaybackFailure = () => {
+    pendingRetry = null
+    hide()
   }
 
   dismissButton?.addEventListener(
@@ -67,14 +64,6 @@ export function createOfflineRecordingPrompt(
     { signal: scope.signal }
   )
 
-  options.view.addEventListener(
-    'offline',
-    () => {
-      dismissed = false
-      show()
-    },
-    { signal: scope.signal }
-  )
   options.view.addEventListener(
     'online',
     () => {
@@ -90,12 +79,10 @@ export function createOfflineRecordingPrompt(
     { signal: scope.signal }
   )
 
-  if (!options.isOnline()) show()
-
   scope.own(() => {
     pendingRetry = null
     hide()
   })
 
-  return { canUseNetwork, setPendingRetry, show, hide }
+  return { recordPlaybackFailure, clearPlaybackFailure, hide }
 }

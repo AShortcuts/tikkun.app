@@ -3,28 +3,15 @@ import utils from '../components/utils.ts'
 import { ScrollViewModel } from '../view-model/scroll-view-model.ts'
 import { LeiningGenerator } from '../calendar-model/generator.ts'
 import {
-  loadCalendarSettings,
+  CalendarSettingsStorageError,
+  loadCalendarSettingsState,
   saveCalendarSettings,
   userSettingsFromCalendarSettings,
   type CalendarSettings,
 } from '../calendar-settings.ts'
-import { ScrollDisplay } from '../components/ScrollDisplay.ts'
 import { applyAnnotationMode } from '../components/annotation-rendering.ts'
 import { alignSmallSpecialLettersWhenFontsReady } from '../special-letter-layout.ts'
-import type { PageLifecycleSnapshot } from '../components/page-lifecycle.ts'
-import {
-  applyPageWindowPolicyEviction,
-  computePageWindowPolicy,
-  type PageWindowPolicyConfig,
-  type PageVirtualizationApplication,
-  type PageWindowPolicyResult,
-} from '../components/page-window-policy.ts'
-import {
-  createPageVirtualizationMetrics,
-  createPageVirtualizationSettings,
-  type PageVirtualizationDiagnostics,
-} from '../components/page-virtualization-debug.ts'
-import { ViewportTracker, type ViewportRange } from '../viewport-tracker.ts'
+import type { ViewportRange } from '../viewport-tracker.ts'
 import {
   createReaderViewport,
   type ReaderViewport,
@@ -58,11 +45,16 @@ import { iconMarkup, type IconName } from '../components/icons.ts'
 import {
   applyReaderPreferences,
   getDefaultReaderPreferences,
-  loadReaderPreferences,
+  loadReaderPreferencesState,
   mergeReaderPreferences,
+  ReaderPreferencesStorageError,
   type ReaderPreferences,
   saveReaderPreferences,
 } from '../reader-preferences.ts'
+import {
+  PersistedStateConflictError,
+  type PersistedJsonRevision,
+} from '../persistence/persisted-state.ts'
 import { TOKENIZATION_VERSION } from '../audio/cue-schema.ts'
 import {
   findAuthoringRecordingForRun,
@@ -103,11 +95,7 @@ import {
 } from '../reading/aliyah-start-marker.ts'
 import { isLastIndexedAliyahInRun } from '../reading/aliyah-range.ts'
 import {
-  AliyahTargetLocationCache,
   findAliyahInRun,
-  findRenderedLineElement,
-  getRenderedLineElements,
-  lineIndexFromLocation,
   type PlaybackAliyahIndex,
 } from '../reading/aliyah-dom-target.ts'
 import {
@@ -122,10 +110,6 @@ import {
 } from '../reading/playback-timeline.ts'
 import { LatestAction } from '../reading/latest-action.ts'
 import {
-  ReaderRuntimeLifecycle,
-  type ReaderRuntimeLifetime,
-} from '../reading/reader-runtime-lifecycle.ts'
-import {
   createReaderPlayback,
   type ReaderPlayback,
 } from '../reading/reader-playback.ts'
@@ -134,6 +118,7 @@ import {
   createLastReadingHash,
   loadEligibleLastReading,
   saveLastReading,
+  type LastReading,
 } from '../reading/last-reading.ts'
 import {
   checkpointFromCue,
@@ -143,8 +128,9 @@ import {
 } from '../reader/checkpoints.ts'
 import { parseTokenKey } from '../reader/token-position.ts'
 import {
+  BookmarkStorageError,
   createBookmark,
-  loadBookmarks,
+  loadBookmarksState,
   saveBookmarks,
   type ReaderBookmark,
 } from '../reader/bookmarks.ts'
@@ -162,10 +148,14 @@ import {
   type ReaderShell,
 } from '../reader/reader-shell.ts'
 import {
-  createReaderPresentationScheduler,
-  type ReaderPresentationScheduler,
-  type ReaderPresentationSchedulerDiagnostics,
-} from './reader-presentation-scheduler.ts'
+  type ReaderProgressAnchor,
+  type ReaderProgressAnchorSnapshot,
+} from './reader-progress-anchor-index.ts'
+import {
+  createReaderDisplaySession,
+  type ReaderDisplaySession,
+} from './reader-display-session.ts'
+import { resolveReaderProgressPresentation } from './reader-progress-presentation.ts'
 import {
   createReaderRoute,
   INITIAL_READER_TITLE,
@@ -182,9 +172,10 @@ import {
 } from '../reader/offline-recording-prompt.ts'
 import {
   getReaderVisibleIssues,
-  loadRecordingIssues,
-  mergeRecordingIssues,
+  loadLocalRecordingIssues,
+  mergePublishedAndLocalRecordingIssues,
   recordingIssueReaderLabel,
+  type LocalRecordingIssuesSnapshot,
   type RecordingIssue,
 } from '../audio/recording-issues.ts'
 import {
@@ -227,32 +218,6 @@ import {
   getReaderFocalPointScrollTop,
 } from '../reader-scroll.ts'
 
-declare global {
-  interface Window {
-    tikkunReaderDiagnostics?: () => {
-      pages: PageLifecycleSnapshot | null
-      pageWindowPolicy: PageWindowPolicyResult | null
-      pageVirtualization: PageVirtualizationDiagnostics
-      presentation: ReaderPresentationSchedulerDiagnostics | null
-      caches: {
-        aliyahTokenKeys: number
-        aliyahTargetLocations: number | null
-        aliyahMarkerElements: number
-        renderedLines: number
-      }
-    }
-    tikkunReaderVirtualization?: {
-      state: () => PageVirtualizationDiagnostics
-      enable: () => PageVirtualizationDiagnostics
-      disable: () => PageVirtualizationDiagnostics
-      setEnabled: (enabled: boolean) => PageVirtualizationDiagnostics
-      resetMetrics: () => PageVirtualizationDiagnostics
-      applyNow: () => PageVirtualizationDiagnostics
-      remountAll: () => Promise<PageVirtualizationDiagnostics>
-    }
-  }
-}
-
 export interface ReaderRuntime {
   destroy(): void
 }
@@ -283,30 +248,18 @@ export function startReaderRuntime({
   const { whenKey } = utils
 
 
-  let calendarSettings = loadCalendarSettings(browserLocalStorage)
+  const loadedCalendarSettings = loadCalendarSettingsState(browserLocalStorage)
+  let calendarSettings = loadedCalendarSettings.settings
+  let calendarSettingsRevision = loadedCalendarSettings.revision
   const createCalendarGenerator = () =>
     new LeiningGenerator(userSettingsFromCalendarSettings(calendarSettings))
 
-  type AliyahProgressAnchor = {
-    line: HTMLElement | null
-    label: string
-    run: LeiningRun | null
-    aliyahIndex: PlaybackAliyahIndex | null
-    position: number
-  }
-
-  let display: ScrollDisplay | null = null
-  const readerRuntimeLifecycle = new ReaderRuntimeLifecycle()
   const mountReaderRuntime = createMount()
-  let readerRuntimeLifetime: ReaderRuntimeLifetime | null = null
+  let readerDisplaySessionGlobal: ReaderDisplaySession | null = null
   let readerNoticeTimer: number | null = null
-  let viewportTrackerGlobal: ViewportTracker | null = null
-  let latestViewportRange: ViewportRange | null = null
   let readerPreferences: ReaderPreferences = getDefaultReaderPreferences()
-  let readerPresentationGlobal: ReaderPresentationScheduler | null = null
   let aliyahStartMarkerLayoutFrame = 0
   let aliyahStartMarkerResizeTimer: number | null = null
-  let progressAnchorLoadPromise: Promise<void> | null = null
   let pendingAliyahRailSelection: {
     runId: string
     aliyahIndex: PlaybackAliyahIndex
@@ -330,10 +283,25 @@ export function startReaderRuntime({
   let commandPaletteGlobal: LazyCommandPalette | null = null
   let offlineRecordingPromptGlobal: OfflineRecordingPrompt | null = null
   let bookmarks: ReaderBookmark[] = []
-  let activeRecordingIssues: RecordingIssue[] = []
+  let bookmarkRevision: PersistedJsonRevision | null = null
+  let readerPreferencesRevision: PersistedJsonRevision | null = null
+  let publishedRecordingIssues: RecordingIssue[] = []
+  let localRecordingIssues: RecordingIssue[] = []
+  let localRecordingIssueRevision: LocalRecordingIssuesSnapshot['revision'] = null
+  let mergedRecordingIssues: RecordingIssue[] = []
   let currentReaderMode: ReaderMode = recordingMode.enabled ? 'recording' : 'normal'
   let annotationsEnabled = true
   let hasUserScrolledReaderForLastReading = false
+  let readerUrlSyncArmed = false
+  let readerUrlPreviousFocalPosition: number | null = null
+  let readerUrlScrollPending = false
+
+  function getReaderDisplaySession() {
+    if (!readerDisplaySessionGlobal) {
+      throw new Error('Reader display session is not mounted')
+    }
+    return readerDisplaySessionGlobal
+  }
 
   function resolvedAliyahCueStatusKey(
     runId: string,
@@ -358,25 +326,19 @@ export function startReaderRuntime({
     aliyahNavigationGlobal?.invalidate()
   }
 
-  function applyHighlightRenderingDebugMode() {
-    const highlightMode = new URLSearchParams(location.search).get('highlight')
-    if (highlightMode === 'legacy-rectangle') {
-      document.documentElement.dataset.highlightRendering = 'legacy-rectangle'
-      return
-    }
-
-    delete document.documentElement.dataset.highlightRendering
-  }
-
-  applyHighlightRenderingDebugMode()
-
   function scheduleSpecialLetterAlignment(
     root: Document | Element,
     signal: AbortSignal
   ) {
-    void alignSmallSpecialLettersWhenFontsReady(root, signal).catch((error) => {
-      console.error('Failed to align special Hebrew letters', error)
-    })
+    void alignSmallSpecialLettersWhenFontsReady(root, signal)
+      .then(() => {
+        if (signal.aborted || !readerDisplaySessionGlobal) return
+        readerDisplaySessionGlobal.invalidateProgressAnchors('text-layout')
+        invalidateReaderPositionAfterLayout()
+      })
+      .catch((error) => {
+        console.error('Failed to align special Hebrew letters', error)
+      })
   }
 
   function getDebugActiveTokenKey() {
@@ -384,68 +346,11 @@ export function startReaderRuntime({
   }
 
   function renderReaderModel(target: ScrollViewModel): ReaderRouteRendering {
-    display?.destroy()
-    latestViewportRange = null
-    resolvedAliyahCueStatuses.clear()
-    resetAliyahDomCaches()
-    syncAliyahNavigationContent()
-    const lifetime = readerRuntimeLifecycle.begin()
-    readerRuntimeLifetime = lifetime
-    const book = document.querySelector<HTMLElement>('[data-target-id="tikkun-book"]')!
-    book.style.visibility = 'hidden'
-    book.setAttribute('aria-busy', 'true')
-    display = new ScrollDisplay(target, book)
-    const currentDisplay = display
-    readerPlaybackGlobal?.setDisplay(display)
-
-    const ready = currentDisplay.rendered
-    const settled = currentDisplay.scrolled.then(async () => {
-      if (!lifetime.isCurrent() || display !== currentDisplay) return
-      markPageVirtualizationReady(currentDisplay)
-      await waitForAnimationFrames(2)
-      if (lifetime.isCurrent() && display === currentDisplay) {
-        book.style.visibility = ''
-        book.removeAttribute('aria-busy')
-        viewportTrackerGlobal?.refresh()
-      }
-    })
-    void settled.catch((error) => {
-      if (display === currentDisplay) {
-        book.style.visibility = ''
-        book.removeAttribute('aria-busy')
-      }
-      console.error(error)
-    })
-
-    return {
-      ready,
-      complete: settled,
-      isCurrent: () => lifetime.isCurrent() && display === currentDisplay,
-      getMountedPageNode: (pageNumber) =>
-        currentDisplay.getMountedPageNode(pageNumber),
-    }
+    return getReaderDisplaySession().render(target)
   }
 
   function deactivateReaderRuntime() {
-    readerRuntimeLifecycle.cancel()
-    readerRuntimeLifetime = null
-    offlineRecordingPromptGlobal?.setPendingRetry()
-    display?.destroy()
-    display = null
-    resetAliyahDomCaches()
-  }
-
-  function waitForAnimationFrames(count: number) {
-    return new Promise<void>((resolve) => {
-      const wait = (remaining: number) => {
-        if (remaining <= 0) {
-          resolve()
-          return
-        }
-        requestAnimationFrame(() => wait(remaining - 1))
-      }
-      wait(count)
-    })
+    readerDisplaySessionGlobal?.deactivate()
   }
 
   function showReaderNotice(
@@ -472,26 +377,32 @@ export function startReaderRuntime({
 
   const showPersistenceNotice = (message: string) => showReaderNotice(message)
 
-  function lastReadingInputFromAnchor(
-    anchor: ReturnType<typeof getAliyahProgressAnchors>[number] | null
-  ) {
-    if (!display?.viewModel || !anchor?.run) return null
+  function readerHashFromAnchor(anchor: ReaderProgressAnchor | null) {
+    if (!anchor?.run) return null
     const aliyah = anchor.run.aliyot.find(
       (candidate) => candidate.index === anchor.aliyahIndex
     )
     const hash = aliyah?.start
       ? createLastReadingHash(anchor.run, aliyah.start)
       : createLastReadingHash(anchor.run)
-    if (!hash || hash === '#/next') return null
+    return !hash || hash === '#/next' ? null : hash
+  }
+
+  function lastReadingInputFromAnchor(
+    anchor: ReaderProgressAnchor | null
+  ) {
+    const activeDisplay = readerDisplaySessionGlobal?.capture()
+    const hash = readerHashFromAnchor(anchor)
+    if (!activeDisplay || !anchor?.run || !hash) return null
     return {
       hash,
-      parshaName: display.viewModel.displayTitleForRun(anchor.run),
+      parshaName: activeDisplay.viewModel.displayTitleForRun(anchor.run),
       aliyahLabel: anchor.label === '—' ? undefined : anchor.label,
     }
   }
 
   function saveLastReadingFromAnchor(
-    anchor: ReturnType<typeof getAliyahProgressAnchors>[number] | null
+    anchor: ReaderProgressAnchor | null
   ) {
     if (
       recordingMode.enabled ||
@@ -509,24 +420,59 @@ export function startReaderRuntime({
     }
   }
 
-  function saveCurrentLastReading() {
-    const anchors = getAliyahProgressAnchors()
-    if (!anchors.length) return
-
+  function currentReadingAnchor() {
+    const displaySession = readerDisplaySessionGlobal
+    if (!displaySession?.capture()) return null
     const book = getBook()
-    const viewportCenter = getReaderFocalPointScrollTop(book)
-    let current = anchors[0] ?? null
-    for (const anchor of anchors) {
-      if (anchor.position <= viewportCenter) current = anchor
-      else break
+    return displaySession
+      .progressSnapshot()
+      .at(getReaderFocalPointScrollTop(book)).current
+  }
+
+  function captureCurrentLastReading(): LastReading | null {
+    const route = readerRouteGlobal?.snapshot()
+    if (recordingMode.enabled || route?.view !== 'reader') return null
+    const input = lastReadingInputFromAnchor(currentReadingAnchor())
+    const savedAt = Date.now()
+    if (input) return { ...input, savedAt }
+
+    const activeDisplay = readerDisplaySessionGlobal?.capture()
+    if (activeDisplay) {
+      const titledRun = activeDisplay.viewModel.relevantRuns.find(
+        (run) =>
+          formatTopBarTitle(activeDisplay.viewModel.displayTitleForRun(run)) ===
+          route.title
+      )
+      if (titledRun) {
+        return {
+          hash: createLastReadingHash(titledRun, titledRun.aliyot[0]?.start),
+          parshaName: activeDisplay.viewModel.displayTitleForRun(titledRun),
+          savedAt,
+        }
+      }
     }
-    saveLastReadingFromAnchor(current)
+
+    const hash =
+      route.currentReaderHash === '#/next' ? null : route.currentReaderHash
+    if (!hash) return null
+    return {
+      hash,
+      parshaName: route.title,
+      savedAt,
+    }
+  }
+
+  function saveCurrentLastReading() {
+    saveLastReadingFromAnchor(currentReadingAnchor())
   }
 
   function resetReaderSideNavigationState() {
     aliyahNavigationGlobal?.closeCompact()
     readerPlaybackGlobal?.resetRoute()
-    activeRecordingIssues = []
+    publishedRecordingIssues = []
+    localRecordingIssues = []
+    localRecordingIssueRevision = null
+    mergedRecordingIssues = []
     cueAuthoringGlobal?.recordingIssuesChanged()
     cueAuthoringGlobal?.clearSession()
     syncActiveReaderIssueNotice()
@@ -536,10 +482,37 @@ export function startReaderRuntime({
 
   function updateCalendarSettings(settings: CalendarSettings) {
     try {
-      saveCalendarSettings(settings, browserLocalStorage)
+      calendarSettingsRevision = saveCalendarSettings(
+        settings,
+        browserLocalStorage,
+        calendarSettingsRevision
+      )
     } catch (error) {
       console.error('Failed to save calendar settings', error)
-      showPersistenceNotice('Calendar settings will apply now but could not be saved.')
+      if (
+        error instanceof CalendarSettingsStorageError &&
+        error.cause instanceof PersistedStateConflictError &&
+        error.cause.reason === 'conflict'
+      ) {
+        const latest = loadCalendarSettingsState(browserLocalStorage)
+        try {
+          calendarSettingsRevision = saveCalendarSettings(
+            settings,
+            browserLocalStorage,
+            latest.revision
+          )
+        } catch (retryError) {
+          console.error(
+            'Failed to save calendar settings after refreshing browser state',
+            retryError
+          )
+          showPersistenceNotice(
+            'Calendar settings changed in another tab. This choice applies now but could not be saved.'
+          )
+        }
+      } else {
+        showPersistenceNotice('Calendar settings will apply now but could not be saved.')
+      }
     }
     calendarSettings = settings
   }
@@ -549,10 +522,14 @@ export function startReaderRuntime({
     getReaderShell().setAnnotationsEnabled(enabled)
     const book = getBook()
     applyAnnotationMode(book, enabled)
-    if (readerRuntimeLifetime) {
-      scheduleSpecialLetterAlignment(book, readerRuntimeLifetime.signal)
+    const displaySession = readerDisplaySessionGlobal
+    displaySession?.invalidateProgressAnchors('annotations')
+    const activeDisplay = displaySession?.capture()
+    if (activeDisplay) {
+      scheduleSpecialLetterAlignment(book, activeDisplay.signal)
     }
     scheduleAliyahStartMarkerLayout(book)
+    if (displaySession) invalidateReaderPositionAfterLayout()
     readerControlsGlobal?.sync()
   }
 
@@ -697,13 +674,18 @@ export function startReaderRuntime({
   }
 
   function setupDebugControls(scope: MountScope) {
-    document
-      .querySelectorAll<HTMLButtonElement>('[data-target-id="debug-focal-measure-toggle"]')
-      .forEach((button) =>
-        button.addEventListener('click', toggleDebugFocalMeasure, {
-          signal: scope.signal,
-        })
-      )
+    document.addEventListener(
+      'click',
+      (event) => {
+        const target = event.target
+        if (!(target instanceof Element)) return
+        if (!target.closest('[data-target-id="debug-focal-measure-toggle"]')) {
+          return
+        }
+        toggleDebugFocalMeasure()
+      },
+      { signal: scope.signal }
+    )
     scope.own(removeDebugFocalMeasure)
   }
 
@@ -839,9 +821,12 @@ export function startReaderRuntime({
   async function jumpToTokenKey(tokenKey: string, options: { audioTime?: number } = {}) {
     const position = parseTokenKey(tokenKey)
     if (!position) throw new TypeError(`Invalid token key: ${tokenKey}`)
-    const virtualizationHold = holdPageVirtualizationEviction()
+    const displaySession = getReaderDisplaySession()
+    const virtualizationHold = displaySession.holdNavigation()
     try {
-      await display?.ensurePageMountedForNavigation(position.pageNumber)
+      await displaySession
+        .capture()
+        ?.ensurePageMountedForNavigation(position.pageNumber)
       virtualizationHold.releaseAfterNavigation()
       const token = await readerPlaybackGlobal?.activateToken(tokenKey, {
         scroll: true,
@@ -855,7 +840,7 @@ export function startReaderRuntime({
       }
       if (token) {
         syncAliyahNavigationToolbar(
-          getAliyahProgressAnchorForElement(token)
+          displaySession.progressAnchorForElement(token)
         )
       }
       focusReaderSurface()
@@ -901,10 +886,32 @@ export function startReaderRuntime({
 
   function persistBookmarks(nextBookmarks: ReaderBookmark[]) {
     try {
-      saveBookmarks(browserLocalStorage, nextBookmarks)
+      bookmarkRevision = saveBookmarks(
+        browserLocalStorage,
+        nextBookmarks,
+        bookmarkRevision
+      )
       return true
     } catch (error) {
       console.error('Failed to save reader bookmarks', error)
+      if (
+        error instanceof BookmarkStorageError &&
+        error.cause instanceof PersistedStateConflictError &&
+        error.cause.reason === 'conflict'
+      ) {
+        const latest = loadBookmarksState(
+          browserLocalStorage,
+          isSemanticallyRoutableReaderHash
+        )
+        bookmarks = latest.bookmarks
+        bookmarkRevision = latest.revision
+        refreshReaderSearch()
+        readerControlsGlobal?.sync()
+        showPersistenceNotice(
+          'Bookmarks changed in another tab. Review the latest list and try again.'
+        )
+        return false
+      }
       showPersistenceNotice('Bookmarks could not be saved in this browser.')
       return false
     }
@@ -978,7 +985,7 @@ export function startReaderRuntime({
   function getCurrentCheckpoints() {
     const checkpoints: Checkpoint[] = [
       ...bookmarks.map(checkpointFromBookmark),
-      ...getReaderVisibleIssues(activeRecordingIssues).map(checkpointFromIssue),
+      ...getReaderVisibleIssues(mergedRecordingIssues).map(checkpointFromIssue),
     ]
 
     const session = readerPlaybackGlobal?.snapshot().session
@@ -1014,125 +1021,19 @@ export function startReaderRuntime({
     void jumpToTokenKey(checkpoint.tokenKey, { audioTime: checkpoint.timeStart })
   }
 
-  type AliyahDomTarget = {
-    element: HTMLElement
-    marker: HTMLElement | null
-  }
-
-  async function getAliyahStartLocationForRun(
-    runId: string,
-    aliyahIndex: PlaybackAliyahIndex,
-    targetDisplay = display
-  ) {
-    if (!targetDisplay) return null
-    const run =
-      targetDisplay.viewModel.relevantRuns.find((candidate) => candidate.id === runId) ??
-      createCalendarGenerator().parseId(runId)
-    if (!run) return null
-
-    return aliyahTargetLocationCache.get(targetDisplay.viewModel, run, aliyahIndex)
-  }
-
-  function getAliyahMarkerElement(
-    runId: string,
-    aliyahIndex: PlaybackAliyahIndex
-  ) {
-    const cacheKey = getAliyahTargetKey(runId, aliyahIndex)
-    const cached = aliyahMarkerElementsByKey.get(cacheKey)
-    if (cached?.isConnected) return cached
-
-    const marker = document.querySelector<HTMLElement>(
-      aliyahMarkerSelector(runId, aliyahIndex)
-    )
-    if (marker) aliyahMarkerElementsByKey.set(cacheKey, marker)
-    else aliyahMarkerElementsByKey.delete(cacheKey)
-    return marker
-  }
-
-  function getRenderedLineForLocation(location: {
-    pageNumber: number
-    lineNumber: number
-  }, targetDisplay = display, exactPageNode?: HTMLElement) {
-    if (!targetDisplay) return null
-    const lineIndex = lineIndexFromLocation(location)
-    if (exactPageNode) return findRenderedLineElement(exactPageNode, lineIndex)
-    const cached = renderedLinesByLocationKey.get(
-      getRenderedLineLocationKey(location.pageNumber, lineIndex)
-    )
-    if (cached?.isConnected) return cached
-
-    const pageNode = targetDisplay.getMountedPageNode(location.pageNumber)
-    const line = pageNode ? findRenderedLineElement(pageNode, lineIndex) : null
-    if (line) {
-      renderedLinesByLocationKey.set(
-        getRenderedLineLocationKey(location.pageNumber, lineIndex),
-        line
-      )
-    }
-    return line
-  }
-
-  function pageNumberFromMountedElement(element: HTMLElement) {
-    const pageElement = element.closest<HTMLElement>('[data-page-number]')
-    const pageNumber = Number(pageElement?.dataset.pageNumber)
-    return Number.isInteger(pageNumber) && pageNumber > 0 ? pageNumber : null
-  }
-
-  async function ensureAliyahDomTargetRendered(
-    runId: string,
-    aliyahIndex: PlaybackAliyahIndex
-  ): Promise<AliyahDomTarget | null> {
-    const targetDisplay = display
-    const lifetime = readerRuntimeLifetime
-    if (!targetDisplay || !lifetime?.isCurrent()) return null
-    let marker = getAliyahMarkerElement(runId, aliyahIndex)
-    if (marker) {
-      latestRailTargetPageNumber = pageNumberFromMountedElement(marker)
-      return { element: marker, marker }
-    }
-
-    const location = await getAliyahStartLocationForRun(
-      runId,
-      aliyahIndex,
-      targetDisplay
-    )
-    if (!lifetime.isCurrent() || display !== targetDisplay) return null
-    if (location) {
-      latestRailTargetPageNumber = location.pageNumber
-      const mountedPage = await targetDisplay.ensurePageMountedForNavigation(
-        location.pageNumber,
-        { runId }
-      )
-      if (!lifetime.isCurrent() || display !== targetDisplay) return null
-      marker = getAliyahMarkerElement(runId, aliyahIndex)
-      if (marker) return { element: marker, marker }
-
-      const line = mountedPage
-        ? getRenderedLineForLocation(location, targetDisplay, mountedPage)
-        : null
-      if (line) return { element: line, marker: null }
-    }
-
-    while (!marker) {
-      if (!lifetime.isCurrent() || display !== targetDisplay) return null
-      const loaded = await targetDisplay.ensureNextContentMounted()
-      if (!loaded) return null
-
-      marker = getAliyahMarkerElement(runId, aliyahIndex)
-    }
-
-    return { element: marker, marker }
-  }
-
   async function scrollToAliyahMarker(
     runId: string,
     aliyahIndex: PlaybackAliyahIndex,
     actionToken = railScrollAction.start()
   ) {
-    const virtualizationHold = holdPageVirtualizationEviction()
-    let target: AliyahDomTarget | null
+    const displaySession = getReaderDisplaySession()
+    const virtualizationHold = displaySession.holdNavigation()
+    let target
     try {
-      target = await ensureAliyahDomTargetRendered(runId, aliyahIndex)
+      target = await displaySession.ensureAliyahDomTargetRendered(
+        runId,
+        aliyahIndex
+      )
     } catch (error) {
       virtualizationHold.release()
       throw error
@@ -1146,12 +1047,12 @@ export function startReaderRuntime({
     virtualizationHold.releaseAfterNavigation()
     centerElementInScrollRoot(getBook(), line ?? target.element, { behavior: 'smooth' })
     syncAliyahNavigationToolbar(
-      getAliyahProgressAnchorForElement(line ?? target.element)
+      displaySession.progressAnchorForElement(line ?? target.element)
     )
-    viewportTrackerGlobal?.refresh()
+    displaySession.refreshViewport()
     invalidateReaderPosition()
     window.setTimeout(() => {
-      viewportTrackerGlobal?.refresh()
+      displaySession.refreshViewport()
       invalidateReaderPosition()
     }, 500)
     focusReaderSurface()
@@ -1320,7 +1221,7 @@ export function startReaderRuntime({
       createNavigationAction({
         id: 'admin.open',
         group: 'admin',
-        label: 'Admin Timing Mode',
+        label: 'Cue Authoring',
         keywords: ['timing', 'authoring', 'record cues'],
         available: cueAuthoringLoaderGlobal?.isUnlocked() ?? false,
         emptyPriority: 30,
@@ -1330,10 +1231,14 @@ export function startReaderRuntime({
 
     actions.push(...upcomingHolidayLeiningActions())
 
-    if (display?.viewModel) {
-      const anchors = getAliyahProgressAnchors()
+    const activeDisplay = readerDisplaySessionGlobal?.capture()
+    if (activeDisplay) {
+      const anchors = getReaderDisplaySession().progressSnapshot().anchors
       const activeRun =
-        getCurrentAliyahFromViewportRange(latestViewportRange, anchors)?.run ??
+        getCurrentAliyahFromViewportRange(
+          readerDisplaySessionGlobal?.viewportRange() ?? null,
+          anchors
+        )?.run ??
         anchors.find((anchor) => anchor.run)?.run ??
         null
       if (activeRun) {
@@ -1343,7 +1248,7 @@ export function startReaderRuntime({
         actions.push(
           ...createAliyahNavigationActions({
             run: activeRun,
-            displayTitle: display.viewModel.displayTitleForRun(activeRun),
+            displayTitle: activeDisplay.viewModel.displayTitleForRun(activeRun),
             dedupeKeyPrefix: activeParshaSlug
               ? `reading.parsha.${activeParshaSlug}`
               : undefined,
@@ -1657,7 +1562,10 @@ export function startReaderRuntime({
       { signal: scope.signal }
     )
     void document.fonts.ready.then(() => {
-      if (!scope.signal.aborted) scheduleAliyahStartMarkerLayout(book)
+      if (scope.signal.aborted) return
+      readerDisplaySessionGlobal?.invalidateProgressAnchors('text-layout')
+      scheduleAliyahStartMarkerLayout(book)
+      if (readerDisplaySessionGlobal) invalidateReaderPositionAfterLayout()
     })
     document.addEventListener(
       'pointerdown',
@@ -1742,19 +1650,22 @@ export function startReaderRuntime({
       /^#\/torah\/parsha\/([^/?]+)/
     )
     const routeSlug = slugMatch?.[1]
-    if (!routeSlug || !display) return currentRun
+    const activeDisplay = readerDisplaySessionGlobal?.capture()
+    if (!routeSlug || !activeDisplay) return currentRun
 
     const resolved = resolveParshaRun(
       createCalendarGenerator(),
       decodeURIComponent(routeSlug)
     )
     const preferredRun = resolved
-      ? display.viewModel.relevantRuns.find((run) => run.id === resolved.run.id) ?? null
+      ? activeDisplay.viewModel.relevantRuns.find(
+          (run) => run.id === resolved.run.id
+        ) ?? null
       : null
     if (!preferredRun) return currentRun
 
     const preferredTitle = formatTopBarTitle(
-      display.viewModel.displayTitleForRun(preferredRun)
+      activeDisplay.viewModel.displayTitleForRun(preferredRun)
     )
     return routeSnapshot?.title === preferredTitle ? preferredRun : currentRun
   }
@@ -1798,8 +1709,9 @@ export function startReaderRuntime({
     target: AliyahNavigationTarget,
     { includePreviousOverlap = false }: { includePreviousOverlap?: boolean } = {}
   ) {
+    const activeDisplay = readerDisplaySessionGlobal?.capture()
     const run =
-      display?.viewModel.relevantRuns.find(
+      activeDisplay?.viewModel.relevantRuns.find(
         (candidate) => candidate.id === target.runId
       ) ?? createCalendarGenerator().parseId(target.runId)
     if (!run) return null
@@ -1841,21 +1753,25 @@ export function startReaderRuntime({
   }
 
   function syncAliyahNavigationContent(
-    range: ViewportRange | null = latestViewportRange
+    range: ViewportRange | null =
+      readerDisplaySessionGlobal?.viewportRange() ?? null,
+    progressSnapshot?: ReaderProgressAnchorSnapshot
   ) {
     if (!isAliyahRailRouteAvailable()) {
       aliyahNavigationGlobal?.clearContent()
-      clearCurrentAliyahAudioPreload()
+      readerDisplaySessionGlobal?.syncAudioPreload(null)
       return
     }
 
-    const anchors = getAliyahProgressAnchors()
+    const anchors = (
+      progressSnapshot ?? getReaderDisplaySession().progressSnapshot()
+    ).anchors
     const current = getCurrentAliyahFromViewportRange(range, anchors)
     const currentRun = current?.run ?? anchors.find((anchor) => anchor.run)?.run ?? null
 
     if (!currentRun) {
       aliyahNavigationGlobal?.clearContent()
-      clearCurrentAliyahAudioPreload()
+      readerDisplaySessionGlobal?.syncAudioPreload(null)
       return
     }
 
@@ -1889,11 +1805,13 @@ export function startReaderRuntime({
       playback
     )
 
-    syncCurrentAliyahAudioPreload(
-      currentRun,
-      currentTarget?.aliyahIndex ?? null
+    syncCurrentAliyahAudioPreload(currentRun, currentTarget?.aliyahIndex ?? null)
+    getReaderDisplaySession().scheduleResourcePrewarm(
+      desktopEntries.flatMap(({ run, aliyah }) =>
+        aliyah.index ? [{ run, aliyahIndex: aliyah.index }] : []
+      ),
+      desktopSnapshot.signature
     )
-    scheduleAliyahResourcePrewarm(desktopEntries, desktopSnapshot.signature)
     aliyahNavigationGlobal?.syncContent({
       desktop: desktopSnapshot,
       compact: mobileSnapshot,
@@ -2030,7 +1948,10 @@ export function startReaderRuntime({
       : session?.activeRecording ?? session?.recording ?? null
     const sessionRevision = playback?.sessionRevision
     const actionToken = recordingIssueLoadAction.start()
-    activeRecordingIssues = []
+    publishedRecordingIssues = []
+    localRecordingIssues = []
+    localRecordingIssueRevision = null
+    mergedRecordingIssues = []
     cueAuthoringGlobal?.recordingIssuesChanged()
     applyReaderVisibleIssueMarkers()
     syncActiveReaderIssueNotice()
@@ -2050,9 +1971,12 @@ export function startReaderRuntime({
         currentPlayback?.sessionRevision !== sessionRevision ||
         currentRecording?.id !== recording.id
       ) return
-      let localIssues: RecordingIssue[] = []
+      let localSnapshot: LocalRecordingIssuesSnapshot = {
+        issues: [],
+        revision: null,
+      }
       try {
-        localIssues = loadRecordingIssues(
+        localSnapshot = loadLocalRecordingIssues(
           browserLocalStorage,
           recording.id,
           TOKENIZATION_VERSION
@@ -2060,9 +1984,12 @@ export function startReaderRuntime({
       } catch (error) {
         console.error(`Recording issue storage is unavailable for ${recording.id}`, error)
       }
-      activeRecordingIssues = mergeRecordingIssues(
-        publishedIssues,
-        localIssues
+      publishedRecordingIssues = publishedIssues
+      localRecordingIssues = localSnapshot.issues
+      localRecordingIssueRevision = localSnapshot.revision
+      mergedRecordingIssues = mergePublishedAndLocalRecordingIssues(
+        publishedRecordingIssues,
+        localRecordingIssues
       )
       cueAuthoringGlobal?.recordingIssuesChanged()
       applyReaderVisibleIssueMarkers()
@@ -2078,7 +2005,7 @@ export function startReaderRuntime({
       word.removeAttribute('title')
     })
 
-    for (const issue of getReaderVisibleIssues(activeRecordingIssues)) {
+    for (const issue of getReaderVisibleIssues(mergedRecordingIssues)) {
       root
         .querySelectorAll<HTMLElement>(`[data-token-key="${issue.tokenKey}"]`)
         .forEach((word) => {
@@ -2094,7 +2021,7 @@ export function startReaderRuntime({
 
     const tokenKey = getActiveTokenKey()
     const issue = tokenKey
-      ? getReaderVisibleIssues(activeRecordingIssues).find((candidate) => candidate.tokenKey === tokenKey)
+      ? getReaderVisibleIssues(mergedRecordingIssues).find((candidate) => candidate.tokenKey === tokenKey)
       : null
 
     if (!issue) {
@@ -2108,21 +2035,17 @@ export function startReaderRuntime({
   }
 
 
-  function setPendingNetworkRecordingRetry(retry?: () => Promise<void>) {
-    const lifetime = readerRuntimeLifetime
-    offlineRecordingPromptGlobal?.setPendingRetry(
+  function recordOfflinePlaybackFailure(retry: () => Promise<void>) {
+    const failedPlayback = readerPlaybackGlobal
+    if (!failedPlayback) return
+    const activeDisplay = readerDisplaySessionGlobal?.capture()
+    const failedSessionRevision = failedPlayback.snapshot().sessionRevision
+    offlineRecordingPromptGlobal?.recordPlaybackFailure(
       retry,
-      lifetime ? () => lifetime.isCurrent() : undefined
-    )
-  }
-
-  function canPlayNetworkRecording(retry?: () => Promise<void>) {
-    const lifetime = readerRuntimeLifetime
-    return (
-      offlineRecordingPromptGlobal?.canUseNetwork(
-        retry,
-        lifetime ? () => lifetime.isCurrent() : undefined
-      ) ?? navigator.onLine
+      () =>
+        readerPlaybackGlobal === failedPlayback &&
+        failedPlayback.snapshot().sessionRevision === failedSessionRevision &&
+        (activeDisplay?.isCurrent() ?? true)
     )
   }
 
@@ -2147,23 +2070,23 @@ export function startReaderRuntime({
       runId &&
         aliyahIndex &&
         readerPlaybackGlobal?.isTargetActive({
-          recordingId: recording?.id,
+          recordingId: recording?.id ?? null,
           runId,
           aliyahIndex,
         })
     )
   }
 
-  function aliyahMarkerSelector(runId: string, aliyahIndex: PlaybackAliyahIndex) {
-    return `[data-aliyah-marker="true"][data-run-id="${runId}"][data-aliyah-index="${aliyahIndex}"]`
-  }
-
   function isLastAliyahInRun(runId: string, aliyahIndex: PlaybackAliyahIndex) {
-    const run = display?.viewModel.relevantRuns.find((candidate) => candidate.id === runId)
+    const run = readerDisplaySessionGlobal
+      ?.capture()
+      ?.viewModel.relevantRuns.find((candidate) => candidate.id === runId)
     return isLastIndexedAliyahInRun(run, aliyahIndex)
   }
 
-  function isLastAliyahProgressAnchor(anchor: AliyahProgressAnchor | null | undefined) {
+  function isLastAliyahProgressAnchor(
+    anchor: ReaderProgressAnchor | null | undefined
+  ) {
     return Boolean(
       anchor?.run?.id &&
         anchor.aliyahIndex &&
@@ -2171,312 +2094,18 @@ export function startReaderRuntime({
     )
   }
 
-  const aliyahTargetLocationCache = new AliyahTargetLocationCache()
-  const aliyahMarkerElementsByKey = new Map<string, HTMLElement>()
-  const renderedLinesByLocationKey = new Map<string, HTMLElement>()
   const railScrollAction = new LatestAction()
   const playbackAction = new LatestAction()
   const recordingIssueLoadAction = new LatestAction()
-  let aliyahResourcePrewarmTimer = 0
-  let aliyahResourcePrewarmSignature: string | null = null
-  let currentAliyahAudioPreload: HTMLAudioElement | null = null
-  const PLAYBACK_IDLE_BACKGROUND_DELAY_MS = 900
-  const pageVirtualizationSettings = createPageVirtualizationSettings({
-    search: location.search,
-    storage: browserLocalStorage,
-  })
-  const pageVirtualizationMetrics = createPageVirtualizationMetrics()
-  const PAGE_WINDOW_POLICY_CONFIG: PageWindowPolicyConfig = {
-    viewportRadius: 2,
-    playbackForwardPageCount: 2,
-  }
-  const VIEWPORT_PLACEHOLDER_REMOUNT_MARGIN_RATIO = 2
-  let latestRailTargetPageNumber: number | null = null
-  let latestPageVirtualizationApplication: PageVirtualizationApplication = {
-    enabled: pageVirtualizationSettings.state().enabled,
-    evictedPages: [],
-  }
-  let pageVirtualizationEvictionPauseDepth = 0
-  let pageVirtualizationReadyForDisplay: ScrollDisplay | null = null
-  let viewportPlaceholderRemountFrame = 0
-  const NAVIGATION_VIRTUALIZATION_HOLD_MS = 1400
 
-  function getAliyahTargetKey(
-    runId: string,
-    aliyahIndex: PlaybackAliyahIndex
-  ) {
-    return `${runId}:${aliyahIndex}`
-  }
-
-  function holdPageVirtualizationEviction() {
-    pageVirtualizationEvictionPauseDepth += 1
-    let released = false
-    let holdTimer = 0
-
-    const release = () => {
-      if (released) return
-      released = true
-      if (holdTimer) window.clearTimeout(holdTimer)
-      pageVirtualizationEvictionPauseDepth = Math.max(
-        0,
-        pageVirtualizationEvictionPauseDepth - 1
-      )
-      if (pageVirtualizationEvictionPauseDepth === 0) applyPageVirtualization()
-    }
-
-    return {
-      release,
-      releaseAfterNavigation() {
-        // A scrollend from the gesture that revealed the rail can arrive after
-        // navigation starts, so use a bounded hold instead of that shared event.
-        holdTimer = window.setTimeout(
-          release,
-          NAVIGATION_VIRTUALIZATION_HOLD_MS
-        )
-      },
-    }
-  }
-
-  function getRenderedLineLocationKey(pageNumber: number, lineIndex: number) {
-    return `${pageNumber}:${lineIndex}`
-  }
-
-  function getPageNumberFromRenderedLineLocationKey(key: string) {
-    const [pageNumber] = key.split(':').map(Number)
-    return Number.isInteger(pageNumber) ? pageNumber : null
-  }
-
-  function resetAliyahDomCaches() {
-    aliyahTargetLocationCache.clear()
-    aliyahMarkerElementsByKey.clear()
-    renderedLinesByLocationKey.clear()
+  function resetDisplayResources() {
     readerPlaybackGlobal?.resetRecordingCache()
     railScrollAction.cancel()
     playbackAction.cancel()
-    if (aliyahResourcePrewarmTimer) {
-      cancelIdleTask(aliyahResourcePrewarmTimer)
-      aliyahResourcePrewarmTimer = 0
-    }
-    aliyahResourcePrewarmSignature = null
-    clearCurrentAliyahAudioPreload()
-    latestRailTargetPageNumber = null
-    latestPageVirtualizationApplication = {
-      enabled: pageVirtualizationSettings.state().enabled,
-      evictedPages: [],
-    }
-    pageVirtualizationMetrics.reset()
-    pageVirtualizationReadyForDisplay = null
-    cancelViewportPlaceholderRemount()
-    progressAnchorLoadPromise = null
-  }
-
-  function getReaderDiagnosticsSnapshot() {
-    const pageWindowPolicy = getPageWindowPolicySnapshot()
-
-    return {
-      pages: display?.getPageLifecycleSnapshot() ?? null,
-      pageWindowPolicy,
-      pageVirtualization: getPageVirtualizationDiagnostics(),
-      presentation: readerPresentationGlobal?.diagnostics() ?? null,
-      caches: {
-        aliyahTokenKeys:
-          readerPlaybackGlobal?.snapshot().tokenCacheSize ?? 0,
-        aliyahTargetLocations: aliyahTargetLocationCache.size,
-        aliyahMarkerElements: aliyahMarkerElementsByKey.size,
-        renderedLines: renderedLinesByLocationKey.size,
-      },
-    }
-  }
-
-  const readerVirtualizationDiagnostics = {
-    state: getPageVirtualizationDiagnostics,
-    enable: () => setPageVirtualizationEnabled(true),
-    disable: () => setPageVirtualizationEnabled(false),
-    setEnabled: (enabled: boolean) => setPageVirtualizationEnabled(enabled),
-    resetMetrics() {
-      pageVirtualizationMetrics.reset()
-      return getPageVirtualizationDiagnostics()
-    },
-    applyNow() {
-      applyPageVirtualization()
-      return getPageVirtualizationDiagnostics()
-    },
-    async remountAll() {
-      await remountAllEvictedPages()
-      return getPageVirtualizationDiagnostics()
-    },
-  }
-
-  function getPageVirtualizationDiagnostics(): PageVirtualizationDiagnostics {
-    const settings = pageVirtualizationSettings.state()
-    return {
-      enabled: settings.enabled,
-      source: settings.source,
-      latestApplication: latestPageVirtualizationApplication,
-      metrics: pageVirtualizationMetrics.snapshot(),
-    }
-  }
-
-  function setPageVirtualizationEnabled(enabled: boolean) {
-    const settings = pageVirtualizationSettings.setEnabled(enabled)
-    if (settings.source === 'memory') {
-      showPersistenceNotice('Page virtualization changed for this session but could not be saved.')
-    }
-    latestPageVirtualizationApplication = {
-      ...latestPageVirtualizationApplication,
-      enabled: settings.enabled,
-    }
-    pageVirtualizationMetrics.recordToggle(settings)
-    applyPageVirtualization()
-    return getPageVirtualizationDiagnostics()
-  }
-
-  async function remountAllEvictedPages() {
-    const targetDisplay = display
-    const lifetime = readerRuntimeLifetime
-    if (!targetDisplay || !lifetime?.isCurrent()) return []
-    const evictedPages = targetDisplay
-      .getPageLifecycleSnapshot()
-      .pages.filter((page) => page.state === 'evicted')
-      .map((page) => page.pageNumber)
-    const remountedPages: number[] = []
-    pageVirtualizationEvictionPauseDepth += 1
-    try {
-      for (const pageNumber of evictedPages) {
-        if (!lifetime.isCurrent() || display !== targetDisplay) break
-        const mounted = await targetDisplay.ensurePageMounted(pageNumber)
-        if (mounted) remountedPages.push(pageNumber)
-      }
-    } finally {
-      pageVirtualizationEvictionPauseDepth = Math.max(
-        0,
-        pageVirtualizationEvictionPauseDepth - 1
-      )
-    }
-    return remountedPages
-  }
-
-  function scheduleViewportPlaceholderRemount() {
-    if (!isPageVirtualizationReady()) return
-    if (viewportPlaceholderRemountFrame) return
-    viewportPlaceholderRemountFrame = requestAnimationFrame(() => {
-      viewportPlaceholderRemountFrame = 0
-      void remountEvictedPagesNearViewport().catch((error) => {
-        console.error('Failed to remount pages near the reader viewport', error)
-      })
-    })
-  }
-
-  function cancelViewportPlaceholderRemount() {
-    if (!viewportPlaceholderRemountFrame) return
-    cancelAnimationFrame(viewportPlaceholderRemountFrame)
-    viewportPlaceholderRemountFrame = 0
-  }
-
-  async function remountEvictedPagesNearViewport() {
-    const targetDisplay = display
-    const lifetime = readerRuntimeLifetime
-    if (!targetDisplay || !lifetime?.isCurrent()) return []
-    const marginPx =
-      targetDisplay.root.clientHeight * VIEWPORT_PLACEHOLDER_REMOUNT_MARGIN_RATIO
-    const evictedPages = targetDisplay.getEvictedPageNumbersNearViewport({ marginPx })
-    if (!evictedPages.length) return []
-
-    pageVirtualizationEvictionPauseDepth += 1
-    try {
-      const remounted = await targetDisplay.ensureEvictedPagesMountedNearViewport({ marginPx })
-      if (lifetime.isCurrent() && display === targetDisplay) {
-        viewportTrackerGlobal?.refresh()
-        invalidateReaderPosition()
-      }
-      return remounted
-    } finally {
-      pageVirtualizationEvictionPauseDepth = Math.max(
-        0,
-        pageVirtualizationEvictionPauseDepth - 1
-      )
-    }
-  }
-
-  function getPageWindowPolicySnapshot() {
-    return display
-      ? computePageWindowPolicy({
-          mountedPageNumbers: display.getMountedPageNumbers(),
-          viewportPageNumber: display.getViewportAnchorPageNumber(),
-          railTargetPageNumber: latestRailTargetPageNumber,
-          playbackPageNumbers: [...getPlaybackProtectedPageNumbers()],
-          config: PAGE_WINDOW_POLICY_CONFIG,
-        })
-      : null
-  }
-
-  function applyPageVirtualization() {
-    const targetDisplay = display
-    if (!targetDisplay) return latestPageVirtualizationApplication
-    if (!isPageVirtualizationReady()) return latestPageVirtualizationApplication
-    const policy = getPageWindowPolicySnapshot()
-    if (!policy) return latestPageVirtualizationApplication
-    const settings = pageVirtualizationSettings.state()
-    const evictionEnabled =
-      settings.enabled && pageVirtualizationEvictionPauseDepth === 0
-    const application = applyPageWindowPolicyEviction({
-      enabled: evictionEnabled,
-      policy,
-      evictPages: (pageNumbers) => targetDisplay.evictPages(pageNumbers),
-    })
-    latestPageVirtualizationApplication = {
-      enabled: settings.enabled,
-      evictedPages: application.evictedPages,
-    }
-    const lifecycle = targetDisplay.getPageLifecycleSnapshot()
-    pageVirtualizationMetrics.recordPolicyApplication({
-      enabled: evictionEnabled,
-      source: settings.source,
-      policy,
-      evictedPages: latestPageVirtualizationApplication.evictedPages,
-      mountedPageCount: lifecycle.mountedPageCount,
-      knownPageCount: lifecycle.pages.length,
-      evictedPageCount: countEvictedLifecyclePages(lifecycle),
-    })
-    return latestPageVirtualizationApplication
-  }
-
-  function markPageVirtualizationReady(displayToMark: ScrollDisplay) {
-    if (display !== displayToMark) return
-    pageVirtualizationReadyForDisplay = displayToMark
-  }
-
-  function isPageVirtualizationReady() {
-    return Boolean(display && pageVirtualizationReadyForDisplay === display)
-  }
-
-  function countEvictedLifecyclePages(lifecycle: PageLifecycleSnapshot) {
-    return lifecycle.pages.filter((page) => page.state === 'evicted').length
-  }
-
-  function getPlaybackProtectedPageNumbers() {
-    return (
-      readerPlaybackGlobal?.protectedCuePageNumbers(
-        PAGE_WINDOW_POLICY_CONFIG.playbackForwardPageCount
-      ) ?? []
-    )
   }
 
   function isPlaybackActive() {
     return readerPlaybackGlobal?.snapshot().playing ?? false
-  }
-
-  function cancelAliyahResourcePrewarm() {
-    if (!aliyahResourcePrewarmTimer) return
-    cancelIdleTask(aliyahResourcePrewarmTimer)
-    aliyahResourcePrewarmTimer = 0
-  }
-
-  function clearCurrentAliyahAudioPreload() {
-    currentAliyahAudioPreload?.pause()
-    currentAliyahAudioPreload?.removeAttribute('src')
-    currentAliyahAudioPreload?.load()
-    currentAliyahAudioPreload = null
   }
 
   function syncCurrentAliyahAudioPreload(
@@ -2494,54 +2123,7 @@ export function startReaderRuntime({
       ? getPreviousOverlapRecording(run, aliyahIndex)
       : null
     const src = recording?.playSrc ?? fallbackRecording?.playSrc ?? null
-    const absoluteSrc = src ? new URL(src, location.href).href : null
-    if (currentAliyahAudioPreload?.src === absoluteSrc) return
-
-    clearCurrentAliyahAudioPreload()
-    if (!src) return
-
-    const preload = new Audio()
-    preload.preload = 'metadata'
-    preload.src = src
-    preload.load()
-    currentAliyahAudioPreload = preload
-  }
-
-  function indexAliyahDomTargets(root: ParentNode) {
-    getRenderedLineElements(root).forEach((line) => {
-      const pageNumber = Number(line.dataset.pageNumber)
-      const lineIndex = Number(line.dataset.lineIndex)
-      if (Number.isFinite(pageNumber) && Number.isFinite(lineIndex)) {
-        renderedLinesByLocationKey.set(
-          getRenderedLineLocationKey(pageNumber, lineIndex),
-          line
-        )
-      }
-    })
-
-    root.querySelectorAll<HTMLElement>('[data-aliyah-marker="true"]').forEach((marker) => {
-      const runId = marker.dataset.runId
-      const aliyahIndex = parsePlaybackAliyahIndex(marker.dataset.aliyahIndex)
-      if (!runId || !aliyahIndex) return
-      aliyahMarkerElementsByKey.set(
-        getAliyahTargetKey(runId, aliyahIndex),
-        marker
-      )
-    })
-  }
-
-  function unindexAliyahDomTargetsForPage(pageNumber: number) {
-    for (const [key] of renderedLinesByLocationKey) {
-      if (getPageNumberFromRenderedLineLocationKey(key) === pageNumber) {
-        renderedLinesByLocationKey.delete(key)
-      }
-    }
-
-    for (const [key, marker] of aliyahMarkerElementsByKey) {
-      if (pageNumberFromMountedElement(marker) === pageNumber || !marker.isConnected) {
-        aliyahMarkerElementsByKey.delete(key)
-      }
-    }
+    readerDisplaySessionGlobal?.syncAudioPreload(src)
   }
 
   function scheduleIdleTask(task: () => void) {
@@ -2563,96 +2145,6 @@ export function startReaderRuntime({
     }
     idleWindow.cancelIdleCallback?.(handle)
     window.clearTimeout(handle)
-  }
-
-  function scheduleAliyahResourcePrewarm(
-    railItems: ReturnType<typeof getAliyahNavigationEntriesForRun>,
-    signature: string
-  ) {
-    const displayToPrewarm = display
-    if (!displayToPrewarm) return
-    if (signature === aliyahResourcePrewarmSignature) return
-    aliyahResourcePrewarmSignature = signature
-    cancelAliyahResourcePrewarm()
-
-    let index = 0
-    const prefetchedPages = new Set<string>()
-    const prewarmNext = () => {
-      aliyahResourcePrewarmTimer = 0
-
-      if (
-        display !== displayToPrewarm ||
-        signature !== aliyahResourcePrewarmSignature
-      ) {
-        return
-      }
-
-      if (isPlaybackActive()) {
-        aliyahResourcePrewarmTimer = window.setTimeout(
-          prewarmNext,
-          PLAYBACK_IDLE_BACKGROUND_DELAY_MS
-        )
-        return
-      }
-
-      const item = railItems[index]
-      if (!item) return
-      index += 1
-
-      const prewarmPromise = (async () => {
-        const { run, aliyah } = item
-        if (!aliyah.index) return
-        const location = await getAliyahStartLocationForRun(run.id, aliyah.index)
-        const prefetchKey = location
-          ? `${run.id}:${location.pageNumber}`
-          : null
-        if (
-          location &&
-          prefetchKey &&
-          !prefetchedPages.has(prefetchKey) &&
-          display === displayToPrewarm
-        ) {
-          prefetchedPages.add(prefetchKey)
-          await displayToPrewarm.viewModel.fetchPageByPageNumber(
-            location.pageNumber,
-            { runId: run.id }
-          )
-        }
-        if (display !== displayToPrewarm) return
-
-        const recording = findRecordingForRun({
-          narratorId: readerPreferences.narratorId,
-          run,
-          aliyahIndex: aliyah.index,
-        })
-        if (recording) {
-          await getCuesForRecording(recording)
-        }
-      })()
-      void prewarmPromise
-        .catch((error) => {
-          console.error('Failed to prewarm aliyah resources', error)
-        })
-        .finally(() => {
-          if (
-            index < railItems.length &&
-            display === displayToPrewarm &&
-            signature === aliyahResourcePrewarmSignature
-          ) {
-            aliyahResourcePrewarmTimer = scheduleIdleTask(prewarmNext)
-          }
-        })
-    }
-
-    void displayToPrewarm.scrolled.then(() => {
-      if (
-        display !== displayToPrewarm ||
-        signature !== aliyahResourcePrewarmSignature
-      ) {
-        return
-      }
-      aliyahResourcePrewarmTimer = scheduleIdleTask(prewarmNext)
-    })
   }
 
   function setControlIcon(element: HTMLElement | null, icon: IconName) {
@@ -2695,13 +2187,6 @@ export function startReaderRuntime({
     root
       .querySelectorAll<HTMLButtonElement>('.aliyah-start-marker')
       .forEach((marker) => marker.remove())
-
-    const legacyLetters = [...root.querySelectorAll<HTMLElement>('.aliyah-start-letter')]
-    if (legacyLetters.length) {
-      root.querySelectorAll('.aliyah-start-chevron').forEach((marker) => marker.remove())
-      legacyLetters.forEach((letter) => letter.replaceWith(...letter.childNodes))
-      if (root instanceof Node) root.normalize()
-    }
 
     root
       .querySelectorAll<HTMLElement>('[data-line-index][data-aliyah-starts]')
@@ -2757,44 +2242,65 @@ export function startReaderRuntime({
       })
   }
 
-  function getAliyahProgressAnchors(): AliyahProgressAnchor[] {
-    const book = getBook()
-    const bookRect = book.getBoundingClientRect()
-
-    return [...book.querySelectorAll<HTMLElement>('[data-line-index][data-aliyah-starts]')]
-      .map((line) => {
-        const rect = line.getBoundingClientRect()
-        const label = line.querySelector('.aliyah-label-text')?.textContent?.trim() ?? '—'
-        const aliyahStarts = (line.dataset.aliyahStarts ?? '').split(',')
-        const aliyahIndex = parsePlaybackAliyahIndex(aliyahStarts[aliyahStarts.length - 1])
-        const lineInfo = getLineInfoFromElement(line)
-        const progressLabel = aliyahStarts.includes('1') ? 'ראשון' : label
-        return {
-          line,
-          label: progressLabel,
-          run: lineInfo?.run ?? null,
-          aliyahIndex,
-          position: book.scrollTop + (rect.top - bookRect.top),
-        }
-      })
-      .sort((a, b) => a.position - b.position)
-  }
-
-  function getCurrentAliyahFromViewportRange(
-    range: ViewportRange | null,
-    anchors: AliyahProgressAnchor[]
-  ): AliyahProgressAnchor | null {
+  function getCenterLineAliyahMemberships(range: ViewportRange | null) {
     const center = range?.center
     const centerRun = center?.run
+    const activeDisplay = readerDisplaySessionGlobal?.capture()
     const memberships = center
       ? aliyahMembershipsForFocalLine({
-          runs: display?.viewModel.relevantRuns ?? (centerRun ? [centerRun] : []),
+          runs:
+            activeDisplay?.viewModel.relevantRuns ??
+            (centerRun ? [centerRun] : []),
           lineRun: centerRun,
           focalRef: center.focalRef,
           aliyot: center.aliyot,
           aliyahStarts: center.aliyahStarts,
         })
       : []
+
+    return { centerRun, memberships }
+  }
+
+  function progressAnchorForAliyahIdentity(
+    identity: AliyahIdentity | null,
+    centerRun: LeiningRun | undefined,
+    anchors: readonly ReaderProgressAnchor[]
+  ): ReaderProgressAnchor | null {
+    if (!identity) return null
+
+    const activeRun =
+      readerDisplaySessionGlobal
+        ?.capture()
+        ?.viewModel.relevantRuns.find((run) => run.id === identity.runId) ??
+      (centerRun?.id === identity.runId ? centerRun : null)
+    if (!activeRun) return null
+
+    const matchingAnchor = anchors.find(
+      (anchor) =>
+        anchor.run?.id === identity.runId &&
+        anchor.aliyahIndex === identity.index
+    )
+    if (matchingAnchor) {
+      return {
+        ...matchingAnchor,
+        label: formatAliyahLabel(identity.index),
+      }
+    }
+
+    return {
+      line: null,
+      label: formatAliyahLabel(identity.index),
+      run: activeRun,
+      aliyahIndex: identity.index,
+      position: getReaderFocalPointScrollTop(getBook()),
+    }
+  }
+
+  function getCurrentAliyahFromViewportRange(
+    range: ViewportRange | null,
+    anchors: readonly ReaderProgressAnchor[]
+  ): ReaderProgressAnchor | null {
+    const { centerRun, memberships } = getCenterLineAliyahMemberships(range)
 
     let pending: AliyahIdentity | null = pendingAliyahRailSelection
       ? {
@@ -2827,7 +2333,6 @@ export function startReaderRuntime({
       pending,
       explicit: explicitAliyahSelection,
     })
-    if (!activeIdentity) return null
 
     if (
       explicitAliyahSelection &&
@@ -2840,49 +2345,36 @@ export function startReaderRuntime({
       clearExplicitAliyahSelection()
     }
 
-    const activeRun =
-      display?.viewModel.relevantRuns.find((run) => run.id === activeIdentity.runId) ??
-      (centerRun?.id === activeIdentity.runId ? centerRun : null)
-    if (!activeRun) return null
-
-    const matchingAnchor = anchors.find(
-      (anchor) =>
-        anchor.run?.id === activeIdentity.runId &&
-        anchor.aliyahIndex === activeIdentity.index
-    )
-    if (matchingAnchor) {
-      return {
-        ...matchingAnchor,
-        label: formatAliyahLabel(activeIdentity.index),
-      }
-    }
-
-    return {
-      line: null,
-      label: formatAliyahLabel(activeIdentity.index),
-      run: activeRun,
-      aliyahIndex: activeIdentity.index,
-      position: getReaderFocalPointScrollTop(getBook()),
-    }
+    return progressAnchorForAliyahIdentity(activeIdentity, centerRun, anchors)
   }
 
-  function getAliyahProgressAnchorForElement(element: HTMLElement) {
-    const line = element.closest<HTMLElement>('[data-line-index]')
-    if (!line) return null
-
-    const book = getBook()
-    const bookRect = book.getBoundingClientRect()
-    const lineRect = line.getBoundingClientRect()
-    const linePosition = book.scrollTop + (lineRect.top - bookRect.top)
-    const anchors = getAliyahProgressAnchors()
-    let current = anchors[0] ?? null
-
-    for (const anchor of anchors) {
-      if (anchor.position <= linePosition) current = anchor
-      else break
+  function getCrossedAliyahStartAnchor(
+    anchors: readonly ReaderProgressAnchor[],
+    previousPosition: number | null,
+    currentPosition: number
+  ) {
+    if (previousPosition === null || currentPosition === previousPosition) {
+      return null
     }
 
-    return current
+    // Start lines are directional checkpoints: keep the current URL between
+    // crossings, including when its own start line is crossed in reverse.
+    if (currentPosition > previousPosition) {
+      for (let index = anchors.length - 1; index >= 0; index -= 1) {
+        const anchor = anchors[index]
+        if (anchor.position > currentPosition) continue
+        if (anchor.position <= previousPosition) break
+        return anchor
+      }
+      return null
+    }
+
+    for (const anchor of anchors) {
+      if (anchor.position < currentPosition) continue
+      if (anchor.position >= previousPosition) break
+      return anchor
+    }
+    return null
   }
 
   function getFirstVisibleWord(line: HTMLElement) {
@@ -2896,7 +2388,7 @@ export function startReaderRuntime({
     const activeWord = book.querySelector<HTMLElement>('.word.is-active-word')
     if (activeWord) return activeWord
 
-    const centerLine = latestViewportRange?.center
+    const centerLine = readerDisplaySessionGlobal?.viewportRange()?.center
     if (!centerLine) return null
 
     const centerLineElement = [
@@ -2915,33 +2407,8 @@ export function startReaderRuntime({
     if (target?.isConnected) {
       centerElementInScrollRoot(book, target, options)
     }
-    viewportTrackerGlobal?.refresh()
+    readerDisplaySessionGlobal?.refreshViewport()
     invalidateReaderPosition()
-  }
-
-  async function ensureNextProgressAnchorLoaded(currentIndex: number) {
-    const targetDisplay = display
-    const lifetime = readerRuntimeLifetime
-    if (!targetDisplay || !lifetime?.isCurrent()) return
-    if (progressAnchorLoadPromise) return progressAnchorLoadPromise
-
-    const request = (async () => {
-      let anchors = getAliyahProgressAnchors()
-      while (
-        lifetime.isCurrent() &&
-        display === targetDisplay &&
-        anchors.length <= currentIndex + 1
-      ) {
-        const loaded = await targetDisplay.ensureNextContentMounted()
-        if (!lifetime.isCurrent() || display !== targetDisplay) break
-        if (!loaded) break
-        anchors = getAliyahProgressAnchors()
-      }
-    })().finally(() => {
-      if (progressAnchorLoadPromise === request) progressAnchorLoadPromise = null
-    })
-    progressAnchorLoadPromise = request
-    return request
   }
 
   function getLineInfoFromElement(element: Element) {
@@ -2956,8 +2423,11 @@ export function startReaderRuntime({
     const aliyahIndex = parsePlaybackAliyahIndex(button.dataset.aliyahIndex)
     if (!lineInfo || !aliyahIndex) return null
     const runId = button.dataset.runId ?? lineInfo?.run?.id
+    const activeDisplay = readerDisplaySessionGlobal?.capture()
     const run =
-      display?.viewModel.relevantRuns.find((candidate) => candidate.id === runId) ??
+      activeDisplay?.viewModel.relevantRuns.find(
+        (candidate) => candidate.id === runId
+      ) ??
       (lineInfo?.run?.id === runId ? lineInfo.run : null) ??
       (runId ? createCalendarGenerator().parseId(runId) : null)
     if (!run) return null
@@ -3023,7 +2493,7 @@ export function startReaderRuntime({
         isAliyahCueStatusUnfinished(cueStatus)
       )
       const isCurrentSession = isCurrentPlaybackTarget({
-        recording: undefined,
+        recording: state?.recording,
         runId: state?.run.id,
         aliyahIndex: state?.aliyahIndex,
       })
@@ -3055,7 +2525,7 @@ export function startReaderRuntime({
   }
 
   function syncAliyahNavigationToolbar(
-    current: ReturnType<typeof getAliyahProgressAnchors>[number] | null
+    current: ReaderProgressAnchor | null
   ) {
     const playback = readerPlaybackGlobal?.snapshot()
     const recording =
@@ -3096,7 +2566,7 @@ export function startReaderRuntime({
         !isTableOfContentsVisible
     )
     const isCurrentSession = isCurrentPlaybackTarget({
-      recording: undefined,
+      recording,
       runId: current?.run?.id,
       aliyahIndex: current?.aliyahIndex,
     })
@@ -3176,20 +2646,22 @@ export function startReaderRuntime({
     runId: string
     aliyahIndex: PlaybackAliyahIndex
   }) {
-    const targetDisplay = display
-    const lifetime = readerRuntimeLifetime
-    if (!targetDisplay || !lifetime?.isCurrent()) return []
+    const displaySession = getReaderDisplaySession()
+    const activeDisplay = displaySession.capture()
+    if (!activeDisplay) return []
     const run =
-      targetDisplay.viewModel.relevantRuns.find((candidate) => candidate.id === runId) ??
+      activeDisplay.viewModel.relevantRuns.find(
+        (candidate) => candidate.id === runId
+      ) ??
       createCalendarGenerator().parseId(runId)
     const aliyah = findAliyahInRun(run, aliyahIndex)
     if (!run || !aliyah) return []
 
-    const resolver = await targetDisplay.viewModel.resolver
-    if (!lifetime.isCurrent() || display !== targetDisplay) return []
+    const resolver = await activeDisplay.viewModel.resolver
+    if (!activeDisplay.isCurrent()) return []
     const startLocation = resolver.physicalLocationFromRef(aliyah.start)
     const endLocation = resolver.physicalLocationFromRef(aliyah.end)
-    pageVirtualizationEvictionPauseDepth += 1
+    const virtualizationPause = displaySession.pauseEviction()
     try {
       // The verse containing the ending reference may continue on the next page.
       for (
@@ -3197,18 +2669,21 @@ export function startReaderRuntime({
         pageNumber <= endLocation.pageNumber + 1;
         pageNumber++
       ) {
-        await targetDisplay.ensurePageMounted(pageNumber)
-        if (!lifetime.isCurrent() || display !== targetDisplay) return []
+        await activeDisplay.ensurePageMounted(pageNumber)
+        if (!activeDisplay.isCurrent()) return []
       }
     } finally {
-      pageVirtualizationEvictionPauseDepth = Math.max(
-        0,
-        pageVirtualizationEvictionPauseDepth - 1
-      )
+      virtualizationPause.release()
     }
 
-    const startLine = getRenderedLineForLocation(startLocation, targetDisplay)
-    const endLine = getRenderedLineForLocation(endLocation, targetDisplay)
+    const startLine = displaySession.getRenderedLineForLocation(
+      startLocation,
+      activeDisplay
+    )
+    const endLine = displaySession.getRenderedLineForLocation(
+      endLocation,
+      activeDisplay
+    )
     if (!startLine || !endLine) return []
     const startLineInfo = getLineInfoFromElement(startLine)
     const endLineInfo = getLineInfoFromElement(endLine)
@@ -3227,9 +2702,7 @@ export function startReaderRuntime({
       endLine,
       endVerseOrdinal,
     })
-    return lifetime.isCurrent() && display === targetDisplay
-      ? [...tokenKeys]
-      : []
+    return activeDisplay.isCurrent() ? [...tokenKeys] : []
   }
 
   async function loadAliyahForAudioAuthoring(
@@ -3270,6 +2743,7 @@ export function startReaderRuntime({
     selectAliyah({ runId: state.run.id, index: state.aliyahIndex })
 
     if (readerPlayback.isTargetActive({
+      recordingId: state.recording?.id ?? null,
       runId: state.run.id,
       aliyahIndex: state.aliyahIndex,
     })) {
@@ -3280,12 +2754,6 @@ export function startReaderRuntime({
         await readerPlayback.restoreActiveHighlight({ scroll: true })
       }
       await playback
-      return
-    }
-
-    if (
-      !canPlayNetworkRecording(() => startPlaybackForButton(button))
-    ) {
       return
     }
 
@@ -3315,8 +2783,11 @@ export function startReaderRuntime({
     const readerPlayback = readerPlaybackGlobal
     if (!readerPlayback) return
     const actionToken = playbackAction.start()
+    const activeDisplay = readerDisplaySessionGlobal?.capture()
     const run =
-      display?.viewModel.relevantRuns.find((candidate) => candidate.id === runId) ??
+      activeDisplay?.viewModel.relevantRuns.find(
+        (candidate) => candidate.id === runId
+      ) ??
       createCalendarGenerator().parseId(runId)
     if (!run) return
 
@@ -3329,7 +2800,11 @@ export function startReaderRuntime({
     )
     if (!authoringTarget && !availability.available) return
 
-    if (readerPlayback.isTargetActive({ runId, aliyahIndex })) {
+    if (readerPlayback.isTargetActive({
+      recordingId: availability.recording?.id ?? null,
+      runId,
+      aliyahIndex,
+    })) {
       selectAliyah({ runId, index: aliyahIndex })
       await readerPlayback.toggle(() =>
         startPlaybackForToolbarCurrentAliyah({ runId, aliyahIndex })
@@ -3339,9 +2814,6 @@ export function startReaderRuntime({
 
     const retry = () =>
       startPlaybackForToolbarCurrentAliyah({ runId, aliyahIndex })
-    if (!authoringTarget && !canPlayNetworkRecording(retry)) {
-      return
-    }
     if (!authoringTarget) {
       authorizePlaybackForUserGesture(
         availability.recording,
@@ -3349,7 +2821,10 @@ export function startReaderRuntime({
       )
     }
 
-    const target = await ensureAliyahDomTargetRendered(runId, aliyahIndex)
+    const target = await getReaderDisplaySession().ensureAliyahDomTargetRendered(
+      runId,
+      aliyahIndex
+    )
     if (!playbackAction.isCurrent(actionToken)) return
     const marker = target?.marker ?? target?.element
     if (!marker) return
@@ -3373,87 +2848,85 @@ export function startReaderRuntime({
     await readerPlayback.play(retry)
   }
 
-  function presentReaderPosition(range: ViewportRange | null = latestViewportRange) {
+  function presentReaderPosition(
+    range: ViewportRange | null =
+      readerDisplaySessionGlobal?.viewportRange() ?? null
+  ) {
     const book = getBook()
-    const anchors = getAliyahProgressAnchors()
-
-    if (!anchors.length) {
-      getReaderShell().setProgress({ label: 'Loading', percent: 0 })
-      syncAliyahNavigationToolbar(
-        null
-      )
-      readerControlsGlobal?.sync()
-      syncAliyahNavigationContent(range)
-      return
-    }
-
-    const viewportCenter = getReaderFocalPointScrollTop(book)
-
-    let currentIndex = 0
-    for (let i = 0; i < anchors.length; i++) {
-      if (anchors[i].position <= viewportCenter) currentIndex = i
-      else break
-    }
-
-    const current = anchors[currentIndex]
-    const currentForChrome = getCurrentAliyahFromViewportRange(range, anchors) ?? current
-    getReaderShell().setProgress({ label: currentForChrome?.label ?? '—' })
-    syncAliyahNavigationToolbar(
-      currentForChrome ?? null
-    )
-    readerControlsGlobal?.sync()
-    syncAliyahNavigationContent(range)
-    const matchingProgressIndex =
-      currentForChrome && currentForChrome.line
-        ? anchors.findIndex((anchor) => anchor.line === currentForChrome.line)
-        : currentIndex
-    const progressIndex =
-      matchingProgressIndex >= 0 ? matchingProgressIndex : currentIndex
-    const progressCurrent = anchors[progressIndex] ?? current
-    const next = anchors[progressIndex + 1]
-    const progressEndPosition = next?.position ?? (
-      isLastAliyahProgressAnchor(progressCurrent)
-        ? Math.max(progressCurrent.position + 1, book.scrollHeight)
+    const progressSnapshot = getReaderDisplaySession().progressSnapshot()
+    const anchors = progressSnapshot.anchors
+    const viewportCenter = anchors.length
+      ? getReaderFocalPointScrollTop(book)
+      : 0
+    const crossedAliyahStart =
+      readerUrlScrollPending && anchors.length
+        ? getCrossedAliyahStartAnchor(
+            anchors,
+            readerUrlPreviousFocalPosition,
+            viewportCenter
+          )
         : null
-    )
+    if (readerUrlSyncArmed) {
+      readerUrlPreviousFocalPosition = viewportCenter
+      readerUrlScrollPending = false
+    }
+    const presentation = resolveReaderProgressPresentation<ReaderProgressAnchor>({
+      source: progressSnapshot,
+      viewportPosition: viewportCenter,
+      getScrollHeight: () => book.scrollHeight,
+      rangeCurrent: anchors.length
+        ? getCurrentAliyahFromViewportRange(range, anchors)
+        : null,
+      isLastAnchor: isLastAliyahProgressAnchor,
+    })
 
-    if (!progressCurrent || progressEndPosition === null) {
-      if (progressCurrent) {
-        void ensureNextProgressAnchorLoaded(progressIndex)
-          .then(() => invalidateReaderPositionAfterLayout())
-          .catch((error) => {
-            console.error('Failed to load the next reader progress anchor', error)
-          })
-        return
-      }
-      getReaderShell().setProgress({ percent: 0 })
+    if (readerUrlSyncArmed && !recordingMode.enabled) {
+      const hash = readerHashFromAnchor(crossedAliyahStart)
+      if (hash) readerRouteGlobal?.syncScrolledReading(hash)
+    }
+
+    if (presentation.kind === 'empty') {
+      getReaderShell().setProgress({
+        label: presentation.label,
+        percent: presentation.percent,
+      })
+      syncAliyahNavigationToolbar(null)
       readerControlsGlobal?.sync()
-      syncAliyahNavigationContent(range)
+      syncAliyahNavigationContent(range, progressSnapshot)
       return
     }
 
-    const progress = Math.max(
-      0,
-      Math.min(
-        1,
-        (viewportCenter - progressCurrent.position) /
-          (progressEndPosition - progressCurrent.position)
-      )
-    )
-    getReaderShell().setProgress({ percent: progress * 100 })
+    getReaderShell().setProgress({ label: presentation.label })
+    syncAliyahNavigationToolbar(presentation.current)
+    readerControlsGlobal?.sync()
+    syncAliyahNavigationContent(range, progressSnapshot)
+
+    if (presentation.kind === 'request-next-anchor') {
+      void getReaderDisplaySession()
+        .ensureNextProgressAnchorLoaded(presentation.requestNextAnchor.afterIndex)
+        .then(() => invalidateReaderPositionAfterLayout())
+        .catch((error) => {
+          console.error('Failed to load the next reader progress anchor', error)
+        })
+      return
+    }
+
+    getReaderShell().setProgress({ percent: presentation.percent })
   }
 
   function invalidateReaderPositionAfterLayout() {
-    if (readerPresentationGlobal) {
-      readerPresentationGlobal.invalidateAfterLayout('reader-position')
+    if (readerDisplaySessionGlobal) {
+      readerDisplaySessionGlobal.invalidatePresentationAfterLayout(
+        'reader-position'
+      )
       return
     }
     presentReaderPosition()
   }
 
   function invalidateReaderPosition() {
-    if (readerPresentationGlobal) {
-      readerPresentationGlobal.invalidate('reader-position')
+    if (readerDisplaySessionGlobal) {
+      readerDisplaySessionGlobal.invalidatePresentation('reader-position')
       return
     }
     presentReaderPosition()
@@ -3461,14 +2934,9 @@ export function startReaderRuntime({
 
   function presentReaderPlaybackState(readerPositionPresented = false) {
     if (!readerPositionPresented) {
-      const anchors = getAliyahProgressAnchors()
+      const progressSnapshot = getReaderDisplaySession().progressSnapshot()
       const viewportCenter = getReaderFocalPointScrollTop(getBook())
-      let currentIndex = 0
-      for (let index = 0; index < anchors.length; index += 1) {
-        if (anchors[index].position <= viewportCenter) currentIndex = index
-        else break
-      }
-      syncAliyahNavigationToolbar(anchors[currentIndex] ?? null)
+      syncAliyahNavigationToolbar(progressSnapshot.at(viewportCenter).current)
     }
     aliyahNavigationGlobal?.syncPlayback(
       getAliyahNavigationPlayback()
@@ -3476,8 +2944,11 @@ export function startReaderRuntime({
   }
 
   function syncReaderPlaybackChrome() {
-    if (readerPresentationGlobal) {
-      readerPresentationGlobal.invalidate('inline-audio', 'playback-state')
+    if (readerDisplaySessionGlobal) {
+      readerDisplaySessionGlobal.invalidatePresentation(
+        'inline-audio',
+        'playback-state'
+      )
       return
     }
     refreshInlineAudioButtons()
@@ -3485,8 +2956,11 @@ export function startReaderRuntime({
   }
 
   function refreshReaderChrome() {
-    if (readerPresentationGlobal) {
-      readerPresentationGlobal.invalidate('inline-audio', 'reader-position')
+    if (readerDisplaySessionGlobal) {
+      readerDisplaySessionGlobal.invalidatePresentation(
+        'inline-audio',
+        'reader-position'
+      )
       return
     }
     refreshInlineAudioButtons()
@@ -3503,13 +2977,44 @@ export function startReaderRuntime({
       ? getReaderFocalPointScrollTarget(getBook())
       : null
 
-    readerPreferences = mergeReaderPreferences(readerPreferences, updates)
+    let nextPreferences = mergeReaderPreferences(readerPreferences, updates)
     try {
-      saveReaderPreferences(readerPreferences)
+      readerPreferencesRevision = saveReaderPreferences(
+        nextPreferences,
+        readerPreferencesRevision
+      )
     } catch (error) {
       console.error('Failed to save reader preferences', error)
-      showPersistenceNotice('Reader settings will apply now but could not be saved.')
+      if (
+        error instanceof ReaderPreferencesStorageError &&
+        error.cause instanceof PersistedStateConflictError &&
+        error.cause.reason === 'conflict'
+      ) {
+        const latest = loadReaderPreferencesState()
+        const rebasedPreferences = mergeReaderPreferences(
+          latest.preferences,
+          updates
+        )
+        try {
+          readerPreferencesRevision = saveReaderPreferences(
+            rebasedPreferences,
+            latest.revision
+          )
+          nextPreferences = rebasedPreferences
+        } catch (retryError) {
+          console.error(
+            'Failed to save reader preferences after refreshing browser state',
+            retryError
+          )
+          showPersistenceNotice(
+            'Reader settings changed in another tab. This change applies now but could not be saved.'
+          )
+        }
+      } else {
+        showPersistenceNotice('Reader settings will apply now but could not be saved.')
+      }
     }
+    readerPreferences = nextPreferences
     applyReaderPreferences(readerPreferences)
     recenterReaderFocalPoint(scrollTarget, { behavior: 'smooth' })
     refreshReaderChrome()
@@ -3520,6 +3025,7 @@ export function startReaderRuntime({
     let recenterFrame = 0
 
     const handleResize = () => {
+      readerDisplaySessionGlobal?.invalidateProgressAnchors('viewport-resized')
       pendingScrollTarget ??= getReaderFocalPointScrollTarget(book)
       setAppHeight()
       if (recenterFrame) return
@@ -3555,26 +3061,20 @@ export function startReaderRuntime({
     document.documentElement.dataset.recordingMode = 'true'
   }
 
+  const loadedReaderPreferences = loadReaderPreferencesState()
+  readerPreferencesRevision = loadedReaderPreferences.revision
   readerPreferences = recordingMode.enabled
-    ? applyRecordingModePreferences(loadReaderPreferences())
-    : loadReaderPreferences()
+    ? applyRecordingModePreferences(loadedReaderPreferences.preferences)
+    : loadedReaderPreferences.preferences
   applyReaderPreferences(readerPreferences)
-  bookmarks = loadBookmarks(
+  const loadedBookmarks = loadBookmarksState(
     browserLocalStorage,
     isSemanticallyRoutableReaderHash
   )
+  bookmarks = loadedBookmarks.bookmarks
+  bookmarkRevision = loadedBookmarks.revision
 
   const destroy = mountReaderRuntime((scope) => {
-  window.tikkunReaderDiagnostics = getReaderDiagnosticsSnapshot
-  window.tikkunReaderVirtualization = readerVirtualizationDiagnostics
-  scope.own(() => {
-    if (window.tikkunReaderDiagnostics === getReaderDiagnosticsSnapshot) {
-      delete window.tikkunReaderDiagnostics
-    }
-    if (window.tikkunReaderVirtualization === readerVirtualizationDiagnostics) {
-      delete window.tikkunReaderVirtualization
-    }
-  })
   const readerShell = createReaderShell(scope, {
     document,
     initialTitle: INITIAL_READER_TITLE,
@@ -3603,44 +3103,90 @@ export function startReaderRuntime({
   })
 
   const topBarModel = new TopBarTracker()
-  const readerPresentation = createReaderPresentationScheduler({
+  const readerDisplaySession = createReaderDisplaySession({
+    document,
+    view: window,
+    root: book,
+    search: location.search,
     frame: {
       request: requestAnimationFrame,
       cancel: cancelAnimationFrame,
     },
-    present: ({ invalidations }) => {
-      const viewportTitleInvalidated = invalidations.includes('viewport-title')
-      const readerPositionInvalidated = invalidations.includes('reader-position')
-      const playbackStateInvalidated = invalidations.includes('playback-state')
-
-      if (
-        viewportTitleInvalidated &&
-        display?.viewModel &&
-        latestViewportRange
-      ) {
-        topBarModel.setLine(display.viewModel, latestViewportRange)
-        const run = topBarModel.info.currentRun
-        readerRouteGlobal?.setTitle(
-          formatTopBarTitle(
-            run ? display.viewModel.displayTitleForRun(run) : undefined
+    timer: {
+      set: (callback, delayMs) => window.setTimeout(callback, delayMs),
+      clear: (handle) => window.clearTimeout(handle),
+    },
+    background: {
+      request: scheduleIdleTask,
+      delay: (callback, delayMs) => window.setTimeout(callback, delayMs),
+      cancel: cancelIdleTask,
+    },
+    effects: {
+      beforeDisplayReplacement() {
+        resolvedAliyahCueStatuses.clear()
+      },
+      resetDisplayResources,
+      afterDisplayReplacementReset: syncAliyahNavigationContent,
+      displayCreated(display) {
+        readerPlaybackGlobal?.setDisplay(display)
+      },
+      displayDeactivating() {
+        offlineRecordingPromptGlobal?.clearPlaybackFailure()
+      },
+      resolveRun: (runId) => createCalendarGenerator().parseId(runId),
+      getPlaybackProtectedPageNumbers: (forwardPageCount) =>
+        readerPlaybackGlobal?.protectedCuePageNumbers(forwardPageCount) ?? [],
+      isPlaybackActive,
+      async prewarmCueData({ run, aliyahIndex }) {
+        const recording = findRecordingForRun({
+          narratorId: readerPreferences.narratorId,
+          run,
+          aliyahIndex,
+        })
+        if (recording) await getCuesForRecording(recording)
+      },
+      present(invalidations) {
+        const viewportTitleInvalidated = invalidations.includes('viewport-title')
+        const readerPositionInvalidated = invalidations.includes('reader-position')
+        const playbackStateInvalidated = invalidations.includes('playback-state')
+        const activeDisplay = readerDisplaySessionGlobal?.capture()
+        const viewportRange = readerDisplaySessionGlobal?.viewportRange() ?? null
+        if (
+          viewportTitleInvalidated &&
+          activeDisplay &&
+          viewportRange
+        ) {
+          topBarModel.setLine(activeDisplay.viewModel, viewportRange)
+          const run = topBarModel.info.currentRun
+          readerRouteGlobal?.setTitle(
+            formatTopBarTitle(
+              run
+                ? activeDisplay.viewModel.displayTitleForRun(run)
+                : undefined
+            )
           )
-        )
-      }
-      if (invalidations.includes('inline-audio')) refreshInlineAudioButtons()
-      if (readerPositionInvalidated) presentReaderPosition()
-      if (playbackStateInvalidated) {
-        presentReaderPlaybackState(readerPositionInvalidated)
-      }
+        }
+        if (invalidations.includes('inline-audio')) refreshInlineAudioButtons()
+        if (readerPositionInvalidated) {
+          presentReaderPosition()
+        }
+        if (playbackStateInvalidated) {
+          presentReaderPlaybackState(readerPositionInvalidated)
+        }
+      },
+      reportError(message, error) {
+        if (message) console.error(message, error)
+        else console.error(error)
+      },
     },
   })
-  readerPresentationGlobal = readerPresentation
+  readerDisplaySessionGlobal = readerDisplaySession
   scope.own(() => {
-    readerPresentation.destroy()
-    if (readerPresentationGlobal === readerPresentation) {
-      readerPresentationGlobal = null
+    readerDisplaySession.destroy()
+    if (readerDisplaySessionGlobal === readerDisplaySession) {
+      readerDisplaySessionGlobal = null
     }
   })
-
   const readerPlayback = createReaderPlayback(scope, {
     document,
     view: window,
@@ -3673,18 +3219,15 @@ export function startReaderRuntime({
       },
       display: {
         resolveRun: (runId) =>
-          display?.viewModel.relevantRuns.find(
+          readerDisplaySession.capture()?.viewModel.relevantRuns.find(
             (candidate) => candidate.id === runId
           ) ??
           createCalendarGenerator().parseId(runId),
         collectTokenKeys: collectAliyahTokenKeysFromDisplay,
-        waitUntilReady: async () => {
-          await display?.rendered
-          await display?.scrolled
-        },
+        waitUntilReady: () => readerDisplaySession.waitUntilReaderReady(),
         resolveRunForRecording: (recording) =>
           isParshaAudioRecording(recording)
-            ? display?.viewModel.relevantRuns.find(
+            ? readerDisplaySession.capture()?.viewModel.relevantRuns.find(
                 (candidate) =>
                   parshaSlugForRun(candidate) === recording.parshaSlug
               ) ?? null
@@ -3693,47 +3236,53 @@ export function startReaderRuntime({
       authoring: {
         isActive: () => cueAuthoringGlobal?.isActive() ?? false,
         isVisible: () => cueAuthoringGlobal?.isVisible() ?? false,
-        getSession: () => cueAuthoringGlobal?.getSession() ?? null,
-        bindSession: async (session) => {
-          await cueAuthoringGlobal?.bindSession(session)
+        hasSession: () => Boolean(cueAuthoringGlobal?.getSession()),
+        bindSession: async () => {
+          await cueAuthoringGlobal?.bindSession()
         },
         clearSession: () => cueAuthoringGlobal?.clearSession(),
       },
       getNarratorId: () => readerPreferences.narratorId,
       recordingMode: recordingMode.enabled,
     },
-    canUseNetwork: canPlayNetworkRecording,
   })
   readerPlaybackGlobal = readerPlayback
   scope.own(
-    readerPlayback.subscribe((change) => {
+    readerPlayback.subscribe((change, snapshot) => {
       if (change.type === 'reader-chrome') {
+        if (snapshot.playing) {
+          offlineRecordingPromptGlobal?.clearPlaybackFailure()
+        }
         syncReaderPlaybackChrome()
       } else if (change.type === 'aliyah-playback') {
         aliyahNavigationGlobal?.syncPlayback(
           getAliyahNavigationPlayback()
         )
       } else if (change.type === 'session-loaded') {
+        offlineRecordingPromptGlobal?.clearPlaybackFailure()
         refreshInlineAudioButtons()
         void loadIssuesForActiveSession()
         invalidateAliyahCueStatuses()
         syncAliyahNavigationContent()
+        readerSettingsGlobal?.sync()
       } else if (change.type === 'segment-updated') {
         void loadIssuesForActiveSession()
+        readerSettingsGlobal?.sync()
       } else if (change.type === 'active-token-changed') {
         syncActiveReaderIssueNotice()
       } else if (change.type === 'playback-error') {
-        console.error(
-          `Audio playback failed for ${change.recording.id}`,
-          change.error
-        )
-        showReaderNotice(
-          'This recording could not play. Check your connection and try again.',
-          { assertive: true }
-        )
+        if (navigator.onLine) {
+          console.error(
+            `Audio playback failed for ${change.recording.id}`,
+            change.error
+          )
+          showReaderNotice(
+            'This recording could not play. Check your connection and try again.',
+            { assertive: true }
+          )
+        }
       } else if (change.type === 'offline-media-error') {
-        offlineRecordingPromptGlobal?.show({ force: true })
-        setPendingNetworkRecordingRetry(change.retry)
+        recordOfflinePlaybackFailure(change.retry)
       }
     })
   )
@@ -3750,17 +3299,14 @@ export function startReaderRuntime({
       module.createCueAuthoring(cueScope, {
         document,
         view: window,
-        audioController: cuePlayback.audioController,
-        highlightController: cuePlayback.highlightController,
+        playback: cuePlayback,
         localStorage: browserLocalStorage,
         sessionStorage: browserSessionStorage,
-        prepareAuthoringSession: cuePlayback.prepareAuthoringSession,
-        restoreReaderSession: cuePlayback.restoreReaderSession,
-        playNetworkRecording: cuePlayback.playNetworkRecording,
         getAutoScroll: () => readerPreferences.autoScrollWithPlayback,
         getActiveTokenKey,
-        getDisplayTime: cuePlayback.getDisplayTime,
-        getRecordingIssues: () => activeRecordingIssues,
+        getMergedRecordingIssues: () => mergedRecordingIssues,
+        getLocalRecordingIssues: () => localRecordingIssues,
+        getLocalRecordingIssueRevision: () => localRecordingIssueRevision,
         focusReader: focusReaderSurface,
         formatDuration,
         onChange: (change: CueAuthoringChange) => {
@@ -3781,8 +3327,13 @@ export function startReaderRuntime({
         onCueNavigationChange: (index) => {
           void cuePlayback.setCueIndex(index)
         },
-        onRecordingIssuesChanged: (issues) => {
-          activeRecordingIssues = issues
+        onLocalRecordingIssuesChanged: (issues, revision) => {
+          localRecordingIssues = issues
+          localRecordingIssueRevision = revision
+          mergedRecordingIssues = mergePublishedAndLocalRecordingIssues(
+            publishedRecordingIssues,
+            localRecordingIssues
+          )
           applyReaderVisibleIssueMarkers()
           syncActiveReaderIssueNotice()
           refreshReaderSearch()
@@ -3841,7 +3392,6 @@ export function startReaderRuntime({
   const offlineRecordingPrompt = createOfflineRecordingPrompt(scope, {
     document,
     view: window,
-    isOnline: () => navigator.onLine,
     onRetryError: (error) => {
       console.error('Failed to retry recording after reconnecting', error)
     },
@@ -3901,16 +3451,6 @@ export function startReaderRuntime({
     listenForRevealGesture(scope, book)
     setupReaderViewportResize(scope, book)
 
-    const viewportTracker = new ViewportTracker(book)
-    viewportTrackerGlobal = viewportTracker
-    scope.own(() => {
-      viewportTracker.destroy()
-      if (viewportTrackerGlobal === viewportTracker) {
-        viewportTrackerGlobal = null
-        latestViewportRange = null
-      }
-    })
-
     const readerSettings = createLazyReaderSettings(scope, {
       document,
       view: window,
@@ -3928,6 +3468,8 @@ export function startReaderRuntime({
         'serviceWorker' in window.navigator
           ? window.navigator.serviceWorker
           : null,
+      getCurrentRecording: () =>
+        readerPlayback.snapshot().session?.activeRecording ?? null,
       onLoadError: (error) => {
         console.error('Failed to load Reader Settings', error)
         showPersistenceNotice(
@@ -3942,24 +3484,29 @@ export function startReaderRuntime({
       }
     })
     setupDebugControls(scope)
-    scope.own(
-      viewportTracker.on('viewport-updated', (range) => {
-        if (!display?.viewModel) return
-        latestViewportRange = range
-        readerPresentation.invalidate(
-          'viewport-title',
-          'reader-position'
-        )
-      })
-    )
   const saveLastReadingDebounced = debounce(() => saveCurrentLastReading(), 1000)
   scope.own(saveLastReadingDebounced.cancel)
 
+  const armReaderUrlSync = () => {
+    if (!readerUrlSyncArmed || readerUrlPreviousFocalPosition === null) {
+      readerUrlPreviousFocalPosition = getReaderFocalPointScrollTop(book)
+    }
+    readerUrlSyncArmed = true
+  }
+
   const markUserScrolledReaderForLastReading: (_event?: Event) => void = () => {
     hasUserScrolledReaderForLastReading = true
+    armReaderUrlSync()
     lastReadingPromptGlobal?.dismiss()
   }
 
+  book.addEventListener('pointerdown', armReaderUrlSync, {
+    passive: true,
+    signal: scope.signal,
+  })
+  book.addEventListener('keydown', armReaderUrlSync, {
+    signal: scope.signal,
+  })
   book.addEventListener('wheel', markUserScrolledReaderForLastReading, {
     passive: true,
     signal: scope.signal,
@@ -3998,19 +3545,20 @@ export function startReaderRuntime({
   book.addEventListener(
     'scroll',
     () => {
-      const scrollTop = book.scrollTop
-      const previousScrollTop = lastAliyahRailScrollTop
-      lastAliyahRailScrollTop = scrollTop
-      extendPendingAliyahRailSelectionForScroll()
-      if (
-        previousScrollTop !== null &&
-        Math.abs(scrollTop - previousScrollTop) >= 28 &&
-        !readerPlayback.snapshot().playing
-      ) {
-        aliyahNavigationGlobal?.revealWideForMovement()
-      }
-      readerPresentation.invalidate('reader-position')
-      scheduleViewportPlaceholderRemount()
+      if (readerUrlSyncArmed) readerUrlScrollPending = true
+      readerDisplaySession.onReaderScroll(() => {
+        const scrollTop = book.scrollTop
+        const previousScrollTop = lastAliyahRailScrollTop
+        lastAliyahRailScrollTop = scrollTop
+        extendPendingAliyahRailSelectionForScroll()
+        if (
+          previousScrollTop !== null &&
+          Math.abs(scrollTop - previousScrollTop) >= 28 &&
+          !readerPlayback.snapshot().playing
+        ) {
+          aliyahNavigationGlobal?.revealWideForMovement()
+        }
+      })
       if (hasUserScrolledReaderForLastReading) saveLastReadingDebounced()
     },
     { signal: scope.signal }
@@ -4023,14 +3571,13 @@ export function startReaderRuntime({
       const pageRoot = renderedPage instanceof Element ? renderedPage : book
       applyAnnotationMode(pageRoot, annotationsEnabled)
       scheduleSpecialLetterAlignment(pageRoot, scope.signal)
-      indexAliyahDomTargets(pageRoot)
-      applyAliyahStartWordMarkers(book, pageRoot)
-      applyRecordingModePageLabels(pageRoot)
-      applyReaderVisibleIssueMarkers(pageRoot)
-      applyPageVirtualization()
+      readerDisplaySession.pageRendered(pageRoot, () => {
+        applyAliyahStartWordMarkers(book, pageRoot)
+        applyRecordingModePageLabels(pageRoot)
+        applyReaderVisibleIssueMarkers(pageRoot)
+      })
       if (isPlaybackActive()) return
       refreshReaderChrome()
-      invalidateReaderPositionAfterLayout()
       void readerPlayback.syncHighlight({ scroll: false })
     },
     { signal: scope.signal }
@@ -4041,22 +3588,9 @@ export function startReaderRuntime({
     (event) => {
       const pageNumber =
         event instanceof CustomEvent ? event.detail?.pageNumber : null
-      if (Number.isInteger(pageNumber)) {
-        unindexAliyahDomTargetsForPage(pageNumber)
-        pageVirtualizationMetrics.recordPageEvicted(pageNumber)
-      }
-    },
-    { signal: scope.signal }
-  )
-
-  book.addEventListener(
-    'page-remounted',
-    (event) => {
-      const pageNumber =
-        event instanceof CustomEvent ? event.detail?.pageNumber : null
-      if (Number.isInteger(pageNumber)) {
-        pageVirtualizationMetrics.recordPageRemounted(pageNumber)
-      }
+      readerDisplaySession.pageEvicted(
+        Number.isInteger(pageNumber) ? pageNumber : null
+      )
     },
     { signal: scope.signal }
   )
@@ -4067,7 +3601,9 @@ export function startReaderRuntime({
     if (playButton) {
       event.preventDefault()
       await startPlaybackForButton(playButton)
-      saveLastReadingFromAnchor(getAliyahProgressAnchorForElement(playButton))
+      saveLastReadingFromAnchor(
+        readerDisplaySession.progressAnchorForElement(playButton)
+      )
       focusReaderSurface()
       return
     }
@@ -4095,7 +3631,7 @@ export function startReaderRuntime({
         focusRow: true,
       })
       syncAliyahNavigationToolbar(
-        getAliyahProgressAnchorForElement(word)
+        readerDisplaySession.progressAnchorForElement(word)
       )
       return
     }
@@ -4104,17 +3640,19 @@ export function startReaderRuntime({
       if (!document.body.contains(word)) return
       word.click()
     }
-    if (cue && playback.paused && !canPlayNetworkRecording(retry)) return
     const activeElement = await readerPlayback.activateSessionToken(tokenKey, {
       play: Boolean(cue),
       seekToCue: Boolean(cue),
       retry,
       scroll: readerPreferences.autoScrollWithPlayback,
     })
-    syncAliyahNavigationToolbar(
-      getAliyahProgressAnchorForElement(activeElement ?? word)
+    const progressAnchor = readerDisplaySession.progressAnchorForElement(
+      activeElement ?? word
     )
-    saveLastReadingFromAnchor(getAliyahProgressAnchorForElement(activeElement ?? word))
+    syncAliyahNavigationToolbar(
+      progressAnchor
+    )
+    saveLastReadingFromAnchor(progressAnchor)
   }, { signal: scope.signal })
 
   const temporaryShiftToggle = createTemporaryShiftToggle({
@@ -4168,6 +3706,7 @@ export function startReaderRuntime({
   )
 
   document.addEventListener('click', (event) => {
+    if (event.defaultPrevented) return
     const link = (event.target as HTMLElement).closest<HTMLAnchorElement>(
       'a[href^="#/"]'
     )
@@ -4221,12 +3760,10 @@ export function startReaderRuntime({
         mountRecordingHarness(scope, {
           document,
           view: window,
-          ...harnessPlayback,
-          isReaderReady: () => Boolean(display),
-          waitUntilReaderReady: async () => {
-            await display?.rendered
-            await display?.scrolled
-          },
+          playback: harnessPlayback,
+          isReaderReady: () => readerDisplaySession.isReaderReady(),
+          waitUntilReaderReady: () =>
+            readerDisplaySession.waitUntilReaderReady(),
           getBook,
         })
       })
@@ -4259,17 +3796,20 @@ export function startReaderRuntime({
       },
       openAbout: () => view.location.assign(aboutHref),
       readerRouteChanged: (nextReaderHash) => {
+        readerUrlSyncArmed = false
+        readerUrlPreviousFocalPosition = null
+        readerUrlScrollPending = false
         if (explicitAliyahSelectionHash !== nextReaderHash) {
           clearExplicitAliyahSelection()
         }
         resetReaderSideNavigationState()
-        latestViewportRange = null
+        readerDisplaySession.resetViewport()
         readerControlsGlobal?.close()
         closeAliyahStartPopup()
         aliyahNavigationGlobal?.revealWide('peek')
       },
       readerReady: () => {
-        const lifetime = readerRuntimeLifetime
+        const lifetime = readerDisplaySession.capture()
         refreshReaderChrome()
         if (readerPlaybackGlobal === readerPlayback) {
           void readerPlayback
@@ -4308,6 +3848,10 @@ export function startReaderRuntime({
         showPersistenceNotice(
           'The Reading Index could not be opened. Reload this page to try again.'
         )
+      },
+      captureReadingPosition: captureCurrentLastReading,
+      showReturnToPreviousReading: (lastReading) => {
+        lastReadingPromptGlobal?.show(lastReading, 'return')
       },
       dismissLastReadingPrompt: () => lastReadingPromptGlobal?.dismiss(),
       saveReadingPosition: saveCurrentLastReading,

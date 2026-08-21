@@ -6,6 +6,7 @@ import {
   type ReaderControlsOptions,
   type ReaderControlsState,
 } from './reader-controls.ts'
+import '../../css/master.css'
 
 let fixture: HTMLElement
 let destroy: (() => void) | null = null
@@ -72,6 +73,21 @@ test('synchronizes wide and compact controls through one action interface', () =
     required('[data-target-id="toolbar-overflow-annotations-label"]')
       .textContent
   ).toContain('Hide Vowels')
+  const annotationsAction = required<HTMLButtonElement>(
+    '[data-toolbar-overflow-action="annotations"]'
+  )
+  const annotationsIcon = required(
+    '[data-target-id="toolbar-overflow-annotations-icon"]'
+  )
+  expect(annotationsAction.getAttribute('aria-pressed')).toBe('true')
+  expect(getComputedStyle(annotationsIcon).fontFamily).toContain(
+    'ShlomosemiStam'
+  )
+  expect(annotationsIcon.querySelector('.toggle.mod-compact')).not.toBeNull()
+  expect(annotationsIcon.querySelector('.toggle-state.mod-off')?.textContent).toBe('א')
+  expect(annotationsIcon.querySelector('.toggle-state.mod-on')?.textContent).toBe(
+    'אֶ֨'
+  )
 
   required<HTMLButtonElement>(
     '[data-toolbar-overflow-action="aliyah-rail"]'
@@ -86,9 +102,7 @@ test('synchronizes wide and compact controls through one action interface', () =
   expect(actions.showAliyahStarts).toHaveBeenCalledOnce()
 
   toggle.click()
-  required<HTMLButtonElement>(
-    '[data-toolbar-overflow-action="annotations"]'
-  ).click()
+  annotationsAction.click()
   expect(actions.toggleAnnotations).toHaveBeenCalledOnce()
 
   toggle.click()
@@ -119,6 +133,7 @@ test('synchronizes wide and compact controls through one action interface', () =
     required('[data-target-id="toolbar-overflow-annotations-label"]')
       .textContent
   ).toContain('Show Vowels')
+  expect(annotationsAction.getAttribute('aria-pressed')).toBe('false')
 })
 
 test('owns menu focus, outside dismissal, and replacement cleanup', () => {

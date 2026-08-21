@@ -27,7 +27,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '22.x'
+          node-version: '22.23.2'
           cache: 'npm'
 
       - name: Use pinned npm
@@ -39,5 +39,5 @@ jobs:
       - name: Install critical browsers
         run: npx playwright install --with-deps chromium webkit
 
-      - name: Verify product
-        run: npm run verify
+      - name: Verify release
+        run: npm run verify:release

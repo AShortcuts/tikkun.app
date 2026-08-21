@@ -63,7 +63,7 @@ Valid Esther page range: `1-17`.
 /reader/#/run/{date}:{service},{run-type}/{book}-{chapter}-{verse}
 ```
 
-## Legacy Torah Ref Route
+## Torah Ref Route
 
 ```text
 /reader/#/r/{book}-{chapter}-{verse}
@@ -79,4 +79,4 @@ Cue Analytics remains an internal Reader tool.
 /reader/#/about/cue-analytics
 ```
 
-`#/about` redirects to the public `/about/` page. Reader hashes opened at the site root redirect to `/reader/#/...` for backward compatibility.
+`#/about` redirects from Reader to the public `/about/` page.

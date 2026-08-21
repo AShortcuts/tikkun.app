@@ -109,8 +109,48 @@ const weeklyParshaRoutes: WeeklyParshaRoute[] = [
   { kind: 'weekly', canonicalSlug: 'haazinu', titleSlugs: ['haazinu'] },
 ]
 
+const combinedWeeklyParshaRoutes: WeeklyParshaRoute[] = [
+  {
+    kind: 'weekly',
+    canonicalSlug: 'vayakhel-pekudei',
+    titleSlugs: ['vayakhelpekudei'],
+  },
+  {
+    kind: 'weekly',
+    canonicalSlug: 'tazria-metzora',
+    titleSlugs: ['tazriametzora'],
+  },
+  {
+    kind: 'weekly',
+    canonicalSlug: 'achrei-mot-kedoshim',
+    titleSlugs: ['achrei-motkedoshim'],
+  },
+  {
+    kind: 'weekly',
+    canonicalSlug: 'behar-bechukotai',
+    titleSlugs: ['beharbechukotai'],
+  },
+  {
+    kind: 'weekly',
+    canonicalSlug: 'chukat-balak',
+    titleSlugs: ['chukatbalak'],
+  },
+  {
+    kind: 'weekly',
+    canonicalSlug: 'matot-masei',
+    titleSlugs: ['matotmasei'],
+  },
+  {
+    kind: 'weekly',
+    canonicalSlug: 'nitzavim-vayelech',
+    titleSlugs: ['nitzavimvayeilech'],
+    aliases: ['nitzavim-vayeilech'],
+  },
+]
+
 export const parshaRouteSpecs: ParshaRouteSpec[] = [
   ...weeklyParshaRoutes,
+  ...combinedWeeklyParshaRoutes,
   {
     kind: 'megillah',
     canonicalSlug: 'megillah-esther',

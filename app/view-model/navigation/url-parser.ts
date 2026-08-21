@@ -3,9 +3,9 @@ import type { LeiningRun } from '../../calendar-model/model-types.ts'
 import { containsRef } from '../../calendar-model/ref-utils.ts'
 import type { RefWithScroll, ScrollName } from '../../ref.ts'
 import {
-  getScrollPageCount,
   hasScrollData,
   isIndexedReference,
+  isValidScrollPageNumber,
 } from '../../location.ts'
 import { ScrollViewModel } from '../scroll-view-model.ts'
 import { generateParshaUrl, resolveParshaRun } from './parsha-routes.ts'
@@ -49,14 +49,6 @@ export function generatePageUrl(scroll: ScrollName, page: number) {
   return `#/${scroll}/page/${page}`
 }
 
-export function canonicalReaderUrl(url: URL, hash: string) {
-  const canonicalUrl = new URL(url.href)
-  canonicalUrl.hash = hash
-  canonicalUrl.searchParams.delete('aliyah')
-  canonicalUrl.searchParams.delete('aliyahRun')
-  return canonicalUrl
-}
-
 // TODO(decide): Should we support links to a specific עלייה in a run?
 
 const pathHandlers: Record<
@@ -80,7 +72,7 @@ const pathHandlers: Record<
     const model = ScrollViewModel.forId(generator, run.id, initialRef ?? undefined)
     return model ? { view: 'reader', model } : null
   },
-  /** Legacy URL: Specifies a ref in חומש. */
+  /** Opens a specific Torah reference. */
   r(generator, [ref]) {
     if (!ref) return null
     const initialRef = refFromPath(ref, 'torah')
@@ -89,7 +81,7 @@ const pathHandlers: Record<
     const model = ScrollViewModel.forRef(generator, initialRef)
     return model ? { view: 'reader', model } : null
   },
-  /** Legacy URL: The next leining. */
+  /** Opens the current calendar reading. */
   next(generator, _pathParts, options) {
     return {
       view: 'reader',
@@ -130,9 +122,6 @@ function parseTorahRoute(
 
     const initialRef = refFromPath(ref, resolved.run.scroll)
     if (ref && !initialRef) return missingReferenceRoute(ref)
-    if (initialRef && !refBelongsToRun(initialRef, resolved.run)) {
-      return { view: 'not-found' }
-    }
 
     const model = ScrollViewModel.forId(
       generator,
@@ -207,7 +196,7 @@ function parsePageRoute(
 ): AppRoute | null {
   if (!page || !/^\d+$/.test(page)) return null
   const pageNumber = Number(page)
-  if (!Number.isInteger(pageNumber) || !isValidPageNumber(scroll, pageNumber)) {
+  if (!isValidScrollPageNumber(scroll, pageNumber)) {
     return { view: 'not-found' }
   }
 
@@ -232,10 +221,6 @@ function parsePageRoute(
     model,
     canonicalHash: generatePageUrl(scroll, pageNumber),
   }
-}
-
-function isValidPageNumber(scroll: ScrollName, page: number) {
-  return page >= 1 && page <= getScrollPageCount(scroll)
 }
 
 function refBelongsToRun(ref: RefWithScroll, run: LeiningRun) {

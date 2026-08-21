@@ -1,19 +1,27 @@
-import { readFile } from 'node:fs/promises'
 import { expect, test } from 'vitest'
+import {
+  BUILD_BUDGETS,
+  MAX_STATIC_ASSET_BYTES,
+} from './check-build-budgets.mjs'
 
-const packageJsonUrl = new URL('../package.json', import.meta.url)
-const budgetScriptUrl = new URL('./check-build-budgets.mjs', import.meta.url)
-
-test('production builds enforce bounded code and host-compatible static assets', async () => {
-  const [packageJson, budgetScript] = await Promise.all([
-    readFile(packageJsonUrl, 'utf8').then(JSON.parse),
-    readFile(budgetScriptUrl, 'utf8'),
+test('keeps simple per-file production budgets', () => {
+  expect(BUILD_BUDGETS.map(({ label }) => label)).toEqual([
+    'JavaScript chunk',
+    'CSS asset',
+    'Service worker',
   ])
+  expect(MAX_STATIC_ASSET_BYTES).toBe(24 * 1024 * 1024)
+})
 
-  expect(packageJson.scripts.build).toContain('node scripts/check-build-budgets.mjs')
-  expect(budgetScript).toContain("label: 'JavaScript chunk'")
-  expect(budgetScript).toContain("label: 'CSS asset'")
-  expect(budgetScript).toContain("label: 'Service worker'")
-  expect(budgetScript).toContain('MAX_STATIC_ASSET_BYTES = 24 * 1024 * 1024')
-  expect(budgetScript).toContain('Cloudflare safety budget')
+test('keeps bounded headroom for the integrity-checked offline service worker', () => {
+  const serviceWorkerBudget = BUILD_BUDGETS.find(
+    (budget) => budget.label === 'Service worker'
+  )
+
+  expect(serviceWorkerBudget).toMatchObject({
+    rawBytes: 72_000,
+    gzipBytes: 14_000,
+  })
+  expect(serviceWorkerBudget?.matches('service-worker.js')).toBe(true)
+  expect(serviceWorkerBudget?.matches('_app/reader.js')).toBe(false)
 })

@@ -2,6 +2,13 @@ import { afterEach, expect, test, vi } from 'vitest'
 import type { ParshaAudioRecording, WordCue } from '../audio/types.ts'
 import { createCueDraftPayload } from '../audio/cue-draft.ts'
 import { TOKENIZATION_VERSION } from '../audio/cue-schema.ts'
+import {
+  createRecordingIssue,
+  loadLocalRecordingIssues,
+  mergePublishedAndLocalRecordingIssues,
+  saveLocalRecordingIssues,
+  type RecordingIssue,
+} from '../audio/recording-issues.ts'
 import { createMount } from '../lifecycle/mount.ts'
 import {
   AudioController,
@@ -9,12 +16,16 @@ import {
 } from '../reading/audio-controller.ts'
 import { HighlightController } from '../reading/highlight-controller.ts'
 import { buildPlaybackPlan } from '../reading/playback-plan.ts'
+import type {
+  ReaderPlaybackCueAuthoringAdapter,
+  ReaderPlaybackCueAuthoringChange,
+  ReaderPlaybackCueAuthoringSnapshot,
+  ReaderPlaybackCueAuthoringSessionSnapshot,
+} from '../reading/reader-playback.ts'
+import { replaceAuthoringSessionCues } from './authoring-session.ts'
 import { createCueAuthoring, type CueAuthoring } from './cue-authoring.ts'
 import { incompleteCueSessionFixture } from './cue-authoring.fixture.ts'
-import {
-  readAdminDraftRecoveries,
-  saveAdminDraftPayload,
-} from './draft-storage.ts'
+import { saveAdminDraftPayload } from './draft-storage.ts'
 
 let fixture: HTMLElement | null = null
 let destroy: (() => void) | null = null
@@ -133,9 +144,9 @@ test('surfaces malformed published Cue Data and recovers it without leaving auth
   )
 
   await audioController.loadSession(session)
-  await cueAuthoring!.bindSession(session)
+  await cueAuthoring!.bindSession()
 
-  expect(cueAuthoring!.getSession()).toBe(session)
+  expect(cueAuthoring!.getSession()?.recording.id).toBe(session.recording.id)
   expect(session.cues).toEqual([])
   expect(resolve).toHaveBeenCalledWith(session.recording)
   expect(
@@ -198,7 +209,7 @@ test('loads an incomplete 137-of-334 published session as resumable', async () =
   )
   await audioController.loadSession(session)
 
-  const binding = cueAuthoring.bindSession(session)
+  const binding = cueAuthoring.bindSession()
   await vi.waitFor(() => {
     expect(required('[data-target-id="admin-status"]').textContent).toContain(
       'loading published timing'
@@ -281,7 +292,7 @@ test('does not let an empty local draft suppress published timing', async () => 
     })!
   )
   await audioController.loadSession(session)
-  await cueAuthoring.bindSession(session)
+  await cueAuthoring.bindSession()
 
   expect(session.cues).toEqual([publishedCue])
   expect(document.querySelectorAll('[data-admin-cue-index]')).toHaveLength(1)
@@ -289,189 +300,6 @@ test('does not let an empty local draft suppress published timing', async () => 
   expect(required('[data-target-id="admin-draft-status"]').textContent).toContain(
     'Published timing loaded'
   )
-})
-
-test('keeps an incompatible local draft out of the session and exports its recovery', async () => {
-  const { audioController, highlightController } = createFixture()
-  const activeRecording = recording('current', 1)
-  const publishedCue = {
-    ...cue(tokenKeys[0], 0),
-    cueNumber: 1,
-  }
-  const rawLegacyDraft = JSON.stringify({
-    audioId: activeRecording.id,
-    tokenCount: tokenKeys.length,
-    tokenPointer: 1,
-    updatedAt: 100,
-    cues: [cue(tokenKeys[0], 9.5)],
-    operatorNote: 'private recovery marker',
-  })
-  localStorage.setItem('tikkun-admin-draft:current', rawLegacyDraft)
-  const createObjectURL = vi
-    .spyOn(URL, 'createObjectURL')
-    .mockReturnValue('blob:draft-recovery')
-  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
-  const downloaded: Array<{ href: string; fileName: string }> = []
-  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
-    this: HTMLAnchorElement
-  ) {
-    downloaded.push({ href: this.href, fileName: this.download })
-  })
-  let cueAuthoring!: CueAuthoring
-
-  destroy = createMount()((scope) => {
-    cueAuthoring = createCueAuthoring(
-      scope,
-      createOptions(audioController, highlightController, {
-        cueData: {
-          resolve: async () => readyCueData(activeRecording, [publishedCue]),
-          retry: async () => readyCueData(activeRecording, [publishedCue]),
-        },
-      })
-    )
-  })
-
-  const session = createActiveAudioSession(
-    buildPlaybackPlan({
-      target: { runId: 'run', index: 1 },
-      tokenKeys,
-      current: { recording: activeRecording, cues: [publishedCue] },
-    })!
-  )
-  await audioController.loadSession(session)
-  highlightController.setSequence(tokenKeys)
-  await cueAuthoring.bindSession(session)
-
-  expect(session.cues).toEqual([publishedCue])
-  expect(localStorage.getItem('tikkun-admin-draft:current')).toBe(rawLegacyDraft)
-  const recoveryProblem = required<HTMLElement>(
-    '[data-admin-problem="local-draft-recovery"]'
-  )
-  expect(recoveryProblem.textContent).toContain(
-    'Local draft recovery preserved'
-  )
-  expect(recoveryProblem.textContent).not.toContain('private recovery marker')
-
-  required<HTMLButtonElement>(
-    '[data-admin-problem-action="export-draft-recovery"]'
-  ).click()
-
-  expect(downloaded).toEqual([{
-    href: 'blob:draft-recovery',
-    fileName: 'current-draft-recoveries.json',
-  }])
-  const recoveryBlob = createObjectURL.mock.calls[0]?.[0]
-  expect(recoveryBlob).toBeInstanceOf(Blob)
-  if (!(recoveryBlob instanceof Blob)) throw new Error('Missing recovery Blob')
-  const exported = JSON.parse(await recoveryBlob.text())
-  expect(exported).toMatchObject({
-    version: 1,
-    kind: 'tikkun-admin-draft-recovery-export',
-    audioId: activeRecording.id,
-    recoveries: [{
-      version: 1,
-      audioId: activeRecording.id,
-      reason: 'invalid draft schema',
-      rawValue: rawLegacyDraft,
-    }],
-  })
-})
-
-test('surfaces a recovery-write failure and exports the untouched raw draft', async () => {
-  const { audioController, highlightController } = createFixture()
-  const activeRecording = recording('current', 1)
-  let resolveDraftSaved!: () => void
-  const draftSaved = new Promise<void>((resolve) => {
-    resolveDraftSaved = resolve
-  })
-  const rawLegacyDraft = JSON.stringify({
-    audioId: activeRecording.id,
-    tokenCount: tokenKeys.length,
-    tokenPointer: 0,
-    updatedAt: 100,
-    cues: [cue(tokenKeys[0], 4.25)],
-    operatorNote: 'raw fallback marker',
-  })
-  const sourceKey = 'tikkun-admin-draft:current'
-  localStorage.setItem(sourceKey, rawLegacyDraft)
-
-  const originalSetItem = Storage.prototype.setItem
-  const recoveryWriteFailure = vi
-    .spyOn(Storage.prototype, 'setItem')
-    .mockImplementation(function (
-    this: Storage,
-    key: string,
-    value: string
-  ) {
-    if (key.startsWith('tikkun-admin-draft-recovery:v1:')) {
-      throw new DOMException('Storage full', 'QuotaExceededError')
-    }
-    originalSetItem.call(this, key, value)
-    })
-  const createObjectURL = vi
-    .spyOn(URL, 'createObjectURL')
-    .mockReturnValue('blob:raw-draft-recovery')
-  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
-  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
-
-  let cueAuthoring!: CueAuthoring
-  destroy = createMount()((scope) => {
-    cueAuthoring = createCueAuthoring(
-      scope,
-      createOptions(audioController, highlightController, {
-        cueData: {
-          resolve: async () => readyCueData(activeRecording, []),
-          retry: async () => readyCueData(activeRecording, []),
-        },
-        onChange: (change) => {
-          if (change === 'draft') resolveDraftSaved()
-        },
-      })
-    )
-  })
-  const session = createActiveAudioSession(
-    buildPlaybackPlan({
-      target: { runId: 'run', index: 1 },
-      tokenKeys,
-      current: { recording: activeRecording, cues: [] },
-    })!
-  )
-  await audioController.loadSession(session)
-  highlightController.setSequence(tokenKeys)
-  await cueAuthoring.bindSession(session)
-
-  expect(localStorage.getItem(sourceKey)).toBe(rawLegacyDraft)
-  expect(
-    required('[data-admin-problem="local-draft-recovery-failed"]')
-      .textContent
-  ).toContain('Local draft needs immediate backup')
-
-  required<HTMLButtonElement>(
-    '[data-admin-problem-action="export-draft-recovery"]'
-  ).click()
-  const recoveryBlob = createObjectURL.mock.calls[0]?.[0]
-  expect(recoveryBlob).toBeInstanceOf(Blob)
-  if (!(recoveryBlob instanceof Blob)) throw new Error('Missing recovery Blob')
-  const exported = JSON.parse(await recoveryBlob.text())
-  expect(exported).toMatchObject({
-    kind: 'tikkun-admin-draft-recovery-export',
-    audioId: activeRecording.id,
-    recoveries: [],
-    unresolvedDraft: {
-      sourceKey,
-      reason: 'invalid draft schema',
-      rawValue: rawLegacyDraft,
-    },
-  })
-
-  recoveryWriteFailure.mockRestore()
-  required<HTMLButtonElement>('[data-target-id="admin-record"]').click()
-  await draftSaved
-  expect(
-    document.querySelector(
-      '[data-admin-problem="local-draft-recovery-failed"]'
-    )
-  ).toBeNull()
 })
 
 test('restores access and binds a validated local Cue Draft to one authoring session', async () => {
@@ -521,7 +349,7 @@ test('restores access and binds a validated local Cue Draft to one authoring ses
 
   await audioController.loadSession(session)
   highlightController.setSequence(tokenKeys)
-  await cueAuthoring!.bindSession(session)
+  await cueAuthoring!.bindSession()
 
   expect(session.cues).toEqual(draftCues)
   expect(
@@ -570,7 +398,7 @@ test('resumes an incomplete draft by previewing its last cue before recording th
   )
   await audioController.loadSession(session)
   highlightController.setSequence(tokenKeys)
-  await cueAuthoring.bindSession(session)
+  await cueAuthoring.bindSession()
 
   const resumeDraft = required<HTMLButtonElement>(
     '[data-target-id="admin-resume-draft"]'
@@ -622,7 +450,7 @@ test('requires synchronized microphone capture for a missing recording', async (
   )
   await audioController.loadSession(session)
   highlightController.setSequence(tokenKeys)
-  await cueAuthoring.bindSession(session)
+  await cueAuthoring.bindSession()
 
   const captureAudio = required<HTMLInputElement>(
     '[data-target-id="admin-capture-audio"]'
@@ -660,7 +488,7 @@ test('keeps cue selection, seeking, focus, and timing edits behind TypeScript', 
   )
   await audioController.loadSession(session)
   highlightController.setSequence(tokenKeys)
-  await cueAuthoring.bindSession(session)
+  await cueAuthoring.bindSession()
 
   const firstRow = required<HTMLButtonElement>(
     '[data-admin-cue-index="0"]'
@@ -688,6 +516,67 @@ test('keeps cue selection, seeking, focus, and timing edits behind TypeScript', 
   expect(onCueNavigationChange).toHaveBeenLastCalledWith(1)
 })
 
+test('rolls back a timing edit when playback rejects its cue replacement', async () => {
+  const { audioController, highlightController } = createFixture()
+  const activeRecording = recording('current', 1)
+  const initialCues = [cue(tokenKeys[0], 0), cue(tokenKeys[1], 3.25)]
+  const showPersistenceNotice = vi.fn()
+  const onChange = vi.fn()
+  const baseOptions = createOptions(audioController, highlightController, {
+    cueData: {
+      resolve: async () => readyCueData(activeRecording, initialCues),
+      retry: async () => readyCueData(activeRecording, initialCues),
+    },
+    showPersistenceNotice,
+    onChange,
+  })
+  const basePlayback = baseOptions.playback
+  let rejectReplacement = false
+  const replaceCues = vi.fn((cues: readonly WordCue[]) =>
+    rejectReplacement ? false : basePlayback.replaceCues(cues)
+  )
+  const playback = {
+    ...basePlayback,
+    replaceCues,
+  } satisfies ReaderPlaybackCueAuthoringAdapter
+  let cueAuthoring!: CueAuthoring
+
+  destroy = createMount()((scope) => {
+    cueAuthoring = createCueAuthoring(scope, {
+      ...baseOptions,
+      playback,
+    })
+  })
+
+  const session = createActiveAudioSession(
+    buildPlaybackPlan({
+      target: { runId: 'run', index: 1 },
+      tokenKeys,
+      current: { recording: activeRecording, cues: initialCues },
+    })!
+  )
+  await audioController.loadSession(session)
+  highlightController.setSequence(tokenKeys)
+  await cueAuthoring.bindSession()
+  await cueAuthoring.selectReaderToken(1)
+
+  const secondRow = required<HTMLButtonElement>(
+    '[data-admin-cue-index="1"]'
+  )
+  const changeCount = onChange.mock.calls.length
+  rejectReplacement = true
+  required<HTMLButtonElement>('[data-admin-nudge="0.05"]').click()
+
+  expect(replaceCues).toHaveBeenCalledTimes(2)
+  expect(session.cues[1].timeStart).toBe(3.25)
+  expect(secondRow.textContent).toContain('0:03.250')
+  expect(onChange).toHaveBeenCalledTimes(changeCount)
+  expect(localStorage.getItem('tikkun-admin-draft:current')).toBeNull()
+  expect(showPersistenceNotice).toHaveBeenCalledWith(
+    'Timing edit was not applied because the active authoring session changed. Reload timing and try again.'
+  )
+})
+
 test('preserves conflicting cues and tells the author to export before reloading', async () => {
   const { audioController, highlightController } = createFixture()
   const activeRecording = recording('current', 1)
@@ -712,7 +601,7 @@ test('preserves conflicting cues and tells the author to export before reloading
   )
   await audioController.loadSession(session)
   highlightController.setSequence(tokenKeys)
-  await cueAuthoring.bindSession(session)
+  await cueAuthoring.bindSession()
 
   await saveAdminDraftPayload(
     createCueDraftPayload({
@@ -734,20 +623,14 @@ test('preserves conflicting cues and tells the author to export before reloading
   await vi.waitFor(() => {
     expect(
       required('[data-target-id="admin-draft-status"]').textContent
-    ).toContain('Download or export them, then reload this recording.')
-  })
-  const recoveries = readAdminDraftRecoveries(activeRecording.id)
-  expect(recoveries).toHaveLength(1)
-  expect(JSON.parse(recoveries[0].rawValue)).toMatchObject({
-    audioId: activeRecording.id,
-    cues: [{ timeStart: 0.05 }],
+    ).toContain('Download or export your unsaved cues')
   })
   expect(
-    required('[data-admin-problem="local-draft-recovery"]').textContent
-  ).toContain('Local draft recovery preserved')
+    required('[data-admin-problem="volatile-draft-recovery"]').textContent
+  ).toContain('Unsaved cue snapshot needs download')
 })
 
-test('keeps a quota-blocked delayed save downloadable on its original recording', async () => {
+test('keeps a delayed rejected save downloadable on its original recording', async () => {
   const { audioController, highlightController } = createFixture()
   const showPersistenceNotice = vi.fn()
   const activeRecording = recording('current', 1)
@@ -775,7 +658,7 @@ test('keeps a quota-blocked delayed save downloadable on its original recording'
   )
   await audioController.loadSession(firstSession)
   highlightController.setSequence(tokenKeys)
-  await cueAuthoring.bindSession(firstSession)
+  await cueAuthoring.bindSession()
 
   await saveAdminDraftPayload(
     createCueDraftPayload({
@@ -790,17 +673,6 @@ test('keeps a quota-blocked delayed save downloadable on its original recording'
     tokenKeys,
     { writerToken: 'other-tab', expectedRevision: null }
   )
-  const originalSetItem = Storage.prototype.setItem
-  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
-    this: Storage,
-    key: string,
-    value: string
-  ) {
-    if (key.startsWith('tikkun-admin-draft-recovery:v1:')) {
-      throw new DOMException('Storage full', 'QuotaExceededError')
-    }
-    originalSetItem.call(this, key, value)
-  })
   const createObjectURL = vi
     .spyOn(URL, 'createObjectURL')
     .mockReturnValue('blob:volatile-draft')
@@ -840,7 +712,7 @@ test('keeps a quota-blocked delayed save downloadable on its original recording'
   )
   await audioController.loadSession(secondSession)
   highlightController.setSequence(tokenKeys)
-  await cueAuthoring.bindSession(secondSession)
+  await cueAuthoring.bindSession()
   releaseLock()
   await blocker
 
@@ -851,30 +723,30 @@ test('keeps a quota-blocked delayed save downloadable on its original recording'
       )
     )
   })
-  expect(cueAuthoring.getSession()).toBe(secondSession)
+  expect(cueAuthoring.getSession()?.recording.id).toBe(
+    secondSession.recording.id
+  )
   expect(
     required('[data-target-id="admin-draft-status"]').textContent
   ).toContain('missing')
   expect(
     required('[data-target-id="admin-draft-status"]').textContent
   ).not.toContain('another tab')
-  expect(readAdminDraftRecoveries(activeRecording.id)).toHaveLength(0)
-
   await audioController.loadSession(firstSession)
   highlightController.setSequence(tokenKeys)
-  await cueAuthoring.bindSession(firstSession)
+  await cueAuthoring.bindSession()
   expect(
     required('[data-admin-problem="volatile-draft-recovery"]').textContent
   ).toContain('Unsaved cue snapshot needs download')
 
   required<HTMLButtonElement>(
-    '[data-admin-problem="volatile-draft-recovery"] [data-admin-problem-action="export-draft-recovery"]'
+    '[data-admin-problem="volatile-draft-recovery"] [data-admin-problem-action="export-unsaved-draft"]'
   ).click()
   const recoveryBlob = createObjectURL.mock.calls[0]?.[0]
   expect(recoveryBlob).toBeInstanceOf(Blob)
   if (!(recoveryBlob instanceof Blob)) throw new Error('Missing recovery Blob')
   const exported = JSON.parse(await recoveryBlob.text())
-  expect(JSON.parse(exported.volatileDraft.rawValue)).toMatchObject({
+  expect(exported).toMatchObject({
     audioId: activeRecording.id,
     cues: [{ timeStart: 0.05 }],
   })
@@ -913,7 +785,7 @@ test('steps back from the highlighted word only while timing existing cues', asy
   )
   await audioController.loadSession(session)
   highlightController.setSequence(timingTokenKeys)
-  await cueAuthoring.bindSession(session)
+  await cueAuthoring.bindSession()
 
   await cueAuthoring.selectReaderToken(1)
   await highlightController.activateTokenKey(timingTokenKeys[3], {
@@ -976,7 +848,7 @@ test('routes Cue List controls through TypeScript behavior', async () => {
   )
   await audioController.loadSession(session)
   highlightController.setSequence(tokenKeys)
-  await cueAuthoring.bindSession(session)
+  await cueAuthoring.bindSession()
   await cueAuthoring.selectReaderToken(1)
 
   const previous = required<HTMLButtonElement>(
@@ -1025,8 +897,8 @@ test('routes Cue List controls through TypeScript behavior', async () => {
   trim.click()
   await vi.waitFor(() => {
     expect(session.cues).toHaveLength(1)
+    expect(document.querySelectorAll('[data-admin-cue-index]')).toHaveLength(1)
   })
-  expect(document.querySelectorAll('[data-admin-cue-index]')).toHaveLength(1)
   expect(previous.disabled).toBe(true)
   expect(next.disabled).toBe(true)
   await vi.waitFor(() => {
@@ -1069,7 +941,7 @@ test('exports Cue Data through the Svelte sheet and revokes replaced downloads',
   )
   await audioController.loadSession(session)
   highlightController.setSequence(tokenKeys)
-  await cueAuthoring.bindSession(session)
+  await cueAuthoring.bindSession()
 
   const exportButton = required<HTMLButtonElement>(
     '[data-target-id="admin-export"]'
@@ -1169,7 +1041,7 @@ test('keeps the export available when clipboard copying is blocked', async () =>
   )
   await audioController.loadSession(session)
   highlightController.setSequence(tokenKeys)
-  await cueAuthoring.bindSession(session)
+  await cueAuthoring.bindSession()
 
   required<HTMLButtonElement>('[data-target-id="admin-export"]').click()
   await vi.waitFor(() => {
@@ -1246,14 +1118,14 @@ test('owns the admin shortcut, access check, and panel toggle', () => {
 
 test('keeps the Svelte issue dialog open when persistence fails and retries safely', async () => {
   const { audioController, highlightController } = createFixture()
-  const onRecordingIssuesChanged = vi.fn()
+  const onLocalRecordingIssuesChanged = vi.fn()
   let cueAuthoring!: CueAuthoring
 
   destroy = createMount()((scope) => {
     cueAuthoring = createCueAuthoring(
       scope,
       createOptions(audioController, highlightController, {
-        onRecordingIssuesChanged,
+        onLocalRecordingIssuesChanged,
       })
     )
   })
@@ -1270,7 +1142,7 @@ test('keeps the Svelte issue dialog open when persistence fails and retries safe
   )
   await audioController.loadSession(session)
   highlightController.setSequence(tokenKeys)
-  await cueAuthoring.bindSession(session)
+  await cueAuthoring.bindSession()
   cueAuthoring.openIssue()
 
   const modal = required<HTMLElement>(
@@ -1288,43 +1160,347 @@ test('keeps the Svelte issue dialog open when persistence fails and retries safe
   firstIssue.click()
 
   expect(modal.getAttribute('aria-hidden')).toBe('false')
-  expect(onRecordingIssuesChanged).not.toHaveBeenCalled()
+  expect(onLocalRecordingIssuesChanged).not.toHaveBeenCalled()
 
   storageFailure.mockRestore()
   firstIssue.click()
   expect(modal.getAttribute('aria-hidden')).toBe('true')
-  expect(onRecordingIssuesChanged).toHaveBeenCalledOnce()
+  expect(onLocalRecordingIssuesChanged).toHaveBeenCalledOnce()
 })
+
+test('persists only local recording issue overlays when published issues are visible', async () => {
+  const { audioController, highlightController } = createFixture()
+  const publishedIssue = createRecordingIssue({
+    audioId: 'current',
+    tokenKey: tokenKeys[0],
+    kind: 'repeated-word',
+    visibility: 'authoringOnly',
+    severity: 'medium',
+    note: 'Published note',
+    createdAt: 1,
+    tokenizationVersion: TOKENIZATION_VERSION,
+  })
+  let localIssues: RecordingIssue[] = []
+  let localRevision = loadLocalRecordingIssues(
+    localStorage,
+    'current',
+    TOKENIZATION_VERSION
+  ).revision
+  let mergedIssues = [publishedIssue]
+  let cueAuthoring!: CueAuthoring
+
+  destroy = createMount()((scope) => {
+    cueAuthoring = createCueAuthoring(
+      scope,
+      createOptions(audioController, highlightController, {
+        getMergedRecordingIssues: () => mergedIssues,
+        getLocalRecordingIssues: () => localIssues,
+        getLocalRecordingIssueRevision: () => localRevision,
+        onLocalRecordingIssuesChanged: (issues, revision) => {
+          localIssues = issues
+          localRevision = revision
+          mergedIssues = mergePublishedAndLocalRecordingIssues(
+            [publishedIssue],
+            localIssues
+          )
+        },
+      })
+    )
+  })
+
+  const session = createActiveAudioSession(
+    buildPlaybackPlan({
+      target: { runId: 'run', index: 1 },
+      tokenKeys,
+      current: {
+        recording: recording('current', 1),
+        cues: [cue(tokenKeys[0], 0)],
+      },
+    })!
+  )
+  await audioController.loadSession(session)
+  highlightController.setSequence(tokenKeys)
+  await cueAuthoring.bindSession()
+  cueAuthoring.openIssue()
+  required<HTMLButtonElement>(
+    '[data-issue-kind="repeated-word"]'
+  ).click()
+
+  expect(localIssues).toHaveLength(1)
+  expect(localIssues[0]).not.toEqual(publishedIssue)
+  expect(mergedIssues).toEqual(localIssues)
+  const persisted = JSON.parse(
+    localStorage.getItem('tikkun.recording-issues:current') ?? '{}'
+  )
+  expect(persisted).toHaveLength(1)
+  expect(persisted[0]).toMatchObject({ id: localIssues[0].id })
+  expect(persisted).not.toContainEqual(publishedIssue)
+})
+
+test('keeps a stale issue save open, adopts newer local state, and retries without data loss', async () => {
+  const { audioController, highlightController } = createFixture()
+  let localIssues: RecordingIssue[] = []
+  let localRevision = loadLocalRecordingIssues(
+    localStorage,
+    'current',
+    TOKENIZATION_VERSION
+  ).revision
+  let cueAuthoring!: CueAuthoring
+
+  destroy = createMount()((scope) => {
+    cueAuthoring = createCueAuthoring(
+      scope,
+      createOptions(audioController, highlightController, {
+        getMergedRecordingIssues: () => localIssues,
+        getLocalRecordingIssues: () => localIssues,
+        getLocalRecordingIssueRevision: () => localRevision,
+        onLocalRecordingIssuesChanged: (issues, revision) => {
+          localIssues = issues
+          localRevision = revision
+        },
+      })
+    )
+  })
+
+  const session = createActiveAudioSession(
+    buildPlaybackPlan({
+      target: { runId: 'run', index: 1 },
+      tokenKeys,
+      current: {
+        recording: recording('current', 1),
+        cues: [cue(tokenKeys[0], 0)],
+      },
+    })!
+  )
+  await audioController.loadSession(session)
+  highlightController.setSequence(tokenKeys)
+  await cueAuthoring.bindSession()
+  cueAuthoring.openIssue()
+
+  const newerTabIssue = createRecordingIssue({
+    audioId: 'current',
+    tokenKey: tokenKeys[1],
+    kind: 'hesitation',
+    visibility: 'authoringOnly',
+    severity: 'low',
+    createdAt: 1,
+    tokenizationVersion: TOKENIZATION_VERSION,
+  })
+  saveLocalRecordingIssues(
+    localStorage,
+    'current',
+    TOKENIZATION_VERSION,
+    [newerTabIssue],
+    localRevision
+  )
+
+  const modal = required<HTMLElement>(
+    '[data-target-id="recording-issue-modal"]'
+  )
+  const issueButton = required<HTMLButtonElement>(
+    '[data-issue-kind="repeated-word"]'
+  )
+  issueButton.click()
+  expect(modal.getAttribute('aria-hidden')).toBe('false')
+  expect(localIssues).toEqual([newerTabIssue])
+
+  issueButton.click()
+  expect(modal.getAttribute('aria-hidden')).toBe('true')
+  expect(localIssues).toHaveLength(2)
+  expect(localIssues).toContainEqual(newerTabIssue)
+  expect(
+    loadLocalRecordingIssues(
+      localStorage,
+      'current',
+      TOKENIZATION_VERSION
+    ).issues
+  ).toEqual(localIssues)
+})
+
+type CueAuthoringTestOverrides = Partial<
+  Parameters<typeof createCueAuthoring>[1]
+> & {
+  prepareAuthoringSession?: () => Promise<void>
+  restoreReaderSession?: () => Promise<void>
+  playNetworkRecording?: (
+    retry?: () => Promise<void>
+  ) => Promise<boolean>
+}
 
 function createOptions(
   audioController: AudioController,
   highlightController: HighlightController,
-  overrides: Partial<
-    Parameters<typeof createCueAuthoring>[1]
-  > = {}
+  overrides: CueAuthoringTestOverrides = {}
 ): Parameters<typeof createCueAuthoring>[1] {
+  const {
+    prepareAuthoringSession = async () => {},
+    restoreReaderSession = async () => {},
+    playNetworkRecording = async () => true,
+    playback: playbackOverride,
+    ...optionOverrides
+  } = overrides
+  const localRecordingIssueRevision = loadLocalRecordingIssues(
+    localStorage,
+    'current',
+    TOKENIZATION_VERSION
+  ).revision
   return {
     document,
     view: window,
-    audioController,
-    highlightController,
+    playback:
+      playbackOverride ??
+      createCueAuthoringPlaybackAdapter(
+        audioController,
+        highlightController,
+        {
+          prepareAuthoringSession,
+          restoreReaderSession,
+          playNetworkRecording,
+        }
+      ),
     localStorage,
     sessionStorage,
-    prepareAuthoringSession: async () => {},
-    restoreReaderSession: async () => {},
-    playNetworkRecording: async () => true,
     getAutoScroll: () => false,
     getActiveTokenKey: () => tokenKeys[0],
-    getDisplayTime: () => audioController.currentTime,
-    getRecordingIssues: () => [],
+    getMergedRecordingIssues: () => [],
+    getLocalRecordingIssues: () => [],
+    getLocalRecordingIssueRevision: () => localRecordingIssueRevision,
     focusReader: () => {},
     formatDuration: (seconds) => `0:${String(Math.floor(seconds)).padStart(2, '0')}`,
     onChange: () => {},
     onCueNavigationChange: () => {},
-    onRecordingIssuesChanged: () => {},
+    onLocalRecordingIssuesChanged: () => {},
     showPersistenceNotice: () => {},
-    ...overrides,
+    ...optionOverrides,
   }
+}
+
+function createCueAuthoringPlaybackAdapter(
+  audioController: AudioController,
+  highlightController: HighlightController,
+  options: {
+    prepareAuthoringSession(): Promise<void>
+    restoreReaderSession(): Promise<void>
+    playNetworkRecording(
+      retry?: () => Promise<void>
+    ): Promise<boolean>
+  }
+): ReaderPlaybackCueAuthoringAdapter {
+  const listeners = new Set<
+    (
+      change: ReaderPlaybackCueAuthoringChange,
+      snapshot: ReaderPlaybackCueAuthoringSnapshot
+    ) => void
+  >()
+  let sessionRevision = 0
+  let disconnect: (() => void) | null = null
+  let cachedSession: ReaderPlaybackCueAuthoringSessionSnapshot | null = null
+
+  const snapshot = (): ReaderPlaybackCueAuthoringSnapshot => {
+    const session = audioController.session
+    const currentTime = audioController.currentTime
+    return Object.freeze({
+      sessionRevision,
+      hasSession: Boolean(session),
+      activeTokenKey: highlightController.getActiveTokenKey(),
+      activeTokenIndex: highlightController.getActiveIndex(),
+      currentCueIndex: session?.cues.length
+        ? highlightController.getCueIndex(session.cues, currentTime)
+        : -1,
+      currentTime,
+      displayTime: currentTime,
+      duration: audioController.duration,
+      paused: audioController.audio.paused,
+      ended: audioController.audio.ended,
+      error: audioController.error,
+    })
+  }
+  const emit = (change: ReaderPlaybackCueAuthoringChange) => {
+    const nextSnapshot = snapshot()
+    for (const listener of listeners) listener(change, nextSnapshot)
+  }
+  const connect = () => {
+    if (disconnect) return
+    const unsubscribers = [
+      audioController.on('session-loaded', () => {
+        sessionRevision += 1
+        cachedSession = null
+        emit({ type: 'session' })
+      }),
+      audioController.on('playback-updated', () => {
+        emit({ type: 'playback' })
+      }),
+      audioController.on('frame-updated', () => {
+        emit({ type: 'media-progress' })
+      }),
+      audioController.on('time-updated', () => {
+        emit({ type: 'display-progress' })
+      }),
+      audioController.on('duration-updated', () => {
+        emit({ type: 'display-progress' })
+      }),
+      audioController.on('playback-error', () => {
+        emit({ type: 'error' })
+      }),
+    ]
+    disconnect = () => {
+      for (const unsubscribe of unsubscribers) unsubscribe()
+      disconnect = null
+    }
+  }
+
+  const adapter: ReaderPlaybackCueAuthoringAdapter = {
+    snapshot,
+    session() {
+      const session = audioController.session
+      if (!session) return null
+      if (cachedSession?.sessionRevision === sessionRevision) {
+        return cachedSession
+      }
+      cachedSession = Object.freeze({
+        sessionRevision,
+        recording: session.recording,
+        tokenKeys: Object.freeze([...session.tokenKeys]),
+      })
+      return cachedSession
+    },
+    readCues() {
+      return Object.freeze(
+        (audioController.session?.cues ?? []).map((cue) =>
+          Object.freeze({ ...cue })
+        )
+      )
+    },
+    subscribe(listener) {
+      listeners.add(listener)
+      connect()
+      return () => {
+        listeners.delete(listener)
+        if (!listeners.size) disconnect?.()
+      }
+    },
+    prepareAuthoringSession: options.prepareAuthoringSession,
+    restoreReaderSession: options.restoreReaderSession,
+    play: options.playNetworkRecording,
+    pause: () => audioController.pause(),
+    seek: (time) => audioController.seek(time),
+    async activateToken(tokenKey, activationOptions) {
+      await highlightController.activateTokenKey(tokenKey, activationOptions)
+    },
+    clearHighlight: () => highlightController.clear(),
+    replaceCues(cues) {
+      const session = audioController.session
+      return session
+        ? replaceAuthoringSessionCues(
+            session,
+            cues.map((cue) => ({ ...cue }))
+          )
+        : false
+    },
+    refresh: () => {},
+    setCueIndex: async () => {},
+  }
+  return Object.freeze(adapter)
 }
 
 const tokenKeys = ['1:0:0:0', '1:0:0:1']

@@ -28,10 +28,10 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-function recording(): ParshaAudioRecording {
+function recording(narratorId = 'reader'): ParshaAudioRecording {
   return {
-    id: 'reader-beresheet-1',
-    narratorId: 'reader',
+    id: `${narratorId}-beresheet-1`,
+    narratorId,
     reading: {
       kind: 'parsha',
       id: 'beresheet',
@@ -41,8 +41,8 @@ function recording(): ParshaAudioRecording {
     parshaName: 'Beresheet',
     aliyah: 1,
     title: 'Beresheet Aliyah 1',
-    playSrc: '/audio/reader/beresheet/1.mp3',
-    downloadSrc: '/audio/reader/beresheet/1.mp3',
+    playSrc: `/audio/${narratorId}/beresheet/1.mp3`,
+    downloadSrc: `/audio/${narratorId}/beresheet/1.mp3`,
     format: 'mp3',
     status: 'available',
   }
@@ -136,11 +136,20 @@ function createFixture() {
   return { audio, book, load, pause, play }
 }
 
-function createHarness() {
+function createHarness({
+  recordings = [recording()],
+  getNarratorId = () => recordings[0]!.narratorId,
+  loadCues = async () => [cue()],
+}: {
+  recordings?: readonly ParshaAudioRecording[]
+  getNarratorId?: () => string
+  loadCues?: (
+    recording: ParshaAudioRecording
+  ) => Promise<readonly WordCue[]>
+} = {}) {
   const { audio, book, load, pause, play } = createFixture()
   const run = createRunFixture()
-  const activeRecording = recording()
-  const canUseNetwork = vi.fn(() => true)
+  const activeRecording = recordings[0]!
   const onPlaybackRateChange = vi.fn()
   const viewport: ReaderViewport = {
     mode: 'wide',
@@ -168,10 +177,16 @@ function createHarness() {
       },
       recording: {
         library: {
-          findRecording: () => activeRecording,
-          findAuthoringRecording: () => activeRecording,
-          listRecordings: () => [activeRecording],
-          loadCues: async () => [cue()],
+          findRecording: ({ narratorId }) =>
+            recordings.find(
+              (candidate) => candidate.narratorId === narratorId
+            ) ?? null,
+          findAuthoringRecording: ({ narratorId }) =>
+            recordings.find(
+              (candidate) => candidate.narratorId === narratorId
+            ) ?? activeRecording,
+          listRecordings: () => [...recordings],
+          loadCues,
         },
         display: {
           resolveRun: (runId) => (runId === run.id ? run : null),
@@ -182,20 +197,18 @@ function createHarness() {
         authoring: {
           isActive: () => false,
           isVisible: () => false,
-          getSession: () => null,
+          hasSession: () => false,
           bindSession: async () => {},
           clearSession: vi.fn(),
         },
-        getNarratorId: () => 'reader',
+        getNarratorId,
         recordingMode: false,
       },
-      canUseNetwork,
     })
   })
 
   return {
     audio,
-    canUseNetwork,
     load,
     onPlaybackRateChange,
     pause,
@@ -242,7 +255,13 @@ test('owns playback state behind semantic commands and immutable snapshots', asy
     activeTokenIndex: 0,
     currentCueIndex: 0,
   })
-  expect(playback.isTargetActive({ runId: run.id, aliyahIndex: 1 })).toBe(true)
+  expect(
+    playback.isTargetActive({
+      recordingId: recording().id,
+      runId: run.id,
+      aliyahIndex: 1,
+    })
+  ).toBe(true)
   expect(playback.tokenIndex(tokenKey)).toBe(0)
   expect(playback.cueForToken(tokenKey)).toEqual(cue())
   expect(Object.isFrozen(playback.cueForToken(tokenKey))).toBe(true)
@@ -269,44 +288,235 @@ test('owns playback state behind semantic commands and immutable snapshots', asy
   ).toBeNull()
 })
 
-test('owns network gating and playback-rate commands', async () => {
+test('replaces the active recording when the narrator changes on the same aliyah', async () => {
+  const first = recording('reader')
+  const second = recording('second-reader')
+  let narratorId = first.narratorId
+  const { playback, run } = createHarness({
+    recordings: [first, second],
+    getNarratorId: () => narratorId,
+  })
+  const target = { runId: run.id, aliyahIndex: 1 as const }
+
+  await playback.loadRecording(target)
+  expect(
+    playback.isTargetActive({ recordingId: first.id, ...target })
+  ).toBe(true)
+
+  narratorId = second.narratorId
+  const availability = playback.lookupRecording(run, target.aliyahIndex)
+  expect(availability.recording?.id).toBe(second.id)
+  expect(
+    playback.isTargetActive({
+      recordingId: availability.recording?.id ?? null,
+      ...target,
+    })
+  ).toBe(false)
+
+  const replaced = await playback.loadRecording(target)
+  expect(replaced?.recording.id).toBe(second.id)
+  expect(playback.snapshot().session?.recording.id).toBe(second.id)
+})
+
+test('keeps only the newest narrator load during rapid replacement', async () => {
+  const first = recording('reader')
+  const second = recording('second-reader')
+  let narratorId = first.narratorId
+  let resolveFirstCues!: (cues: readonly WordCue[]) => void
+  const firstCues = new Promise<readonly WordCue[]>((resolve) => {
+    resolveFirstCues = resolve
+  })
+  const loadCues = vi.fn((candidate: ParshaAudioRecording) =>
+    candidate.id === first.id
+      ? firstCues
+      : Promise.resolve<readonly WordCue[]>([cue(1)])
+  )
+  const { playback, run } = createHarness({
+    recordings: [first, second],
+    getNarratorId: () => narratorId,
+    loadCues,
+  })
+  const target = { runId: run.id, aliyahIndex: 1 as const }
+
+  const obsoleteLoad = playback.loadRecording(target)
+  await vi.waitFor(() => expect(loadCues).toHaveBeenCalledWith(first))
+  narratorId = second.narratorId
+  const currentLoad = playback.loadRecording(target)
+
+  await expect(currentLoad).resolves.toMatchObject({
+    recording: { id: second.id },
+  })
+  resolveFirstCues([cue()])
+  await expect(obsoleteLoad).resolves.toBeNull()
+  expect(playback.snapshot().session?.recording.id).toBe(second.id)
+})
+
+test('attempts new and active playback commands while offline', async () => {
   const {
-    canUseNetwork,
+    audio,
     onPlaybackRateChange,
+    pause,
     play,
     playback,
     run,
   } = createHarness()
+  vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false)
+
+  // Loading a new target must reach its exact media URL so the service worker
+  // can satisfy the request from the offline recording cache.
   await playback.loadRecording({ runId: run.id, aliyahIndex: 1 })
   const retry = vi.fn(async () => {})
 
-  canUseNetwork.mockReturnValue(false)
-  expect(await playback.play(retry)).toBe(false)
-  expect(canUseNetwork).toHaveBeenLastCalledWith(retry)
-  expect(play).not.toHaveBeenCalled()
-
-  canUseNetwork.mockReturnValue(true)
   expect(playback.authorizePlayback(recording())).toBe(true)
   expect(await playback.play(retry)).toBe(true)
   expect(play).toHaveBeenCalledOnce()
+  expect(retry).not.toHaveBeenCalled()
   expect(playback.snapshot().playing).toBe(true)
 
   playback.pause()
   expect(playback.snapshot().paused).toBe(true)
 
+  fixture!
+    .querySelector<HTMLButtonElement>('[data-target-id="floating-replay"]')!
+    .click()
+  await vi.waitFor(() => expect(play).toHaveBeenCalledTimes(2))
+  expect(retry).not.toHaveBeenCalled()
+
+  pause.mockClear()
+  playback.pause()
+  await playback.activateSessionToken(tokenKey, {
+    play: true,
+    seekToCue: true,
+    retry,
+  })
+  expect(play).toHaveBeenCalledTimes(3)
+  expect(retry).not.toHaveBeenCalled()
+  expect(playback.snapshot().activeTokenKey).toBe(tokenKey)
+  expect(audio.currentTime).toBe(0)
+
   await playback.setPlaybackRate(2)
   expect(onPlaybackRateChange).toHaveBeenLastCalledWith(2)
 })
 
-test('limits raw implementations to explicit optional-feature adapters', () => {
-  const { playback } = createHarness()
+test('reports an offline media failure with a retry for the current session', async () => {
+  const { audio, play, playback, run } = createHarness()
+  let online = false
+  vi.spyOn(window.navigator, 'onLine', 'get').mockImplementation(() => online)
+  await playback.loadRecording({ runId: run.id, aliyahIndex: 1 })
+  play.mockClear()
 
-  expect(playback.cueAuthoringAdapter()).toBe(
-    playback.cueAuthoringAdapter()
-  )
-  expect(playback.recordingHarnessAdapter()).toBe(
-    playback.recordingHarnessAdapter()
-  )
+  let offlineRetry: (() => Promise<void>) | null = null
+  playback.subscribe((change) => {
+    if (change.type === 'offline-media-error') offlineRetry = change.retry
+  })
+
+  audio.dispatchEvent(new Event('error'))
+  expect(offlineRetry).not.toBeNull()
+
+  online = true
+  await offlineRetry!()
+  expect(play).toHaveBeenCalledOnce()
+})
+
+test('retries the exact offline action after playback rejects', async () => {
+  const { play, playback, run } = createHarness()
+  vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false)
+  await playback.loadRecording({ runId: run.id, aliyahIndex: 1 })
+  play.mockRejectedValueOnce(new Error('Media unavailable offline'))
+
+  const retryAction = vi.fn(async () => {})
+  let offlineRetry: (() => Promise<void>) | null = null
+  playback.subscribe((change) => {
+    if (change.type === 'offline-media-error') offlineRetry = change.retry
+  })
+
+  expect(await playback.play(retryAction)).toBe(false)
+  expect(offlineRetry).not.toBeNull()
+  expect(retryAction).not.toHaveBeenCalled()
+
+  await offlineRetry!()
+  expect(retryAction).toHaveBeenCalledOnce()
+})
+
+test('keeps Cue Authoring semantic, immutable, and generation-stable', async () => {
+  const { audio, playback, run } = createHarness()
+  await playback.loadRecording({ runId: run.id, aliyahIndex: 1 })
+
+  const adapter = playback.cueAuthoringAdapter()
+  const session = adapter.session()
+  const readCues = adapter.readCues()
+  expect(session).not.toBeNull()
+  expect(Object.isFrozen(session)).toBe(true)
+  expect(Object.isFrozen(session?.tokenKeys)).toBe(true)
+  expect(Object.isFrozen(readCues)).toBe(true)
+  expect(Object.isFrozen(readCues[0])).toBe(true)
+  expect(() => (session!.tokenKeys as string[]).push('mutated')).toThrow()
+  expect(() => {
+    ;(readCues[0] as WordCue).timeStart = 9
+  }).toThrow()
+  expect(playback.tokenIndex('mutated')).toBe(-1)
+  expect(playback.cueForToken(tokenKey)?.timeStart).toBe(0)
+
+  const changes: string[] = []
+  const unsubscribe = adapter.subscribe((change) => {
+    changes.push(change.type)
+  })
+  adapter.seek(2)
+  expect(adapter.session()).toBe(session)
+  audio.dispatchEvent(new Event('timeupdate'))
+  expect(changes).toContain('media-progress')
+  expect(changes).toContain('display-progress')
+  unsubscribe()
+
+  const replacement = [cue(3)]
+  expect(adapter.replaceCues(replacement)).toBe(true)
+  replacement[0].timeStart = 7
+  expect(playback.cueForToken(tokenKey)?.timeStart).toBe(3)
+})
+
+test('exposes deterministic recording semantics without raw implementations', async () => {
+  const { pause, play, playback } = createHarness()
+  const harness = playback.recordingHarnessAdapter()
+  const loaded = await harness.loadByAudioId(recording().id)
+
+  expect(loaded).not.toBeNull()
+  expect(Object.isFrozen(loaded)).toBe(true)
+  expect(Object.isFrozen(loaded?.cues)).toBe(true)
+  expect(Object.isFrozen(loaded?.cues[0])).toBe(true)
+  expect(Object.isFrozen(loaded?.tokenKeys)).toBe(true)
+  expect(harness.snapshot().session).toBe(loaded)
+
+  harness.seek(0)
+  await harness.syncHighlight()
+  expect(await harness.activateHighlightAt(0, { scroll: false })).toBe(true)
+  expect(harness.snapshot()).toMatchObject({
+    currentTime: 0,
+    activeTokenKey: tokenKey,
+  })
+
+  play.mockClear()
+  pause.mockClear()
+  await harness.play()
+  harness.pause()
+  expect(play).toHaveBeenCalledOnce()
+  expect(pause).toHaveBeenCalledOnce()
+})
+
+test('keeps raw implementations private behind semantic Adapters', () => {
+  const { playback } = createHarness()
+  const cueAuthoring = playback.cueAuthoringAdapter()
+  const recordingHarness = playback.recordingHarnessAdapter()
+
+  expect(playback.cueAuthoringAdapter()).toBe(cueAuthoring)
+  expect(playback.recordingHarnessAdapter()).toBe(recordingHarness)
+  expect('audioController' in cueAuthoring).toBe(false)
+  expect('highlightController' in cueAuthoring).toBe(false)
+  expect('audio' in cueAuthoring).toBe(false)
+  expect('highlight' in cueAuthoring).toBe(false)
+  expect('audio' in recordingHarness).toBe(false)
+  expect('highlight' in recordingHarness).toBe(false)
+  expect('timeline' in recordingHarness).toBe(false)
+  expect('recordingSession' in recordingHarness).toBe(false)
   expect('audioController' in playback).toBe(false)
   expect('highlightController' in playback).toBe(false)
   expect('recordingSession' in playback).toBe(false)

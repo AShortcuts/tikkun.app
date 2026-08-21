@@ -12,7 +12,7 @@ const testSettings: UserSettings = {
 
 const generator = new LeiningGenerator(testSettings)
 
-test('legacy ref URLs start at the requested verse, not the start of the run', async () => {
+test('Torah reference URLs start at the requested verse, not the start of the run', async () => {
   const route = parseUrl(generator, '/r/1-1-10')
   if (!route || route.view !== 'reader') throw new Error('URL did not parse.')
 

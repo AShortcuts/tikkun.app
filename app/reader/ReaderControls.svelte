@@ -186,6 +186,7 @@
     class="toolbar-overflow-item"
     type="button"
     data-toolbar-overflow-action="annotations"
+    aria-pressed={controlState.annotationsEnabled}
     onclick={() => run(toggleAnnotations)}
   >
     <span data-target-id="toolbar-overflow-annotations-label">
@@ -196,7 +197,12 @@
       data-target-id="toolbar-overflow-annotations-icon"
       aria-hidden="true"
     >
-      {controlState.annotationsEnabled ? 'אֶ֨' : 'א'}
+      <span class="toggle mod-compact">
+        <span class="shadowed-circle">
+          <span class="toggle-state mod-off">א</span>
+          <span class="toggle-state mod-on">אֶ֨</span>
+        </span>
+      </span>
     </span>
   </button>
   <button

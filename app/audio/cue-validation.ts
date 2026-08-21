@@ -129,9 +129,6 @@ export function parseDraftWordCues(value: unknown): WordCue[] | null {
   return cues
 }
 
-/** @deprecated Prefer parseDraftWordCues when accepting repairable authoring state. */
-export const parseWordCues = parseDraftWordCues
-
 export function isPublishableCueSequence(cues: readonly WordCue[]) {
   for (let index = 0; index < cues.length; index += 1) {
     const cue = cues[index]
@@ -161,14 +158,11 @@ export function parseCueExportPayload(value: unknown): CueExportPayload | null {
   const cues = parsePublishedWordCues(value.cues)
   if (!cues) return null
 
-  const readingId = isNonEmptyString(value.readingId) ? value.readingId : null
-  const parshaSlug = isNonEmptyString(value.parshaSlug) ? value.parshaSlug : null
-  if (Boolean(readingId) === Boolean(parshaSlug)) return null
-
   if (
     !isNonEmptyString(value.audioId) ||
     (value.audioFormat !== 'mp3' && value.audioFormat !== 'm4a') ||
     !isNonEmptyString(value.narratorId) ||
+    !isNonEmptyString(value.readingId) ||
     !isPositiveInteger(value.aliyah) ||
     !isNonNegativeInteger(value.tokenCount) ||
     !isNonNegativeInteger(value.cueCount) ||
@@ -179,9 +173,6 @@ export function parseCueExportPayload(value: unknown): CueExportPayload | null {
     return null
   }
 
-  if (value.audioVersion !== undefined && !isNonEmptyString(value.audioVersion)) {
-    return null
-  }
   if (
     value.savedAt !== undefined &&
     !isIsoTimestamp(value.savedAt)
@@ -208,27 +199,22 @@ export function parseCueExportPayload(value: unknown): CueExportPayload | null {
   }
 
   const audioFormat: AudioFormat = value.audioFormat
-  const audioVersion = typeof value.audioVersion === 'string'
-    ? value.audioVersion
-    : undefined
   const savedAt = typeof value.savedAt === 'string' ? value.savedAt : undefined
   const payload = {
     audioId: value.audioId,
     audioFormat,
     narratorId: value.narratorId,
+    readingId: value.readingId,
     aliyah: value.aliyah,
     tokenCount: value.tokenCount,
     cueCount: value.cueCount,
     tokenizationVersion: value.tokenizationVersion,
     ...(mediaIdentity === undefined ? {} : { mediaIdentity }),
-    ...(audioVersion === undefined ? {} : { audioVersion }),
     ...(savedAt === undefined ? {} : { savedAt }),
     ...(issues === undefined ? {} : { issues }),
     cues,
   }
-  if (readingId) return { ...payload, readingId }
-  if (parshaSlug) return { ...payload, parshaSlug }
-  return null
+  return payload
 }
 
 export function inspectCueExportPayload(value: unknown): CuePayloadInspection {
@@ -253,7 +239,7 @@ export function inspectCueExportPayload(value: unknown): CuePayloadInspection {
   ) {
     addIssue(
       '$',
-      'This looks like a local Cue Draft. Use Export in Admin Timing Mode and publish the exported Cue Data JSON.'
+      'This looks like a local Cue Draft. Use Export in Cue Authoring and publish the exported Cue Data JSON.'
     )
   }
 
@@ -267,13 +253,8 @@ export function inspectCueExportPayload(value: unknown): CuePayloadInspection {
     addIssue('narratorId', 'narratorId must be a non-empty string.')
   }
 
-  const hasReadingId = isNonEmptyString(value.readingId)
-  const hasParshaSlug = isNonEmptyString(value.parshaSlug)
-  if (hasReadingId === hasParshaSlug) {
-    addIssue(
-      'readingId',
-      'Provide exactly one non-empty readingId or parshaSlug.'
-    )
+  if (!isNonEmptyString(value.readingId)) {
+    addIssue('readingId', 'readingId must be a non-empty string.')
   }
   if (!isPositiveInteger(value.aliyah)) {
     addIssue('aliyah', 'aliyah must be a positive integer.')
@@ -348,9 +329,6 @@ export function inspectCueExportPayload(value: unknown): CuePayloadInspection {
     }
   }
 
-  if (value.audioVersion !== undefined && !isNonEmptyString(value.audioVersion)) {
-    addIssue('audioVersion', 'audioVersion must be a non-empty string.')
-  }
   if (value.savedAt !== undefined && !isIsoTimestamp(value.savedAt)) {
     addIssue('savedAt', 'savedAt must be an ISO timestamp.')
   }
@@ -386,21 +364,16 @@ export function cuePayloadMatchesRecording(
   payload: CueExportPayload,
   recording: AudioRecording
 ) {
-  const readingId = payload.readingId ?? payload.parshaSlug
   const mediaIdentityMatches = !payload.mediaIdentity || (
     recording.mediaIdentity !== undefined &&
     audioMediaIdentitiesEqual(payload.mediaIdentity, recording.mediaIdentity)
   )
-  const legacyAudioVersionMatches = Boolean(payload.mediaIdentity) ||
-    !payload.audioVersion ||
-    payload.audioVersion === recording.notes
   return (
     payload.audioId === recording.id &&
     payload.audioFormat === recording.format &&
     payload.narratorId === recording.narratorId &&
     payload.aliyah === recording.aliyah &&
-    readingId === recording.reading.id &&
-    mediaIdentityMatches &&
-    legacyAudioVersionMatches
+    payload.readingId === recording.reading.id &&
+    mediaIdentityMatches
   )
 }

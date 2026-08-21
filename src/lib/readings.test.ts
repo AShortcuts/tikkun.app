@@ -3,6 +3,7 @@ import {
   availableReadings,
   coverageSummary,
   filterReadingCoverage,
+  getReadingAvailabilitySummary,
   getRequiredReading,
   readingCoverage,
 } from './readings.ts'
@@ -70,6 +71,19 @@ test('uses manual rows only for active work while generated cues decide readines
   expect(readingCoverage.map((reading) => reading.statusLabel)).not.toContain(
     'Needs review'
   )
+})
+
+test('derives featured-reading copy from generated availability and cue truth', () => {
+  expect(getReadingAvailabilitySummary(getRequiredReading('beresheet'))).toEqual({
+    aliyahLabel: 'All seven aliyot available',
+    statusLabel: 'All aliyot ready',
+  })
+  expect(
+    getReadingAvailabilitySummary(getRequiredReading('behalotecha'))
+  ).toEqual({
+    aliyahLabel: 'All seven aliyot available',
+    statusLabel: 'Audio available',
+  })
 })
 
 test('fails the build-facing lookup when a featured reading is absent', () => {

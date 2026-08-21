@@ -2,9 +2,15 @@
   import { asset, resolve } from '$app/paths'
   import AliyahBubbles from '$lib/components/AliyahBubbles.svelte'
   import ReadingCard from '$lib/components/ReadingCard.svelte'
-  import { availableReadings, getRequiredReading } from '$lib/readings'
+  import {
+    availableReadings,
+    getReadingAvailabilitySummary,
+    getRequiredReading,
+  } from '$lib/readings'
+  import '../../../css/home.css'
 
   const featuredReading = getRequiredReading('beresheet')
+  const featuredAvailability = getReadingAvailabilitySummary(featuredReading)
 </script>
 
 <svelte:head>
@@ -33,13 +39,6 @@
         >
           Start practicing
         </a>
-        <a
-          class="home-experiment-action"
-          href={resolve('/prototypes/apple-sentient/')}
-          data-sveltekit-reload
-        >
-          View experimental redesign
-        </a>
       </div>
     </div>
 
@@ -60,13 +59,16 @@
       </span>
       <span class="home-reader-dock">
         <strong>{featuredReading.parshaName}</strong>
-        <span class="home-reader-dock-bubbles" aria-label="All seven aliyot available">
+        <span
+          class="home-reader-dock-bubbles"
+          aria-label={featuredAvailability.aliyahLabel}
+        >
           <AliyahBubbles
             aliyot={featuredReading.aliyot}
             readingName={featuredReading.parshaName}
           />
         </span>
-        <span>All aliyot ready</span>
+        <span>{featuredAvailability.statusLabel}</span>
       </span>
     </a>
   </section>

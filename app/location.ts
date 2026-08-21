@@ -58,6 +58,17 @@ export function getScrollPageCount(name: ScrollName) {
   return pageIndexes[name].getPageCount()
 }
 
+export function isValidScrollPageNumber(
+  name: ScrollName,
+  pageNumber: number
+) {
+  return (
+    Number.isInteger(pageNumber) &&
+    pageNumber >= 1 &&
+    pageNumber <= getScrollPageCount(name)
+  )
+}
+
 export function isIndexedReference({
   b: book,
   c: chapter,

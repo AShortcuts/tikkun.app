@@ -1,16 +1,7 @@
-import {
-  parseHttpByteRange,
-  type HttpByteRange,
-} from '../../app/audio/http-byte-range.ts'
+import { parseHttpByteRange } from '../../app/audio/http-byte-range.ts'
 
 interface AssetFetcher {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
-}
-
-interface FixedLengthStreamConstructor {
-  new (
-    expectedLength: number
-  ): ReadableWritablePair<Uint8Array, Uint8Array>
 }
 
 export interface AudioRangeFunctionContext {
@@ -27,7 +18,7 @@ function requestWithoutRange(request: Request) {
   return assetRequest
 }
 
-function mediaHeaders(response: Response, advertiseRanges = true) {
+function mediaHeaders(response: Response, advertiseRanges = false) {
   const headers = new Headers(response.headers)
   headers.set('x-content-type-options', 'nosniff')
   if (advertiseRanges) headers.set('accept-ranges', 'bytes')
@@ -38,7 +29,9 @@ function mediaHeaders(response: Response, advertiseRanges = true) {
 function forwardAsset(
   response: Response,
   method: string,
-  advertiseRanges = true
+  advertiseRanges =
+    response.status === 206 ||
+    response.headers.get('accept-ranges')?.toLowerCase() === 'bytes'
 ) {
   return new Response(method === 'HEAD' ? null : response.body, {
     status: response.status,
@@ -81,77 +74,8 @@ function ifRangeMatches(request: Request, response: Response) {
   return response.headers.get('last-modified') === validator
 }
 
-function streamByteRange(
-  body: ReadableStream<Uint8Array>,
-  range: HttpByteRange
-) {
-  const reader = body.getReader()
-  let sourceOffset = 0
-  let remaining = range.end - range.start + 1
-  let finished = false
-
-  return new ReadableStream<Uint8Array>({
-    async pull(controller) {
-      while (!finished && remaining > 0) {
-        const { done, value } = await reader.read()
-        if (done) {
-          finished = true
-          controller.error(
-            new Error('Audio asset ended before its declared Content-Length')
-          )
-          return
-        }
-
-        const chunkStart = sourceOffset
-        sourceOffset += value.byteLength
-        if (sourceOffset <= range.start) continue
-
-        const startInChunk = Math.max(0, range.start - chunkStart)
-        const byteCount = Math.min(
-          value.byteLength - startInChunk,
-          remaining
-        )
-        if (byteCount > 0) {
-          controller.enqueue(
-            value.subarray(startInChunk, startInChunk + byteCount)
-          )
-          remaining -= byteCount
-        }
-
-        if (remaining === 0) {
-          finished = true
-          controller.close()
-          await reader.cancel('Requested byte range complete')
-        }
-        return
-      }
-    },
-    async cancel(reason) {
-      finished = true
-      await reader.cancel(reason)
-    },
-  })
-}
-
-function fixedLengthByteRange(
-  body: ReadableStream<Uint8Array>,
-  range: HttpByteRange,
-  contentLength: number
-) {
-  const source = streamByteRange(body, range)
-  const FixedLengthStream = (
-    globalThis as typeof globalThis & {
-      FixedLengthStream?: FixedLengthStreamConstructor
-    }
-  ).FixedLengthStream
-
-  return FixedLengthStream
-    ? source.pipeThrough(new FixedLengthStream(contentLength))
-    : source
-}
-
 function rangeNotSatisfiable(response: Response, totalLength: number) {
-  const headers = mediaHeaders(response)
+  const headers = mediaHeaders(response, false)
   headers.delete('content-encoding')
   headers.set('content-length', '0')
   headers.set('content-range', `bytes */${totalLength}`)
@@ -197,28 +121,10 @@ export async function onRequest({
     return rangeNotSatisfiable(assetResponse, totalLength)
   }
 
-  if (!assetResponse.body) {
-    return new Response('Audio asset body unavailable', {
-      status: 502,
-      statusText: 'Bad Gateway',
-    })
-  }
-
-  const contentLength = range.end - range.start + 1
-  const headers = mediaHeaders(assetResponse)
-  headers.delete('content-encoding')
-  headers.set('content-length', String(contentLength))
-  headers.set(
-    'content-range',
-    `bytes ${range.start}-${range.end}/${totalLength}`
-  )
-
-  return new Response(
-    fixedLengthByteRange(assetResponse.body, range, contentLength),
-    {
-      status: 206,
-      statusText: 'Partial Content',
-      headers,
-    }
-  )
+  // A 200 response is sequential. Synthesizing a middle or suffix 206 from it
+  // would consume every preceding byte and make seek cost scale with file size.
+  // Stream the honest full response instead; release verification requires the
+  // deployed asset binding to return a native 206 for byte-range requests.
+  void range
+  return forwardAsset(assetResponse, request.method, false)
 }

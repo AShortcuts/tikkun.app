@@ -23,9 +23,7 @@ type CueDraftRecordingIdentity = {
   narratorId: string
   readingId: string
   aliyah: number
-  mediaIdentity?: AudioMediaIdentity
-  /** @deprecated Used only for recordings without a durable media identity. */
-  audioVersion?: string
+  mediaIdentity: AudioMediaIdentity
 }
 
 export type CueDraftPayload = CueDraftRecordingIdentity & {
@@ -91,20 +89,10 @@ function draftIdentityMatchesRecording(
   }
 
   const mediaIdentity = parseAudioMediaIdentity(value.mediaIdentity)
-  const audioVersion = value.audioVersion
-  if (recording.mediaIdentity) {
-    return (
-      audioVersion === undefined &&
-      mediaIdentity !== null &&
-      audioMediaIdentitiesEqual(mediaIdentity, recording.mediaIdentity)
-    )
-  }
-
   return (
-    mediaIdentity === null &&
-    typeof recording.notes === 'string' &&
-    recording.notes.length > 0 &&
-    audioVersion === recording.notes
+    recording.mediaIdentity !== undefined &&
+    mediaIdentity !== null &&
+    audioMediaIdentitiesEqual(mediaIdentity, recording.mediaIdentity)
   )
 }
 
@@ -139,13 +127,14 @@ export function parseCueDraftPayload(
   }
 
   const mediaIdentity = parseAudioMediaIdentity(value.mediaIdentity)
+  if (!mediaIdentity) return null
   return {
     audioId: recording.id,
     audioFormat: recording.format,
     narratorId: recording.narratorId,
     readingId: recording.reading.id,
     aliyah: recording.aliyah,
-    ...(mediaIdentity ? { mediaIdentity } : { audioVersion: recording.notes! }),
+    mediaIdentity,
     tokenCount,
     tokenPointer: value.tokenPointer,
     tokenizationVersion: TOKENIZATION_VERSION,
@@ -162,23 +151,17 @@ export function createCueDraftPayload({
   updatedAt,
   cues,
 }: CreateCueDraftPayloadOptions): CueDraftPayload {
-  const identity: CueDraftRecordingIdentity = recording.mediaIdentity
-    ? {
-        audioId: recording.id,
-        audioFormat: recording.format,
-        narratorId: recording.narratorId,
-        readingId: recording.reading.id,
-        aliyah: recording.aliyah,
-        mediaIdentity: recording.mediaIdentity,
-      }
-    : {
-        audioId: recording.id,
-        audioFormat: recording.format,
-        narratorId: recording.narratorId,
-        readingId: recording.reading.id,
-        aliyah: recording.aliyah,
-        audioVersion: recording.notes ?? '',
-      }
+  if (!recording.mediaIdentity) {
+    throw new TypeError('Cannot create a Cue Draft without media identity')
+  }
+  const identity: CueDraftRecordingIdentity = {
+    audioId: recording.id,
+    audioFormat: recording.format,
+    narratorId: recording.narratorId,
+    readingId: recording.reading.id,
+    aliyah: recording.aliyah,
+    mediaIdentity: recording.mediaIdentity,
+  }
   const candidate = {
     ...identity,
     tokenCount,

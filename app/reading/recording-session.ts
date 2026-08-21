@@ -6,6 +6,7 @@ import {
   AuthoringSessionTransition,
   createAuthoringPlaybackPlan,
   isAuthoringSession,
+  replaceAuthoringSessionCues,
 } from '../admin/authoring-session.ts'
 import { getAliyahNavigationEntriesForRun } from './aliyah-navigation/model.ts'
 import type { PlaybackAliyahIndex } from './aliyah-dom-target.ts'
@@ -42,8 +43,8 @@ export interface RecordingSessionDisplay {
 export interface RecordingSessionAuthoring {
   isActive(): boolean
   isVisible(): boolean
-  getSession(): ActiveAudioSession | null
-  bindSession(session: ActiveAudioSession): Promise<void>
+  hasSession(): boolean
+  bindSession(): Promise<void>
   clearSession(): void
 }
 
@@ -86,6 +87,7 @@ export interface RecordingSession {
   loadByAudioId(audioId: string): Promise<ActiveAudioSession | null>
   enterAuthoring(): Promise<void>
   leaveAuthoring(): Promise<void>
+  replaceAuthoringCues(cues: readonly WordCue[]): boolean
   reset(): void
   tokenCacheSize(): number
 }
@@ -294,7 +296,7 @@ export function createRecordingSession(
     if (!isCurrent(lifetime)) return null
 
     if (isAuthoringSession(session)) {
-      await authoring.bindSession(session)
+      await authoring.bindSession()
       if (!isCurrent(lifetime)) return null
       await presentation.setCueIndex(
         session.cues.length && audioController.currentTime
@@ -342,7 +344,7 @@ export function createRecordingSession(
     const session = audioController.session
     if (
       !session ||
-      authoring.getSession() ||
+      authoring.hasSession() ||
       session.status === 'overlap-only'
     ) {
       return
@@ -399,12 +401,20 @@ export function createRecordingSession(
     authoringTransition.leave()
   }
 
+  const replaceAuthoringCues = (cues: readonly WordCue[]) => {
+    const session = audioController.session
+    return session
+      ? replaceAuthoringSessionCues(session, cloneCues(cues))
+      : false
+  }
+
   return {
     lookup,
     load,
     loadByAudioId,
     enterAuthoring,
     leaveAuthoring,
+    replaceAuthoringCues,
     reset,
     tokenCacheSize: () => tokenKeysByTarget.size,
   }

@@ -1,3 +1,5 @@
+import { createOfflineWorkerRequestClient } from './worker-request.ts'
+
 export type OfflineTorahDownloadPhase =
   | 'checking'
   | 'idle'
@@ -32,8 +34,6 @@ type TorahDownloadWorkerMessage = {
   complete: boolean
   errorMessage?: string
 }
-
-const WORKER_RESPONSE_TIMEOUT_MS = 5000
 
 const isNonNegativeInteger = (value: unknown): value is number =>
   Number.isSafeInteger(value) && Number(value) >= 0
@@ -83,7 +83,11 @@ export function createOfflineTorahDownloadController({
   const listeners = new Set<
     (snapshot: OfflineTorahDownloadSnapshot) => void
   >()
-  const activePorts = new Set<MessagePort>()
+  const workerRequests = createOfflineWorkerRequestClient({
+    serviceWorker,
+    createMessageChannel,
+    responseTimeoutMs: 120_000,
+  })
 
   const updateSnapshot = (updates: Partial<OfflineTorahDownloadSnapshot>) => {
     if (destroyed) return
@@ -91,75 +95,29 @@ export function createOfflineTorahDownloadController({
     listeners.forEach((listener) => listener({ ...snapshot }))
   }
 
-  const getActiveWorker = async () => {
-    if (!serviceWorker) return null
-    const registration = await serviceWorker.getRegistration()
-    if (!registration) return serviceWorker.controller
-    if (registration.waiting) return registration.waiting
-    if (registration.active) return registration.active
-    const readyRegistration = await serviceWorker.ready
-    return readyRegistration.active ?? serviceWorker.controller
-  }
-
   const requestStatus = async (
     command: 'GET_TORAH_DOWNLOAD_STATUS' | 'DOWNLOAD_TORAH_PAGES'
   ) => {
-    const worker = await getActiveWorker()
-    if (!worker) {
+    const result = await workerRequests.request({ type: command }, (value) => {
+      const message = parseWorkerMessage(value)
+      updateSnapshot({
+        phase: message.state,
+        downloaded: message.downloaded,
+        total: message.total,
+        errorMessage: message.errorMessage ?? null,
+      })
+      return (
+        command === 'GET_TORAH_DOWNLOAD_STATUS' ||
+        message.state === 'complete' ||
+        message.state === 'error'
+      )
+    })
+    if (result === 'unavailable') {
       updateSnapshot({
         phase: 'unavailable',
         errorMessage: null,
       })
-      return
     }
-
-    await new Promise<void>((resolve, reject) => {
-      const channel = createMessageChannel()
-      const port = channel.port1
-      const responseTimer = setTimeout(() => {
-        close()
-        reject(
-          new Error(
-            'The offline worker is not ready. Apply any available update and try again.'
-          )
-        )
-      }, WORKER_RESPONSE_TIMEOUT_MS)
-      activePorts.add(port)
-      const close = () => {
-        clearTimeout(responseTimer)
-        activePorts.delete(port)
-        port.close()
-      }
-      port.onmessage = (event) => {
-        try {
-          clearTimeout(responseTimer)
-          const message = parseWorkerMessage(event.data)
-          updateSnapshot({
-            phase: message.state,
-            downloaded: message.downloaded,
-            total: message.total,
-            errorMessage: message.errorMessage ?? null,
-          })
-          if (
-            command === 'GET_TORAH_DOWNLOAD_STATUS' ||
-            message.state === 'complete' ||
-            message.state === 'error'
-          ) {
-            close()
-            resolve()
-          }
-        } catch (error) {
-          close()
-          reject(error)
-        }
-      }
-      port.onmessageerror = () => {
-        close()
-        reject(new Error('The offline worker response could not be read.'))
-      }
-      port.start()
-      worker.postMessage({ type: command }, [channel.port2])
-    })
   }
 
   const runRequest = async (
@@ -206,8 +164,7 @@ export function createOfflineTorahDownloadController({
     },
     destroy: () => {
       destroyed = true
-      activePorts.forEach((port) => port.close())
-      activePorts.clear()
+      workerRequests.destroy()
       listeners.clear()
       refreshPromise = null
       downloadPromise = null

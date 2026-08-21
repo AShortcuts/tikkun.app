@@ -16,7 +16,7 @@ type PhysicalLocation = {
 }
 
 type PlaybackTarget = {
-  recordingId?: string
+  recordingId: string | null
   runId: string
   aliyahIndex: PlaybackSessionAliyahIndex
 }
@@ -93,6 +93,7 @@ export function isActivePlaybackTarget(
     session &&
       session.runId === target.runId &&
       session.aliyahIndex === target.aliyahIndex &&
-      (!target.recordingId || session.recording.id === target.recordingId)
+      (target.recordingId === null ||
+        session.recording.id === target.recordingId)
   )
 }

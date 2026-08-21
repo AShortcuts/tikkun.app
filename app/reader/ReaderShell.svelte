@@ -35,6 +35,10 @@
   let annotationsEnabled = $state(readInitialAnnotationsEnabled())
   let titleButton: HTMLButtonElement
 
+  const mobileTitleQuery = '(max-width: 550px)'
+  const mobileTitleFontProperty = '--mobile-parsha-title-font-size'
+  const minimumMobileTitleFontSize = 10
+
   const readerChromeVisible = $derived(view === 'reader' && !pickerOpen)
 
   function setView(nextView: ReaderShellViewName) {
@@ -53,6 +57,36 @@
     flushSync(() => {
       title = nextTitle
     })
+    fitMobileTitle()
+  }
+
+  function fitMobileTitle() {
+    titleButton.style.removeProperty(mobileTitleFontProperty)
+
+    const ownerWindow = titleButton.ownerDocument.defaultView
+    if (!ownerWindow) {
+      throw new Error('Reader Shell title requires a browser window')
+    }
+    if (!ownerWindow.matchMedia(mobileTitleQuery).matches) return
+
+    const style = ownerWindow.getComputedStyle(titleButton)
+    const inlinePadding =
+      Number.parseFloat(style.paddingInlineStart) +
+      Number.parseFloat(style.paddingInlineEnd)
+    const availableWidth = titleButton.clientWidth - inlinePadding
+    const contentWidth = titleButton.scrollWidth - inlinePadding
+    if (availableWidth <= 0 || contentWidth <= availableWidth + 0.5) return
+
+    const baseFontSize = Number.parseFloat(style.fontSize)
+    const fittedFontSize = Math.max(
+      minimumMobileTitleFontSize,
+      Math.floor((baseFontSize * (availableWidth - 1) * 100) / contentWidth) /
+        100
+    )
+    titleButton.style.setProperty(
+      mobileTitleFontProperty,
+      `${fittedFontSize}px`
+    )
   }
 
   function setProgress(nextProgress: Partial<ReaderShellProgress>) {
@@ -94,7 +128,28 @@
   }
 
   onMount(() => {
+    const toolbar = titleButton.closest<HTMLElement>('.toolbar-content')
+    if (!toolbar) throw new Error('Reader Shell toolbar is missing')
+    const ownerDocument = titleButton.ownerDocument
+    const ownerWindow = ownerDocument.defaultView
+    if (!ownerWindow) {
+      throw new Error('Reader Shell toolbar requires a browser window')
+    }
+
+    const resizeObserver = new ownerWindow.ResizeObserver(fitMobileTitle)
+    resizeObserver.observe(toolbar)
+    let connected = true
+
+    fitMobileTitle()
+    void ownerDocument.fonts.ready.then(() => {
+      if (connected) fitMobileTitle()
+    })
     connect(shell)
+
+    return () => {
+      connected = false
+      resizeObserver.disconnect()
+    }
   })
 </script>
 
@@ -189,7 +244,7 @@
     class="last-reading-dismiss"
     data-target-id="last-reading-dismiss"
     type="button"
-    aria-label="Dismiss resume prompt"
+    aria-label="Dismiss reading prompt"
   ></button>
 </div>
 

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { execFile } from 'node:child_process'
-import { readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { readFile, readlink, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { promisify } from 'node:util'
@@ -20,30 +20,62 @@ export function processRegistryTransitionPath(workRoot) {
   return `${processRegistryPath(workRoot)}.transition`
 }
 
+async function inspectProcessCwd(pid) {
+  if (process.platform === 'linux') {
+    return path.resolve(await readlink(`/proc/${pid}/cwd`))
+  }
+
+  const { stdout } = await execFileAsync('lsof', [
+    '-a',
+    '-p',
+    String(pid),
+    '-d',
+    'cwd',
+    '-Fn',
+  ])
+  const cwdLine = stdout.split(/\r?\n/).find((line) => line.startsWith('n'))
+  if (!cwdLine || cwdLine.length === 1) {
+    throw new Error(`Could not inspect working directory for PID ${pid}`)
+  }
+  return path.resolve(cwdLine.slice(1))
+}
+
 export async function inspectProcess(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return null
 
   try {
-    const [{ stdout: startedAt }, { stdout: command }] = await Promise.all([
+    const [{ stdout: startedAt }, { stdout: command }, cwd] = await Promise.all([
       execFileAsync('ps', ['-p', String(pid), '-o', 'lstart=']),
       execFileAsync('ps', ['-ww', '-p', String(pid), '-o', 'command=']),
+      inspectProcessCwd(pid),
     ])
     const normalizedStartedAt = startedAt.trim()
     const normalizedCommand = command.trim()
     if (!normalizedStartedAt || !normalizedCommand) return null
-    return { pid, startedAt: normalizedStartedAt, command: normalizedCommand }
+    return { pid, startedAt: normalizedStartedAt, command: normalizedCommand, cwd }
   } catch {
     return null
   }
 }
 
 export function processMatchesRecord(record, identity) {
+  const recordCwd =
+    typeof record?.cwd === 'string' && path.isAbsolute(record.cwd)
+      ? path.resolve(record.cwd)
+      : null
+  const identityCwd =
+    typeof identity?.cwd === 'string' && path.isAbsolute(identity.cwd)
+      ? path.resolve(identity.cwd)
+      : null
   return Boolean(
     record &&
       identity &&
+      recordCwd &&
+      identityCwd &&
       record.pid === identity.pid &&
       record.startedAt === identity.startedAt &&
-      record.command === identity.command
+      record.command === identity.command &&
+      recordCwd === identityCwd
   )
 }
 
@@ -51,7 +83,7 @@ function recorderCommandIsExpected(command) {
   return (
     typeof command === 'string' &&
     command.includes(recorderScriptName) &&
-    !/(?:^|\s)(?:shutdown|cleanup)(?:\s|$)/.test(command)
+    !/(?:^|\s)(?:shutdown|cleanup|status|--dry-run)(?:\s|$)/.test(command)
   )
 }
 
@@ -66,11 +98,16 @@ function isProcessRecord(value) {
     value.command.length > 0 &&
     typeof value.kind === 'string' &&
     typeof value.cwd === 'string' &&
+    path.isAbsolute(value.cwd) &&
     typeof value.processGroup === 'boolean'
   )
 }
 
-function assertValidRegistry(registry, { repoRoot, workRoot }) {
+function assertValidRegistry(
+  registry,
+  { repoRoot, workRoot },
+  invalidMessage = 'Video process registry is invalid; refusing to signal any process'
+) {
   const expectedRepoRoot = path.resolve(repoRoot)
   const expectedWorkRoot = path.resolve(workRoot)
   if (
@@ -87,18 +124,23 @@ function assertValidRegistry(registry, { repoRoot, workRoot }) {
     !Array.isArray(registry.children) ||
     !registry.children.every(isProcessRecord)
   ) {
-    throw new Error('Video process registry is invalid; refusing to signal any process')
+    throw new Error(invalidMessage)
   }
   return registry
 }
 
-async function readRegistry(filePath) {
+async function readRegistrySnapshot(filePath) {
   try {
-    return JSON.parse(await readFile(filePath, 'utf8'))
+    const source = await readFile(filePath, 'utf8')
+    return { source, registry: JSON.parse(source) }
   } catch (error) {
     if (error && typeof error === 'object' && error.code === 'ENOENT') return null
     throw error
   }
+}
+
+async function readRegistry(filePath) {
+  return (await readRegistrySnapshot(filePath))?.registry ?? null
 }
 
 async function writeRegistry(filePath, registry) {
@@ -203,7 +245,12 @@ export async function openOwnedProcessRegistry({
   const filePath = processRegistryPath(normalizedWorkRoot)
 
   const ownerIdentity = await inspect(ownerPid)
-  if (!ownerIdentity || !recorderCommandIsExpected(ownerIdentity.command)) {
+  if (
+    !ownerIdentity ||
+    !recorderCommandIsExpected(ownerIdentity.command) ||
+    typeof ownerIdentity.cwd !== 'string' ||
+    !path.isAbsolute(ownerIdentity.cwd)
+  ) {
     throw new Error('Could not verify video recorder process identity')
   }
 
@@ -215,7 +262,7 @@ export async function openOwnedProcessRegistry({
     owner: {
       ...ownerIdentity,
       kind: 'recorder',
-      cwd: normalizedRepoRoot,
+      cwd: path.resolve(ownerIdentity.cwd),
       processGroup: false,
     },
     children: [],
@@ -270,16 +317,24 @@ export async function openOwnedProcessRegistry({
     filePath,
     runId: registry.runId,
     async add(child, { kind, cwd }) {
+      const expectedCwd = path.resolve(cwd)
       let identity = null
       for (let attempt = 0; attempt < 5 && !identity; attempt += 1) {
         identity = await inspect(child.pid)
         if (!identity) await new Promise((resolve) => setTimeout(resolve, 20))
       }
-      if (!identity) return null
+      if (
+        !identity ||
+        typeof identity.cwd !== 'string' ||
+        !path.isAbsolute(identity.cwd) ||
+        path.resolve(identity.cwd) !== expectedCwd
+      ) {
+        return null
+      }
       const record = {
         ...identity,
         kind,
-        cwd: path.resolve(cwd),
+        cwd: path.resolve(identity.cwd),
         processGroup: process.platform !== 'win32',
       }
       await update((current) => ({
@@ -374,10 +429,99 @@ async function stopRegistryProcesses(registry, dependencies) {
   return stopped
 }
 
+function inspectedProcess(record, role, identity) {
+  return {
+    role,
+    kind: record.kind,
+    pid: record.pid,
+    cwd: record.cwd,
+    processGroup: record.processGroup,
+    state: !identity
+      ? 'stale'
+      : processMatchesRecord(record, identity)
+        ? 'running'
+        : 'mismatch',
+    expected: {
+      startedAt: record.startedAt,
+      command: record.command,
+      cwd: record.cwd,
+    },
+    observed: identity
+      ? {
+          pid: identity.pid,
+          startedAt: identity.startedAt,
+          command: identity.command,
+          cwd: identity.cwd,
+        }
+      : null,
+  }
+}
+
+export async function inspectOwnedRun({
+  repoRoot,
+  workRoot,
+  expectedRunId = undefined,
+  inspect = inspectProcess,
+}) {
+  const normalizedRepoRoot = path.resolve(repoRoot)
+  const normalizedWorkRoot = path.resolve(workRoot)
+  const filePath = processRegistryPath(normalizedWorkRoot)
+  const snapshot = await readRegistrySnapshot(filePath)
+  const base = {
+    repoRoot: normalizedRepoRoot,
+    workRoot: normalizedWorkRoot,
+  }
+
+  if (!snapshot) {
+    return { status: 'not-running', runId: null, ...base, processes: [] }
+  }
+
+  const registry = assertValidRegistry(
+    snapshot.registry,
+    {
+      repoRoot: normalizedRepoRoot,
+      workRoot: normalizedWorkRoot,
+    },
+    'Video process registry is invalid; inspection stopped without changing it'
+  )
+  if (expectedRunId && registry.runId !== expectedRunId) {
+    return { status: 'changed', runId: registry.runId, ...base, processes: [] }
+  }
+
+  const records = [
+    { role: 'owner', record: registry.owner },
+    ...registry.children.map((record) => ({ role: 'child', record })),
+  ]
+  const processes = await Promise.all(
+    records.map(async ({ role, record }) =>
+      inspectedProcess(record, role, await inspect(record.pid))
+    )
+  )
+
+  // Status never takes the write lock. Re-read to avoid reporting identities
+  // against a registry that changed while process inspection was in flight.
+  const current = await readRegistrySnapshot(filePath)
+  if (!current || current.source !== snapshot.source) {
+    return { status: 'changed', runId: registry.runId, ...base, processes: [] }
+  }
+
+  const runningCount = processes.filter((entry) => entry.state === 'running').length
+  const status = runningCount === processes.length
+    ? 'running'
+    : runningCount > 0
+      ? 'partial'
+      : processes.some((entry) => entry.state === 'mismatch')
+        ? 'mismatched'
+        : 'stale'
+
+  return { status, runId: registry.runId, ...base, processes }
+}
+
 export async function shutdownOwnedRun({
   repoRoot,
   workRoot,
   expectedRunId = undefined,
+  dryRun = false,
   inspect = inspectProcess,
   signalProcess = process.kill.bind(process),
   wait = delay,
@@ -386,6 +530,23 @@ export async function shutdownOwnedRun({
   killTimeoutMs = 1000,
   cleanup = () => {},
 }) {
+  if (dryRun) {
+    const inspection = await inspectOwnedRun({
+      repoRoot,
+      workRoot,
+      expectedRunId,
+      inspect,
+    })
+    return {
+      status: 'dry-run',
+      stopped: [],
+      wouldStop: inspection.processes
+        .filter((entry) => entry.state === 'running')
+        .map(({ kind, pid }) => ({ kind, pid })),
+      inspection,
+    }
+  }
+
   const filePath = processRegistryPath(workRoot)
   const transition = await acquireRegistryTransition(filePath, {
     kind: 'shutdown',

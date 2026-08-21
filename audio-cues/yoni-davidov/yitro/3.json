@@ -2,10 +2,15 @@
   "audioId": "yitro-3",
   "audioFormat": "m4a",
   "narratorId": "yoni-davidov",
-  "parshaSlug": "yitro",
+  "readingId": "yitro",
   "aliyah": 3,
   "tokenCount": 0,
   "cueCount": 0,
   "tokenizationVersion": "v1",
+  "mediaIdentity": {
+    "algorithm": "sha256",
+    "digest": "dd458258f902959c67379f641fb1dd48226549430e78aa04116375d4767c100c",
+    "byteLength": 447051
+  },
   "cues": []
 }

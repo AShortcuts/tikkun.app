@@ -1,12 +1,17 @@
 import { sveltekit } from '@sveltejs/kit/vite'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, type UserConfig } from 'vite'
+import { resolveBuildIdentifier } from './scripts/build-identifier.ts'
 
 const projectRoot = fileURLToPath(new URL('.', import.meta.url))
 export const defaultViteHost = '127.0.0.1'
+export const buildIdentifier = resolveBuildIdentifier()
 
 export const viteConfig = {
   plugins: [sveltekit()],
+  define: {
+    __TIKKUN_BUILD_ID__: JSON.stringify(buildIdentifier),
+  },
   server: {
     host: defaultViteHost,
     port: 5176,

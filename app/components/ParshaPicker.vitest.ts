@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { tick } from 'svelte'
 
 import { LeiningGenerator } from '../calendar-model/generator.ts'
 import type { UserSettings } from '../calendar-model/user-settings.ts'
@@ -12,9 +13,11 @@ const testSettings: UserSettings = {
 }
 
 const mountedPickers: ReturnType<typeof ParshaPicker>[] = []
+let compactLibrarySupported = false
 
 beforeEach(() => {
   vi.spyOn(window, 'matchMedia')
+  compactLibrarySupported = false
   setHoverFlyoutSupport(true)
 })
 
@@ -22,7 +25,9 @@ function setHoverFlyoutSupport(supported: boolean) {
   vi.mocked(window.matchMedia).mockImplementation(
     (query) =>
       ({
-        matches: supported,
+        matches: query === '(max-width: 550px)'
+          ? compactLibrarySupported
+          : supported,
         media: query,
         onchange: null,
         addEventListener() {},
@@ -32,6 +37,11 @@ function setHoverFlyoutSupport(supported: boolean) {
         dispatchEvent: () => true,
       }) as MediaQueryList
   )
+}
+
+function setCompactLibrarySupport(supported: boolean) {
+  compactLibrarySupported = supported
+  setHoverFlyoutSupport(false)
 }
 
 afterEach(() => {
@@ -84,9 +94,7 @@ test('keeps nested flyouts open while moving backward and closes outside', () =>
 
 test('opens a nested aliyah flyout for a double portion', () => {
   const picker = mountPicker()
-  const trigger = [...picker.querySelectorAll<HTMLElement>('[data-aliyah-choice-id]')]
-    .find((candidate) => candidate.textContent?.trim() === 'ויקהל־פקודי')
-  if (!trigger) throw new Error('Expected a double-portion trigger')
+  const trigger = findDoublePortionTrigger(picker)
 
   trigger.dispatchEvent(
     new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' })
@@ -191,6 +199,152 @@ test('renders and changes the Israel calendar setting', () => {
   toggle.dispatchEvent(new Event('change', { bubbles: true }))
 
   expect(onCalendarSettingsChange).toHaveBeenCalledWith({ israel: true })
+})
+
+test('opens a parsha at its beginning while its chevron owns aliyah choices', () => {
+  const navigate = vi.fn()
+  const picker = mountPicker({ navigate })
+  const link = [...picker.querySelectorAll<HTMLAnchorElement>('.parsha')]
+    .find((candidate) => candidate.textContent?.trim() === 'ויקהל־פקודי')
+  if (!link) throw new Error('Expected a double-portion link')
+
+  link.click()
+
+  expect(navigate).toHaveBeenCalledOnce()
+  expect(navigate).toHaveBeenCalledWith(link.getAttribute('href'))
+  expect(document.querySelector('.aliyah-selection-popup')).toBeNull()
+
+  findDoublePortionTrigger(picker).click()
+  expect(document.querySelector('.aliyah-selection-popup')).not.toBeNull()
+})
+
+test('uses mobile Library depth without a Go button', async () => {
+  setCompactLibrarySupport(true)
+  const navigate = vi.fn()
+  const picker = mountPicker({
+    navigate,
+    getActions: () => [
+      createNavigationAction({
+        id: 'resume.last-reading',
+        group: 'resume',
+        label: 'Resume Vayeitzei, 6th Aliyah',
+        href: '#/torah/parsha/vayeitzei/1-31-17',
+        run: vi.fn(),
+      }),
+    ],
+  })
+
+  expect(picker.querySelector('.mobile-library-header h1')?.textContent).toBe(
+    'Library'
+  )
+  expect(picker.querySelectorAll('[data-mobile-book]')).toHaveLength(5)
+  expect(
+    picker.querySelector('[data-mobile-destination="continue"]')?.textContent
+  ).toContain('Vayeitzei, 6th Aliyah')
+  expect(picker.textContent).toContain('Coming Up')
+  expect(picker.textContent).toContain('Holidays')
+  expect(picker.textContent).toContain('Megillot')
+  expect(picker.textContent).toContain('Torah Reference')
+  expect(picker.textContent).toContain('Calendar')
+
+  requiredButton(picker, '[data-mobile-book="3"]').click()
+  await tick()
+  expect(requiredButton(picker, '.mobile-library-back').textContent).toContain(
+    'Books'
+  )
+  const aliyahToggle = picker.querySelector<HTMLButtonElement>(
+    'button[aria-label^="Choose aliyah for תזריע"]'
+  )
+  if (!aliyahToggle) throw new Error('Expected a mobile double-parsha toggle')
+  aliyahToggle.click()
+  await tick()
+  expect(aliyahToggle.getAttribute('aria-expanded')).toBe('true')
+  expect(picker.querySelectorAll('.mobile-aliyah-groups button')).toHaveLength(3)
+  expect(picker.querySelectorAll('.mobile-aliyah-links a').length).toBeGreaterThan(6)
+
+  requiredButton(picker, '.mobile-library-back').click()
+  await tick()
+  requiredButton(picker, '[data-mobile-destination="reference"]').click()
+  await tick()
+  requiredButton(picker, '[data-mobile-reference-book="1"]').click()
+  await tick()
+  requiredButton(picker, '[data-mobile-reference-chapter="1"]').click()
+  await tick()
+  const verse = picker.querySelector<HTMLAnchorElement>(
+    '[data-mobile-reference-verse="1"]'
+  )
+  if (!verse) throw new Error('Expected verse 1 destination')
+  verse.click()
+
+  expect(navigate).toHaveBeenLastCalledWith('#/r/1-1-1')
+  expect(picker.querySelector('.torah-reference-button')).toBeNull()
+})
+
+test('opens and returns from a mobile book with a pointer-only spatial transition', async () => {
+  setCompactLibrarySupport(true)
+  const picker = mountPicker()
+  const book = requiredButton(picker, '[data-mobile-book="2"]')
+
+  if (typeof document.startViewTransition !== 'function') {
+    book.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+    await tick()
+    expect(picker.querySelector('.mobile-library-header h1')?.textContent).toBe(
+      'Shemot'
+    )
+    expect(
+      requiredButton(picker, '.mobile-library-back').getAttribute('aria-label')
+    ).toBe('Back to Books')
+    return
+  }
+
+  const startViewTransition = vi.spyOn(document, 'startViewTransition')
+  book.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+  const forward = startViewTransition.mock.results[0]?.value
+  expect(
+    picker
+      .querySelector('.parsha-picker')
+      ?.classList.contains('mod-mobile-page-transition')
+  ).toBe(true)
+  expect(document.documentElement.dataset.mobileLibraryTransition).toBe(
+    'forward'
+  )
+  await forward?.updateCallbackDone
+
+  expect(startViewTransition).toHaveBeenCalledOnce()
+  expect(picker.querySelector('.mobile-library-header h1')?.textContent).toBe(
+    'Shemot'
+  )
+  expect(
+    requiredButton(picker, '.mobile-library-back').getAttribute('aria-label')
+  ).toBe('Back to Books')
+
+  requiredButton(picker, '.mobile-library-back').dispatchEvent(
+    new MouseEvent('click', { bubbles: true, detail: 1 })
+  )
+  const backward = startViewTransition.mock.results[1]?.value
+  expect(document.documentElement.dataset.mobileLibraryTransition).toBe('back')
+  await backward?.updateCallbackDone
+  await backward?.finished
+  await tick()
+
+  expect(startViewTransition).toHaveBeenCalledTimes(2)
+  expect(picker.querySelector('.mobile-library-header h1')?.textContent).toBe(
+    'Library'
+  )
+  expect(picker.querySelector('[data-mobile-book="2"]')).toBe(
+    document.activeElement
+  )
+  expect(
+    picker
+      .querySelector('.parsha-picker')
+      ?.classList.contains('mod-mobile-page-transition')
+  ).toBe(false)
+  expect(document.documentElement.dataset.mobileLibraryTransition).toBeUndefined()
+
+  const callsBeforeKeyboard = startViewTransition.mock.calls.length
+  requiredButton(picker, '[data-mobile-book="2"]').click()
+  await tick()
+  expect(startViewTransition).toHaveBeenCalledTimes(callsBeforeKeyboard)
 })
 
 test('keeps Quick Access closed until the unified search receives focus', () => {
@@ -387,9 +541,19 @@ test('empty search results tolerate keyboard navigation', () => {
 
 function findDoublePortionTrigger(picker: Element) {
   const trigger = [...picker.querySelectorAll<HTMLElement>('[data-aliyah-choice-id]')]
-    .find((candidate) => candidate.textContent?.trim() === 'ויקהל־פקודי')
+    .find(
+      (candidate) =>
+        candidate.getAttribute('aria-label') ===
+        'Choose aliyah for ויקהל־פקודי'
+    )
   if (!trigger) throw new Error('Expected a double-portion trigger')
   return trigger
+}
+
+function requiredButton(root: Element, selector: string) {
+  const button = root.querySelector<HTMLButtonElement>(selector)
+  if (!button) throw new Error(`Expected button ${selector}`)
+  return button
 }
 
 function inputValue(input: HTMLInputElement, value: string) {

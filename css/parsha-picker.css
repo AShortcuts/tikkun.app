@@ -203,6 +203,15 @@
   width: 100%;
 }
 
+.parsha-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 2.75rem;
+  align-items: stretch;
+  width: calc(100% - 1.5rem);
+  margin-inline: auto;
+  border-radius: var(--button-border-radius);
+}
+
 .parsha {
   display: block;
   text-decoration: none;
@@ -218,19 +227,53 @@
   text-align: center;
 }
 
-.parsha-books.mod-emphasize-first-in-group li:first-child>.parsha {
+.parsha-row .parsha {
+  width: 100%;
+  margin: 0;
+}
+
+.parsha-aliyah-toggle {
+  display: grid;
+  place-items: center;
+  min-width: 2.75rem;
+  border: 0;
+  border-radius: var(--button-border-radius);
+  background: transparent;
+  color: var(--light-text-color);
+  cursor: pointer;
+  transition:
+    background-color var(--reader-motion-color) var(--reader-ease-standard),
+    color var(--reader-motion-color) var(--reader-ease-standard),
+    transform var(--reader-motion-fast) var(--reader-ease-out);
+}
+
+.parsha-aliyah-toggle .ui-icon {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.parsha-books.mod-emphasize-first-in-group li:first-child .parsha {
   font-weight: bolder;
 }
 
-.parsha:hover,
 .parsha:focus-visible,
-.parsha[aria-expanded='true'] {
+.parsha-aliyah-toggle[aria-expanded='true'] {
   background-color: var(--medium-accent-color);
   outline: none;
 }
 
-.parsha:active {
+@media (hover: hover) and (pointer: fine) {
+  .parsha:hover,
+  .parsha-aliyah-toggle:hover {
+    background-color: var(--medium-accent-color);
+    outline: none;
+  }
+}
+
+.parsha:active,
+.parsha-aliyah-toggle:active {
   background-color: var(--heavy-accent-color);
+  transform: scale(var(--reader-control-press-scale));
 }
 
 .aliyah-selection-stack {
@@ -377,6 +420,7 @@
 }
 
 .parsha:focus-visible,
+.parsha-aliyah-toggle:focus-visible,
 .aliyah-selection-back:focus-visible,
 .aliyah-selection-option:focus-visible {
   outline: 2px solid var(--reader-focus-color);
@@ -385,6 +429,7 @@
 
 @media (forced-colors: active) {
   .parsha:focus-visible,
+  .parsha-aliyah-toggle:focus-visible,
   .aliyah-selection-back:focus-visible,
   .aliyah-selection-option:focus-visible {
     outline-color: Highlight;
@@ -457,4 +502,719 @@
 .coming-up-date {
   color: var(--text-color);
   font-size: 1.02em;
+}
+
+@media screen and (max-width: 550px) {
+  .parsha-picker {
+    position: fixed;
+    z-index: 130;
+    padding:
+      max(0.5rem, env(safe-area-inset-top, 0px)) 0
+      max(1.5rem, env(safe-area-inset-bottom, 0px));
+    background: var(--paper-color);
+  }
+
+  .mobile-library {
+    width: min(100%, 34rem);
+    margin-inline: auto;
+    color: var(--text-color);
+  }
+
+  .mobile-library-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    min-height: 3.75rem;
+    padding-inline: 1rem;
+  }
+
+  .mobile-library-header.mod-detail {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 0.35rem;
+  }
+
+  .mobile-library-header h1 {
+    margin: 0;
+    color: var(--text-color);
+    font-size: 1.55rem;
+    font-weight: 720;
+    letter-spacing: -0.025em;
+    line-height: 1.1;
+  }
+
+  .mobile-library-header.mod-detail h1 {
+    max-width: 9rem;
+    overflow: hidden;
+    font-size: 1.25rem;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .parsha-picker.mod-mobile-page-transition {
+    view-transition-name: mobile-library-page;
+  }
+
+  html[data-mobile-library-transition] {
+    --mobile-library-navigation-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  html[data-mobile-library-transition]::view-transition-group(root),
+  html[data-mobile-library-transition]::view-transition-old(root),
+  html[data-mobile-library-transition]::view-transition-new(root),
+  html[data-mobile-library-transition]::view-transition-group(mobile-library-page) {
+    animation: none;
+  }
+
+  html[data-mobile-library-transition]::view-transition-old(root),
+  html[data-mobile-library-transition]::view-transition-new(root),
+  html[data-mobile-library-transition]::view-transition-old(mobile-library-page),
+  html[data-mobile-library-transition]::view-transition-new(mobile-library-page) {
+    mix-blend-mode: normal;
+  }
+
+  html[data-mobile-library-transition]::view-transition-old(mobile-library-page),
+  html[data-mobile-library-transition]::view-transition-new(mobile-library-page) {
+    height: 100%;
+    overflow: clip;
+  }
+
+  html[data-mobile-library-transition='forward']::view-transition-old(mobile-library-page) {
+    z-index: 1;
+    animation: mobile-library-push-old 280ms
+      var(--mobile-library-navigation-ease) both;
+  }
+
+  html[data-mobile-library-transition='forward']::view-transition-new(mobile-library-page) {
+    z-index: 2;
+    animation: mobile-library-push-new 280ms
+      var(--mobile-library-navigation-ease) both;
+    box-shadow: -14px 0 28px rgb(0 0 0 / 16%);
+  }
+
+  html[data-mobile-library-transition='back']::view-transition-old(mobile-library-page) {
+    z-index: 2;
+    animation: mobile-library-pop-old 260ms
+      var(--mobile-library-navigation-ease) both;
+    box-shadow: -14px 0 28px rgb(0 0 0 / 16%);
+  }
+
+  html[data-mobile-library-transition='back']::view-transition-new(mobile-library-page) {
+    z-index: 1;
+    animation: mobile-library-pop-new 260ms
+      var(--mobile-library-navigation-ease) both;
+  }
+
+  @keyframes mobile-library-push-old {
+    to {
+      transform: translateX(-28%);
+    }
+  }
+
+  @keyframes mobile-library-push-new {
+    from {
+      transform: translateX(100%);
+    }
+  }
+
+  @keyframes mobile-library-pop-old {
+    to {
+      transform: translateX(100%);
+    }
+  }
+
+  @keyframes mobile-library-pop-new {
+    from {
+      transform: translateX(-28%);
+    }
+  }
+
+  .mobile-library-close,
+  .mobile-library-back {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    border: 0;
+    color: var(--text-color);
+    cursor: pointer;
+    font: inherit;
+    transition:
+      background-color var(--reader-motion-color) var(--reader-ease-standard),
+      transform var(--reader-motion-fast) var(--reader-ease-out);
+  }
+
+  .mobile-library-close {
+    display: grid;
+    place-items: center;
+    justify-self: end;
+    width: 2.75rem;
+    padding: 0;
+    border-radius: 50%;
+    background: var(--light-accent-color);
+  }
+
+  .mobile-library-close .ui-icon {
+    width: 1.35rem;
+    height: 1.35rem;
+  }
+
+  .mobile-library-back {
+    display: inline-flex;
+    align-items: center;
+    justify-self: start;
+    gap: 0.15rem;
+    max-width: 100%;
+    padding: 0 0.35rem 0 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--reader-focus-color);
+    font-size: 0.9rem;
+  }
+
+  .mobile-library-back .ui-icon {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .mobile-library-back span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-library-search {
+    position: relative;
+    z-index: 2;
+    padding: 0.35rem 1rem 0.65rem;
+  }
+
+  .mobile-library-search .reader-search {
+    border-radius: 14px;
+    background: color-mix(
+      in srgb,
+      var(--paper-color) 92%,
+      var(--text-color) 8%
+    );
+  }
+
+  .mobile-library-search .reader-search-bar {
+    min-height: 3rem;
+    border-radius: 13px;
+    background: transparent;
+  }
+
+  .mobile-library-content {
+    display: grid;
+    gap: 1.35rem;
+    padding: 0.35rem 1rem 1.5rem;
+  }
+
+  .mobile-library-section {
+    display: grid;
+    gap: 0.55rem;
+    min-width: 0;
+  }
+
+  .mobile-library-section h2,
+  .mobile-library-section-heading h2 {
+    margin: 0;
+    color: var(--light-text-color);
+    font-size: 0.72rem;
+    font-weight: 780;
+    letter-spacing: 0.11em;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+
+  .mobile-library-section-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .mobile-library-section-heading span {
+    color: var(--reader-focus-color);
+    font-size: 0.68rem;
+  }
+
+  .mobile-library-destinations {
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .mobile-library-destination {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    min-height: 4rem;
+    padding: 0.68rem 0.72rem 0.68rem 0.85rem;
+    border: 1px solid color-mix(in srgb, var(--text-color) 15%, transparent);
+    border-radius: 14px;
+    background: color-mix(
+      in srgb,
+      var(--paper-color) 93%,
+      var(--text-color) 7%
+    );
+    box-shadow: 0 7px 18px -17px color-mix(in srgb, black 45%, transparent);
+    color: var(--text-color);
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+    text-decoration: none;
+    transition:
+      background-color var(--reader-motion-color) var(--reader-ease-standard),
+      border-color var(--reader-motion-color) var(--reader-ease-standard),
+      transform var(--reader-motion-fast) var(--reader-ease-out);
+  }
+
+  .mobile-library-destination.mod-continue {
+    background: color-mix(
+      in srgb,
+      var(--paper-color) 88%,
+      var(--reader-highlight-fill) 12%
+    );
+  }
+
+  .mobile-library-destination.is-selected,
+  .mobile-parsha-card.is-expanded {
+    border-color: var(--reader-focus-color);
+    background: color-mix(
+      in srgb,
+      var(--paper-color) 84%,
+      var(--reader-focus-color) 16%
+    );
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--reader-focus-color) 38%, transparent);
+  }
+
+  .mobile-library-destination-copy {
+    display: grid;
+    gap: 0.12rem;
+    min-width: 0;
+  }
+
+  .mobile-library-destination-copy strong {
+    overflow: hidden;
+    font-size: 1rem;
+    font-weight: 720;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-library-destination-copy strong[dir='rtl'] {
+    text-align: right;
+  }
+
+  .mobile-library-destination-copy small {
+    color: var(--light-text-color);
+    font-size: 0.78rem;
+    line-height: 1.25;
+  }
+
+  .mobile-library-arrow {
+    display: inline-flex;
+    color: var(--light-text-color);
+  }
+
+  .mobile-library-arrow .ui-icon {
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+
+  .mobile-coming-up {
+    display: grid;
+    grid-auto-columns: minmax(8.5rem, 1fr);
+    grid-auto-flow: column;
+    gap: 0.45rem;
+    margin: 0;
+    padding: 0 0 0.2rem;
+    overflow-x: auto;
+    list-style: none;
+    scroll-snap-type: x proximity;
+  }
+
+  .mobile-coming-up li {
+    min-width: 0;
+    scroll-snap-align: start;
+  }
+
+  .mobile-coming-up a {
+    display: grid;
+    gap: 0.3rem;
+    min-height: 4.6rem;
+    padding: 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--text-color) 15%, transparent);
+    border-radius: 14px;
+    background: color-mix(
+      in srgb,
+      var(--paper-color) 93%,
+      var(--text-color) 7%
+    );
+    color: var(--text-color);
+    text-decoration: none;
+    transition: transform var(--reader-motion-fast) var(--reader-ease-out);
+  }
+
+  .mobile-coming-up strong {
+    overflow: hidden;
+    font-size: 0.88rem;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-coming-up time {
+    align-self: end;
+    color: var(--light-text-color);
+    font-size: 0.72rem;
+  }
+
+  .mobile-library-more {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+  }
+
+  .mobile-library-more button,
+  .mobile-calendar-options button {
+    display: grid;
+    align-content: center;
+    gap: 0.16rem;
+    min-height: 4.7rem;
+    padding: 0.7rem;
+    border: 1px solid color-mix(in srgb, var(--text-color) 15%, transparent);
+    border-radius: 14px;
+    background: color-mix(
+      in srgb,
+      var(--paper-color) 93%,
+      var(--text-color) 7%
+    );
+    color: var(--text-color);
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+    transition:
+      background-color var(--reader-motion-color) var(--reader-ease-standard),
+      border-color var(--reader-motion-color) var(--reader-ease-standard),
+      transform var(--reader-motion-fast) var(--reader-ease-out);
+  }
+
+  .mobile-library-more strong,
+  .mobile-calendar-options strong {
+    font-size: 0.88rem;
+    line-height: 1.2;
+  }
+
+  .mobile-library-more small,
+  .mobile-calendar-options small {
+    color: var(--light-text-color);
+    font-size: 0.68rem;
+    line-height: 1.25;
+  }
+
+  .mobile-library-section.mod-detail-list {
+    gap: 0.7rem;
+  }
+
+  .mobile-parsha-list,
+  .mobile-simple-reading-list {
+    display: grid;
+    gap: 0.48rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .mobile-parsha-card {
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--text-color) 15%, transparent);
+    border-radius: 14px;
+    background: color-mix(
+      in srgb,
+      var(--paper-color) 94%,
+      var(--text-color) 6%
+    );
+  }
+
+  .mobile-parsha-card-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 3.2rem;
+    align-items: stretch;
+  }
+
+  .mobile-parsha-card-row > a {
+    display: grid;
+    gap: 0.14rem;
+    min-height: 4rem;
+    padding: 0.72rem 0.3rem 0.72rem 0.85rem;
+    color: var(--text-color);
+    text-decoration: none;
+    transition: transform var(--reader-motion-fast) var(--reader-ease-out);
+  }
+
+  .mobile-parsha-card-row > a strong {
+    align-self: end;
+    font-size: 1.05rem;
+    font-weight: 760;
+    line-height: 1.2;
+    text-align: right;
+  }
+
+  .mobile-parsha-card-row > a small {
+    align-self: start;
+    color: var(--light-text-color);
+    font-size: 0.76rem;
+  }
+
+  .mobile-parsha-card-row > button {
+    display: grid;
+    place-items: center;
+    align-self: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 1px solid color-mix(in srgb, var(--text-color) 14%, transparent);
+    border-radius: 12px;
+    background: var(--light-accent-color);
+    color: var(--light-text-color);
+    cursor: pointer;
+    transition:
+      background-color var(--reader-motion-color) var(--reader-ease-standard),
+      color var(--reader-motion-color) var(--reader-ease-standard),
+      transform var(--reader-motion-fast) var(--reader-ease-out);
+  }
+
+  .mobile-parsha-card.is-expanded .mobile-parsha-card-row > button {
+    border-color: color-mix(in srgb, var(--reader-focus-color) 55%, transparent);
+    background: color-mix(in srgb, var(--reader-focus-color) 22%, transparent);
+    color: var(--reader-focus-color);
+  }
+
+  .mobile-parsha-card-row > button .ui-icon {
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+
+  .mobile-aliyah-choices {
+    display: grid;
+    gap: 0.7rem;
+    padding: 0 0.7rem 0.75rem;
+  }
+
+  .mobile-aliyah-groups {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(4.5rem, 1fr));
+    gap: 0.25rem;
+    padding: 0.22rem;
+    border-radius: 11px;
+    background: color-mix(in srgb, var(--text-color) 8%, transparent);
+  }
+
+  .mobile-aliyah-groups button {
+    min-height: 2.4rem;
+    padding: 0.35rem;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--text-color);
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.74rem;
+  }
+
+  .mobile-aliyah-groups button.is-active {
+    background: var(--reader-focus-color);
+    color: white;
+  }
+
+  .mobile-aliyah-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.38rem;
+  }
+
+  .mobile-aliyah-links a {
+    min-height: 2.6rem;
+    padding: 0.6rem 0.72rem;
+    border: 1px solid color-mix(in srgb, var(--text-color) 18%, transparent);
+    border-radius: 999px;
+    color: var(--text-color);
+    font-size: 0.75rem;
+    line-height: 1.25;
+    text-decoration: none;
+    transition:
+      background-color var(--reader-motion-color) var(--reader-ease-standard),
+      border-color var(--reader-motion-color) var(--reader-ease-standard),
+      transform var(--reader-motion-fast) var(--reader-ease-out);
+  }
+
+  .mobile-simple-reading-list a {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    min-height: 4rem;
+    padding: 0.7rem 0.8rem;
+    border: 1px solid color-mix(in srgb, var(--text-color) 15%, transparent);
+    border-radius: 14px;
+    background: color-mix(
+      in srgb,
+      var(--paper-color) 94%,
+      var(--text-color) 6%
+    );
+    color: var(--text-color);
+    text-decoration: none;
+  }
+
+  .mobile-simple-reading-list strong,
+  .mobile-simple-reading-list small {
+    grid-column: 1;
+  }
+
+  .mobile-simple-reading-list strong {
+    font-size: 1rem;
+    text-align: right;
+  }
+
+  .mobile-simple-reading-list small {
+    color: var(--light-text-color);
+    font-size: 0.74rem;
+  }
+
+  .mobile-simple-reading-list a > span {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    color: var(--light-text-color);
+  }
+
+  .mobile-simple-reading-list .ui-icon {
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+
+  .mobile-reference-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(3.2rem, 1fr));
+    gap: 0.45rem;
+  }
+
+  .mobile-reference-grid button,
+  .mobile-reference-grid a {
+    display: grid;
+    place-items: center;
+    min-height: 3.15rem;
+    border: 1px solid color-mix(in srgb, var(--text-color) 15%, transparent);
+    border-radius: 12px;
+    background: color-mix(
+      in srgb,
+      var(--paper-color) 93%,
+      var(--text-color) 7%
+    );
+    color: var(--text-color);
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.9rem;
+    font-variant-numeric: tabular-nums;
+    text-decoration: none;
+    transition:
+      background-color var(--reader-motion-color) var(--reader-ease-standard),
+      transform var(--reader-motion-fast) var(--reader-ease-out);
+  }
+
+  .mobile-library-detail-copy,
+  .mobile-library-empty {
+    margin: 0;
+    color: var(--light-text-color);
+    font-size: 0.82rem;
+    line-height: 1.45;
+  }
+
+  .mobile-calendar-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+  }
+
+  .mobile-calendar-options button.is-selected {
+    border-color: var(--reader-focus-color);
+    background: color-mix(
+      in srgb,
+      var(--paper-color) 84%,
+      var(--reader-focus-color) 16%
+    );
+  }
+
+  .mobile-library-close:active,
+  .mobile-library-back:active,
+  .mobile-library-destination:active,
+  .mobile-coming-up a:active,
+  .mobile-library-more button:active,
+  .mobile-parsha-card-row > a:active,
+  .mobile-parsha-card-row > button:active,
+  .mobile-aliyah-links a:active,
+  .mobile-reference-grid button:active,
+  .mobile-reference-grid a:active,
+  .mobile-calendar-options button:active {
+    transform: scale(var(--reader-control-press-scale));
+  }
+
+  .mobile-library button:focus-visible,
+  .mobile-library a:focus-visible {
+    outline: 2px solid var(--reader-focus-color);
+    outline-offset: 2px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .mobile-library-destination:hover,
+    .mobile-coming-up a:hover,
+    .mobile-library-more button:hover,
+    .mobile-parsha-card-row > a:hover,
+    .mobile-parsha-card-row > button:hover,
+    .mobile-aliyah-links a:hover,
+    .mobile-reference-grid button:hover,
+    .mobile-reference-grid a:hover,
+    .mobile-calendar-options button:hover {
+      background-color: var(--medium-accent-color);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html[data-mobile-library-transition]::view-transition-group(root),
+    html[data-mobile-library-transition]::view-transition-group(mobile-library-page),
+    html[data-mobile-library-transition]::view-transition-old(root),
+    html[data-mobile-library-transition]::view-transition-new(root),
+    html[data-mobile-library-transition]::view-transition-old(mobile-library-page),
+    html[data-mobile-library-transition]::view-transition-new(mobile-library-page) {
+      animation: none;
+    }
+
+    .mobile-library-close,
+    .mobile-library-back,
+    .mobile-library-destination,
+    .mobile-coming-up a,
+    .mobile-library-more button,
+    .mobile-parsha-card-row > a,
+    .mobile-parsha-card-row > button,
+    .mobile-aliyah-links a,
+    .mobile-reference-grid button,
+    .mobile-reference-grid a,
+    .mobile-calendar-options button {
+      transition-duration: 0.01ms;
+    }
+
+    .mobile-library-close:active,
+    .mobile-library-back:active,
+    .mobile-library-destination:active,
+    .mobile-coming-up a:active,
+    .mobile-library-more button:active,
+    .mobile-parsha-card-row > a:active,
+    .mobile-parsha-card-row > button:active,
+    .mobile-aliyah-links a:active,
+    .mobile-reference-grid button:active,
+    .mobile-reference-grid a:active,
+    .mobile-calendar-options button:active {
+      transform: none;
+    }
+  }
 }

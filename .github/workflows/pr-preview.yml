@@ -30,7 +30,7 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '22.x'
+          node-version: '22.23.2'
           cache: 'npm'
 
       - name: Use pinned npm
@@ -42,7 +42,8 @@ jobs:
       - name: Build preview
         env:
           TIKKUN_BASE_PATH: "/pr-preview/pr-${{ github.event.pull_request.number }}"
-        run: npm run build
+          TIKKUN_PREVIEW_BROWSER_CHANNEL: chrome
+        run: npm run build && npm run preview:verify
 
       - name: Upload preview artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

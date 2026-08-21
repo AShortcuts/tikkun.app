@@ -1,3 +1,5 @@
+import '../../css/cue-analytics.css'
+
 import {
   getCueAnalyticsAliyahSummaries,
   getCueAnalyticsOverview,

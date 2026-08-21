@@ -109,6 +109,7 @@
         const response = await fetch(workerUrl, {
           cache: 'no-store',
           method: 'HEAD',
+          signal: listeners.signal,
         })
         const contentType = response.headers.get('content-type') ?? ''
         const hasProductionWorker =
@@ -131,6 +132,7 @@
 
         if (navigator.serviceWorker.controller) await registration.update()
       } catch (error) {
+        if (listeners.signal.aborted) return
         console.error('Failed to prepare the application service worker', error)
       }
     }

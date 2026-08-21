@@ -30,7 +30,6 @@ export type PlaybackTimelineChange =
   | { type: 'session-loaded'; session: ActiveAudioSession }
   | { type: 'segment-updated' }
   | { type: 'playback-error'; error: Error; recording: AudioRecording }
-  | { type: 'offline-media-error'; retry: () => Promise<void> }
 
 export type PlaybackCommand =
   | { type: 'toggle'; retry?: () => Promise<void> }
@@ -47,8 +46,8 @@ export interface PlaybackTimelineOptions {
   getAutoScroll(): boolean
   getPlaybackRate(): number
   onPlaybackRateChange(rate: number): void
-  playNetworkRecording(retry?: () => Promise<void>): Promise<boolean>
-  replayNetworkRecordingFromStart(retry?: () => Promise<void>): Promise<boolean>
+  attemptPlayback(retry?: () => Promise<void>): Promise<boolean>
+  attemptReplayFromStart(retry?: () => Promise<void>): Promise<boolean>
   isCueAuthoringRecording(): boolean
   saveReadingPosition(): void
   focusReader(): void
@@ -428,7 +427,7 @@ export function createPlaybackTimeline(
       return
     }
 
-    const played = await options.playNetworkRecording(retry)
+    const played = await options.attemptPlayback(retry)
     if (played) refresh()
   }
 
@@ -437,7 +436,7 @@ export function createPlaybackTimeline(
     if (!session) return
 
     const playback = restartAudio
-      ? options.replayNetworkRecordingFromStart(() => restart(restartAudio))
+      ? options.attemptReplayFromStart(() => restart(restartAudio))
       : null
 
     if (session.cues.length) {
@@ -659,7 +658,7 @@ export function createPlaybackTimeline(
       case 'toggle-playback':
         void (async () => {
           await toggle(async () => {
-            await options.playNetworkRecording()
+            await options.attemptPlayback()
           })
           options.saveReadingPosition()
           focusAfterAction()
@@ -786,20 +785,6 @@ export function createPlaybackTimeline(
       { signal: scope.signal }
     )
   }
-  audioController.audio.addEventListener(
-    'error',
-    () => {
-      if (view.navigator.onLine || !audioController.session) return
-      options.onChange({
-        type: 'offline-media-error',
-        retry: async () => {
-          await options.playNetworkRecording()
-        },
-      })
-    },
-    { signal: scope.signal }
-  )
-
   scope.own(() => {
     if (focusFrame) view.cancelAnimationFrame(focusFrame)
     focusFrame = 0

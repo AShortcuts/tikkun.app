@@ -92,20 +92,15 @@ interface CueExportPayloadBase {
   audioId: string
   audioFormat: AudioFormat
   narratorId: string
+  readingId: string
   aliyah: number
   tokenCount: number
   cueCount: number
   tokenizationVersion: string
   mediaIdentity?: AudioMediaIdentity
-  /** @deprecated Use mediaIdentity for content-derived recording identity. */
-  audioVersion?: string
   savedAt?: string
   issues?: RecordingIssue[]
   cues: WordCue[]
 }
 
-export type CueExportPayload = CueExportPayloadBase &
-  (
-    | { readingId: string; parshaSlug?: never }
-    | { readingId?: never; parshaSlug: string }
-  )
+export type CueExportPayload = CueExportPayloadBase

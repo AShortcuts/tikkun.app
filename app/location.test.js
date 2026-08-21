@@ -1,11 +1,29 @@
 import { expect, test } from 'vitest'
-import { getScrollPageCount, hasScrollData, loadScroll } from './location.ts'
+import {
+  getScrollPageCount,
+  hasScrollData,
+  isValidScrollPageNumber,
+  loadScroll,
+} from './location.ts'
 
 test('page count for torah', async () => {
   const resolver = await loadScroll('torah')
   expect(resolver.getPageCount()).toBe(245)
   expect(getScrollPageCount('torah')).toBe(245)
   expect(getScrollPageCount('esther')).toBe(17)
+})
+
+test('page ranges come from each scroll index', () => {
+  expect(isValidScrollPageNumber('torah', 1)).toBe(true)
+  expect(isValidScrollPageNumber('torah', 245)).toBe(true)
+  expect(isValidScrollPageNumber('torah', 0)).toBe(false)
+  expect(isValidScrollPageNumber('torah', 246)).toBe(false)
+
+  expect(isValidScrollPageNumber('esther', 1)).toBe(true)
+  expect(isValidScrollPageNumber('esther', 17)).toBe(true)
+  expect(isValidScrollPageNumber('esther', 0)).toBe(false)
+  expect(isValidScrollPageNumber('esther', 18)).toBe(false)
+  expect(isValidScrollPageNumber('esther', 1.5)).toBe(false)
 })
 
 test('Beresheet 1:1 starts on { page 1, line 1 }', async () => {

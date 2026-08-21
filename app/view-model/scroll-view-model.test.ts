@@ -206,8 +206,7 @@ test('forDate on צום גדליה', async () => {
     )).toEqual(await renderScroll(ScrollViewModel.forDate(generator, new Date(2024, 9, 6))))
 })
 
-// TODO(haftara): Enable after this can read איכה.
-test.skip('forDate before תשעה באב', async () => {
+test('forDate before תשעה באב', async () => {
   expect(await renderScroll(
       ScrollViewModel.forId(generator, '2024-8-13:shacharis,main')
     )).toEqual(await renderScroll(

@@ -1,5 +1,5 @@
 /*
-  Content-Security-Policy-Report-Only: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' 'sha256-B62cMPfBDu49Fs0nuz4lCkoKCt154KRpdV61IaK2GFc='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; media-src 'self' blob: https://koofr.eu; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests
+  Content-Security-Policy-Report-Only: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' 'sha256-9vDbaFvlvBEEKRkqkpVjCzt6B0DNVNfKSvPsHouFxcQ='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; media-src 'self' blob: https://koofr.eu; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests
   Strict-Transport-Security: max-age=31536000
   X-Frame-Options: SAMEORIGIN
   X-Content-Type-Options: nosniff

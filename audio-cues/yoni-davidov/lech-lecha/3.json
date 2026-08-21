@@ -7,7 +7,11 @@
   "tokenCount": 158,
   "cueCount": 158,
   "tokenizationVersion": "v2",
-  "audioVersion": "Source file: פרשת לך לך ג׳.m4a",
+  "mediaIdentity": {
+    "algorithm": "sha256",
+    "digest": "2d4b54907be686873764d2c5935bcad063d66f532c14d193a29673e2d59d67f5",
+    "byteLength": 1973971
+  },
   "savedAt": "2026-07-15T17:13:19.433Z",
   "issues": [],
   "cues": [

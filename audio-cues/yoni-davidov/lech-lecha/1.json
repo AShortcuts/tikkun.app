@@ -2,12 +2,16 @@
   "audioId": "lech-lecha-1",
   "audioFormat": "m4a",
   "narratorId": "yoni-davidov",
-  "parshaSlug": "lech-lecha",
+  "readingId": "lech-lecha",
   "aliyah": 1,
   "tokenCount": 158,
   "cueCount": 158,
   "tokenizationVersion": "v2",
-  "audioVersion": "Source file: פרשת לך לך א’.m4a",
+  "mediaIdentity": {
+    "algorithm": "sha256",
+    "digest": "c4689f3ae601cb3143d742a7eec21f7122f79bf69429a98d44b8a5f7d8376e11",
+    "byteLength": 2065509
+  },
   "savedAt": "2026-07-05T21:51:11.212Z",
   "issues": [],
   "cues": [

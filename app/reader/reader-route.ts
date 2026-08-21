@@ -5,9 +5,10 @@ import PageNotFoundPage from '../components/PageNotFoundPage.ts'
 import { mountCueAnalyticsRoute } from '../components/cue-analytics-route.ts'
 import type { MountScope } from '../lifecycle/mount.ts'
 import type { NavigationAction } from '../navigation/actions.ts'
+import type { LastReading } from '../reading/last-reading.ts'
 import { ScrollViewModel } from '../view-model/scroll-view-model.ts'
+import { preserveSemanticParshaRoute } from '../view-model/navigation/reader-hash.ts'
 import {
-  canonicalReaderUrl,
   parseUrl,
   type AppRoute,
 } from '../view-model/navigation/url-parser.ts'
@@ -36,6 +37,8 @@ export interface ReaderRouteHost {
   preparePicker(): void
   pickerChanged(open: boolean): void
   pickerLoadFailed(error: unknown): void
+  captureReadingPosition(): LastReading | null
+  showReturnToPreviousReading(lastReading: LastReading): void
   dismissLastReadingPrompt(): void
   saveReadingPosition(): void
 }
@@ -52,8 +55,12 @@ export interface ReaderRoute {
   start(): void
   navigate(
     hash: string,
-    options?: { saveReadingAfterRender?: boolean }
+    options?: {
+      saveReadingAfterRender?: boolean
+      offerReturnToPreviousReading?: boolean
+    }
   ): void
+  syncScrolledReading(hash: string): boolean
   toggleAbout(): void
   togglePicker(options?: PickerOpenOptions): void
   focusPickerSearch(): boolean
@@ -130,6 +137,8 @@ export function createReaderRoute(
   let lastReaderHash = DEFAULT_READER_HASH
   let currentTitle = INITIAL_READER_TITLE
   let saveReadingAfterRender = false
+  let returnReadingAfterRender: LastReading | null = null
+  let pickerReturnReading: LastReading | null = null
   let pickerReturnFocus: HTMLElement | null = null
 
   const hashPath = (hash = view.location.hash) => hash.split('?', 1)[0]
@@ -161,6 +170,7 @@ export function createReaderRoute(
     pickerRequestGeneration += 1
     pickerLoading = false
     pickerReturnView = null
+    pickerReturnReading = null
     pickerReturnFocus = null
     pickerFocusSearchPending = false
     destroyPicker()
@@ -175,8 +185,14 @@ export function createReaderRoute(
 
   const navigate = (
     hash: string,
-    navigationOptions: { saveReadingAfterRender?: boolean } = {}
+    navigationOptions: {
+      saveReadingAfterRender?: boolean
+      offerReturnToPreviousReading?: boolean
+    } = {}
   ) => {
+    returnReadingAfterRender = navigationOptions.offerReturnToPreviousReading
+      ? pickerReturnReading ?? host.captureReadingPosition()
+      : null
     if (navigationOptions.saveReadingAfterRender) {
       saveReadingAfterRender = true
       host.dismissLastReadingPrompt()
@@ -188,6 +204,41 @@ export function createReaderRoute(
       return
     }
     view.location.hash = hash
+  }
+
+  const syncScrolledReading = (hash: string) => {
+    const requestedHash = hashPath(hash)
+    if (
+      !started ||
+      currentReaderHash === null ||
+      !shell.isReaderVisible() ||
+      !requestedHash
+    ) {
+      return false
+    }
+    if (requestedHash === currentReaderHash && requestedHash === hashPath()) {
+      return false
+    }
+
+    const route = parseHash(requestedHash)
+    if (route?.view !== 'reader') return false
+
+    const nextReaderHash = preserveSemanticParshaRoute(
+      currentReaderHash,
+      route.canonicalHash ?? requestedHash
+    )
+    if (!nextReaderHash) return false
+
+    const nextUrl = new URL(view.location.href)
+    nextUrl.hash = nextReaderHash
+    const changed = nextUrl.href !== view.location.href
+    if (changed) {
+      view.history.replaceState(view.history.state, '', nextUrl)
+    }
+
+    currentReaderHash = nextReaderHash
+    lastReaderHash = nextReaderHash
+    return changed
   }
 
   const loadPickerModule = () => {
@@ -225,6 +276,7 @@ export function createReaderRoute(
     pickerLoading = true
     pickerFocusSearchPending = focusSearch
     pickerReturnView = returnView
+    pickerReturnReading = host.captureReadingPosition()
     host.preparePicker()
 
     void loadPickerModule()
@@ -248,7 +300,10 @@ export function createReaderRoute(
             openPicker(nextReturnView)
           },
           navigate: (hash) => {
-            navigate(hash, { saveReadingAfterRender: true })
+            navigate(hash, {
+              saveReadingAfterRender: true,
+              offerReturnToPreviousReading: true,
+            })
           },
           getActions: options.getSearchActions,
           requestClose: closePicker,
@@ -388,17 +443,18 @@ export function createReaderRoute(
     setTitle(OPTIONAL_ROUTE_TITLE)
   }
 
-  const renderReaderRoute = (route: Extract<AppRoute, { view: 'reader' }>) => {
+  const renderReaderRoute = (
+    route: Extract<AppRoute, { view: 'reader' }>,
+    previousReading: LastReading | null
+  ) => {
     abortOptionalRoute()
     shell.setView('reader')
     optionalView.innerHTML = ''
 
     const nextReaderHash =
       (route.canonicalHash ?? hashPath()) || lastReaderHash
-    const canonicalUrl = canonicalReaderUrl(
-      new URL(view.location.href),
-      nextReaderHash
-    )
+    const canonicalUrl = new URL(view.location.href)
+    canonicalUrl.hash = nextReaderHash
     if (canonicalUrl.href !== view.location.href) {
       view.history.replaceState(null, '', canonicalUrl)
     }
@@ -422,6 +478,9 @@ export function createReaderRoute(
       if (!isCurrent()) return
       closePicker()
       host.readerReady()
+      if (previousReading && previousReading.hash !== nextReaderHash) {
+        host.showReturnToPreviousReading(previousReading)
+      }
     })
 
     void Promise.all([readerReady, rendering.complete])
@@ -436,6 +495,8 @@ export function createReaderRoute(
   }
 
   function renderRoute(route: AppRoute) {
+    const previousReading = returnReadingAfterRender
+    returnReadingAfterRender = null
     if (route.view === 'not-found') {
       renderNotFound()
       return
@@ -444,7 +505,7 @@ export function createReaderRoute(
       renderOptionalRoute(route)
       return
     }
-    renderReaderRoute(route)
+    renderReaderRoute(route, previousReading)
   }
 
   const toggleAbout = () => {
@@ -468,6 +529,7 @@ export function createReaderRoute(
       () => {
         const route = parseCurrentRoute()
         if (route) renderRoute(route)
+        else returnReadingAfterRender = null
       },
       { signal: scope.signal }
     )
@@ -487,12 +549,15 @@ export function createReaderRoute(
     pickerRequestGeneration += 1
     pickerLoading = false
     pickerModulePromise = null
+    returnReadingAfterRender = null
+    pickerReturnReading = null
     destroyPicker()
   })
 
   return {
     start,
     navigate,
+    syncScrolledReading,
     toggleAbout,
     togglePicker,
     focusPickerSearch,

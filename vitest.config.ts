@@ -1,6 +1,9 @@
+import { defineBrowserCommand } from '@vitest/browser'
 import { playwright } from '@vitest/browser-playwright'
-import { defineConfig, mergeConfig } from 'vitest/config'
-
+import {
+  defineConfig,
+  mergeConfig,
+} from 'vitest/config'
 import viteConfig from './vite.config.ts'
 
 const browserExclude = [
@@ -8,6 +11,17 @@ const browserExclude = [
   '**/node_modules/**',
   '**/dist/**',
 ]
+
+interface AccessibilityMediaOptions {
+  forcedColors?: 'active' | 'none' | null
+  reducedMotion?: 'reduce' | 'no-preference' | null
+}
+
+const emulateAccessibilityMedia = defineBrowserCommand<
+  [AccessibilityMediaOptions]
+>(async ({ page }, options) => {
+  await page.emulateMedia(options)
+})
 
 export default mergeConfig(
   viteConfig,
@@ -38,6 +52,7 @@ export default mergeConfig(
               enabled: true,
               headless: true,
               provider: playwright(),
+              commands: { emulateAccessibilityMedia },
               instances: [{ browser: 'chromium' }],
             },
           },
@@ -46,16 +61,34 @@ export default mergeConfig(
           extends: true,
           test: {
             name: 'webkit',
+            fileParallelism: false,
             include: [
-              'app/reading/reader-playback.vitest.ts',
-              'app/reader/reader-shell.vitest.ts',
+              'app/app-accessibility.vitest.ts',
               'app/app-smoke.vitest.ts',
+              'app/components/ParshaPicker.vitest.ts',
+              'app/components/ScrollDisplay.vitest.ts',
+              'app/navigation/command-palette.vitest.ts',
+              'app/reader/bookmarks.vitest.ts',
+              'app/reader/last-reading-prompt.vitest.ts',
+              'app/reader/reader-keyboard-journey.vitest.ts',
+              'app/reader/reader-responsive-layout.vitest.ts',
+              'app/reader/reader-controls.vitest.ts',
+              'app/reader/reader-route.vitest.ts',
+              'app/reader/reader-settings.vitest.ts',
+              'app/reader/reader-shell.vitest.ts',
+              'app/reading/aliyah-navigation/aliyah-navigation.vitest.ts',
+              'app/reading/floating-player.vitest.ts',
+              'app/reading/last-reading.vitest.ts',
+              'app/reading/reader-playback.vitest.ts',
+              'src/lib/components/ServiceWorkerUpdate.vitest.ts',
+              'src/routes/public-routes-real-url.vitest.ts',
             ],
             exclude: browserExclude,
             browser: {
               enabled: true,
               headless: true,
               provider: playwright(),
+              commands: { emulateAccessibilityMedia },
               instances: [{ browser: 'webkit' }],
             },
           },

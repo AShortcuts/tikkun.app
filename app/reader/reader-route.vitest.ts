@@ -87,6 +87,8 @@ function createHost(rendering = createRendering()) {
     preparePicker: vi.fn(),
     pickerChanged: vi.fn(),
     pickerLoadFailed: vi.fn(),
+    captureReadingPosition: vi.fn(() => null),
+    showReturnToPreviousReading: vi.fn(),
     dismissLastReadingPrompt: vi.fn(),
     saveReadingPosition: vi.fn(),
   }
@@ -164,6 +166,78 @@ test('canonicalizes reader aliases without starting a second render', () => {
     '#/torah/parsha/beresheet'
   )
   expect(host.renderReader).toHaveBeenCalledOnce()
+})
+
+test('replaces the scrolled reading hash without rerendering or adding history', () => {
+  setHash('#/torah/parsha/beresheet')
+  const { host, route } = mountRoute()
+  const historyLength = window.history.length
+
+  expect(
+    route.syncScrolledReading('#/torah/parsha/beresheet/1-2-4')
+  ).toBe(true)
+
+  expect(window.location.hash).toBe('#/torah/parsha/beresheet/1-2-4')
+  expect(route.snapshot().currentReaderHash).toBe(
+    '#/torah/parsha/beresheet/1-2-4'
+  )
+  expect(window.history.length).toBe(historyLength)
+  expect(host.renderReader).toHaveBeenCalledOnce()
+  expect(host.readerRouteChanged).not.toHaveBeenCalled()
+  expect(
+    route.syncScrolledReading('#/torah/parsha/beresheet/1-2-4')
+  ).toBe(false)
+})
+
+test('keeps the public parsha route while adopting an internal run reference', () => {
+  setHash('#/torah/parsha/haazinu/5-32-1')
+  const { host, route } = mountRoute()
+  const historyLength = window.history.length
+
+  expect(
+    route.syncScrolledReading(
+      '#/run/2026-09-05:shacharis,main/5-31-28'
+    )
+  ).toBe(true)
+
+  expect(window.location.hash).toBe('#/torah/parsha/haazinu/5-31-28')
+  expect(route.snapshot().currentReaderHash).toBe(
+    '#/torah/parsha/haazinu/5-31-28'
+  )
+  expect(window.history.length).toBe(historyLength)
+  expect(host.renderReader).toHaveBeenCalledOnce()
+  expect(host.readerRouteChanged).not.toHaveBeenCalled()
+})
+
+test('promotes scroll sync into a combined parsha route', () => {
+  setHash('#/torah/parsha/ki-tavo/5-29-6')
+  const { host, route } = mountRoute()
+  const historyLength = window.history.length
+
+  expect(
+    route.syncScrolledReading(
+      '#/torah/parsha/nitzavim-vayelech/5-29-9'
+    )
+  ).toBe(true)
+
+  expect(window.location.hash).toBe(
+    '#/torah/parsha/nitzavim-vayelech/5-29-9'
+  )
+  expect(route.snapshot().currentReaderHash).toBe(
+    '#/torah/parsha/nitzavim-vayelech/5-29-9'
+  )
+  expect(window.history.length).toBe(historyLength)
+  expect(host.renderReader).toHaveBeenCalledOnce()
+})
+
+test('ignores scroll hash synchronization outside the reader', () => {
+  setHash('#/about/playback-analytics')
+  const { route } = mountRoute()
+
+  expect(
+    route.syncScrolledReading('#/torah/parsha/beresheet/1-2-4')
+  ).toBe(false)
+  expect(window.location.hash).toBe('#/about/playback-analytics')
 })
 
 test('sends About to the public page without mutating the reader hash', async () => {
@@ -477,6 +551,53 @@ test('rerenders the same hash and saves only after that render completes', async
 
   expect(host.renderReader).toHaveBeenCalledTimes(2)
   expect(host.readerRouteChanged).not.toHaveBeenCalled()
+  expect(host.dismissLastReadingPrompt).toHaveBeenCalledOnce()
+  expect(host.saveReadingPosition).toHaveBeenCalledOnce()
+})
+
+test('offers a return to the previous reading after picker navigation', async () => {
+  setHash('#/torah/parsha/beresheet')
+  const previousReading = {
+    hash: '#/torah/parsha/beresheet/1-1-1',
+    parshaName: 'Beresheet',
+    aliyahLabel: 'Aliyah 1',
+    savedAt: Date.now(),
+  }
+  const host = createHost()
+  vi.mocked(host.captureReadingPosition).mockReturnValue(previousReading)
+  const pickerOptions: Array<Parameters<ParshaPickerModule['default']>[1]> = []
+  const createPicker = vi.fn<ParshaPickerModule['default']>(
+    (_generator, options) => {
+      pickerOptions.push(options)
+      const node = document.createElement('div')
+      return {
+        node,
+        onMount: vi.fn(),
+        focusSearch: vi.fn(),
+        refreshSearch: vi.fn(),
+        destroy: vi.fn(() => node.remove()),
+      }
+    }
+  )
+  const { route } = mountRoute({
+    host,
+    loadParshaPicker: async () => ({ default: createPicker }),
+  })
+  await flushRouteWork()
+
+  route.togglePicker()
+  await vi.waitFor(() => expect(createPicker).toHaveBeenCalledOnce())
+  pickerOptions[0]?.navigate('#/torah/parsha/noach')
+  await vi.waitFor(() =>
+    expect(window.location.hash).toBe('#/torah/parsha/noach')
+  )
+  await vi.waitFor(() =>
+    expect(host.showReturnToPreviousReading).toHaveBeenCalledWith(
+      previousReading
+    )
+  )
+
+  expect(host.captureReadingPosition).toHaveBeenCalledOnce()
   expect(host.dismissLastReadingPrompt).toHaveBeenCalledOnce()
   expect(host.saveReadingPosition).toHaveBeenCalledOnce()
 })

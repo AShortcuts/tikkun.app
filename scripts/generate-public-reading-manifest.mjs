@@ -133,8 +133,7 @@ export async function readPublishedCueCoverage(options = {}) {
     }
     if (
       payload.cueCount > 0 &&
-      !payload.mediaIdentity &&
-      !payload.audioVersion
+      !payload.mediaIdentity
     ) {
       throw new Error(
         `Cue Data for ${payload.audioId} has no recording media identity`

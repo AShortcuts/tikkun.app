@@ -16,12 +16,14 @@ Durable trade-offs live in [`docs/adr/`](adr/): static delivery, Reader hash rou
 - `src/routes/(site)/` owns the prerendered Home, Readings & Coverage, Tidbits, and About pages. `src/lib/readings.ts` derives public coverage from the real recording catalog and maintained tracker.
 - `src/routes/reader/+page.svelte` renders `src/lib/components/ReaderApp.svelte`. Reader App owns the stable mount targets and loads `app/index.ts` only in `onMount`, so public pages never execute the Reader Runtime.
 - `app/index.ts` is the small Reader bootstrap. It resolves browser storage, recording mode, and the public About URL, then exposes explicit start and stop functions to the SvelteKit route.
-- `app/reader/reader-runtime.ts` is the composition root and the real Reader Runtime Module. Its lexical lifetime owns reader state and wires page rendering, preference policy, feature Interfaces, Reader Playback, and the Reader Route host without exposing mutable globals.
+- `app/reader/reader-runtime.ts` is the composition root and the real Reader Runtime Module. Its lexical lifetime owns reader state and wires preference policy, feature Interfaces, Reader Playback, Reader Display Session, and the Reader Route host without exposing mutable globals.
+- `app/reader/reader-display-session.ts` is the Reader Display Session Module. It owns the active `ScrollDisplay` lifetime and generation, DOM target indexes, progress-anchor cache, `ViewportTracker`, presentation scheduler, Page Window, audio preload, and background resource prewarming behind one narrow Interface. Reader Runtime supplies domain effects; stale async work validates the captured display lease before applying.
 - `app/reader/reader-route.ts` is the Reader Route Module. Its small Interface hides hash listening, same-hash navigation, canonical reader hashes, Cue Analytics/not-found switching, visible title state, Optional Feature cancellation, first-use Parsha Picker loading and lifetime, and route-safe post-render work. Public About navigation crosses the host seam into the SvelteKit page.
 - `app/reader/reader-shell.ts` mounts `app/reader/ReaderShell.svelte` before the rest of Reader Runtime. Reader Shell owns the stable reader frame and presents title, progress, route and Parsha Picker visibility, annotations, static chrome icons, and the empty targets used by nested reader features.
 - `app/reading/aliyah-navigation/aliyah-navigation.ts` is the public Interface for the Aliyah Navigation Module. Its two Svelte views own the toolbar capsule, compact segments and sheet, wide rail, local focus and reveal state, async presentation data, and cleanup. Reader Runtime supplies typed snapshots and actions while keeping routing, page scrolling, playback, recording lookup, and Cue Data policy outside Svelte.
 - `app/reading/reader-playback.ts` is the Reader Playback Module. It owns construction, cross-wiring, route reset, and teardown for the Audio Controller, Highlight Controller, Recording Session, and Playback Timeline while accepting page, network, preference, Cue Authoring, and presentation Adapters from Reader Runtime.
-- `app/reader/reader-presentation-scheduler.ts` is the Reader Presentation Module. Its small invalidation Interface coalesces scroll, Reader Viewport, resize, and playback presentation work into at most one presentation callback per animation frame; immutable diagnostics expose requested, coalesced, scheduled, and completed work.
+- `app/reader/reader-presentation-scheduler.ts` is the Reader Presentation Module. Its small invalidation Interface coalesces scroll, Reader Viewport, resize, and playback presentation work into at most one presentation callback per animation frame.
+- `app/reader/reader-page-window.ts` owns the optional virtualization session: active display generation, retain policy, nested eviction holds, and coalesced near-placeholder remount and trim work. Reader Display Session supplies direct playback-protection, viewport, and presentation callbacks; `ScrollDisplay` retains rendering and mount mechanics.
 - `app/reading/recording-session.ts` owns the Recording Session: narrator-aware recording lookup, page-token caching, Cue Data loading, playback-plan installation, cancellation, and transitions into and out of authoring.
 - `app/reading/playback-timeline.ts` owns Playback Timeline behavior: playback commands, seeking policy, speed policy, cue progress, highlight synchronization, responsive policy, and cleanup. `app/reading/floating-player.ts` mounts `app/reading/FloatingPlayer.svelte`, whose connected Interface owns player markup, visual state, focusable controls, pointer mechanics, and icon presentation without selector-driven updates from Playback Timeline.
 - `app/reader/lazy-reader-settings.ts` keeps the settings launcher ready immediately and imports `app/reader/reader-settings.ts` only on first use. The mount bridge and `app/reader/ReaderSettings.svelte` then own presentation, dialog state, focus return, theme-transition timing, preference events, and playback-rate handoff.
@@ -29,6 +31,7 @@ Durable trade-offs live in [`docs/adr/`](adr/): static delivery, Reader hash rou
 - `app/navigation/lazy-command-palette.ts` preserves the first-use overlay boundary while importing `app/navigation/command-palette.ts` only when needed. `app/navigation/CommandPalette.svelte` is now only an overlay and focus host for shared Reader search.
 - `app/components/parsha-picker-model.ts` prepares calendar, route, reading-catalog, and aliyah-choice data without rendering. `app/components/ParshaPicker.svelte` owns Reading Index and hosts the same shared search control behind `app/components/ParshaPicker.ts`.
 - `app/reader/last-reading-prompt.ts` and `app/reader/offline-recording-prompt.ts` own their focused reader tools and browser effects.
+- `app/support/support-diagnostics.ts` is the Support Diagnostics Module. Its small Interface hides bounded error capture, coarse environment classification, privacy filtering, and JSON export. `src/hooks.client.ts` starts its in-memory browser lifetime and records unexpected SvelteKit errors; About and Reader Settings expose explicit copy/download actions. No report is persisted, uploaded, or created before a user asks for it.
 - `app/admin/cue-authoring-loader.ts` and `app/components/cue-analytics-route.ts` keep Optional Features outside the core reader bundle until they are requested.
 - `app/admin/cue-authoring.ts` owns the Cue Authoring lifetime: access state, Cue Drafts, timing rules, microphone capture, issue rules, and export. `app/admin/cue-waveform.ts` owns Cue Waveform loading, caching, windows, markers, seeking, retry, and scheduling. The Svelte Panel, Cue List, Recording Issue dialog, and Cue Export Sheet own their focused presentation behind narrow TypeScript Interfaces.
 - Remaining imperative UI uses focused components and controllers. Svelte is introduced feature by feature where it gives one clear owner to markup, local interaction state, or browser lifetime.
@@ -40,6 +43,7 @@ Durable trade-offs live in [`docs/adr/`](adr/): static delivery, Reader hash rou
 
 - `app/lifecycle/mount.ts` is the shared seam for browser effect ownership. A mount receives an `AbortSignal`, owns explicit teardown functions, and returns an idempotent destroy function.
 - Reader Runtime is one replaceable lexical mount created inside `app/reader/reader-runtime.ts`. It owns Reader Playback, nested feature mounts, public feature Interfaces, DOM and media listeners, timers, frames, and cancellation for pending route work. The bootstrap retains only the returned destroy Interface.
+- Reader Display Session is nested inside Reader Runtime. A route replacement destroys the old display first, invalidates every display-bound cache, aborts its generation, and rejects stale render, prewarm, and remount completion before they can affect the new display. Its teardown releases the display, ViewportTracker, Page Window, presentation frames, preload media, and background work together.
 - Reader Shell is mounted first and released last within Reader Runtime. Its reader root, optional-page outlet, toolbar, Aliyah Navigation mount targets, and other nested feature targets retain their identity for the lifetime of the mount.
 - Reader Route owns the hash listener, Optional Feature abort controller, Parsha Picker import and instance, pending-intent cancellation, and stale-render checks. It keeps the current view visible until the picker is ready, and its cleanup runs before Reader Shell releases the roots it uses.
 - Aliyah Navigation mounts into those empty Reader Shell targets before Reader Controls. Its timers, resize listeners, focus work, async status requests, and framework instances are released before Reader Shell.
@@ -99,6 +103,8 @@ The app is treated as a PWA-capable static site rather than a native shell.
 - The generated service worker precaches the app shell, page chunks, and first-use core reader chunks, then uses cache-first behavior for requested same-origin assets.
 - Navigation requests use network-first behavior with an exact cached clean-route match, then the cached Home page as a final fallback.
 - Cue Data, prototype routes/assets, Optional Feature bundles, the recording-only harness, and large media files are intentionally excluded from the initial precache so installation does not download content the reader has not requested.
+- Reader Settings offers an explicit per-recording Offline Download. The recording cache incrementally verifies the published SHA-256 digest and size before commit, reports progress, exposes the selected copy and other saved recordings for explicit cleanup, and serves cached `Range`/`If-Range` playback without opportunistically storing ordinary media requests.
+- Before the first production release, the generated worker and cache protocol support only the current build contract; there is no previous-worker compatibility layer.
 - Reader Settings, the search overlay, and Reading Index are deferred from initial JavaScript execution but remain precached because they are core reader controls that must work offline.
 - Unified Reader search can read saved Cue Authoring access without importing Cue Authoring. The authoring implementation loads only when an unlocked user runs that action or invokes its dedicated shortcut.
 - Recording media should become available offline only through explicit user-requested offline downloads, not silent playback caching.
@@ -125,12 +131,10 @@ Public routing uses clean SvelteKit pathnames. Reader routing remains hash-based
 - `/`, `/readings/`, `/tidbits/`, and `/about/` are prerendered public pages.
 - `/tidbits/[slug]/` is generated only for entries in `src/lib/tidbits.ts`; with no published Tidbits, no detail pages are emitted.
 - `/reader/` is a prerendered entry document. Everything after `/reader/#/` belongs to the Reader Route Module.
-- Legacy hashes opened at `/` are redirected to their public page or the equivalent `/reader/#/...` URL.
-
 - `app/view-model/navigation/url-parser.ts` parses hashes into app routes.
 - `app/reader/reader-route.ts` owns the browser route transaction and uses Reader Shell as its presentation Adapter.
 - Reader routes resolve to a `ScrollViewModel`.
-- Supported Reader route families include current/next reading, explicit run IDs, legacy references, parsha slugs, physical pages, and cue analytics.
+- Supported Reader route families include the current reading, explicit run IDs, Torah references, parsha slugs, physical pages, and cue analytics.
 - Canonical parsha hashes are generated through the navigation view-model layer and applied once by Reader Route rather than directly in UI handlers.
 
 ## Search
@@ -152,7 +156,17 @@ Rendering is page-oriented and lazy.
 - `ScrollDisplay` renders `RenderedEntry` values into the reader root.
 - `InfiniteScroller` loads previous or next content when the user nears either edge of the scroll container.
 - Rendered pages dispatch a `page-rendered` event so other systems, especially highlighting, can index newly inserted token elements.
-- Scroll position and top-bar state are derived from the rendered DOM and view models instead of duplicated in a central store.
+- Reader Display Session is the single vertical owner for display replacement and page lifecycle orchestration. It preserves the established event order while keeping display generation, DOM indexes, progress-anchor invalidation, presentation scheduling, ViewportTracker, Page Window, audio preload, and prewarm cancellation consistent.
+- Reader Page Window waits for the active display's initial centered scroll before allowing eviction, preserves nested navigation and token-collection holds across display replacement, and rejects stale async remount completions by display generation. A near-placeholder remount schedules one generation-bound policy trim after scroll quiescence so reverse traversal stays bounded. Ordinary pause release deliberately does not trigger a policy pass; navigation-hold release does.
+- Reader Progress Anchor Index rebuilds measured aliyah geometry only after explicit layout invalidation; routine scroll frames use its immutable cached snapshot without rescanning the DOM.
+- `/reader/?debugPerformance=1#/...` enables local native User Timing
+  entries for presentation work, progress-anchor rebuilds, and page
+  render/eviction churn. Inspect them with
+  `performance.getEntries().filter(({ name }) => name.startsWith('tikkun:reader:'))`;
+  reset with the corresponding `performance.clearMarks(name)` and
+  `performance.clearMeasures(name)` calls. Nothing is persisted, uploaded, or
+  reported.
+- Scroll position and top-bar state are derived from the measured anchor index and view models instead of duplicated in a central store.
 
 ## Audio and Highlighting
 
@@ -177,7 +191,14 @@ The admin flow lives inside the same browser app rather than a separate tool.
 - Cue drafts are stored in local storage per recording.
 - Exported cue JSON should match the payload shape expected under `audio-cues/`.
 - Cue file naming and narrator/reading folder rules are documented in `audio-cues/README.md`.
-- `app/admin/cue-authoring.ts` is the single owner of the interactive workflow and its mutable state.
+- `app/admin/cue-draft-editor.ts` is the Cue Draft Editor Module. Its semantic
+  Interface owns canonical token-prefix validation, selection, timing-recording
+  state, record, undo, trim, nudge, published-source comparison, dirty/export
+  readiness, and save-conflict state behind a cached immutable snapshot.
+- `app/admin/cue-authoring.ts` owns the surrounding interactive lifetime and
+  coordinates Cue Draft Editor with playback, Web-Locked draft persistence,
+  microphone capture, object URLs, downloads, dialogs, waveform, and panel
+  Adapters. It does not keep a second mutable copy of Cue Draft state.
 - `app/admin/cue-authoring-loader.ts` reads saved access without importing Cue Authoring, then imports and mounts the Optional Feature only when it must restore an open panel, open an unlocked panel, or handle the dedicated shortcut.
 - `app/admin/CueAuthoringPanel.svelte` owns the Cue Authoring Panel markup, labels, icons, visible and disabled presentation, microphone state presentation, draft and progress presentation, and stable targets for nested Cue List and Cue Waveform Implementations. Cue Authoring sends one typed snapshot and receives semantic actions through `app/admin/cue-authoring-panel.ts`.
 - `app/admin/CueAuthoringExportSheet.svelte` owns Cue Export Sheet markup, visibility, native download anchors, copy-status presentation, serialized Cue Data presentation, and delayed textarea selection. Cue Authoring retains payload generation, microphone finalization, Blob and object URL ownership, clipboard success and failure rules, and download invalidation through `app/admin/cue-authoring-export-sheet.ts`.
@@ -198,6 +219,30 @@ Video generation is a local publishing workflow, not part of the production app 
 - `scripts/generate-video-manifest.mjs` exposes only validated videos that have manually registered share/download links.
 - `app/video/` provides manifest and lookup helpers for app playback/download links.
 
+## Persisted State
+
+`app/persistence/persisted-state.ts` is the shared Persisted State Module. Its
+small Interface owns direct JSON reads, exact-value revisions, writes, removals,
+and explicit storage/conflict failures. Domain Modules own validation, defaults,
+merge policy, and user-facing errors.
+
+All browser state uses unversioned keys and one current JSON shape. There are no
+envelopes, migration chains, repair records, or compatibility parsers.
+
+- Reader Preferences, Calendar Settings, Bookmarks, Last Reading, and local
+  Recording Issues retain the revision returned by `read()` and supply it to
+  every write or removal. A stale client must reload, rebase, or ask
+  the user to retry instead of silently replacing another tab's change.
+- Invalid current-schema data uses the domain's explicit default or unavailable
+  state and remains untouched until the user performs a valid save.
+- `localStorage` has no synchronous compare-and-swap. Exact-value revisions are
+  a best-effort stale-write guard, not a transactional claim.
+- Cue Drafts are the higher-value exception: their store uses Web Locks and an
+  exact raw revision so concurrent authoring cannot silently overwrite a valid
+  current draft.
+- The early theme bootstrap reads the same direct current preference object as
+  the runtime and otherwise applies the default theme.
+
 ## Preferences and Theming
 
 Reader preferences are local, explicit, and CSS-variable driven.
@@ -213,14 +258,17 @@ Reader preferences are local, explicit, and CSS-variable driven.
 The project uses three Vitest 4 projects across Node and two browser engines.
 
 - `*.test.ts` files run as Node-oriented unit tests.
-- `*.vitest.ts` files run as the full headless Chromium project through `vitest.config.ts`; playback, shell, and real-app smoke paths also run in the limited WebKit project.
+- `*.vitest.ts` files run as the full headless Chromium project through `vitest.config.ts`; the WebKit critical matrix repeats Reader startup, accessibility, search, navigation, settings, bookmarks/resume, scrolling, playback, and service-worker update behavior.
 - Prefer focused tests around pure model/view-model logic, parsing, generated-data helpers, cue/highlight behavior, and DOM rendering boundaries.
 - Floating Player and Playback Timeline browser tests cover their connected Interface, replacement mounts, timed and untimed controls, compact expansion, speed synchronization, pointer mechanics, and teardown ownership.
 - Reader Playback browser tests cover Implementation ownership, event translation, route reset, and teardown.
-- Reader Presentation unit tests cover deterministic invalidation ordering, same-frame coalescing, reentrant work, layout deferral, immutable snapshots, diagnostics, and teardown.
+- Reader Presentation unit tests cover deterministic invalidation ordering, same-frame coalescing, reentrant work, layout deferral, immutable frames, and teardown.
+- Reader Display Session unit tests cover display replacement order, stale-generation settlement, page indexing and eviction cleanup, prewarm and audio lifetime, deactivation, and teardown. Its focused runtime test rapidly replaces real Reader routes and verifies that only the latest generation becomes visible and ready.
+- Reader Page Window unit tests cover ready-display identity, initial no-apply behavior, retain policy inputs, nested navigation and ordinary pause release semantics, coalesced near-placeholder remounts and post-remount trims, bounded reverse traversal, stale display generations, and teardown. Existing policy and Reader runtime browser tests remain the integration gates.
 - Parsha Picker unit and browser tests cover model rules, canonical search, Torah references, calendar settings, nested aliyah choices, compact subviews, cleanup, pending-load cancellation, failure restoration, and retry.
 - Shared Reader search browser tests cover mixed reading/action results, bold label and alias ranges, both hosts, keyboard selection, query-first Escape, repeated Cmd-K focus, action refresh, dismissal, replacement mounts, first-use loading, pending cancellation, retry, and cleanup.
 - Reader Settings browser tests cover replacement mounts, first-click loading, pending cancellation, retry, focus return, outside dismissal, form synchronization, playback-rate handoff, and scheduled-effect cleanup.
+- Offline Download tests cover worker request cancellation, active-recording rebinding, explicit progress/removal states, media-identity URL versioning, streamed cache writes, and exact cached prefix/suffix/unsatisfiable ranges.
 - Reader Controls browser tests cover shared wide and compact actions, synchronized labels, disabled states, dismissal, focus return, replacement mounts, and teardown ownership.
 - Reader Shell browser tests cover synchronous presentation updates, stable reader and feature-target identity, externally mounted reader content, action ownership, replacement mounts, and teardown ordering.
 - Reader Route browser tests cover hashless startup, canonical aliases, About return, not-found Parsha Picker entry, same-hash rerendering, post-render Last Reading saves, and direct-page number reveal.
@@ -230,7 +278,8 @@ The project uses three Vitest 4 projects across Node and two browser engines.
 - Recording Harness browser tests cover its external Interface, deterministic render delegation, duplicate-mount protection, and teardown.
 - Optional Feature tests cover deferred mounting, aborted routes, keyboard loading, saved-open restoration, and retry after a failed import.
 - The full-app browser smoke test loads the real `/reader/` entry and bootstrap in an isolated same-origin frame, verifies Cmd-K focuses embedded search without opening the overlay, verifies Cmd-K opens the overlay when Reading Index is closed, confirms the toolbar entry is absent, then exercises first-use Reader Settings and Cue Authoring.
-- `npm run verify` is the release gate: typecheck, lint, Node tests, the full Chromium suite, the WebKit critical path, deterministic generation, static build, and bundle budgets. Deployed behavior still follows `docs/release-checklist.md` because static checks cannot prove CDN range responses, CSP delivery, PWA upgrades, or real-device safe areas.
+- `npm run verify` is the deterministic product gate: typecheck, lint, Node tests, the full Chromium suite, the WebKit critical path, deterministic generation, static build, and bundle budgets. `npm run verify:release` wraps it with byte-for-byte post-generation drift detection, `git diff --check HEAD --`, and the live production-dependency audit. Deployed behavior still follows `docs/release-checklist.md` because local checks cannot prove CDN range responses, CSP delivery, an installed production PWA upgrade, or real-device safe areas.
+- `docs/release-operations.md` owns support tiers, preview and rollback procedure, dependency cadence, and the source-to-generated-output ownership table. Each release records concrete evidence from `docs/release-evidence-template.md`.
 
 ## Architectural Preferences
 

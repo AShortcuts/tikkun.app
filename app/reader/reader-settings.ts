@@ -3,6 +3,11 @@ import type { AudioNarrator } from '../audio/types.ts'
 import type { MountScope } from '../lifecycle/mount.ts'
 import type { ReaderPreferences } from '../reader-preferences.ts'
 import {
+  createOfflineRecordingDownloadController,
+  type OfflineDownloadRecording,
+  type OfflineRecordingDownloadController,
+} from '../offline/recording-download.ts'
+import {
   createOfflineTorahDownloadController,
   type OfflineTorahDownloadController,
 } from '../offline/torah-download.ts'
@@ -18,6 +23,7 @@ export interface ReaderSettingsOptions {
   restoreFocus(target: HTMLElement | null): void
   animateThemeChanges: boolean
   serviceWorker: ServiceWorkerContainer | null
+  getCurrentRecording(): OfflineDownloadRecording | null
 }
 
 export interface ReaderSettings {
@@ -29,6 +35,7 @@ export interface ReaderSettings {
 export interface ReaderSettingsComponentProps extends ReaderSettingsOptions {
   toggle: HTMLButtonElement
   offlineTorah: OfflineTorahDownloadController
+  offlineRecording: OfflineRecordingDownloadController
   connect(settings: ReaderSettings): void
 }
 
@@ -61,7 +68,12 @@ export function createReaderSettings(
   const offlineTorah = createOfflineTorahDownloadController({
     serviceWorker: options.serviceWorker,
   })
+  const offlineRecording = createOfflineRecordingDownloadController({
+    serviceWorker: options.serviceWorker,
+    getRecording: options.getCurrentRecording,
+  })
   scope.own(() => offlineTorah.destroy())
+  scope.own(() => offlineRecording.destroy())
   const getConnectedSettings = () => settings
   const component = mount(ReaderSettingsPane, {
     target,
@@ -69,6 +81,7 @@ export function createReaderSettings(
       ...options,
       toggle,
       offlineTorah,
+      offlineRecording,
       connect: (connectedSettings: ReaderSettings) => {
         settings = connectedSettings
       },

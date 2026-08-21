@@ -22,10 +22,10 @@ function createFrameHarness() {
     size() {
       return callbacks.size
     },
-    flush() {
+    flush(timestampMs = 0) {
       const current = [...callbacks.values()]
       callbacks.clear()
-      current.forEach((callback) => callback(0))
+      current.forEach((callback) => callback(timestampMs))
     },
   }
 }
@@ -43,18 +43,6 @@ test('coalesces mixed invalidations into one ordered immutable frame', () => {
   scheduler.invalidate('reader-position', 'viewport-title')
 
   expect(frames.size()).toBe(1)
-  expect(scheduler.diagnostics()).toMatchObject({
-    pendingInvalidations: [
-      'viewport-title',
-      'inline-audio',
-      'reader-position',
-      'playback-state',
-    ],
-    invalidationRequestCount: 3,
-    coalescedRequestCount: 2,
-    scheduledAnimationFrameCount: 1,
-    presentationCount: 0,
-  })
 
   frames.flush()
 
@@ -111,12 +99,6 @@ test('defers layout-sensitive work one frame before normal presentation', () => 
   scheduler.invalidateAfterLayout('reader-position', 'viewport-title')
 
   expect(frames.size()).toBe(1)
-  expect(scheduler.diagnostics()).toMatchObject({
-    deferredInvalidations: ['viewport-title', 'reader-position'],
-    invalidationRequestCount: 2,
-    coalescedRequestCount: 1,
-    scheduledAnimationFrameCount: 1,
-  })
 
   frames.flush()
   expect(present).not.toHaveBeenCalled()
@@ -196,9 +178,4 @@ test('destroy cancels pending work and makes future invalidation inert', () => {
 
   expect(frames.size()).toBe(0)
   expect(present).not.toHaveBeenCalled()
-  expect(scheduler.diagnostics()).toMatchObject({
-    pendingInvalidations: [],
-    deferredInvalidations: [],
-    animationFrameScheduled: false,
-  })
 })

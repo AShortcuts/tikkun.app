@@ -136,12 +136,15 @@
     role="status"
     aria-live="polite"
   >
-    <span>No Internet Access. Recordings can't be played.</span>
+    <span>
+      This recording isn't available offline. It will retry when your connection
+      returns.
+    </span>
     <button
       class="app-update-dismiss"
       data-target-id="app-offline-dismiss"
       type="button"
-      aria-label="Dismiss no internet prompt"
+      aria-label="Dismiss offline recording prompt"
     >OK</button>
   </div>
 

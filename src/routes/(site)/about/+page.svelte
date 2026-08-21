@@ -1,6 +1,7 @@
 <script lang="ts">
   import { resolve } from '$app/paths'
   import { projectStatusRows } from '../../../../app/data/about-progress.ts'
+  import SupportDiagnosticsActions from '../../../../app/support/SupportDiagnosticsActions.svelte'
 
   function projectStatusClass(status: string) {
     return `mod-${status.toLowerCase().replace(/[^a-z]+/g, '-')}`
@@ -54,6 +55,18 @@
         <a href="https://github.com/AShortcuts/tikkun.app" rel="noreferrer">View the source.</a>
       </p>
     </article>
+  </section>
+
+  <section class="site-section" aria-labelledby="support-title">
+    <div class="site-section-header">
+      <h2 id="support-title">Support</h2>
+      <p>
+        If something breaks, make a local diagnostic report to share by choice.
+        It includes this build, coarse browser details, and recent error
+        categories—not Torah text, recordings, searches, or authoring data.
+      </p>
+    </div>
+    <SupportDiagnosticsActions variant="site" />
   </section>
 
   <section class="site-section about-taskboard" aria-labelledby="taskboard-title">

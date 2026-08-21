@@ -1,6 +1,5 @@
 import { expect, test } from 'vitest'
 import {
-  canonicalReaderUrl,
   generateAboutUrl,
   generateCueAnalyticsUrl,
   generatePageUrl,
@@ -112,20 +111,7 @@ test('hash-route search parameters do not change route parsing', async () => {
   )
 })
 
-test('canonical reader URLs remove legacy aliyah state and preserve other options', () => {
-  const url = canonicalReaderUrl(
-    new URL(
-      'http://localhost:5173/?debug=1&aliyah=4&aliyahRun=legacy#/torah/parsha/noach/1-9-8?aliyah=5&aliyahRun=current'
-    ),
-    '#/torah/parsha/noach/1-9-8'
-  )
-
-  expect(url.href).toBe(
-    'http://localhost:5173/?debug=1#/torah/parsha/noach/1-9-8'
-  )
-})
-
-test('legacy Bereshit slug canonicalizes to Beresheet', async () => {
+test('alternate Bereshit spelling canonicalizes to Beresheet', async () => {
   const route = toReaderRoute(
     parseUrl(generator, '/torah/parsha/bereshit', { now: new Date('2024-10-01') })
   )
@@ -137,7 +123,7 @@ test('legacy Bereshit slug canonicalizes to Beresheet', async () => {
     ))
 })
 
-test('legacy Vayetze recording slug canonicalizes to Vayetzei', async () => {
+test('alternate Vayetze spelling canonicalizes to Vayetzei', async () => {
   const route = toReaderRoute(
     parseUrl(generator, '/torah/parsha/vayetze', { now: new Date('2026-01-01') })
   )
@@ -170,15 +156,46 @@ test('Parsha slug can start at a specific ref', async () => {
   expect(route?.canonicalHash).toBe('#/torah/parsha/behar/3-25-1')
   expect(await renderStartingLineForRoute(route)).toBe(await renderStartingLineForRoute(
       toReaderRoute(parseUrl(generator, '/run/2027-05-22:shacharis,main/3-25-1'))
-    ))
+  ))
 })
 
-test('run and parsha routes reject indexed references outside their reading', () => {
-  expect(
-    parseUrl(generator, '/torah/parsha/beresheet/1-13-1', {
-      now: new Date('2024-10-01'),
+test('Parsha slug stays contextual while its reference controls position', async () => {
+  const route = toReaderRoute(
+    parseUrl(generator, '/torah/parsha/haazinu/5-31-28', {
+      now: new Date('2026-01-01'),
     })
-  ).toEqual({ view: 'not-found' })
+  )
+
+  expect(route?.canonicalHash).toBe('#/torah/parsha/haazinu/5-31-28')
+  expect(await renderStartingLineForRoute(route)).toBe(
+    await renderStartingLineForRoute(
+      toReaderRoute(
+        parseUrl(generator, '/run/2026-09-05:shacharis,main/5-31-28')
+      )
+    )
+  )
+})
+
+test('combined Parsha slug resolves its reading and reference', async () => {
+  const route = toReaderRoute(
+    parseUrl(generator, '/torah/parsha/nitzavim-vayelech/5-31-28', {
+      now: new Date('2026-01-01'),
+    })
+  )
+
+  expect(route?.canonicalHash).toBe(
+    '#/torah/parsha/nitzavim-vayelech/5-31-28'
+  )
+  expect(await renderStartingLineForRoute(route)).toBe(
+    await renderStartingLineForRoute(
+      toReaderRoute(
+        parseUrl(generator, '/run/2026-09-05:shacharis,main/5-31-28')
+      )
+    )
+  )
+})
+
+test('dated run routes reject references outside their reading', () => {
   expect(
     parseUrl(generator, '/run/2024-10-26:shacharis,main/1-13-1')
   ).toEqual({ view: 'not-found' })

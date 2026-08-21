@@ -18,60 +18,86 @@ afterEach(() => {
   fixture.remove()
 })
 
-test('retries current work on reconnect and ignores stale work', async () => {
-  let online = false
+test('stays hidden until an offline playback attempt really fails', () => {
+  const destroy = createMount()((scope) => {
+    createOfflineRecordingPrompt(scope, {
+      document,
+      view: window,
+      onRetryError: vi.fn(),
+    })
+  })
+
+  window.dispatchEvent(new Event('offline'))
+  expect(isPromptHidden()).toBe(true)
+
+  destroy()
+})
+
+test('shows a real playback failure and retries current work on reconnect', async () => {
   const retry = vi.fn(async () => {})
   const onRetryError = vi.fn()
   const destroy = createMount()((scope) => {
     const prompt = createOfflineRecordingPrompt(scope, {
       document,
       view: window,
-      isOnline: () => online,
       onRetryError,
     })
-    expect(prompt.canUseNetwork(retry, () => true)).toBe(false)
+    prompt.recordPlaybackFailure(retry, () => true)
   })
 
-  expect(
-    fixture
-      .querySelector('[data-target-id="app-offline-prompt"]')
-      ?.classList.contains('u-hidden')
-  ).toBe(false)
-  online = true
+  expect(isPromptHidden()).toBe(false)
   window.dispatchEvent(new Event('online'))
   await Promise.resolve()
   expect(retry).toHaveBeenCalledOnce()
   expect(onRetryError).not.toHaveBeenCalled()
+  expect(isPromptHidden()).toBe(true)
 
   destroy()
 })
 
-test('replacement mounts own the connectivity listeners', async () => {
+test('does not retry a playback failure after its target becomes stale', async () => {
+  let current = true
+  const retry = vi.fn(async () => {})
+  const destroy = createMount()((scope) => {
+    const prompt = createOfflineRecordingPrompt(scope, {
+      document,
+      view: window,
+      onRetryError: vi.fn(),
+    })
+    prompt.recordPlaybackFailure(retry, () => current)
+  })
+
+  current = false
+  window.dispatchEvent(new Event('online'))
+  await Promise.resolve()
+  expect(retry).not.toHaveBeenCalled()
+  expect(isPromptHidden()).toBe(true)
+
+  destroy()
+})
+
+test('replacement mounts own the reconnect listener', async () => {
   const mount = createMount()
   const firstRetry = vi.fn(async () => {})
   const secondRetry = vi.fn(async () => {})
-  let online = false
 
   mount((scope) => {
     const prompt = createOfflineRecordingPrompt(scope, {
       document,
       view: window,
-      isOnline: () => online,
       onRetryError: vi.fn(),
     })
-    prompt.setPendingRetry(firstRetry)
+    prompt.recordPlaybackFailure(firstRetry)
   })
   const destroy = mount((scope) => {
     const prompt = createOfflineRecordingPrompt(scope, {
       document,
       view: window,
-      isOnline: () => online,
       onRetryError: vi.fn(),
     })
-    prompt.setPendingRetry(secondRetry)
+    prompt.recordPlaybackFailure(secondRetry)
   })
 
-  online = true
   window.dispatchEvent(new Event('online'))
   await Promise.resolve()
   expect(firstRetry).not.toHaveBeenCalled()
@@ -79,3 +105,11 @@ test('replacement mounts own the connectivity listeners', async () => {
 
   destroy()
 })
+
+function isPromptHidden() {
+  return Boolean(
+    fixture
+      .querySelector('[data-target-id="app-offline-prompt"]')
+      ?.classList.contains('u-hidden')
+  )
+}

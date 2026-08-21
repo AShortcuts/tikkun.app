@@ -53,6 +53,7 @@ function mountLazySettings(
       restoreFocus: vi.fn(),
       animateThemeChanges: true,
       serviceWorker: null,
+      getCurrentRecording: () => null,
       load,
       onLoadError,
     })

@@ -84,7 +84,7 @@ test('builds submenu choices for a double parsha', () => {
     )).toEqual([
       {
         label: 'תזריע־מצרע',
-        firstHref: '#/run/2025-05-03:shacharis,main/3-12-1',
+        firstHref: '#/torah/parsha/tazria-metzora/3-12-1',
       },
       {
         label: 'תזריע',

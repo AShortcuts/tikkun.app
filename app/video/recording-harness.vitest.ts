@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest'
 import type { ParshaAudioRecording } from '../audio/types.ts'
 import { createMount } from '../lifecycle/mount.ts'
-import type { ActiveAudioSession } from '../reading/audio-controller.ts'
+import type { ReaderPlaybackRecordingHarnessSessionSnapshot } from '../reading/reader-playback.ts'
 import {
   mountRecordingHarness,
   type RecordingHarnessOptions,
@@ -41,6 +41,10 @@ function recording(): ParshaAudioRecording {
 
 function createOptions(): {
   options: RecordingHarnessOptions
+  activateHighlightAt: ReturnType<typeof vi.fn>
+  loadByAudioId: ReturnType<typeof vi.fn>
+  pause: ReturnType<typeof vi.fn>
+  play: ReturnType<typeof vi.fn>
   seek: ReturnType<typeof vi.fn>
   syncHighlight: ReturnType<typeof vi.fn>
 } {
@@ -56,7 +60,8 @@ function createOptions(): {
   `
   document.body.appendChild(fixture)
   const book = fixture.querySelector<HTMLElement>('[data-target-id="book"]')!
-  const session: ActiveAudioSession = {
+  const session: ReaderPlaybackRecordingHarnessSessionSnapshot = {
+    sessionRevision: 1,
     recording: recording(),
     cues: [
       {
@@ -70,7 +75,6 @@ function createOptions(): {
     runId: 'beresheet',
     aliyahIndex: 1,
     tokenKeys: ['1:0:0:0'],
-    segments: [],
     status: 'current-only',
   }
   let currentTime = 0
@@ -78,37 +82,35 @@ function createOptions(): {
     currentTime = seconds
   })
   const syncHighlight = vi.fn(async () => {})
+  const activateHighlightAt = vi.fn(async () => true)
+  const loadByAudioId = vi.fn(async () => session)
+  const play = vi.fn(async () => {})
+  const pause = vi.fn()
   let ready = false
 
   return {
+    activateHighlightAt,
+    loadByAudioId,
+    pause,
+    play,
     seek,
     syncHighlight,
     options: {
       document,
       view: window,
-      audio: {
-        get session() {
-          return session
-        },
-        get currentTime() {
-          return currentTime
-        },
-        get duration() {
-          return 12
-        },
+      playback: {
+        snapshot: () => ({
+          session,
+          currentTime,
+          duration: 12,
+          activeTokenKey: '1:0:0:0',
+        }),
+        loadByAudioId,
         seek,
-        play: vi.fn(async () => {}),
-        pause: vi.fn(),
-      },
-      highlight: {
-        getActiveTokenKey: () => '1:0:0:0',
-        getCueIndex: () => 0,
-        clear: vi.fn(),
-        activateCue: vi.fn(async () => null),
-      },
-      timeline: { syncHighlight },
-      recordingSession: {
-        loadByAudioId: vi.fn(async () => session),
+        play,
+        pause,
+        syncHighlight,
+        activateHighlightAt,
       },
       isReaderReady: () => ready,
       waitUntilReaderReady: async () => {
@@ -120,7 +122,15 @@ function createOptions(): {
 }
 
 test('mounts the external recording interface and cleans it up with its lifetime', async () => {
-  const { options, seek, syncHighlight } = createOptions()
+  const {
+    activateHighlightAt,
+    loadByAudioId,
+    options,
+    pause,
+    play,
+    seek,
+    syncHighlight,
+  } = createOptions()
   destroy = createMount()((scope) => {
     mountRecordingHarness(scope, options)
   })
@@ -128,6 +138,13 @@ test('mounts the external recording interface and cleans it up with its lifetime
   expect(window.tikkunRecorder?.state().ready).toBe(false)
   await window.tikkunRecorder?.ready()
   expect(window.tikkunRecorder?.state().ready).toBe(true)
+
+  const loaded = await window.tikkunRecorder?.loadAudio(
+    'reader-beresheet-1'
+  )
+  expect(loadByAudioId).toHaveBeenCalledWith('reader-beresheet-1')
+  expect(loaded?.cues).toHaveLength(1)
+  expect(loaded?.tokenKeys).toEqual(['1:0:0:0'])
 
   const rendered = await window.tikkunRecorder?.renderAt(3.5)
   expect(seek).toHaveBeenCalledWith(3.5)
@@ -138,6 +155,21 @@ test('mounts the external recording interface and cleans it up with its lifetime
     duration: 12,
     activeTokenKey: '1:0:0:0',
   })
+
+  const animated = await window.tikkunRecorder?.renderHighlightAnimationAt(
+    1.25,
+    120,
+    false,
+    true,
+    0
+  )
+  expect(activateHighlightAt).toHaveBeenCalledWith(1.25, { scroll: true })
+  expect(animated?.audioId).toBe('reader-beresheet-1')
+
+  await window.tikkunRecorder?.play()
+  window.tikkunRecorder?.pause()
+  expect(play).toHaveBeenCalledOnce()
+  expect(pause).toHaveBeenCalledOnce()
 
   destroy()
   destroy = null

@@ -2,12 +2,16 @@
   "audioId": "beresheet-7",
   "audioFormat": "m4a",
   "narratorId": "yoni-davidov",
-  "parshaSlug": "beresheet",
+  "readingId": "beresheet",
   "aliyah": 7,
   "tokenCount": 187,
   "cueCount": 187,
   "tokenizationVersion": "v2",
-  "audioVersion": "Source file: בראשית ז׳.m4a",
+  "mediaIdentity": {
+    "algorithm": "sha256",
+    "digest": "364ffbc4b57f7d173d639ef07d7e947f4be9dc61d6ee35fb8201b47583cb105c",
+    "byteLength": 7104021
+  },
   "savedAt": "2026-06-04T23:20:56.571Z",
   "cues": [
     {

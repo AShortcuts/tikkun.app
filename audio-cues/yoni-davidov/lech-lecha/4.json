@@ -7,7 +7,11 @@
   "tokenCount": 243,
   "cueCount": 243,
   "tokenizationVersion": "v2",
-  "audioVersion": "Source file: פרשת לך לך ד׳.m4a",
+  "mediaIdentity": {
+    "algorithm": "sha256",
+    "digest": "bda21b66bedcaae2a3fe4a5bec46fbc872df4565ea3a1aa6a7c34085a8726f6c",
+    "byteLength": 3134478
+  },
   "savedAt": "2026-07-15T17:25:15.322Z",
   "issues": [],
   "cues": [

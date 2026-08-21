@@ -1,11 +1,13 @@
 import { readdir, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
+import process from 'node:process'
+import { pathToFileURL } from 'node:url'
 import { gzipSync } from 'node:zlib'
 
 const distRoot = path.resolve('dist')
-const MAX_STATIC_ASSET_BYTES = 24 * 1024 * 1024
+export const MAX_STATIC_ASSET_BYTES = 24 * 1024 * 1024
 
-const budgets = [
+export const BUILD_BUDGETS = [
   {
     label: 'JavaScript chunk',
     matches: (filePath) => filePath.endsWith('.js') && filePath !== 'service-worker.js',
@@ -21,8 +23,8 @@ const budgets = [
   {
     label: 'Service worker',
     matches: (filePath) => filePath === 'service-worker.js',
-    rawBytes: 30_000,
-    gzipBytes: 10_000,
+    rawBytes: 72_000,
+    gzipBytes: 14_000,
   },
 ]
 
@@ -40,63 +42,73 @@ async function listFiles(root, prefix = '') {
   return files.flat()
 }
 
-const files = await listFiles(distRoot)
-const failures = []
+export async function checkBuildBudgets(root = distRoot) {
+  const files = await listFiles(root)
+  const failures = []
 
-let largestArtifact = null
-for (const relativePath of files) {
-  const { size } = await stat(path.join(distRoot, relativePath))
-  if (!largestArtifact || size > largestArtifact.rawBytes) {
-    largestArtifact = { relativePath, rawBytes: size }
+  let largestArtifact = null
+  for (const relativePath of files) {
+    const { size } = await stat(path.join(root, relativePath))
+    if (!largestArtifact || size > largestArtifact.rawBytes) {
+      largestArtifact = { relativePath, rawBytes: size }
+    }
+    if (size > MAX_STATIC_ASSET_BYTES) {
+      failures.push(
+        `Static artifact ${relativePath} is ${size} bytes; ` +
+          `Cloudflare safety budget is ${MAX_STATIC_ASSET_BYTES}`
+      )
+    }
   }
-  if (size > MAX_STATIC_ASSET_BYTES) {
-    failures.push(
-      `Static artifact ${relativePath} is ${size} bytes; ` +
-        `Cloudflare safety budget is ${MAX_STATIC_ASSET_BYTES}`
+  if (largestArtifact) {
+    console.log(
+      `Largest static artifact: ${largestArtifact.relativePath} ` +
+        `(${largestArtifact.rawBytes} bytes raw)`
     )
   }
-}
-if (largestArtifact) {
-  console.log(
-    `Largest static artifact: ${largestArtifact.relativePath} ` +
-      `(${largestArtifact.rawBytes} bytes raw)`
-  )
-}
 
-for (const budget of budgets) {
-  const candidates = files.filter(budget.matches)
-  if (!candidates.length) {
-    failures.push(`${budget.label}: no matching build output`)
-    continue
+  for (const budget of BUILD_BUDGETS) {
+    const candidates = files.filter(budget.matches)
+    if (!candidates.length) {
+      failures.push(`${budget.label}: no matching build output`)
+      continue
+    }
+
+    let largest = null
+    for (const relativePath of candidates) {
+      const contents = await readFile(path.join(root, relativePath))
+      const measurement = {
+        relativePath,
+        rawBytes: contents.byteLength,
+        gzipBytes: gzipSync(contents, { level: 9 }).byteLength,
+      }
+      if (!largest || measurement.rawBytes > largest.rawBytes) {
+        largest = measurement
+      }
+      if (measurement.rawBytes > budget.rawBytes) {
+        failures.push(
+          `${budget.label} ${relativePath} is ${measurement.rawBytes} bytes; budget is ${budget.rawBytes}`
+        )
+      }
+      if (measurement.gzipBytes > budget.gzipBytes) {
+        failures.push(
+          `${budget.label} ${relativePath} is ${measurement.gzipBytes} bytes gzip; budget is ${budget.gzipBytes}`
+        )
+      }
+    }
+
+    console.log(
+      `${budget.label}: ${largest.relativePath} ` +
+        `(${largest.rawBytes} bytes raw, ${largest.gzipBytes} bytes gzip)`
+    )
   }
 
-  let largest = null
-  for (const relativePath of candidates) {
-    const contents = await readFile(path.join(distRoot, relativePath))
-    const measurement = {
-      relativePath,
-      rawBytes: contents.byteLength,
-      gzipBytes: gzipSync(contents, { level: 9 }).byteLength,
-    }
-    if (!largest || measurement.rawBytes > largest.rawBytes) largest = measurement
-    if (measurement.rawBytes > budget.rawBytes) {
-      failures.push(
-        `${budget.label} ${relativePath} is ${measurement.rawBytes} bytes; budget is ${budget.rawBytes}`
-      )
-    }
-    if (measurement.gzipBytes > budget.gzipBytes) {
-      failures.push(
-        `${budget.label} ${relativePath} is ${measurement.gzipBytes} bytes gzip; budget is ${budget.gzipBytes}`
-      )
-    }
+  if (failures.length) {
+    throw new Error(`Build budgets exceeded:\n- ${failures.join('\n- ')}`)
   }
 
-  console.log(
-    `${budget.label}: ${largest.relativePath} ` +
-      `(${largest.rawBytes} bytes raw, ${largest.gzipBytes} bytes gzip)`
-  )
+  return { files, largestArtifact }
 }
 
-if (failures.length) {
-  throw new Error(`Build budgets exceeded:\n- ${failures.join('\n- ')}`)
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await checkBuildBudgets()
 }

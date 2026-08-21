@@ -48,21 +48,37 @@ html[data-reader-theme='dark'] .toggle {
 }
 
 .annotations-toggle[aria-pressed='true'] .toggle-state.mod-on,
-.annotations-toggle[aria-pressed='false'] .toggle-state.mod-off {
+.annotations-toggle[aria-pressed='false'] .toggle-state.mod-off,
+[data-toolbar-overflow-action='annotations'][aria-pressed='true']
+  .toggle-state.mod-on,
+[data-toolbar-overflow-action='annotations'][aria-pressed='false']
+  .toggle-state.mod-off {
   transform: scale(1.5);
   color: var(--annotations-toggle-active-color);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .annotations-toggle[aria-pressed='true']:hover .toggle-state.mod-off,
-  .annotations-toggle[aria-pressed='false']:hover .toggle-state.mod-on {
+  .annotations-toggle[aria-pressed='false']:hover .toggle-state.mod-on,
+  [data-toolbar-overflow-action='annotations'][aria-pressed='true']:hover
+    .toggle-state.mod-off,
+  [data-toolbar-overflow-action='annotations'][aria-pressed='false']:hover
+    .toggle-state.mod-on {
     color: var(--annotations-toggle-hover-color);
   }
 }
 
 .annotations-toggle[aria-pressed='false'] .toggle-state.mod-on,
-.annotations-toggle[aria-pressed='false'] .toggle-state.mod-off {
+.annotations-toggle[aria-pressed='false'] .toggle-state.mod-off,
+[data-toolbar-overflow-action='annotations'][aria-pressed='false']
+  .toggle-state.mod-on,
+[data-toolbar-overflow-action='annotations'][aria-pressed='false']
+  .toggle-state.mod-off {
   right: -3px; /* <1adb87> When toggle is unchecked, give the appearance of shifting things to the left a little. See comment `fb0f10` for "checked" state. */
+}
+
+.toggle.mod-compact {
+  font-size: 0.42rem;
 }
 
 .shadowed-circle {

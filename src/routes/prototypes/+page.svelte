@@ -18,14 +18,8 @@
     Draft interfaces live here for review without changing the current public site or reader.
   </p>
 
-  <a class="prototype-card" href={resolve('/prototypes/apple-sentient/')}>
-    <span>Draft 01</span>
-    <strong>Apple / Sentient</strong>
-    <small>Mobile-first editorial launch, reader themes, and purpose-built secondary pages.</small>
-  </a>
-
   <a class="prototype-card" href={resolve('/prototypes/scroll-story/')}>
-    <span>Draft 02</span>
+    <span>Prototype</span>
     <strong>Tikkun Reader scroll story</strong>
     <small>Current hero identity, live reader embed, scroll-led practice story, and a focused light theme chapter.</small>
   </a>
@@ -85,10 +79,6 @@
     background: var(--site-surface);
     color: inherit;
     text-decoration: none;
-  }
-
-  .prototype-card + .prototype-card {
-    margin-top: 1rem;
   }
 
   .prototype-card span {

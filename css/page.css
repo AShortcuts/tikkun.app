@@ -393,58 +393,6 @@ html[data-reader-theme='dark'] .word[data-recording-issue] {
   }
 }
 
-html[data-highlight-rendering='legacy-rectangle'] .word.is-active-word {
-  /* outline: var(--reader-highlight-outline-width) solid
-    var(--reader-highlight-outline-color); */
-  z-index: 0;
-  background: transparent;
-  /* box-shadow: 0 0 0 var(--reader-highlight-glow) var(--reader-highlight-fill-tint); */
-  /* outline-offset: var(--reader-highlight-outline-offset); */
-  border-radius: var(--reader-highlight-border-radius);
-  box-shadow: none;
-}
-
-html[data-highlight-rendering='legacy-rectangle'] .word.is-active-word::before {
-  content: '';
-  position: absolute;
-  inset: calc(
-    -1 * (
-      var(--reader-highlight-outline-offset) +
-      var(--reader-highlight-outline-width)
-    )
-  );
-  z-index: -1;
-  border: var(--reader-highlight-outline-width) solid
-    var(--reader-active-highlight-outline-color);
-  border-radius: var(--reader-highlight-border-radius);
-  background: var(--reader-active-highlight-fill-surface);
-  box-shadow: 0 0 var(--reader-highlight-glow) var(--reader-active-highlight-fill-tint);
-  pointer-events: none;
-  animation: active-word-highlight-in 0.1s ease;
-  animation-delay: var(--recording-highlight-animation-delay, 0s);
-  animation-play-state: var(--recording-highlight-animation-play-state, running);
-  transition:
-    inset 0.1s ease,
-    transform 0.1s ease,
-    border-color 0.1s linear,
-    border-radius 0.1s ease,
-    border-width 0.1s ease,
-    box-shadow 0.1s ease,
-    background-color 0.1s ease;
-}
-
-@keyframes active-word-highlight-in {
-  from {
-    opacity: 0;
-    transform: scale(0.92);
-  }
-
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
 .fragment.mod-setuma {
   width: auto;
 }

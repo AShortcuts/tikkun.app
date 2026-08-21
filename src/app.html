@@ -25,15 +25,55 @@
     />
     <script>
       ;(() => {
-        const storageKey = 'tikkun.reader-preferences.v3'
-        const validThemes = new Set(['automatic', 'light', 'sepia', 'dark'])
+        const storageKey = 'tikkun.reader-preferences'
+        const validThemes = new Set([
+          'automatic',
+          'light',
+          'sepia',
+          'dark',
+          'custom',
+        ])
+        const validColor = /^#[0-9a-f]{6}$/i
+        const defaultCustomBackground = '#eee6d6'
+        const defaultCustomText = '#3b3026'
+
+        const luminance = (color) => {
+          const channels = [1, 3, 5].map((offset) => {
+            const value = Number.parseInt(color.slice(offset, offset + 2), 16) / 255
+            return value <= 0.04045
+              ? value / 12.92
+              : ((value + 0.055) / 1.055) ** 2.4
+          })
+          return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+        }
 
         try {
           const raw = window.localStorage.getItem(storageKey)
           if (!raw) return
-          const themeMode = JSON.parse(raw)?.themeMode
+          const preferences = JSON.parse(raw)
+          const themeMode = preferences?.themeMode
+          const customBackground = validColor.test(
+            preferences?.customBackgroundColor
+          )
+            ? preferences.customBackgroundColor
+            : defaultCustomBackground
+          const customText = validColor.test(preferences?.customTextColor)
+            ? preferences.customTextColor
+            : defaultCustomText
+          document.documentElement.style.setProperty(
+            '--reader-custom-background-color',
+            customBackground
+          )
+          document.documentElement.style.setProperty(
+            '--reader-custom-text-color',
+            customText
+          )
           if (validThemes.has(themeMode)) {
             document.documentElement.dataset.readerTheme = themeMode
+            if (themeMode === 'custom') {
+              document.documentElement.style.colorScheme =
+                luminance(customBackground) < 0.32 ? 'dark' : 'light'
+            }
           }
         } catch {
           document.documentElement.dataset.readerTheme = 'automatic'

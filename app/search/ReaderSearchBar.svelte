@@ -242,6 +242,7 @@
           <li
             class="reader-search-result"
             class:is-active={index === activeIndex}
+            role="presentation"
             data-action-id={result.action?.id}
             data-target-class="list-item"
             data-result-source={result.source}

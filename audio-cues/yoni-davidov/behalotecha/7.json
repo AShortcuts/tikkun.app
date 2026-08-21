@@ -2,10 +2,15 @@
   "audioId": "behalotecha-7",
   "audioFormat": "m4a",
   "narratorId": "yoni-davidov",
-  "parshaSlug": "behalotecha",
+  "readingId": "behalotecha",
   "aliyah": 7,
   "tokenCount": 0,
   "cueCount": 0,
   "tokenizationVersion": "v1",
+  "mediaIdentity": {
+    "algorithm": "sha256",
+    "digest": "51ae9dfdc5829c879e21d2e95e26b3cc68bef0d79772d5208109d1da2e997484",
+    "byteLength": 9196076
+  },
   "cues": []
 }

@@ -2,12 +2,16 @@
   "audioId": "noach-3",
   "audioFormat": "m4a",
   "narratorId": "yoni-davidov",
-  "parshaSlug": "noach",
+  "readingId": "noach",
   "aliyah": 3,
   "tokenCount": 256,
   "cueCount": 256,
   "tokenizationVersion": "v2",
-  "audioVersion": "Source file: פרשת נח ג׳.m4a",
+  "mediaIdentity": {
+    "algorithm": "sha256",
+    "digest": "0230735f02001f56a098f2ba1d62fabff31a11737d23c6060effebe2ca87a5a5",
+    "byteLength": 9554369
+  },
   "savedAt": "2026-06-16T22:43:41.249Z",
   "cues": [
     {

@@ -177,3 +177,19 @@ export function getRequiredReading(parshaSlug: string) {
   }
   return reading
 }
+
+export function getReadingAvailabilitySummary(reading: PublicReading) {
+  const totalAliyot = reading.aliyot.length
+  const availableAliyot = reading.availableAliyot.length
+  const allAvailable = totalAliyot > 0 && availableAliyot === totalAliyot
+  return Object.freeze({
+    aliyahLabel:
+      allAvailable && totalAliyot === 7
+        ? 'All seven aliyot available'
+        : `${availableAliyot} of ${totalAliyot} aliyot available`,
+    statusLabel:
+      allAvailable && reading.statusKind === 'ready'
+        ? 'All aliyot ready'
+        : reading.statusLabel,
+  })
+}

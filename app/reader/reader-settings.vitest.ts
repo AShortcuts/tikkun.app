@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
-import type { AudioNarrator } from '../audio/types.ts'
+import type {
+  AudioNarrator,
+  ParshaAudioRecording,
+} from '../audio/types.ts'
 import { createMount } from '../lifecycle/mount.ts'
 import {
   defaultReaderPreferences,
@@ -30,6 +33,12 @@ afterEach(() => {
   destroy = null
   fixture.remove()
   document.documentElement.classList.remove('mod-theme-transition')
+  document.documentElement.dataset.readerTheme = 'automatic'
+  document.documentElement.style.removeProperty(
+    '--reader-custom-background-color'
+  )
+  document.documentElement.style.removeProperty('--reader-custom-text-color')
+  document.documentElement.style.colorScheme = ''
   vi.restoreAllMocks()
 })
 
@@ -137,6 +146,37 @@ test('settings synchronize representative controls and release scheduled effects
     document.documentElement.classList.contains('mod-theme-transition')
   ).toBe(true)
 
+  required<HTMLButtonElement>('[data-theme-mode="custom"]').click()
+  expect(state.preferences.themeMode).toBe('custom')
+  expect(required('[data-target-id="settings-custom-theme"]')).toBeTruthy()
+  required<HTMLButtonElement>('[data-custom-theme-preset="night"]').click()
+  expect(state.preferences.customBackgroundColor).toBe('#191c22')
+  expect(state.preferences.customTextColor).toBe('#f8f7f3')
+  const backgroundTone = required<HTMLInputElement>(
+    '[data-target-id="settings-custom-background-tone"]'
+  )
+  backgroundTone.value = '30'
+  backgroundTone.dispatchEvent(new Event('input', { bubbles: true }))
+  const previewedBackground = document.documentElement.style.getPropertyValue(
+    '--reader-custom-background-color'
+  )
+  expect(previewedBackground).not.toBe('#191c22')
+  backgroundTone.dispatchEvent(new Event('change', { bubbles: true }))
+  expect(state.preferences.customBackgroundColor).toBe(previewedBackground)
+
+  state.preferences = mergeReaderPreferences(state.preferences, {
+    customBackgroundColor: '#aaaaaa',
+    customTextColor: '#999999',
+  })
+  settings!.sync()
+  expect(
+    required('[data-target-id="settings-custom-contrast"]').textContent
+  ).toContain('Current colors remain allowed')
+  required<HTMLButtonElement>(
+    '[data-target-id="settings-custom-contrast"] button'
+  ).click()
+  expect(state.preferences.customTextColor).not.toBe('#999999')
+
   required<HTMLButtonElement>('[data-focal-point-mode="browser"]').click()
   expect(state.preferences.focalPointMode).toBe('browser')
 
@@ -165,6 +205,296 @@ test('settings synchronize representative controls and release scheduled effects
   expect(
     document.documentElement.classList.contains('mod-theme-transition')
   ).toBe(false)
+})
+
+test('downloads and removes only the active recording after explicit requests', async () => {
+  const state = createState()
+  const commands: string[] = []
+  let finishDownload = () => {}
+  const worker = {
+    postMessage(
+      message: { type: string; recording?: { audioId: string } },
+      transfer: Transferable[]
+    ) {
+      commands.push(message.type)
+      const port = transfer[0] as MessagePort
+      if (message.type === 'GET_TORAH_DOWNLOAD_STATUS') {
+        port.postMessage({
+          type: 'TORAH_DOWNLOAD_STATUS',
+          state: 'idle',
+          downloaded: 0,
+          total: 1,
+          complete: false,
+        })
+        return
+      }
+      const audioId = message.recording?.audioId
+      if (!audioId) throw new Error('Missing recording command payload')
+      const send = (
+        phase: 'idle' | 'downloading' | 'complete' | 'removing',
+        downloadedBytes: number
+      ) =>
+        port.postMessage({
+          type: 'RECORDING_DOWNLOAD_STATUS',
+          audioId,
+          state: phase,
+          downloadedBytes,
+          totalBytes: 12,
+          otherCount: 0,
+          otherBytes: 0,
+          exactStored: phase === 'complete',
+          complete: phase === 'complete',
+        })
+      if (message.type === 'GET_RECORDING_DOWNLOAD_STATUS') {
+        send('idle', 0)
+      } else if (message.type === 'DOWNLOAD_RECORDING') {
+        send('downloading', 6)
+        finishDownload = () => send('complete', 12)
+      } else {
+        send('removing', 12)
+        send('idle', 0)
+      }
+    },
+  }
+  const registration = { active: worker }
+  const serviceWorker = {
+    controller: null,
+    getRegistration: vi.fn(async () => registration),
+    ready: Promise.resolve(registration),
+  } as unknown as ServiceWorkerContainer
+  let settings: ReaderSettings | null = null
+
+  destroy = createMount()((scope) => {
+    settings = createReaderSettings(scope, {
+      ...createOptions(state),
+      serviceWorker,
+      getCurrentRecording: () => activeRecording,
+    })
+  })
+  settings!.open()
+  await flushMessages()
+
+  const button = required<HTMLButtonElement>(
+    '[data-target-id="settings-offline-recording-download"]'
+  )
+  await vi.waitFor(() => {
+    expect(commands).toEqual([
+      'GET_TORAH_DOWNLOAD_STATUS',
+      'GET_RECORDING_DOWNLOAD_STATUS',
+    ])
+    expect(button.textContent).toBe('Download current recording')
+    expect(
+      required('[data-target-id="settings-offline-recording-status"]')
+        .textContent
+    ).toContain('Saved only when you request it')
+  })
+
+  button.click()
+  await vi.waitFor(() => {
+    expect(commands).toContain('DOWNLOAD_RECORDING')
+    expect(button.textContent).toBe('Downloading recording…')
+    expect(
+      required<HTMLProgressElement>(
+        '[aria-label="Offline recording download progress"]'
+      ).value
+    ).toBe(6)
+    expect(
+      required('[data-target-id="settings-offline-recording-announcement"]')
+        .textContent
+    ).toContain('Saving Beresheet Aliyah 1 for offline playback')
+    expect(
+      required('[data-target-id="settings-offline-recording-announcement"]')
+        .textContent
+    ).not.toContain('6')
+  })
+
+  finishDownload()
+  await vi.waitFor(() => {
+    expect(button.textContent).toBe('Remove offline recording')
+  })
+
+  button.click()
+  await vi.waitFor(() => {
+    expect(commands).toContain('REMOVE_RECORDING_DOWNLOAD')
+    expect(button.textContent).toBe('Download current recording')
+    expect(
+      required('[data-target-id="settings-offline-recording-announcement"]')
+        .textContent
+    ).toContain('Beresheet Aliyah 1 was removed from offline storage')
+  })
+})
+
+test('shows and explicitly removes offline recordings outside the current catalog entry', async () => {
+  const state = createState()
+  const commands: string[] = []
+  const worker = {
+    postMessage(
+      message: { type: string; recording?: { audioId: string } },
+      transfer: Transferable[]
+    ) {
+      commands.push(message.type)
+      const port = transfer[0] as MessagePort
+      if (message.type === 'GET_TORAH_DOWNLOAD_STATUS') {
+        port.postMessage({
+          type: 'TORAH_DOWNLOAD_STATUS',
+          state: 'idle',
+          downloaded: 0,
+          total: 1,
+          complete: false,
+        })
+        return
+      }
+      const audioId = message.recording?.audioId
+      if (!audioId) throw new Error('Missing recording command payload')
+      const send = (state: 'idle' | 'removing', otherCount: number) =>
+        port.postMessage({
+          type: 'RECORDING_DOWNLOAD_STATUS',
+          audioId,
+          state,
+          downloadedBytes: 0,
+          totalBytes: 12,
+          otherCount,
+          otherBytes: otherCount > 0 ? 24 : 0,
+          exactStored: false,
+          complete: false,
+        })
+      if (message.type === 'REMOVE_OTHER_RECORDING_DOWNLOADS') {
+        send('removing', 1)
+        send('idle', 0)
+      } else {
+        send('idle', 1)
+      }
+    },
+  }
+  const registration = { active: worker }
+  const serviceWorker = {
+    controller: null,
+    getRegistration: vi.fn(async () => registration),
+    ready: Promise.resolve(registration),
+  } as unknown as ServiceWorkerContainer
+  let settings: ReaderSettings | null = null
+
+  destroy = createMount()((scope) => {
+    settings = createReaderSettings(scope, {
+      ...createOptions(state),
+      serviceWorker,
+      getCurrentRecording: () => activeRecording,
+    })
+  })
+  settings!.open()
+  await flushMessages()
+
+  await vi.waitFor(() => {
+    expect(
+      fixture.querySelector(
+        '[data-target-id="settings-offline-recording-remove-others"]'
+      )
+    ).not.toBeNull()
+  })
+  const removeOthers = required<HTMLButtonElement>(
+    '[data-target-id="settings-offline-recording-remove-others"]'
+  )
+  expect(
+    required('[data-target-id="settings-offline-recording-other-status"]')
+      .textContent
+  ).toContain('1 other offline recording copy')
+
+  removeOthers.click()
+  await vi.waitFor(() => {
+    expect(commands).toContain('REMOVE_OTHER_RECORDING_DOWNLOADS')
+    expect(
+      fixture.querySelector(
+        '[data-target-id="settings-offline-recording-remove-others"]'
+      )
+    ).toBeNull()
+    expect(
+      required('[data-target-id="settings-offline-recording-announcement"]')
+        .textContent
+    ).toContain('1 other offline recording was removed')
+  })
+})
+
+test('shows and removes stored recordings without an active recording', async () => {
+  const state = createState()
+  const commands: string[] = []
+  let storedCount = 2
+  let storedBytes = 24
+  const worker = {
+    postMessage(message: { type: string }, transfer: Transferable[]) {
+      commands.push(message.type)
+      const port = transfer[0] as MessagePort
+      if (message.type === 'GET_TORAH_DOWNLOAD_STATUS') {
+        port.postMessage({
+          type: 'TORAH_DOWNLOAD_STATUS',
+          state: 'idle',
+          downloaded: 0,
+          total: 1,
+          complete: false,
+        })
+        return
+      }
+      const send = (phase: 'idle' | 'removing') =>
+        port.postMessage({
+          type: 'RECORDING_DOWNLOAD_INVENTORY_STATUS',
+          state: phase,
+          count: storedCount,
+          totalBytes: storedBytes,
+          complete: phase === 'idle' && storedCount === 0,
+        })
+      if (message.type === 'REMOVE_ALL_RECORDING_DOWNLOADS') {
+        send('removing')
+        storedCount = 0
+        storedBytes = 0
+      }
+      send('idle')
+    },
+  }
+  const registration = { active: worker }
+  const serviceWorker = {
+    controller: null,
+    getRegistration: vi.fn(async () => registration),
+    ready: Promise.resolve(registration),
+  } as unknown as ServiceWorkerContainer
+  let settings: ReaderSettings | null = null
+
+  destroy = createMount()((scope) => {
+    settings = createReaderSettings(scope, {
+      ...createOptions(state),
+      serviceWorker,
+      getCurrentRecording: () => null,
+    })
+  })
+  settings!.open()
+  await flushMessages()
+
+  await vi.waitFor(() => {
+    expect(
+      fixture.querySelector(
+        '[data-target-id="settings-offline-recording-remove-all"]'
+      )
+    ).not.toBeNull()
+  })
+  const removeAll = required<HTMLButtonElement>(
+    '[data-target-id="settings-offline-recording-remove-all"]'
+  )
+  expect(
+    required('[data-target-id="settings-offline-recording-status"]')
+      .textContent
+  ).toContain('2 offline recording copies use')
+
+  removeAll.click()
+  await vi.waitFor(() => {
+    expect(commands).toContain('REMOVE_ALL_RECORDING_DOWNLOADS')
+    expect(
+      fixture.querySelector(
+        '[data-target-id="settings-offline-recording-remove-all"]'
+      )
+    ).toBeNull()
+    expect(
+      required('[data-target-id="settings-offline-recording-announcement"]')
+        .textContent
+    ).toContain('2 offline recordings were removed')
+  })
 })
 
 function createState() {
@@ -207,6 +537,7 @@ function createOptions(
     restoreFocus: state.restoreFocus,
     animateThemeChanges: true,
     serviceWorker: null,
+    getCurrentRecording: () => null,
   }
 }
 
@@ -218,6 +549,12 @@ function required<T extends Element = HTMLElement>(selector: string): T {
 
 function nextAnimationFrame() {
   return new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+}
+
+async function flushMessages() {
+  await Promise.resolve()
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  await Promise.resolve()
 }
 
 const narrators: AudioNarrator[] = [
@@ -232,3 +569,22 @@ const narrators: AudioNarrator[] = [
     credit: 'Second Reader',
   },
 ]
+
+const activeRecording: ParshaAudioRecording = {
+  id: 'beresheet-1',
+  narratorId: 'reader',
+  reading: { kind: 'parsha', id: 'beresheet', name: 'Beresheet' },
+  aliyah: 1,
+  title: 'Beresheet Aliyah 1',
+  playSrc: `/audio/beresheet-1.m4a?tikkun-media=${'a'.repeat(64)}`,
+  downloadSrc: '/audio/beresheet-1.m4a',
+  format: 'm4a',
+  status: 'available',
+  mediaIdentity: {
+    algorithm: 'sha256',
+    digest: 'a'.repeat(64),
+    byteLength: 12,
+  },
+  parshaSlug: 'beresheet',
+  parshaName: 'Beresheet',
+}

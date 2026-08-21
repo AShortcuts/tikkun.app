@@ -21,6 +21,8 @@ const preferences: ReaderPreferences = {
   focalPointMode: 'browser',
   disableShiftNekudotHide: true,
   themeMode: 'dark',
+  customBackgroundColor: '#eee6d6',
+  customTextColor: '#3b3026',
 }
 
 test('recording mode is enabled through search params without changing hash routing', () => {

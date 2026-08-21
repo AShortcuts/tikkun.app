@@ -2,9 +2,40 @@ import { expect, test } from 'vitest'
 import {
   firstCueAtOrAfterLocation,
   firstCueForTokenKeys,
+  isActivePlaybackTarget,
   playbackTargetKey,
   playbackTokenRangeAliyahIndex,
 } from './playback-session.ts'
+
+test('matches an active target by recording identity when one is available', () => {
+  const session = {
+    recording: { id: 'first-reader' },
+    runId: 'fixture-run',
+    aliyahIndex: 1,
+  }
+
+  expect(
+    isActivePlaybackTarget(session, {
+      recordingId: 'first-reader',
+      runId: session.runId,
+      aliyahIndex: session.aliyahIndex,
+    })
+  ).toBe(true)
+  expect(
+    isActivePlaybackTarget(session, {
+      recordingId: 'second-reader',
+      runId: session.runId,
+      aliyahIndex: session.aliyahIndex,
+    })
+  ).toBe(false)
+  expect(
+    isActivePlaybackTarget(session, {
+      recordingId: null,
+      runId: session.runId,
+      aliyahIndex: session.aliyahIndex,
+    })
+  ).toBe(true)
+})
 
 test('keeps maftir and seventh aliyah playback targets distinct when they share audio', () => {
   const baseTarget = {

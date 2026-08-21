@@ -10,10 +10,7 @@ import {
   type LeiningInstance,
   type LeiningRun,
 } from '../calendar-model/model-types.ts'
-import {
-  AudioController,
-  type ActiveAudioSession,
-} from './audio-controller.ts'
+import { AudioController } from './audio-controller.ts'
 import { HighlightController } from './highlight-controller.ts'
 import {
   createRecordingSession,
@@ -158,7 +155,7 @@ function createHarness({
 } = {}) {
   const run = createRunFixture()
   let authoringVisible = false
-  let authoringSession: ActiveAudioSession | null = null
+  let authoringSessionBound = false
   const collectTokenKeys = vi.fn(async ({ aliyahIndex }: RecordingTarget) =>
     aliyahIndex === 1
       ? [firstToken, overlapToken]
@@ -200,12 +197,12 @@ function createHarness({
     authoring: {
       isActive: () => authoringVisible,
       isVisible: () => authoringVisible,
-      getSession: () => authoringSession,
-      bindSession: async (activeSession) => {
-        authoringSession = activeSession
+      hasSession: () => authoringSessionBound,
+      bindSession: async () => {
+        authoringSessionBound = true
       },
       clearSession: () => {
-        authoringSession = null
+        authoringSessionBound = false
       },
     },
     presentation: {
@@ -226,7 +223,7 @@ function createHarness({
       authoringVisible = visible
     },
     clearAuthoringSession() {
-      authoringSession = null
+      authoringSessionBound = false
     },
   }
 }

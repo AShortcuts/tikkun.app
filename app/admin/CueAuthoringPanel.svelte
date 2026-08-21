@@ -122,15 +122,15 @@
   data-target-id="admin-panel"
 >
   <div class="admin-panel-header">
-    <strong>Admin Timing Mode</strong>
+    <strong>Cue Authoring</strong>
     <div class="admin-panel-header-actions">
       <span data-target-id="admin-cue-count">{snapshot.cueCountText}</span>
       <button
         class="admin-panel-close"
         type="button"
         data-target-id="admin-close"
-        aria-label="Close admin timing mode"
-        title="Close admin timing mode"
+        aria-label="Close Cue Authoring"
+        title="Close Cue Authoring"
         onclick={() => action({ type: 'close' })}
       >
         <UiIcon name="x" />

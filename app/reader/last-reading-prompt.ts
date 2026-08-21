@@ -7,8 +7,10 @@ export interface LastReadingPromptOptions {
   onResume(lastReading: LastReading): void
 }
 
+export type LastReadingPromptMode = 'resume' | 'return'
+
 export interface LastReadingPrompt {
-  show(lastReading: LastReading): void
+  show(lastReading: LastReading, mode?: LastReadingPromptMode): void
   hide(): void
   dismiss(): void
 }
@@ -29,7 +31,6 @@ export function createLastReadingPrompt(
   const resumeButton = options.document.querySelector<HTMLButtonElement>(
     '[data-target-id="last-reading-resume"]'
   )
-  let dismissed = false
   let target: LastReading | null = null
 
   const hide = () => {
@@ -37,16 +38,25 @@ export function createLastReadingPrompt(
   }
 
   const dismiss = () => {
-    dismissed = true
+    target = null
     hide()
   }
 
-  const show = (lastReading: LastReading) => {
-    if (dismissed || options.disabled || !prompt || !copy) return
+  const show = (
+    lastReading: LastReading,
+    mode: LastReadingPromptMode = 'resume'
+  ) => {
+    if (options.disabled || !prompt || !copy) return
     const locationLabel = lastReading.aliyahLabel
       ? `${lastReading.parshaName}, ${lastReading.aliyahLabel}`
       : lastReading.parshaName
-    copy.textContent = `Resume ${locationLabel}?`
+    const action = mode === 'return' ? 'Return to' : 'Resume'
+    copy.textContent = `${action} ${locationLabel}?`
+    if (resumeButton) resumeButton.textContent = mode === 'return' ? 'Return' : 'Resume'
+    dismissButton?.setAttribute(
+      'aria-label',
+      mode === 'return' ? 'Dismiss return prompt' : 'Dismiss resume prompt'
+    )
     target = lastReading
     prompt.classList.remove('u-hidden')
   }

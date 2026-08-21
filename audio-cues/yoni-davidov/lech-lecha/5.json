@@ -7,7 +7,11 @@
   "tokenCount": 120,
   "cueCount": 120,
   "tokenizationVersion": "v2",
-  "audioVersion": "Source file: פרשת לך לך ה׳.m4a",
+  "mediaIdentity": {
+    "algorithm": "sha256",
+    "digest": "09fa8b9740bbcb7acaa375da4627dbfd3be2e15d81d5b7c317481693e9dd3bd9",
+    "byteLength": 1478608
+  },
   "savedAt": "2026-07-15T17:37:19.854Z",
   "issues": [],
   "cues": [

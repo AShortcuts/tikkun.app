@@ -14,6 +14,7 @@ import {
 } from '../app/video/cue-frame-plan.ts'
 import { currentAppBuildHash } from './video-provenance.mjs'
 import {
+  inspectOwnedRun,
   openOwnedProcessRegistry,
   shutdownOwnedRun,
 } from './video-process-ownership.mjs'
@@ -59,6 +60,7 @@ function parseArgs(argv) {
     keepFrames: false,
     includeOutput: false,
     externalServer: false,
+    dryRun: false,
   }
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -69,6 +71,10 @@ function parseArgs(argv) {
       options.command = 'cleanup'
     } else if (arg === 'shutdown') {
       options.command = 'shutdown'
+    } else if (arg === 'status') {
+      options.command = 'status'
+    } else if (arg === '--dry-run') {
+      options.dryRun = true
     } else if (arg === '--keep-frames') {
       options.keepFrames = true
     } else if (arg === '--include-output') {
@@ -130,6 +136,9 @@ function parseArgs(argv) {
   }
   if (!Number.isFinite(options.cueBurstMaxMs) || options.cueBurstMaxMs < 0) {
     throw new Error('--cue-burst-max-ms must be a non-negative number')
+  }
+  if (options.dryRun && options.command !== 'shutdown') {
+    throw new Error('--dry-run requires the shutdown command')
   }
   return options
 }
@@ -1249,19 +1258,30 @@ async function cleanup(options) {
 
 const options = parseArgs(process.argv.slice(2))
 
-if (options.command === 'cleanup') {
+if (options.command === 'status') {
+  const result = await inspectOwnedRun({
+    repoRoot,
+    workRoot: options.workRoot,
+  })
+  console.log(JSON.stringify(result, null, 2))
+} else if (options.command === 'cleanup') {
   await cleanup(options)
 } else if (options.command === 'shutdown') {
   const result = await shutdownOwnedRun({
     repoRoot,
     workRoot: options.workRoot,
     cleanup: () => cleanup(options),
+    dryRun: options.dryRun,
   })
-  console.log(
-    result.status === 'stopped'
-      ? `Stopped owned video processes: ${result.stopped.join(', ')}`
-      : 'No active owned video processes found'
-  )
+  if (result.status === 'dry-run') {
+    console.log(JSON.stringify(result, null, 2))
+  } else {
+    console.log(
+      result.status === 'stopped'
+        ? `Stopped owned video processes: ${result.stopped.join(', ')}`
+        : 'No active owned video processes found'
+    )
+  }
 } else if (options.command === 'calibrate') {
   processRegistry = await openOwnedProcessRegistry({ repoRoot, workRoot: options.workRoot })
   installShutdownHandlers()

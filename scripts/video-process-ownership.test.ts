@@ -1,9 +1,13 @@
+import { execFile } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, expect, test } from 'vitest'
+import { fileURLToPath } from 'node:url'
+import { promisify } from 'node:util'
+import { afterEach, expect, test, vi } from 'vitest'
 import {
+  inspectOwnedRun,
   openOwnedProcessRegistry,
   processMatchesRecord,
   processRegistryPath,
@@ -11,6 +15,10 @@ import {
   shutdownOwnedRun,
 } from './video-process-ownership.mjs'
 
+const execFileAsync = promisify(execFile)
+const recorderScriptPath = fileURLToPath(
+  new URL('./record-aliyah-videos.mjs', import.meta.url)
+)
 const temporaryRoots: string[] = []
 
 afterEach(async () => {
@@ -43,13 +51,275 @@ function deferred() {
   return { promise, resolve }
 }
 
-test('process identity requires PID, start marker, and command to match', () => {
-  const record = { pid: 101, startedAt: 'start-a', command: 'node recorder' }
+type TestProcessIdentity = {
+  pid: number
+  startedAt: string
+  command: string
+  cwd?: string
+}
+
+function inspectFromMap(
+  identities: ReadonlyMap<number, TestProcessIdentity>,
+  fallbackCwd: string
+) {
+  return async (pid: number) => {
+    const identity = identities.get(pid)
+    return identity
+      ? { ...identity, cwd: path.resolve(identity.cwd ?? fallbackCwd) }
+      : null
+  }
+}
+
+test('process identity requires PID, start marker, command, and cwd to match', () => {
+  const record = {
+    pid: 101,
+    startedAt: 'start-a',
+    command: 'node recorder',
+    cwd: '/repo',
+  }
 
   expect(processMatchesRecord(record, { ...record })).toBe(true)
   expect(processMatchesRecord(record, { ...record, startedAt: 'start-b' })).toBe(false)
   expect(processMatchesRecord(record, { ...record, command: 'vite' })).toBe(false)
+  expect(processMatchesRecord(record, { ...record, cwd: '/other-repo' })).toBe(false)
   expect(processMatchesRecord(record, null)).toBe(false)
+})
+
+test('registry refuses a child whose inspected cwd differs from its spawn cwd', async () => {
+  const workRoot = await makeWorkRoot()
+  const repoRoot = path.join(workRoot, 'repo')
+  const identities = new Map<number, TestProcessIdentity>([
+    [
+      101,
+      {
+        pid: 101,
+        startedAt: 'owner-start',
+        command: 'node record-aliyah-videos.mjs',
+        cwd: repoRoot,
+      },
+    ],
+    [
+      202,
+      {
+        pid: 202,
+        startedAt: 'child-start',
+        command: 'npm run dev -- --port 4177',
+        cwd: path.join(workRoot, 'different-repo'),
+      },
+    ],
+  ])
+  const registry = await openOwnedProcessRegistry({
+    repoRoot,
+    workRoot,
+    inspect: inspectFromMap(identities, repoRoot),
+    ownerPid: 101,
+  })
+
+  await expect(
+    registry.add(childProcess(202), { kind: 'vite', cwd: repoRoot })
+  ).resolves.toBeNull()
+  expect(JSON.parse(await readFile(processRegistryPath(workRoot), 'utf8'))).toMatchObject({
+    children: [],
+  })
+
+  await registry.close()
+})
+
+test('read-only inspection reports exact running, stale, and mismatched identities', async () => {
+  const workRoot = await makeWorkRoot()
+  const repoRoot = path.join(workRoot, 'repo')
+  const markerPath = path.join(workRoot, 'keep.txt')
+  await writeFile(markerPath, 'keep')
+  const identities = new Map([
+    [101, { pid: 101, startedAt: 'owner-start', command: 'node record-aliyah-videos.mjs' }],
+    [202, { pid: 202, startedAt: 'vite-start', command: 'npm run dev -- --port 4177' }],
+    [303, { pid: 303, startedAt: 'probe-start', command: 'ffprobe output.mp4' }],
+    [404, { pid: 404, startedAt: 'validation-start', command: 'ffmpeg -v error' }],
+  ])
+  const inspect = inspectFromMap(identities, repoRoot)
+  const registry = await openOwnedProcessRegistry({
+    repoRoot,
+    workRoot,
+    inspect,
+    ownerPid: 101,
+  })
+  await registry.add(childProcess(202), { kind: 'vite', cwd: repoRoot })
+  await registry.add(childProcess(303), { kind: 'ffprobe', cwd: repoRoot })
+  await registry.add(childProcess(404), { kind: 'ffmpeg-validation', cwd: repoRoot })
+  identities.delete(303)
+  identities.set(404, {
+    pid: 404,
+    startedAt: 'reused-start',
+    command: 'unrelated process',
+  })
+  const registryBefore = await readFile(processRegistryPath(workRoot), 'utf8')
+
+  const result = await inspectOwnedRun({ repoRoot, workRoot, inspect })
+
+  expect(result.status).toBe('partial')
+  expect(
+    result.processes.map(({ role, kind, pid, state }) => ({ role, kind, pid, state }))
+  ).toEqual([
+    { role: 'owner', kind: 'recorder', pid: 101, state: 'running' },
+    { role: 'child', kind: 'vite', pid: 202, state: 'running' },
+    { role: 'child', kind: 'ffprobe', pid: 303, state: 'stale' },
+    { role: 'child', kind: 'ffmpeg-validation', pid: 404, state: 'mismatch' },
+  ])
+  expect(result.processes[3]).toMatchObject({
+    expected: {
+      startedAt: 'validation-start',
+      command: 'ffmpeg -v error',
+      cwd: path.resolve(repoRoot),
+    },
+    observed: {
+      pid: 404,
+      startedAt: 'reused-start',
+      command: 'unrelated process',
+      cwd: path.resolve(repoRoot),
+    },
+  })
+  expect(await readFile(processRegistryPath(workRoot), 'utf8')).toBe(registryBefore)
+  expect(await readFile(markerPath, 'utf8')).toBe('keep')
+  await expect(readFile(processRegistryTransitionPath(workRoot), 'utf8')).rejects.toMatchObject({
+    code: 'ENOENT',
+  })
+
+  identities.clear()
+  await expect(inspectOwnedRun({ repoRoot, workRoot, inspect })).resolves.toMatchObject({
+    status: 'stale',
+    processes: expect.arrayContaining([expect.objectContaining({ state: 'stale' })]),
+  })
+  identities.set(101, {
+    pid: 101,
+    startedAt: 'reused-owner',
+    command: 'unrelated process',
+  })
+  await expect(inspectOwnedRun({ repoRoot, workRoot, inspect })).resolves.toMatchObject({
+    status: 'mismatched',
+    processes: expect.arrayContaining([expect.objectContaining({ state: 'mismatch' })]),
+  })
+
+  await registry.close()
+})
+
+test('shutdown dry-run never signals, cleans, locks, or changes its registry', async () => {
+  const workRoot = await makeWorkRoot()
+  const repoRoot = path.join(workRoot, 'repo')
+  const markerPath = path.join(workRoot, 'keep.txt')
+  await writeFile(markerPath, 'keep')
+  const identities = new Map([
+    [101, { pid: 101, startedAt: 'owner-start', command: 'node record-aliyah-videos.mjs' }],
+    [202, { pid: 202, startedAt: 'vite-start', command: 'npm run dev -- --port 4177' }],
+  ])
+  const inspect = inspectFromMap(identities, repoRoot)
+  const registry = await openOwnedProcessRegistry({
+    repoRoot,
+    workRoot,
+    inspect,
+    ownerPid: 101,
+  })
+  await registry.add(childProcess(202), { kind: 'vite', cwd: repoRoot })
+  const registryBefore = await readFile(processRegistryPath(workRoot), 'utf8')
+  const signalProcess = vi.fn((): true => true)
+  const cleanup = vi.fn(async () => {})
+
+  const result = await shutdownOwnedRun({
+    repoRoot,
+    workRoot,
+    dryRun: true,
+    inspect,
+    signalProcess,
+    cleanup,
+  })
+
+  expect(result).toMatchObject({
+    status: 'dry-run',
+    stopped: [],
+    wouldStop: [
+      { kind: 'recorder', pid: 101 },
+      { kind: 'vite', pid: 202 },
+    ],
+    inspection: { status: 'running' },
+  })
+  expect(signalProcess).not.toHaveBeenCalled()
+  expect(cleanup).not.toHaveBeenCalled()
+  expect(await readFile(processRegistryPath(workRoot), 'utf8')).toBe(registryBefore)
+  expect(await readFile(markerPath, 'utf8')).toBe('keep')
+  await expect(readFile(processRegistryTransitionPath(workRoot), 'utf8')).rejects.toMatchObject({
+    code: 'ENOENT',
+  })
+
+  await registry.close()
+})
+
+test('status and shutdown dry-run CLI modes preserve an unowned work root', async () => {
+  const workRoot = await makeWorkRoot()
+  const markerPath = path.join(workRoot, 'keep.txt')
+  await writeFile(markerPath, 'keep')
+
+  const status = JSON.parse(
+    (
+      await execFileAsync(process.execPath, [
+        recorderScriptPath,
+        'status',
+        `--work-root=${workRoot}`,
+      ])
+    ).stdout
+  )
+  const dryRun = JSON.parse(
+    (
+      await execFileAsync(process.execPath, [
+        recorderScriptPath,
+        'shutdown',
+        '--dry-run',
+        `--work-root=${workRoot}`,
+      ])
+    ).stdout
+  )
+
+  expect(status).toMatchObject({ status: 'not-running', processes: [] })
+  expect(dryRun).toMatchObject({
+    status: 'dry-run',
+    stopped: [],
+    wouldStop: [],
+    inspection: { status: 'not-running', processes: [] },
+  })
+  expect(await readFile(markerPath, 'utf8')).toBe('keep')
+  await expect(readFile(processRegistryTransitionPath(workRoot), 'utf8')).rejects.toMatchObject({
+    code: 'ENOENT',
+  })
+})
+
+test('read-only inspection rejects an invalid owner without touching its registry', async () => {
+  const workRoot = await makeWorkRoot()
+  const repoRoot = path.join(workRoot, 'repo')
+  const filePath = processRegistryPath(workRoot)
+  const source = `${JSON.stringify({
+    version: 1,
+    runId: 'invalid-owner',
+    repoRoot: path.resolve(repoRoot),
+    workRoot: path.resolve(workRoot),
+    owner: {
+      pid: 101,
+      startedAt: 'owner-start',
+      command: 'node scripts/record-aliyah-videos.mjs status',
+      kind: 'recorder',
+      cwd: path.resolve(repoRoot),
+      processGroup: false,
+    },
+    children: [],
+  }, null, 2)}\n`
+  await writeFile(filePath, source)
+  const inspect = vi.fn(async () => null)
+
+  await expect(inspectOwnedRun({ repoRoot, workRoot, inspect })).rejects.toThrow(
+    'Video process registry is invalid; inspection stopped without changing it'
+  )
+  expect(inspect).not.toHaveBeenCalled()
+  expect(await readFile(filePath, 'utf8')).toBe(source)
+  await expect(readFile(processRegistryTransitionPath(workRoot), 'utf8')).rejects.toMatchObject({
+    code: 'ENOENT',
+  })
 })
 
 test('second recorder cannot replace registry owned by matching live process', async () => {
@@ -59,6 +329,7 @@ test('second recorder cannot replace registry owned by matching live process', a
     pid: 101,
     startedAt: 'Wed Aug 19 12:00:00 2026',
     command: 'node scripts/record-aliyah-videos.mjs',
+    cwd: path.resolve(repoRoot),
   }
   const inspect = async () => owner
   const registry = await openOwnedProcessRegistry({ repoRoot, workRoot, inspect, ownerPid: 101 })
@@ -77,6 +348,7 @@ test('parallel recorders acquire the registry atomically', async () => {
     pid,
     startedAt: `start-${pid}`,
     command: 'node scripts/record-aliyah-videos.mjs',
+    cwd: path.resolve(repoRoot),
   })
 
   const attempts = await Promise.allSettled([
@@ -107,7 +379,7 @@ test('recovery stops children left by a stale recorder before replacing it', asy
     [202, { pid: 202, startedAt: 'child-start', command: 'npm run dev -- --port 4177' }],
     [303, { pid: 303, startedAt: 'new-owner', command: 'node record-aliyah-videos.mjs' }],
   ])
-  const inspect = async (pid: number) => identities.get(pid) ?? null
+  const inspect = inspectFromMap(identities, repoRoot)
   const staleRegistry = await openOwnedProcessRegistry({
     repoRoot,
     workRoot,
@@ -148,7 +420,7 @@ test('stale recovery holds ownership until replacement is complete', async () =>
     [303, { pid: 303, startedAt: 'new-owner-a', command: 'node record-aliyah-videos.mjs' }],
     [404, { pid: 404, startedAt: 'new-owner-b', command: 'node record-aliyah-videos.mjs' }],
   ])
-  const inspect = async (pid: number) => identities.get(pid) ?? null
+  const inspect = inspectFromMap(identities, repoRoot)
   const staleRegistry = await openOwnedProcessRegistry({
     repoRoot,
     workRoot,
@@ -214,7 +486,7 @@ test('shutdown cleanup blocks a successor until the old work root is gone', asyn
     [101, { pid: 101, startedAt: 'old-owner', command: 'node record-aliyah-videos.mjs' }],
     [303, { pid: 303, startedAt: 'new-owner', command: 'node record-aliyah-videos.mjs' }],
   ])
-  const inspect = async (pid: number) => identities.get(pid) ?? null
+  const inspect = inspectFromMap(identities, repoRoot)
   await openOwnedProcessRegistry({ repoRoot, workRoot, inspect, ownerPid: 101 })
   const cleanupStarted = deferred()
   const allowCleanup = deferred()
@@ -274,7 +546,7 @@ test('shutdown signals only exact registered owner and child process group', asy
     [303, { pid: 303, startedAt: 'probe-start', command: 'ffprobe output.mp4' }],
     [404, { pid: 404, startedAt: 'validation-start', command: 'ffmpeg -v error' }],
   ])
-  const inspect = async (pid: number) => identities.get(pid) ?? null
+  const inspect = inspectFromMap(identities, repoRoot)
   const registry = await openOwnedProcessRegistry({ repoRoot, workRoot, inspect, ownerPid: 101 })
   await registry.add(childProcess(202), { kind: 'vite', cwd: repoRoot })
   await registry.add(childProcess(303), { kind: 'ffprobe', cwd: repoRoot })
@@ -332,7 +604,12 @@ test('recorder routes validation tools through its owned process gateway', async
 test('stale registry never signals a reused PID', async () => {
   const workRoot = await makeWorkRoot()
   const repoRoot = path.join(workRoot, 'repo')
-  const owner = { pid: 101, startedAt: 'old-start', command: 'node record-aliyah-videos.mjs' }
+  const owner = {
+    pid: 101,
+    startedAt: 'old-start',
+    command: 'node record-aliyah-videos.mjs',
+    cwd: path.resolve(repoRoot),
+  }
   const registry = await openOwnedProcessRegistry({
     repoRoot,
     workRoot,
@@ -354,6 +631,39 @@ test('stale registry never signals a reused PID', async () => {
 
   expect(result).toEqual({ status: 'stale', stopped: [] })
   expect(signals).toEqual([])
+  await registry.close()
+})
+
+test('shutdown never signals a process whose cwd changed', async () => {
+  const workRoot = await makeWorkRoot()
+  const repoRoot = path.join(workRoot, 'repo')
+  const owner = {
+    pid: 101,
+    startedAt: 'owner-start',
+    command: 'node record-aliyah-videos.mjs',
+    cwd: path.resolve(repoRoot),
+  }
+  const registry = await openOwnedProcessRegistry({
+    repoRoot,
+    workRoot,
+    inspect: async () => owner,
+    ownerPid: owner.pid,
+  })
+  const signalProcess = vi.fn((): true => true)
+
+  const result = await shutdownOwnedRun({
+    repoRoot,
+    workRoot,
+    inspect: async () => ({
+      ...owner,
+      cwd: path.join(workRoot, 'different-repo'),
+    }),
+    signalProcess,
+    wait: async () => {},
+  })
+
+  expect(result).toEqual({ status: 'stale', stopped: [] })
+  expect(signalProcess).not.toHaveBeenCalled()
   await registry.close()
 })
 

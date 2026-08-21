@@ -9,7 +9,6 @@ import {
   parseDraftWordCues,
   parsePublishedWordCues,
   parseWordCue,
-  parseWordCues,
 } from './cue-validation.ts'
 
 const validCue = {
@@ -51,7 +50,6 @@ const validPayload = {
 
 test('parses structurally valid word cues without changing their order', () => {
   const laterCue = { ...validCue, cueNumber: 2, timeStart: 1, timeEnd: 1.5 }
-  expect(parseWordCues([validCue, laterCue])).toEqual([validCue, laterCue])
   expect(parseDraftWordCues([validCue, laterCue])).toEqual([validCue, laterCue])
   expect(parsePublishedWordCues([validCue, laterCue])).toBeNull()
 })
@@ -64,7 +62,7 @@ test.each([
   { nonsense: true },
 ])('rejects malformed cues atomically', (cue) => {
   expect(parseWordCue(cue)).toBeNull()
-  expect(parseWordCues([validCue, cue])).toBeNull()
+  expect(parseDraftWordCues([validCue, cue])).toBeNull()
 })
 
 test('validates cue payload counts, metadata, and recording identity', () => {
@@ -148,25 +146,9 @@ test('validates durable media identity and rejects explicit recording mismatches
   })).toBe(false)
   expect(cuePayloadMatchesRecording(payload, recording)).toBe(false)
 
-  const legacyPayload = parseCueExportPayload(validPayload)!
-  expect(cuePayloadMatchesRecording(legacyPayload, { ...recording, mediaIdentity })).toBe(true)
+  const payloadWithoutIdentity = parseCueExportPayload(validPayload)!
+  expect(cuePayloadMatchesRecording(payloadWithoutIdentity, { ...recording, mediaIdentity })).toBe(true)
 })
-
-test('uses legacy audioVersion metadata until a durable identity is published', () => {
-  const payload = parseCueExportPayload({
-    ...validPayload,
-    audioVersion: 'Source file: test.mp3',
-  })!
-  expect(cuePayloadMatchesRecording(payload, {
-    ...recording,
-    notes: 'Source file: test.mp3',
-  })).toBe(true)
-  expect(cuePayloadMatchesRecording(payload, {
-    ...recording,
-    notes: 'Source file: replacement.mp3',
-  })).toBe(false)
-})
-
 test('rejects an invalid published recording issue atomically', () => {
   const issue = {
     id: 'issue-1',

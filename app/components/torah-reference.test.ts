@@ -28,6 +28,6 @@ test('lists verses from the torah table of contents', () => {
   expect(last(listTorahVerses(5, 34))).toEqual(12)
 })
 
-test('generates legacy torah reference hashes', () => {
+test('generates Torah reference hashes', () => {
   expect(generateTorahReferenceHash({ book: 1, chapter: 1, verse: 1 })).toBe('#/r/1-1-1')
 })

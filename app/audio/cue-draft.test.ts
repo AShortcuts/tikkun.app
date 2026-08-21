@@ -132,25 +132,3 @@ test('rejects an impossible future update timestamp', () => {
     )
   ).toBeNull()
 })
-
-test('uses legacy audioVersion only when recording has no media identity', () => {
-  const legacyRecording = { ...recording, mediaIdentity: undefined }
-  const draft = createCueDraftPayload({
-    recording: legacyRecording,
-    tokenCount: tokenKeys.length,
-    tokenKeys,
-    tokenPointer: 0,
-    updatedAt: 100,
-    cues: [cue(0, 0)],
-  })
-
-  expect(draft.audioVersion).toBe(recording.notes)
-  expect('mediaIdentity' in draft).toBe(false)
-  expect(
-    parseCueDraftPayload(draft, {
-      recording: { ...legacyRecording, notes: 'Source file: replacement.mp3' },
-      tokenCount: tokenKeys.length,
-      tokenKeys,
-    })
-  ).toBeNull()
-})

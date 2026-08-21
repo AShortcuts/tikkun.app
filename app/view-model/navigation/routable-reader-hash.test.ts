@@ -7,12 +7,17 @@ test('accepts routes valid in another supported calendar mode', () => {
   ).toBe(true)
 })
 
-test('rejects dead pages, unknown readings, and out-of-reading references', () => {
+test('accepts contextual Parsha refs while rejecting dead routes', () => {
+  expect(
+    isSemanticallyRoutableReaderHash(
+      '#/torah/parsha/haazinu/5-31-28'
+    )
+  ).toBe(true)
   expect(isSemanticallyRoutableReaderHash('#/torah/page/999999')).toBe(false)
   expect(
     isSemanticallyRoutableReaderHash('#/torah/parsha/not-a-real-parsha')
   ).toBe(false)
   expect(
-    isSemanticallyRoutableReaderHash('#/torah/parsha/beresheet/1-13-1')
+    isSemanticallyRoutableReaderHash('#/torah/parsha/beresheet/99-99-99')
   ).toBe(false)
 })

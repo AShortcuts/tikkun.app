@@ -112,7 +112,7 @@ test('copies the current aliyah permalink even when the reader is already on tha
   expect(button.querySelector('[data-aliyah-link-icon="check"]')?.hasAttribute('hidden')).toBe(false)
 })
 
-test('copies a clean permalink from a reader URL with legacy selection parameters', async () => {
+test('copies a clean permalink regardless of unrelated Reader query state', async () => {
   window.location.hash =
     '#/torah/parsha/noach/1-9-8?aliyah=5&aliyahRun=2026-10-17%3Ashacharis%2Cmain'
   document.body.innerHTML = `

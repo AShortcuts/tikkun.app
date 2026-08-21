@@ -3,6 +3,7 @@ import {
   onRequest,
   type AudioRangeFunctionContext,
 } from './[[path]].ts'
+import { parseHttpByteRange } from '../../app/audio/http-byte-range.ts'
 
 const audioBytes = Uint8Array.from([10, 20, 30, 40, 50, 60])
 
@@ -92,18 +93,80 @@ function chunkedAssetResponse() {
   }
 }
 
-test('serves a satisfiable audio range as partial content', async () => {
+function nativeRangeAsset() {
+  const state = {
+    activeRequests: 0,
+    maxActiveRequests: 0,
+    transferredBytes: 0,
+  }
+  const fetch = vi.fn(async (input: RequestInfo | URL) => {
+    state.activeRequests += 1
+    state.maxActiveRequests = Math.max(
+      state.maxActiveRequests,
+      state.activeRequests
+    )
+    await Promise.resolve()
+
+    try {
+      const request = input instanceof Request ? input : new Request(input)
+      const rangeHeader = request.headers.get('range')
+      const headers = new Headers({
+        'accept-ranges': 'bytes',
+        'content-type': 'audio/mp4',
+        etag: '"sample"',
+      })
+      if (request.method === 'HEAD' || !rangeHeader) {
+        headers.set('content-length', String(audioBytes.byteLength))
+        return new Response(request.method === 'HEAD' ? null : audioBytes, {
+          headers,
+        })
+      }
+
+      const range = parseHttpByteRange(rangeHeader, audioBytes.byteLength)
+      if (!range) {
+        headers.set('content-length', '0')
+        headers.set('content-range', `bytes */${audioBytes.byteLength}`)
+        return new Response(null, { status: 416, headers })
+      }
+
+      const body = audioBytes.slice(range.start, range.end + 1)
+      state.transferredBytes += body.byteLength
+      headers.set('content-length', String(body.byteLength))
+      headers.set(
+        'content-range',
+        `bytes ${range.start}-${range.end}/${audioBytes.byteLength}`
+      )
+      return new Response(body, { status: 206, headers })
+    } finally {
+      state.activeRequests -= 1
+    }
+  })
+
+  return { fetch, state }
+}
+
+function nativeContext(
+  asset: ReturnType<typeof nativeRangeAsset>,
+  range: string
+): AudioRangeFunctionContext {
+  return {
+    request: new Request('https://tikkun.test/audio/reader/sample.m4a', {
+      headers: { range },
+    }),
+    env: { ASSETS: { fetch: asset.fetch } },
+  }
+}
+
+test('does not synthesize a partial response when upstream ignores Range', async () => {
   const fixture = context('bytes=1-3')
   const response = await onRequest(fixture.value)
 
-  expect(response.status).toBe(206)
-  expect(response.headers.get('accept-ranges')).toBe('bytes')
+  expect(response.status).toBe(200)
+  expect(response.headers.has('accept-ranges')).toBe(false)
   expect(response.headers.get('x-content-type-options')).toBe('nosniff')
-  expect(response.headers.get('content-range')).toBe('bytes 1-3/6')
-  expect(response.headers.get('content-length')).toBe('3')
-  expect(new Uint8Array(await response.arrayBuffer())).toEqual(
-    Uint8Array.from([20, 30, 40])
-  )
+  expect(response.headers.has('content-range')).toBe(false)
+  expect(response.headers.get('content-length')).toBe('6')
+  expect(new Uint8Array(await response.arrayBuffer())).toEqual(audioBytes)
 
   const assetRequest = fixture.fetch.mock.calls[0]?.[0]
   expect(assetRequest).toBeInstanceOf(Request)
@@ -111,25 +174,23 @@ test('serves a satisfiable audio range as partial content', async () => {
   expect(assetRequest.headers.get('range')).toBe('bytes=1-3')
 })
 
-test('streams a prefix range without buffering or reading the remaining asset', async () => {
+test('streams an ignored range without a prefix-discard transform', async () => {
   const asset = chunkedAssetResponse()
-  const fixture = context('bytes=0-1', { assetResponse: asset.response })
+  const fixture = context('bytes=4-5', { assetResponse: asset.response })
   const upstreamArrayBuffer = vi.spyOn(asset.response, 'arrayBuffer')
   const response = await onRequest(fixture.value)
 
-  expect(response.status).toBe(206)
-  expect(response.headers.get('content-range')).toBe('bytes 0-1/6')
-  expect(new Uint8Array(await response.arrayBuffer())).toEqual(
-    Uint8Array.from([10, 20])
-  )
+  expect(response.status).toBe(200)
+  expect(response.headers.has('accept-ranges')).toBe(false)
+  expect(new Uint8Array(await response.arrayBuffer())).toEqual(audioBytes)
   expect(upstreamArrayBuffer).not.toHaveBeenCalled()
-  expect(asset.state.bytesRead).toBe(2)
-  expect(asset.state.cancelled).toBe(true)
+  expect(asset.state.bytesRead).toBe(audioBytes.byteLength)
+  expect(asset.state.cancelled).toBe(false)
 })
 
 test('serves suffix ranges used to read media metadata at the end of a file', async () => {
-  const fixture = context('bytes=-2')
-  const response = await onRequest(fixture.value)
+  const asset = nativeRangeAsset()
+  const response = await onRequest(nativeContext(asset, 'bytes=-2'))
 
   expect(response.status).toBe(206)
   expect(response.headers.get('content-range')).toBe('bytes 4-5/6')
@@ -166,7 +227,18 @@ test('ignores unsupported range units', async () => {
 })
 
 test('applies only a matching strong If-Range validator', async () => {
-  const matching = context('bytes=1-3', { ifRange: '"sample"' })
+  const matching = context('bytes=1-3', {
+    ifRange: '"sample"',
+    assetResponse: new Response(Uint8Array.from([20, 30, 40]), {
+      status: 206,
+      headers: {
+        'accept-ranges': 'bytes',
+        'content-length': '3',
+        'content-range': 'bytes 1-3/6',
+        etag: '"sample"',
+      },
+    }),
+  })
   const partialResponse = await onRequest(matching.value)
   expect(partialResponse.status).toBe(206)
 
@@ -181,7 +253,7 @@ test('answers range HEAD requests with full metadata and no body', async () => {
   const response = await onRequest(fixture.value)
 
   expect(response.status).toBe(200)
-  expect(response.headers.get('accept-ranges')).toBe('bytes')
+  expect(response.headers.has('accept-ranges')).toBe(false)
   expect(response.headers.get('content-length')).toBe('6')
   expect((await response.arrayBuffer()).byteLength).toBe(0)
 
@@ -213,6 +285,30 @@ test('passes through native upstream range responses', async () => {
   )
 })
 
+test('keeps concurrent seeks native and proportional', async () => {
+  const asset = nativeRangeAsset()
+  const responses = await Promise.all([
+    onRequest(nativeContext(asset, 'bytes=0-1')),
+    onRequest(nativeContext(asset, 'bytes=2-3')),
+    onRequest(nativeContext(asset, 'bytes=-2')),
+  ])
+  const bodies = await Promise.all(
+    responses.map(async (response) =>
+      Array.from(new Uint8Array(await response.arrayBuffer()))
+    )
+  )
+
+  expect(responses.map((response) => response.status)).toEqual([206, 206, 206])
+  expect(bodies).toEqual([
+    [10, 20],
+    [30, 40],
+    [50, 60],
+  ])
+  expect(asset.fetch).toHaveBeenCalledTimes(3)
+  expect(asset.state.maxActiveRequests).toBe(3)
+  expect(asset.state.transferredBytes).toBe(6)
+})
+
 test('streams a full response when upstream omits required range metadata', async () => {
   const fixture = context('bytes=1-3', {
     assetResponse: new Response(audioBytes, {
@@ -228,12 +324,12 @@ test('streams a full response when upstream omits required range metadata', asyn
   expect(upstreamArrayBuffer).not.toHaveBeenCalled()
 })
 
-test('streams ordinary audio requests and advertises range support', async () => {
+test('streams ordinary audio requests without inventing range support', async () => {
   const fixture = context()
   const response = await onRequest(fixture.value)
 
   expect(response.status).toBe(200)
-  expect(response.headers.get('accept-ranges')).toBe('bytes')
+  expect(response.headers.has('accept-ranges')).toBe(false)
   expect(new Uint8Array(await response.arrayBuffer())).toEqual(audioBytes)
   expect(fixture.fetch).toHaveBeenCalledWith(fixture.value.request)
 })

@@ -4,13 +4,13 @@ import { semanticParshaUrlForLeining } from '../view-model/navigation/parsha-rou
 import { isReaderHash } from '../view-model/navigation/reader-hash.ts'
 import { generateUrl } from '../view-model/navigation/url-parser.ts'
 import {
+  createPersistedJsonStore,
   isPlausiblePersistedTimestamp,
-  readPersistedJson,
-  removeStorageItem,
-  writeStorageItem,
+  requirePersistedJsonMutation,
+  type PersistedJsonRevision,
 } from '../persistence/persisted-state.ts'
 
-export const LAST_READING_STORAGE_KEY = 'tikkun.last-reading.v1'
+export const LAST_READING_STORAGE_KEY = 'tikkun.last-reading'
 export const LAST_READING_MAX_AGE_MS = 48 * 60 * 60 * 1000
 
 export interface LastReading {
@@ -41,6 +41,19 @@ function isValidLastReading(value: unknown, now: number): value is LastReading {
   )
 }
 
+function createLastReadingStore(
+  storage: Storage | null,
+  now: number,
+  validateHash: (hash: string) => boolean = isReaderHash
+) {
+  return createPersistedJsonStore({
+    storage,
+    key: LAST_READING_STORAGE_KEY,
+    validate: (value): value is LastReading =>
+      isValidLastReading(value, now) && validateHash(value.hash),
+  })
+}
+
 export function saveLastReading(
   storage: Storage | null,
   input: LastReadingInput,
@@ -57,7 +70,10 @@ export function saveLastReading(
     savedAt,
   }
   try {
-    writeStorageItem(storage, LAST_READING_STORAGE_KEY, JSON.stringify(payload))
+    const store = createLastReadingStore(storage, savedAt)
+    const current = store.read()
+    if (current.status === 'unavailable') throw current.error
+    requirePersistedJsonMutation(store.write(payload, current.revision))
   } catch (error) {
     throw new LastReadingStorageError(error)
   }
@@ -68,12 +84,8 @@ export function loadEligibleLastReading(
   now = Date.now(),
   validateHash: (hash: string) => boolean = isReaderHash
 ): LastReading | null {
-  const result = readPersistedJson({
-    storage,
-    key: LAST_READING_STORAGE_KEY,
-    validate: (value): value is LastReading =>
-      isValidLastReading(value, now) && validateHash(value.hash),
-  })
+  const store = createLastReadingStore(storage, now, validateHash)
+  const result = store.read()
   if (result.status === 'unavailable') {
     console.error('Failed to read the last-reading checkpoint', result.error)
     return null
@@ -81,24 +93,30 @@ export function loadEligibleLastReading(
   if (result.status === 'invalid') {
     if (result.reason === 'invalid-json') {
       console.error('Failed to parse the last-reading checkpoint', result.error)
+    } else {
+      console.error('Invalid last-reading checkpoint')
     }
     return null
   }
   if (result.status === 'missing') return null
 
   if (now - result.value.savedAt > LAST_READING_MAX_AGE_MS) {
-    discardExpiredLastReading(storage)
+    discardExpiredLastReading(store, result.revision)
     return null
   }
 
   return result.value
 }
 
-function discardExpiredLastReading(storage: Storage | null) {
+function discardExpiredLastReading(
+  store: ReturnType<typeof createLastReadingStore>,
+  revision: PersistedJsonRevision
+) {
   try {
-    removeStorageItem(storage, LAST_READING_STORAGE_KEY)
+    const removed = store.remove(revision)
+    if (removed.status === 'unavailable') throw removed.error
   } catch (error) {
-    console.error('Failed to remove an invalid last-reading checkpoint', error)
+    console.error('Failed to remove an expired last-reading checkpoint', error)
   }
 }
 

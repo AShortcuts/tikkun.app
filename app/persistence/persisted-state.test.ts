@@ -1,14 +1,38 @@
-import { expect, test, vi } from 'vitest'
+import { expect, test } from 'vitest'
 import {
   PERSISTED_TIMESTAMP_FUTURE_TOLERANCE_MS,
+  PersistedStateConflictError,
   PersistedStateStorageError,
+  createPersistedJsonStore,
   isPlausiblePersistedTimestamp,
-  quarantineStorageItem,
-  readPersistedJson,
   readStorageItem,
   removeStorageItem,
+  requirePersistedJsonMutation,
   writeStorageItem,
 } from './persisted-state.ts'
+
+function memoryStorage() {
+  const values = new Map<string, string>()
+  return {
+    get length() {
+      return values.size
+    },
+    clear: () => values.clear(),
+    getItem: (key: string) => values.get(key) ?? null,
+    key: (index: number) => [...values.keys()][index] ?? null,
+    removeItem: (key: string) => values.delete(key),
+    setItem: (key: string, value: string) => values.set(key, value),
+  } as Storage
+}
+
+function stringListStore(storage: Storage | null) {
+  return createPersistedJsonStore({
+    storage,
+    key: 'reader',
+    validate: (value): value is string[] =>
+      Array.isArray(value) && value.every((item) => typeof item === 'string'),
+  })
+}
 
 test('accepts bounded timestamps and rejects impossible future values', () => {
   const now = 1_000_000
@@ -27,20 +51,6 @@ test('accepts bounded timestamps and rejects impossible future values', () => {
   ).toBe(false)
 })
 
-function memoryStorage() {
-  const values = new Map<string, string>()
-  return {
-    get length() {
-      return values.size
-    },
-    clear: () => values.clear(),
-    getItem: (key: string) => values.get(key) ?? null,
-    key: (index: number) => [...values.keys()][index] ?? null,
-    removeItem: (key: string) => values.delete(key),
-    setItem: (key: string, value: string) => values.set(key, value),
-  } as Storage
-}
-
 test('normalizes denied storage operations into one error contract', () => {
   expect(() => readStorageItem(null, 'reader')).toThrow(PersistedStateStorageError)
   expect(() => writeStorageItem(null, 'reader', '{}')).toThrow(
@@ -51,134 +61,103 @@ test('normalizes denied storage operations into one error contract', () => {
   )
 })
 
-test('quarantines a bounded recovery copy before removing invalid state', () => {
+test('stores the current value directly as JSON', () => {
   const storage = memoryStorage()
-  storage.setItem('reader', '{bad json')
+  const store = stringListStore(storage)
+  const empty = store.read()
+  expect(empty.status).toBe('missing')
+  if (empty.status !== 'missing') throw new Error('Expected missing state')
 
-  expect(quarantineStorageItem({
-    storage,
-    key: 'reader',
-    rawValue: '{bad json',
-    reason: 'invalid JSON',
-    quarantinedAt: 123,
-  })).toBe(true)
-  expect(storage.getItem('reader')).toBeNull()
-  expect(JSON.parse(storage.getItem('reader:quarantine') ?? '{}')).toMatchObject({
-    sourceKey: 'reader',
-    reason: 'invalid JSON',
-    quarantinedAt: 123,
-    rawValue: '{bad json',
-  })
-})
-
-test('keeps a recovery copy while replacing partially valid state', () => {
-  const storage = memoryStorage()
-  storage.setItem('reader', '[{"valid":true},{"invalid":true}]')
-
-  expect(quarantineStorageItem({
-    storage,
-    key: 'reader',
-    rawValue: '[{"valid":true},{"invalid":true}]',
-    reason: 'invalid entries',
-    replacementValue: '[{"valid":true}]',
-    quarantinedAt: 123,
-  })).toBe(true)
-  expect(storage.getItem('reader')).toBe('[{"valid":true}]')
-  expect(JSON.parse(storage.getItem('reader:quarantine') ?? '{}')).toMatchObject({
-    sourceKey: 'reader',
-    reason: 'invalid entries',
-    rawValue: '[{"valid":true},{"invalid":true}]',
-  })
-})
-
-test('keeps the original value when a repaired replacement cannot be stored', () => {
-  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
-  const storage = memoryStorage()
-  const setItem = storage.setItem.bind(storage)
-  const originalValue = '[{"valid":true},{"invalid":true}]'
-  setItem('reader', originalValue)
-  storage.setItem = (key, value) => {
-    if (key === 'reader') throw new DOMException('quota', 'QuotaExceededError')
-    setItem(key, value)
-  }
-
-  expect(quarantineStorageItem({
-    storage,
-    key: 'reader',
-    rawValue: originalValue,
-    reason: 'invalid entries',
-    replacementValue: '[{"valid":true}]',
-  })).toBe(false)
-  expect(storage.getItem('reader')).toBe(originalValue)
-  expect(storage.getItem('reader:quarantine')).not.toBeNull()
-  expect(log).toHaveBeenCalledOnce()
-  log.mockRestore()
-})
-
-test('contains quarantine failures without masking the original recovery path', () => {
-  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
-  const storage = {
-    ...memoryStorage(),
-    setItem: () => {
-      throw new DOMException('quota', 'QuotaExceededError')
-    },
-  } as Storage
-
-  expect(quarantineStorageItem({
-    storage,
-    key: 'reader',
-    rawValue: '{}',
-    reason: 'invalid shape',
-  })).toBe(false)
-  expect(log).toHaveBeenCalledOnce()
-  log.mockRestore()
-})
-
-test('reads validated JSON through one persistence contract', () => {
-  const storage = memoryStorage()
-  storage.setItem('reader', JSON.stringify({ version: 1, value: 'ready' }))
-
-  const result = readPersistedJson({
-    storage,
-    key: 'reader',
-    validate: (value): value is { version: number; value: string } =>
-      Boolean(
-        value &&
-          typeof value === 'object' &&
-          (value as { version?: unknown }).version === 1 &&
-          typeof (value as { value?: unknown }).value === 'string'
-      ),
-  })
-
-  expect(result).toEqual({
+  const written = store.write(['one', 'two'], empty.revision)
+  expect(written.status).toBe('written')
+  expect(storage.getItem('reader')).toBe('["one","two"]')
+  expect(store.read()).toMatchObject({
     status: 'ready',
-    value: { version: 1, value: 'ready' },
+    value: ['one', 'two'],
   })
 })
 
-test('distinguishes missing, unavailable, malformed, and invalid persisted JSON', () => {
+test.each([
+  ['{bad json', 'invalid-json'],
+  ['["valid",1]', 'invalid-value'],
+] as const)('returns a revision for %s without mutating it', (raw, reason) => {
   const storage = memoryStorage()
-  const validate = (value: unknown): value is { valid: true } =>
-    Boolean(value && typeof value === 'object' && (value as { valid?: unknown }).valid === true)
+  storage.setItem('reader', raw)
+  const store = stringListStore(storage)
+  const result = store.read()
+  expect(result).toMatchObject({ status: 'invalid', reason })
+  expect(storage.getItem('reader')).toBe(raw)
+  if (result.status !== 'invalid') throw new Error('Expected invalid state')
 
-  expect(readPersistedJson({ storage, key: 'missing', validate })).toEqual({
-    status: 'missing',
+  expect(store.write(['recovered'], result.revision)).toMatchObject({
+    status: 'written',
   })
-  expect(readPersistedJson({ storage: null, key: 'reader', validate })).toMatchObject({
+  expect(storage.getItem('reader')).toBe('["recovered"]')
+})
+
+test('rejects stale writes and removals without losing newer state', () => {
+  const storage = memoryStorage()
+  const store = stringListStore(storage)
+  const first = store.read()
+  const stale = store.read()
+  if (first.status !== 'missing' || stale.status !== 'missing') {
+    throw new Error('Expected missing state')
+  }
+  expect(store.write(['newer'], first.revision)).toMatchObject({
+    status: 'written',
+  })
+
+  expect(store.write(['stale'], stale.revision)).toMatchObject({
+    status: 'conflict',
+  })
+  expect(store.remove(stale.revision)).toMatchObject({ status: 'conflict' })
+  expect(store.read()).toMatchObject({ status: 'ready', value: ['newer'] })
+})
+
+test('reports unavailable reads and writes', () => {
+  const denied = new DOMException('denied', 'SecurityError')
+  const storage = memoryStorage()
+  storage.getItem = () => {
+    throw denied
+  }
+  expect(stringListStore(storage).read()).toMatchObject({
     status: 'unavailable',
+    error: { operation: 'read', key: 'reader', cause: denied },
   })
 
-  storage.setItem('reader', '{bad json')
-  expect(readPersistedJson({ storage, key: 'reader', validate })).toMatchObject({
-    status: 'invalid',
-    reason: 'invalid-json',
+  const writable = memoryStorage()
+  const store = stringListStore(writable)
+  const current = store.read()
+  if (current.status !== 'missing') throw new Error('Expected missing state')
+  writable.setItem = () => {
+    throw denied
+  }
+  expect(store.write([], current.revision)).toMatchObject({
+    status: 'unavailable',
+    error: { operation: 'write', key: 'reader', cause: denied },
   })
-  expect(storage.getItem('reader:quarantine')).not.toBeNull()
+})
 
-  storage.setItem('reader', JSON.stringify({ valid: false }))
-  expect(readPersistedJson({ storage, key: 'reader', validate })).toEqual({
-    status: 'invalid',
-    reason: 'invalid-value',
-  })
+test('throws a typed error when a required mutation conflicts', () => {
+  const storage = memoryStorage()
+  const store = stringListStore(storage)
+  const stale = store.read()
+  if (stale.status !== 'missing') throw new Error('Expected missing state')
+  storage.setItem('reader', '[]')
+
+  expect(() =>
+    requirePersistedJsonMutation(store.write(['stale'], stale.revision))
+  ).toThrow(PersistedStateConflictError)
+})
+
+test('rejects invalid values before touching storage', () => {
+  const storage = memoryStorage()
+  const store = stringListStore(storage)
+  const current = store.read()
+  if (current.status !== 'missing') throw new Error('Expected missing state')
+
+  expect(() => store.write(['valid', 1] as never, current.revision)).toThrow(
+    TypeError
+  )
   expect(storage.getItem('reader')).toBeNull()
 })

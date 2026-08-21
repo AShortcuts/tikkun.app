@@ -5,7 +5,7 @@ import CueAuthoringPanelView from './CueAuthoringPanel.svelte'
 export type CueAuthoringPanelAction =
   | { type: 'close' }
   | { type: 'retry-cue-data' }
-  | { type: 'export-draft-recovery' }
+  | { type: 'export-unsaved-draft' }
   | { type: 'capture-audio'; requested: boolean }
   | { type: 'record' }
   | { type: 'step-back' }
@@ -34,7 +34,7 @@ export interface CueAuthoringPanelProblem {
   message: string
   details: string[]
   action: {
-    type: 'retry-cue-data' | 'export-draft-recovery'
+    type: 'retry-cue-data' | 'export-unsaved-draft'
     label: string
     pendingLabel: string
     pending: boolean

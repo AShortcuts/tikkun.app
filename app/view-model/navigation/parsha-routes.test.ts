@@ -19,7 +19,7 @@ const generator = new LeiningGenerator(testSettings)
 
 function findLeining(date: string, predicate: (title: string) => boolean) {
   const leiningDate = generator
-    .forHebrewYear(5785)
+    .aroundDate(new Date(`${date}T12:00:00`))
     .find((candidate) => candidate.id === date)
 
   if (!leiningDate) throw new Error(`Missing leining date ${date}`)
@@ -46,6 +46,9 @@ test('parsha route aliases canonicalize title and alternate spellings', () => {
   expect(canonicalizeParshaSlug('Noah')).toBe('noach')
   expect(canonicalizeParshaSlug('Behaalotcha')).toBe('behalotecha')
   expect(canonicalizeParshaSlug('Vayeilech')).toBe('vayelech')
+  expect(canonicalizeParshaSlug('Nitzavim-Vayeilech')).toBe(
+    'nitzavim-vayelech'
+  )
   expect(canonicalizeParshaSlug('Vayetze')).toBe('vayetzei')
 })
 
@@ -85,13 +88,18 @@ test('holiday links keep dated run routes', () => {
   expect(semanticParshaUrlForLeining(holiday)).toBe(null)
 })
 
-test('combined parshiyot do not get semantic single-parsha routes', () => {
-  const combined = generator
-    .forHebrewYear(5786)
-    .find((candidate) => candidate.title.en === 'Parshat Nitzavim-Vayeilech')
-    ?.leinings[0]
+test.each([
+  ['2026-03-14', 'Parshat Vayakhel-Pekudei', 'vayakhel-pekudei'],
+  ['2026-04-18', 'Parshat Tazria-Metzora', 'tazria-metzora'],
+  ['2026-04-25', 'Parshat Achrei Mot-Kedoshim', 'achrei-mot-kedoshim'],
+  ['2026-05-09', 'Parshat Behar-Bechukotai', 'behar-bechukotai'],
+  ['2026-06-27', 'Parshat Chukat-Balak', 'chukat-balak'],
+  ['2026-07-11', 'Parshat Matot-Masei', 'matot-masei'],
+  ['2026-09-05', 'Parshat Nitzavim-Vayeilech', 'nitzavim-vayelech'],
+])('combined parsha %s gets its own semantic route', (date, title, slug) => {
+  const combined = findLeining(date, (candidate) => candidate === title)
 
-  if (!combined) throw new Error('Missing combined parsha')
-
-  expect(semanticParshaUrlForLeining(combined)).toBe(null)
+  expect(semanticParshaUrlForLeining(combined)).toBe(
+    `#/torah/parsha/${slug}`
+  )
 })

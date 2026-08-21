@@ -1,263 +1,258 @@
 @charset "UTF-8";
-@import '../node_modules/normalize.css/normalize.css';
+@layer reset, tokens, shell, reader, feature, responsive, overrides;
 
-@import './app-layout.css';
-@import './reader-search.css';
-@import './tooltip.css';
-@import './page.css';
-@import './parsha-picker.css';
-@import './toggle.css';
-@import './toolbar.css';
-@import './reader-enhancements.css';
-@import './mobile-reader.css';
+@import '../node_modules/normalize.css/normalize.css' layer(reset);
 
-@font-face {
-  font-family: 'ShlomosemiStam';
-  src: url('/assets/fonts/ShlomosemiStam.ttf');
-}
+@import './app-layout.css' layer(shell);
+@import './reader-search.css' layer(feature);
+@import './tooltip.css' layer(feature);
+@import './page.css' layer(reader);
+@import './parsha-picker.css' layer(feature);
+@import './toggle.css' layer(feature);
+@import './toolbar.css' layer(shell);
+@import './reader-enhancements.css' layer(feature);
+@import './reader-navigation.css';
+@import './reader-settings.css';
+@import './mobile-reader.css' layer(responsive);
+@import './reader-player.css';
 
-@font-face {
-  font-family: 'Lora';
-  src: url('/assets/fonts/Lora-Regular.ttf') format('truetype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
+@layer tokens {
+  @font-face {
+    font-family: 'ShlomosemiStam';
+    src: url('/assets/fonts/ShlomosemiStam.ttf');
+  }
 
-@font-face {
-  font-family: 'Noto Sans Hebrew UI';
-  src: url('/assets/fonts/NotoSansHebrew-Variable.ttf') format('truetype');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+0590-05FF, U+FB1D-FB4F;
-}
+  @font-face {
+    font-family: 'Lora';
+    src: url('/assets/fonts/Lora-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-:root {
-  height: var(--app-height, 100vh);
-  --hebrew-ui-font-family: 'Noto Sans Hebrew UI', -apple-system, sans-serif;
-  --admin-missing-audio-color: #c45f66;
-  --admin-cue-incomplete-color: #30d5c8;
-  --admin-cue-incomplete-ink: #06383a;
-}
-
-html,
-body {
-  height: 100%;
-  background-color: var(--paper-color, white);
-  overflow: hidden;
-}
-
-body,
-input,
-button,
-select,
-textarea {
-  font-family: var(--hebrew-ui-font-family);
-}
-
-.parsha-title,
-.toolbar-current-aliyah-label,
-.aliyah-rail-button,
-.mobile-aliyah-picker-toggle [data-target-id='mobile-current-aliyah'],
-.mobile-aliyah-card-label,
-.aliyah-label-text,
-.aliyah-start-popup-value,
-.aliyah-start-marker-capsule {
-  font-family: var(--hebrew-ui-font-family);
-  font-synthesis: none;
-  font-weight: 400;
-}
-
-ol {
-  padding: 0;
-}
-
-.u-page-wrap {
-  max-width: 550px;
-  margin: 0 auto;
-}
-
-.u-hidden {
-  display: none !important;
-}
-
-.centerize {
-  display: flex;
-  justify-content: center;
-  max-width: 100%;
-  margin: 0 auto;
-}
-
-@keyframes fade-out {
-  to {
-    opacity: 0;
+  @font-face {
+    font-family: 'Noto Sans Hebrew UI';
+    src: url('/assets/fonts/NotoSansHebrew-Variable.ttf') format('truetype');
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+    unicode-range: U+0590-05FF, U+FB1D-FB4F;
   }
 }
 
-.u-hidden.mod-animated {
-  animation: fade-out 0.2s;
+@layer reset {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 }
 
-.app-update-prompt,
-.app-offline-prompt {
-  position: fixed;
-  left: 50%;
-  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
-  z-index: 180;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  max-width: calc(100vw - 2rem);
-  padding: 0.45rem 0.5rem 0.45rem 0.75rem;
-  border: 1px solid color-mix(in srgb, var(--text-color) 12%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--paper-color) 94%, transparent);
-  box-shadow: 0 16px 36px -28px black;
-  color: var(--text-color);
-  font-size: 0.86rem;
-  transform: translateX(-50%);
-  backdrop-filter: blur(18px);
+@layer tokens {
+  :root {
+    height: var(--app-height, 100vh);
+    --hebrew-ui-font-family: 'Noto Sans Hebrew UI', -apple-system, sans-serif;
+    --admin-missing-audio-color: #c45f66;
+    --admin-cue-incomplete-color: #30d5c8;
+    --admin-cue-incomplete-ink: #06383a;
+  }
 }
 
-.app-offline-prompt {
-  bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+@layer shell {
+  html,
+  body {
+    height: 100%;
+    background-color: var(--paper-color, white);
+    overflow: hidden;
+  }
+
+  body,
+  input,
+  button,
+  select,
+  textarea {
+    font-family: var(--hebrew-ui-font-family);
+  }
+
+  .aliyah-label-text,
+  .aliyah-start-popup-value,
+  .aliyah-start-marker-capsule {
+    font-family: var(--hebrew-ui-font-family);
+    font-synthesis: none;
+    font-weight: 400;
+  }
+
+  ol {
+    padding: 0;
+  }
+
+  .u-page-wrap {
+    max-width: 550px;
+    margin: 0 auto;
+  }
+
+  .u-hidden {
+    display: none !important;
+  }
+
+  .centerize {
+    display: flex;
+    justify-content: center;
+    max-width: 100%;
+    margin: 0 auto;
+  }
+
+  @keyframes fade-out {
+    to {
+      opacity: 0;
+    }
+  }
+
+  .u-hidden.mod-animated {
+    animation: fade-out 0.2s;
+  }
+
+  .app-update-prompt,
+  .app-offline-prompt {
+    position: fixed;
+    left: 50%;
+    bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    z-index: 180;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    max-width: calc(100vw - 2rem);
+    padding: 0.45rem 0.5rem 0.45rem 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--text-color) 12%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--paper-color) 94%, transparent);
+    box-shadow: 0 16px 36px -28px black;
+    color: var(--text-color);
+    font-size: 0.86rem;
+    transform: translateX(-50%);
+    backdrop-filter: blur(18px);
+  }
+
+  .app-offline-prompt {
+    bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .app-update-button,
+  .app-update-dismiss {
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    font: inherit;
+  }
+
+  .app-update-button {
+    padding: 0.32rem 0.62rem;
+    background: var(--text-color);
+    color: var(--paper-color);
+  }
+
+  .app-update-dismiss {
+    padding: 0.32rem 0.45rem;
+    background: transparent;
+    color: var(--light-text-color);
+  }
+
+  .stack.xsmall > * + * {
+    margin-top: 0.35em;
+  }
+
+  .stack.small > * + * {
+    margin-top: 0.5em;
+  }
+
+  .stack.medium > * + * {
+    margin-top: 1em;
+  }
+
+  .stack.large > * + * {
+    margin-top: 1.5em;
+  }
+
+  .stack.xlarge > * + * {
+    margin-top: 2em;
+  }
+
+  .cluster {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .cluster > * + * {
+    margin-left: 1em;
+  }
 }
 
-.app-update-button,
-.app-update-dismiss {
-  border: none;
-  border-radius: 999px;
-  cursor: pointer;
-  font: inherit;
-}
-
-.app-update-button {
-  padding: 0.32rem 0.62rem;
-  background: var(--text-color);
-  color: var(--paper-color);
-}
-
-.app-update-dismiss {
-  padding: 0.32rem 0.45rem;
-  background: transparent;
-  color: var(--light-text-color);
-}
-
-.stack.xsmall>*+* {
-  margin-top: 0.35em;
-}
-
-.stack.small>*+* {
-  margin-top: 0.5em;
-}
-
-.stack.medium>*+* {
-  margin-top: 1em;
-}
-
-.stack.large>*+* {
-  margin-top: 1.5em;
-}
-
-.stack.xlarge>*+* {
-  margin-top: 2em;
-}
-
-.cluster {
-  display: inline-flex;
-  align-items: center;
-}
-
-.cluster>*+* {
-  margin-left: 1em;
-}
-
-:root {
-  /* HACK: I don't like that I have to specify the header height
+@layer tokens {
+  :root {
+    /* HACK: I don't like that I have to specify the header height
      here, but I don't know how else to use flexbox to say that
      the header's height should fit to content, and the body's
      height should fill the rest of the container (in this case
      the screen), regardless of overflow */
-  --header-height: 45px;
+    --header-height: 45px;
 
-  --paper-color: oklch(98.5% 0 0);
-  --page-ink-color: oklch(0% 0 0 / 0.8);
-  --annotations-toggle-active-color: black;
-  --verses-color: oklch(0% 0 0 / 0.35);
-  --light-accent-color: oklch(0% 0 0 / 0.05);
-  --medium-accent-color: oklch(0% 0 0 / 0.1);
-  --heavy-accent-color: oklch(0% 0 0 / 0.2);
-  --text-color: oklch(0% 0 0 / 0.7);
-  --light-text-color: oklch(0% 0 0 / 0.5);
-  --button-border-radius: 8px;
-  --reader-control-press-scale: 0.97;
-  --reader-motion-fast: 140ms;
-  --reader-motion-color: 160ms;
-  --reader-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --reader-ease-standard: cubic-bezier(0.2, 0.75, 0.25, 1);
-  --reader-focus-color: #0a84ff;
-  --reader-highlight-fill: #ffd700;
-  --reader-highlight-fill-tint: rgba(255,255,0,0.15);
-  --reader-highlight-fill-alpha-percent: 15%;
-  --reader-highlight-fill-alpha-inverse-percent: 85%;
-  --reader-highlight-outline-color: gold;
-  --reader-highlight-outline-width: 2px;
-  --reader-highlight-border-radius: 10px;
-  --reader-highlight-radius: var(--reader-highlight-border-radius);
-  --reader-highlight-glow: 3.5px;
-  --reader-highlight-outline-offset: 3.5px;
-}
+    --paper-color: oklch(98.5% 0 0);
+    --page-ink-color: oklch(0% 0 0 / 0.8);
+    --annotations-toggle-active-color: black;
+    --verses-color: oklch(0% 0 0 / 0.35);
+    --light-accent-color: oklch(0% 0 0 / 0.05);
+    --medium-accent-color: oklch(0% 0 0 / 0.1);
+    --heavy-accent-color: oklch(0% 0 0 / 0.2);
+    --text-color: oklch(0% 0 0 / 0.7);
+    --light-text-color: oklch(0% 0 0 / 0.5);
+    --button-border-radius: 8px;
+    --reader-control-press-scale: 0.97;
+    --reader-motion-fast: 140ms;
+    --reader-motion-color: 160ms;
+    --reader-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --reader-ease-standard: cubic-bezier(0.2, 0.75, 0.25, 1);
+    --reader-focus-color: #0a84ff;
+    --reader-highlight-fill: #ffd700;
+    --reader-highlight-fill-tint: rgba(255, 255, 0, 0.15);
+    --reader-highlight-fill-alpha-percent: 15%;
+    --reader-highlight-fill-alpha-inverse-percent: 85%;
+    --reader-highlight-outline-color: gold;
+    --reader-highlight-outline-width: 2px;
+    --reader-highlight-border-radius: 10px;
+    --reader-highlight-radius: var(--reader-highlight-border-radius);
+    --reader-highlight-glow: 3.5px;
+    --reader-highlight-outline-offset: 3.5px;
+    --reader-custom-background-color: #eee6d6;
+    --reader-custom-text-color: #3b3026;
+  }
 
-body {
-  --reader-highlight-fill-surface: color-mix(
-    in srgb,
-    var(--paper-color, white) var(--reader-highlight-fill-alpha-inverse-percent),
-    var(--reader-highlight-fill) var(--reader-highlight-fill-alpha-percent)
-  );
-}
+  body {
+    --reader-highlight-fill-surface: color-mix(
+      in srgb,
+      var(--paper-color, white)
+        var(--reader-highlight-fill-alpha-inverse-percent),
+      var(--reader-highlight-fill) var(--reader-highlight-fill-alpha-percent)
+    );
+  }
 
-html[data-reader-theme='light'] {
-  color-scheme: light;
-}
+  html[data-reader-theme='light'] {
+    color-scheme: light;
+  }
 
-html[data-reader-theme='sepia'] body {
-  --paper-color: oklch(90% 17% 90deg);
-  --reader-highlight-fill-surface: color-mix(
-    in srgb,
-    oklch(98.5% 0 0) var(--reader-highlight-fill-alpha-inverse-percent),
-    var(--reader-highlight-fill) var(--reader-highlight-fill-alpha-percent)
-  );
-}
+  html[data-reader-theme='sepia'] body {
+    --paper-color: oklch(90% 17% 90deg);
+    --reader-highlight-fill-surface: color-mix(
+      in srgb,
+      oklch(98.5% 0 0) var(--reader-highlight-fill-alpha-inverse-percent),
+      var(--reader-highlight-fill) var(--reader-highlight-fill-alpha-percent)
+    );
+  }
 
-html[data-reader-theme='sepia'] {
-  color-scheme: light;
-}
+  html[data-reader-theme='sepia'] {
+    color-scheme: light;
+  }
 
-html[data-reader-theme='dark'] body {
-  --paper-color: oklch(25% 0 0);
-  --page-ink-color: oklch(100% 0 0 / 0.8);
-  --annotations-toggle-active-color: oklch(100% 0 0 / 0.8);
-  --verses-color: oklch(100% 0 0 / 0.35);
-  --light-accent-color: oklch(100% 0 0 / 0.05);
-  --medium-accent-color: oklch(100% 0 0 / 0.1);
-  --heavy-accent-color: oklch(100% 0 0 / 0.2);
-  --text-color: oklch(100% 0 0 / 0.7);
-  --light-text-color: oklch(100% 0 0 / 0.5);
-}
-
-html[data-reader-theme='dark'] {
-  color-scheme: dark;
-}
-
-@media (prefers-color-scheme: dark) {
-  html[data-reader-theme='automatic'] body {
+  html[data-reader-theme='dark'] body {
     --paper-color: oklch(25% 0 0);
     --page-ink-color: oklch(100% 0 0 / 0.8);
     --annotations-toggle-active-color: oklch(100% 0 0 / 0.8);
@@ -269,44 +264,98 @@ html[data-reader-theme='dark'] {
     --light-text-color: oklch(100% 0 0 / 0.5);
   }
 
-  html[data-reader-theme='automatic'] {
+  html[data-reader-theme='dark'] {
     color-scheme: dark;
+  }
+
+  html[data-reader-theme='custom'] body {
+    --paper-color: var(--reader-custom-background-color);
+    --page-ink-color: var(--reader-custom-text-color);
+    --annotations-toggle-active-color: var(--reader-custom-text-color);
+    --verses-color: color-mix(
+      in srgb,
+      var(--reader-custom-text-color) 42%,
+      transparent
+    );
+    --light-accent-color: color-mix(
+      in srgb,
+      var(--reader-custom-text-color) 6%,
+      transparent
+    );
+    --medium-accent-color: color-mix(
+      in srgb,
+      var(--reader-custom-text-color) 12%,
+      transparent
+    );
+    --heavy-accent-color: color-mix(
+      in srgb,
+      var(--reader-custom-text-color) 22%,
+      transparent
+    );
+    --text-color: var(--reader-custom-text-color);
+    --light-text-color: color-mix(
+      in srgb,
+      var(--reader-custom-text-color) 68%,
+      transparent
+    );
+  }
+
+  @media (prefers-color-scheme: dark) {
+    html[data-reader-theme='automatic'] body {
+      --paper-color: oklch(25% 0 0);
+      --page-ink-color: oklch(100% 0 0 / 0.8);
+      --annotations-toggle-active-color: oklch(100% 0 0 / 0.8);
+      --verses-color: oklch(100% 0 0 / 0.35);
+      --light-accent-color: oklch(100% 0 0 / 0.05);
+      --medium-accent-color: oklch(100% 0 0 / 0.1);
+      --heavy-accent-color: oklch(100% 0 0 / 0.2);
+      --text-color: oklch(100% 0 0 / 0.7);
+      --light-text-color: oklch(100% 0 0 / 0.5);
+    }
+
+    html[data-reader-theme='automatic'] {
+      color-scheme: dark;
+    }
   }
 }
 
-.tikkun-book {
-  padding-top: 1em;
-  padding-bottom: 5em;
-  /* basically some scroll overflow so that when you get to the end of a Scroll, you can scroll past the annotations toggle so that it doesn't block the last few lines of text */
-  font-size: 1.8rem;
-  height: 100%;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  overflow-anchor: none;
-  -webkit-overflow-scrolling: touch;
-  /*https://css-tricks.com/snippets/css/momentum-scrolling-on-ios-overflow-elements/*/
-  box-sizing: border-box;
+@layer reader {
+  .tikkun-book {
+    padding-top: 1em;
+    padding-bottom: 5em;
+    /* basically some scroll overflow so that when you get to the end of a Scroll, you can scroll past the annotations toggle so that it doesn't block the last few lines of text */
+    font-size: 1.8rem;
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overflow-anchor: none;
+    -webkit-overflow-scrolling: touch;
+    /*https://css-tricks.com/snippets/css/momentum-scrolling-on-ios-overflow-elements/*/
+    box-sizing: border-box;
 
-  --pull-transform: 0s;
-  --pull-translation: 0;
+    --pull-transform: 0s;
+    --pull-translation: 0;
+  }
+
+  /* Focus returns here after reader overlays close; the surface itself is not a control. */
+  .tikkun-book:focus {
+    outline: none;
+  }
+
+  .tikkun-book.mod-pull-releasing {
+    --pull-transform: 0.15s;
+  }
 }
 
-/* Focus returns here after reader overlays close; the surface itself is not a control. */
-.tikkun-book:focus {
-  outline: none;
-}
-
-.tikkun-book.mod-pull-releasing {
-  --pull-transform: 0.15s;
-}
-
-#debug {
-  position: fixed;
-  bottom: 1em;
-  left: 1em;
-  padding: 1em;
-  background: oklch(100% 0 0 / 0.8);
-  border-radius: 8px;
-  display: inline-block;
+@layer overrides {
+  #debug {
+    position: fixed;
+    bottom: 1em;
+    left: 1em;
+    padding: 1em;
+    background: oklch(100% 0 0 / 0.8);
+    border-radius: 8px;
+    display: inline-block;
+  }
 }

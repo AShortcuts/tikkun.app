@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest'
 import type { ParshaAudioRecording } from '../audio/types.ts'
 import { createMount } from '../lifecycle/mount.ts'
-import type { ActiveAudioSession } from '../reading/audio-controller.ts'
+import type { ReaderPlaybackCueAuthoringSessionSnapshot } from '../reading/reader-playback.ts'
 import {
   createCueWaveform,
   type CueWaveformSnapshot,
@@ -138,22 +138,8 @@ const recording: ParshaAudioRecording = {
   status: 'available',
 }
 
-const session: ActiveAudioSession = {
+const session: ReaderPlaybackCueAuthoringSessionSnapshot = {
+  sessionRevision: 1,
   recording,
-  cues: [],
-  runId: 'run',
-  aliyahIndex: 1,
   tokenKeys: ['1:0:0:0'],
-  segments: [
-    {
-      recording,
-      cues: [],
-      tokenKeys: ['1:0:0:0'],
-      startTime: 0,
-      endTime: null,
-      logicalStart: 0,
-      logicalEnd: Number.POSITIVE_INFINITY,
-    },
-  ],
-  status: 'current-only',
 }

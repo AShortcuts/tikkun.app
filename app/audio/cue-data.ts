@@ -53,7 +53,6 @@ function describeRecordingMismatch(
   recording: AudioRecording
 ) {
   const details: string[] = []
-  const readingId = payload.readingId ?? payload.parshaSlug
   const compare = (field: string, actual: unknown, expected: unknown) => {
     if (actual !== expected) {
       details.push(
@@ -65,7 +64,7 @@ function describeRecordingMismatch(
   compare('audioId', payload.audioId, recording.id)
   compare('audioFormat', payload.audioFormat, recording.format)
   compare('narratorId', payload.narratorId, recording.narratorId)
-  compare('readingId', readingId, recording.reading.id)
+  compare('readingId', payload.readingId, recording.reading.id)
   compare('aliyah', payload.aliyah, recording.aliyah)
   if (
     payload.mediaIdentity &&
@@ -73,15 +72,6 @@ function describeRecordingMismatch(
       !audioMediaIdentitiesEqual(payload.mediaIdentity, recording.mediaIdentity))
   ) {
     details.push('mediaIdentity does not match the published audio file.')
-  }
-  if (
-    !payload.mediaIdentity &&
-    payload.audioVersion &&
-    payload.audioVersion !== recording.notes
-  ) {
-    details.push(
-      `audioVersion is ${JSON.stringify(payload.audioVersion)}; expected ${JSON.stringify(recording.notes)}.`
-    )
   }
   return details
 }

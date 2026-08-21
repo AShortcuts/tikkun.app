@@ -1,14 +1,25 @@
 import { setReaderFocalPointMode, type ReaderFocalPointMode } from './reader-scroll.ts'
 import {
+  createPersistedJsonStore,
   getBrowserStorage,
-  readPersistedJson,
-  writeStorageItem,
+  requirePersistedJsonMutation,
+  type PersistedJsonRevision,
 } from './persistence/persisted-state.ts'
 
-const STORAGE_KEY = 'tikkun.reader-preferences.v3'
+const STORAGE_KEY = 'tikkun.reader-preferences'
 
-export const themeModes = ['automatic', 'light', 'sepia', 'dark'] as const
+export const themeModes = [
+  'automatic',
+  'light',
+  'sepia',
+  'dark',
+  'custom',
+] as const
 export const readerFocalPointModes = ['browser', 'reader'] as const
+export const defaultCustomThemeColors = {
+  background: '#eee6d6',
+  text: '#3b3026',
+} as const
 
 const preferenceRanges = {
   playbackRate: { min: 0.5, max: 3 },
@@ -35,6 +46,13 @@ export interface ReaderPreferences {
   focalPointMode: ReaderFocalPointMode
   disableShiftNekudotHide: boolean
   themeMode: ThemeMode
+  customBackgroundColor: string
+  customTextColor: string
+}
+
+export interface LoadedReaderPreferences {
+  preferences: ReaderPreferences
+  revision: PersistedJsonRevision | null
 }
 
 export const defaultReaderPreferences: ReaderPreferences = {
@@ -51,6 +69,8 @@ export const defaultReaderPreferences: ReaderPreferences = {
   focalPointMode: 'reader',
   disableShiftNekudotHide: false,
   themeMode: 'automatic',
+  customBackgroundColor: defaultCustomThemeColors.background,
+  customTextColor: defaultCustomThemeColors.text,
 }
 
 function rootCssValue(name: string) {
@@ -195,48 +215,76 @@ function normalizeReaderPreferences(
     themeMode: isThemeMode(candidate.themeMode)
       ? candidate.themeMode
       : defaults.themeMode,
+    customBackgroundColor: normalizedColor(
+      candidate.customBackgroundColor,
+      defaults.customBackgroundColor
+    ),
+    customTextColor: normalizedColor(
+      candidate.customTextColor,
+      defaults.customTextColor
+    ),
   }
 }
 
-export function loadReaderPreferences(): ReaderPreferences {
-  const defaults = getDefaultReaderPreferences()
-  const result = readPersistedJson({
+function createReaderPreferencesStore() {
+  return createPersistedJsonStore({
     storage: getBrowserStorage('local'),
     key: STORAGE_KEY,
     validate: isRecord,
   })
+}
+
+export function loadReaderPreferences(): ReaderPreferences {
+  return loadReaderPreferencesState().preferences
+}
+
+export function loadReaderPreferencesState(): LoadedReaderPreferences {
+  const defaults = getDefaultReaderPreferences()
+  const store = createReaderPreferencesStore()
+  const result = store.read()
   if (result.status === 'unavailable') {
     console.error('Failed to read reader preferences', result.error)
-    return { ...defaults }
+    return { preferences: { ...defaults }, revision: null }
   }
   if (result.status === 'invalid') {
     if (result.reason === 'invalid-json') {
       console.error('Failed to parse reader preferences', result.error)
+    } else {
+      console.error('Invalid reader preferences')
     }
-    return { ...defaults }
+    return { preferences: { ...defaults }, revision: result.revision }
   }
-  if (result.status === 'missing') return { ...defaults }
-
-  return {
+  if (result.status === 'missing') {
+    return { preferences: { ...defaults }, revision: result.revision }
+  }
+  const preferences = {
     ...normalizeReaderPreferences(result.value, defaults),
     playbackRate: defaults.playbackRate,
   }
+  return { preferences, revision: result.revision }
 }
 
-export function saveReaderPreferences(preferences: ReaderPreferences) {
+export function saveReaderPreferences(
+  preferences: ReaderPreferences,
+  expectedRevision?: PersistedJsonRevision | null
+) {
   const normalized = normalizeReaderPreferences(
     preferences,
     getDefaultReaderPreferences()
   )
   try {
-    writeStorageItem(
-      getBrowserStorage('local'),
-      STORAGE_KEY,
-      JSON.stringify({
-        ...normalized,
-        playbackRate: defaultReaderPreferences.playbackRate,
-      })
-    )
+    const store = createReaderPreferencesStore()
+    const payload = {
+      ...normalized,
+      playbackRate: defaultReaderPreferences.playbackRate,
+    }
+    let revision = expectedRevision
+    if (!revision) {
+      const current = store.read()
+      if (current.status === 'unavailable') throw current.error
+      revision = current.revision
+    }
+    return requirePersistedJsonMutation(store.write(payload, revision))
   } catch (error) {
     throw new ReaderPreferencesStorageError(error)
   }
@@ -269,6 +317,19 @@ export function applyReaderPreferences(preferences: ReaderPreferences) {
   const fillAlphaInversePercent = `${(1 - preferences.highlightOpacity) * 100}%`
 
   root.dataset.readerTheme = preferences.themeMode
+  root.style.setProperty(
+    '--reader-custom-background-color',
+    preferences.customBackgroundColor
+  )
+  root.style.setProperty(
+    '--reader-custom-text-color',
+    preferences.customTextColor
+  )
+  root.style.colorScheme = preferences.themeMode === 'custom'
+    ? relativeLuminance(preferences.customBackgroundColor) < 0.32
+      ? 'dark'
+      : 'light'
+    : ''
   setReaderFocalPointMode(preferences.focalPointMode)
 
   root.style.setProperty('--reader-highlight-fill', preferences.highlightFill)
@@ -298,6 +359,45 @@ export function applyReaderPreferences(preferences: ReaderPreferences) {
   root.style.setProperty(
     '--reader-highlight-outline-offset',
     `${preferences.outlineOffset}px`
+  )
+}
+
+export function colorContrastRatio(background: string, text: string) {
+  const lighter = Math.max(
+    relativeLuminance(background),
+    relativeLuminance(text)
+  )
+  const darker = Math.min(
+    relativeLuminance(background),
+    relativeLuminance(text)
+  )
+  return (lighter + 0.05) / (darker + 0.05)
+}
+
+export function recommendedThemeTextColor(background: string) {
+  const dark = '#191c22'
+  const light = '#f8f7f3'
+  return colorContrastRatio(background, dark) >=
+    colorContrastRatio(background, light)
+    ? dark
+    : light
+}
+
+function relativeLuminance(color: string) {
+  const [red, green, blue] = hexChannels(color).map((channel) => {
+    const value = channel / 255
+    return value <= 0.04045
+      ? value / 12.92
+      : ((value + 0.055) / 1.055) ** 2.4
+  })
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+}
+
+function hexChannels(color: string) {
+  const match = /^#([0-9a-f]{6})$/i.exec(color.trim())
+  if (!match) return [0, 0, 0]
+  return [0, 2, 4].map((offset) =>
+    Number.parseInt(match[1].slice(offset, offset + 2), 16)
   )
 }
 

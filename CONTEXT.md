@@ -25,8 +25,12 @@ The brief branded transition shown only while the app shell hydrates and the fir
 _Avoid_: Loading screen
 
 **Reader Runtime**:
-The replaceable lexical browser lifetime in `app/reader/reader-runtime.ts` that owns the active reader display, controllers, tools, listeners, and scheduled work. The application bootstrap only starts it and retains its destroy Interface.
+The replaceable lexical browser composition root in `app/reader/reader-runtime.ts` that wires reader state, controllers, tools, listeners, and feature Interfaces. The application bootstrap only starts it and retains its destroy Interface.
 _Avoid_: Global reader state, page component
+
+**Reader Display Session**:
+The TypeScript Module that owns one active ScrollDisplay generation and everything whose validity follows it: DOM target indexes, progress anchors, Reader Viewport tracking, presentation scheduling, Page Window composition, audio preload, and background resource prewarming. Reader Runtime supplies domain effects and consumes a narrow Interface.
+_Avoid_: Reader Runtime, ScrollDisplay rendering mechanics, playback state
 
 **Reader Shell**:
 The Svelte-rendered, long-lived presentation frame around the reader. It presents the title, progress, reader-versus-optional-page visibility, Parsha Picker visibility, annotations, and stable mount targets while Reader Route coordinates those states and Reader Runtime owns reader behavior.
@@ -45,8 +49,12 @@ A browser or native service that is actually available in the current runtime, s
 _Avoid_: Mobile layout, compact viewport
 
 **Persisted State**:
-The shared browser-storage Module that owns read, write, remove, validated JSON loading, and invalid-value quarantine mechanics. Domain Modules retain their own schemas, migration rules, and user-facing recovery policy.
+The small browser-storage helper that reads and writes current-schema JSON with exact-value conflict checks and explicit storage failures. Domain Modules own validation, defaults, and user-facing error policy.
 _Avoid_: Global state, domain model, silent fallback
+
+**Support Diagnostics**:
+The browser-local Module that identifies one build and retains a bounded, in-memory history of safe error categories for a user-triggered support report. It never stores error messages, stack traces, URLs, Torah or recording content, search queries, or Cue Authoring data, and never sends a report automatically.
+_Avoid_: Telemetry, console transcript, crash upload
 
 **Aliyah Navigation**:
 The Svelte-rendered reader feature for identifying, selecting, and playing an aliyah. One Module owns the toolbar capsule, compact sheet, segments, and wide rail behind a small TypeScript Interface; Reader Runtime still owns routing, scrolling, playback, recording lookup, and Cue Data.
@@ -67,6 +75,10 @@ _Avoid_: Playback Timeline, Audio Controller, global playback state
 **Reader Presentation**:
 The animation-frame scheduler that coalesces Reader Viewport title, reader position, inline audio, and playback-state invalidations into one immutable presentation frame. Reader Runtime owns its Adapter and applies only invalidated work.
 _Avoid_: Global reader state, animation loop, Reader Shell
+
+**Reader Page Window**:
+The TypeScript Module that owns one optional page-virtualization session: active display identity, retain policy, navigation holds, and near-placeholder remount and trim scheduling. Reader Display Session supplies the required callbacks while ScrollDisplay retains page rendering and mount mechanics.
+_Avoid_: ScrollDisplay, Reader Presentation, playback prewarming
 
 **Reader Settings**:
 The first-use Svelte dialog that presents preferences and owns its form, focus, and browser lifetime behind a small TypeScript mount interface. Its launcher remains ready before the dialog code loads. Reader Runtime still owns the canonical preference state and cross-feature effects.
@@ -89,7 +101,7 @@ The Svelte-rendered audio control surface mounted behind one connected Interface
 _Avoid_: Playback Timeline, audio controller
 
 **Cue Data**:
-Validated word timing and token-position data loaded from a published cue file.
+Validated word timing and token-position data loaded from a published cue file. Published files use one current `readingId`, tokenization, and media-identity contract.
 _Avoid_: Raw cue JSON
 
 **Cue Data Resolution**:
@@ -102,6 +114,14 @@ _Avoid_: Thrown cue error, repeated cue retry
 **Cue Draft**:
 Validated local authoring state for Cue Data that has not yet been published.
 _Avoid_: Published cues, raw localStorage data
+
+**Cue Draft Editor**:
+The pure TypeScript Module that owns one Cue Draft's canonical token prefix,
+selection, timing-recording state, record, undo, trim, nudge, published-source
+comparison, dirty/export readiness, and semantic save-conflict state behind an
+immutable snapshot. Cue Authoring supplies playback, storage, microphone, and
+presentation Adapters.
+_Avoid_: Cue Authoring workflow, draft storage, Cue Authoring Panel
 
 **Cue Authoring**:
 The local workflow for recording, reviewing, adjusting, and exporting Cue Data for one recording.

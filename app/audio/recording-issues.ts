@@ -1,8 +1,8 @@
 import { isValidTokenKey } from '../reader/token-position.ts'
 import {
-  quarantineStorageItem,
-  readStorageItem,
-  writeStorageItem,
+  createPersistedJsonStore,
+  PersistedStateConflictError,
+  type PersistedJsonRevision,
 } from '../persistence/persisted-state.ts'
 
 export type RecordingIssueKind =
@@ -59,7 +59,18 @@ const issueLabels: Record<RecordingIssueKind, string> = {
 }
 
 function storageKey(audioId: string) {
-  return `tikkun.recording-issues.v1:${audioId}`
+  return `tikkun.recording-issues:${audioId}`
+}
+
+function createRecordingIssuesStore(
+  storage: Storage | null,
+  audioId: string
+) {
+  return createPersistedJsonStore({
+    storage,
+    key: storageKey(audioId),
+    validate: (value): value is unknown[] => Array.isArray(value),
+  })
 }
 
 export function createRecordingIssue(
@@ -152,82 +163,87 @@ export function filterRecordingIssues(
     .sort((a, b) => a.createdAt - b.createdAt)
 }
 
-export function loadRecordingIssues(
+export interface LocalRecordingIssuesSnapshot {
+  issues: RecordingIssue[]
+  revision: PersistedJsonRevision | null
+}
+
+export function loadLocalRecordingIssues(
   storage: Storage | null,
   audioId: string,
   tokenizationVersion: string
+): LocalRecordingIssuesSnapshot {
+  if (!storage) return { issues: [], revision: null }
+  const store = createRecordingIssuesStore(storage, audioId)
+  const result = store.read()
+  if (result.status === 'unavailable') {
+    console.error(`Failed to read recording issues for ${audioId}`, result.error)
+    return { issues: [], revision: null }
+  }
+  if (result.status === 'invalid') {
+    if (result.reason === 'invalid-json') {
+      console.error(`Failed to parse recording issues for ${audioId}`, result.error)
+    } else {
+      console.error(`Invalid recording issues for ${audioId}`)
+    }
+    return { issues: [], revision: result.revision }
+  }
+  if (result.status === 'missing') {
+    return { issues: [], revision: result.revision }
+  }
+  const parsed = parseRecordingIssues(
+    result.value,
+    audioId,
+    tokenizationVersion
+  )
+  if (parsed) return { issues: parsed, revision: result.revision }
+
+  const validIssues = filterRecordingIssues(
+    result.value,
+    audioId,
+    tokenizationVersion
+  )
+  const uniqueIssues = [...new Map(
+    validIssues.map((issue) => [issue.id, issue])
+  ).values()]
+  console.warn(`Ignoring invalid recording issues for ${audioId}`)
+  return { issues: uniqueIssues, revision: result.revision }
+}
+
+function recordingIssueOverlayKey(issue: RecordingIssue) {
+  return `${issue.audioId}\u0000${issue.tokenKey}\u0000${issue.kind}`
+}
+
+export function mergePublishedAndLocalRecordingIssues(
+  publishedIssues: readonly RecordingIssue[],
+  localIssues: readonly RecordingIssue[]
 ) {
-  if (!storage) return []
-  const key = storageKey(audioId)
-  let raw: string | null = null
-  try {
-    raw = readStorageItem(storage, key)
-  } catch (error) {
-    console.error(`Failed to read recording issues for ${audioId}`, error)
-    return []
+  const issuesByOverlayKey = new Map<string, RecordingIssue>()
+  for (const issue of publishedIssues) {
+    issuesByOverlayKey.set(recordingIssueOverlayKey(issue), issue)
   }
-  if (!raw) return []
-
-  try {
-    const storedIssues = JSON.parse(raw) as unknown
-    const parsed = parseRecordingIssues(
-      storedIssues,
-      audioId,
-      tokenizationVersion
-    )
-    if (parsed) return parsed
-
-    const repairedIssues = filterRecordingIssues(
-      storedIssues,
-      audioId,
-      tokenizationVersion
-    )
-    const uniqueIssues = [...new Map(
-      repairedIssues.map((issue) => [issue.id, issue])
-    ).values()]
-    console.warn(`Repairing invalid recording issues for ${audioId}`)
-    quarantineStorageItem({
-      storage,
-      key,
-      rawValue: raw,
-      reason: 'invalid recording issue schema',
-      ...(uniqueIssues.length
-        ? { replacementValue: JSON.stringify(uniqueIssues) }
-        : {}),
-    })
-    return uniqueIssues
-  } catch (error) {
-    console.error(`Failed to parse recording issues for ${audioId}`, error)
-    quarantineStorageItem({
-      storage,
-      key,
-      rawValue: raw,
-      reason: 'invalid JSON',
-    })
-    return []
+  for (const issue of localIssues) {
+    issuesByOverlayKey.set(recordingIssueOverlayKey(issue), issue)
   }
+
+  return [...issuesByOverlayKey.values()].sort(
+    (a, b) => a.createdAt - b.createdAt
+  )
 }
 
-export function mergeRecordingIssues(...issueGroups: RecordingIssue[][]) {
-  const issuesById = new Map<string, RecordingIssue>()
-  for (const issue of issueGroups.flat()) {
-    issuesById.set(issue.id, issue)
-  }
-
-  return [...issuesById.values()].sort((a, b) => a.createdAt - b.createdAt)
-}
-
-export function saveRecordingIssues(
+export function saveLocalRecordingIssues(
   storage: Storage | null,
   audioId: string,
-  issues: RecordingIssue[]
+  tokenizationVersion: string,
+  issues: RecordingIssue[],
+  expectedRevision: PersistedJsonRevision | null
 ) {
   const issueIds = new Set<string>()
   const isValid = issues.every((issue) => {
     const parsed = parseRecordingIssue(
       issue,
       audioId,
-      issue.tokenizationVersion
+      tokenizationVersion
     )
     if (!parsed || issueIds.has(parsed.id)) return false
     issueIds.add(parsed.id)
@@ -237,12 +253,21 @@ export function saveRecordingIssues(
     throw new TypeError(`Cannot persist invalid recording issues for ${audioId}`)
   }
 
-  if (!storage) throw new RecordingIssueStorageError(audioId)
-  try {
-    writeStorageItem(storage, storageKey(audioId), JSON.stringify(issues))
-  } catch (error) {
-    throw new RecordingIssueStorageError(audioId, error)
+  if (!storage || !expectedRevision) {
+    throw new RecordingIssueStorageError(audioId)
   }
+  const mutation = createRecordingIssuesStore(storage, audioId).write(
+    issues,
+    expectedRevision
+  )
+  if (mutation.status === 'written') return mutation.revision
+  if (mutation.status === 'conflict') {
+    throw new RecordingIssueConflictError(
+      audioId,
+      loadLocalRecordingIssues(storage, audioId, tokenizationVersion)
+    )
+  }
+  throw new RecordingIssueStorageError(audioId, mutation.error)
 }
 
 export class RecordingIssueStorageError extends Error {
@@ -252,5 +277,15 @@ export class RecordingIssueStorageError extends Error {
     super(`Failed to save recording issues for ${audioId}`)
     this.name = 'RecordingIssueStorageError'
     this.cause = cause
+  }
+}
+
+export class RecordingIssueConflictError extends RecordingIssueStorageError {
+  constructor(
+    audioId: string,
+    readonly latest: LocalRecordingIssuesSnapshot
+  ) {
+    super(audioId, new PersistedStateConflictError())
+    this.name = 'RecordingIssueConflictError'
   }
 }

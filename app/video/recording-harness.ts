@@ -1,25 +1,10 @@
 import type { MountScope } from '../lifecycle/mount.ts'
 import { calculateCaptureRect } from '../recording-mode.ts'
 import type {
-  ActiveAudioSession,
-  AudioController,
-} from '../reading/audio-controller.ts'
-import type { HighlightController } from '../reading/highlight-controller.ts'
-import type { PlaybackTimeline } from '../reading/playback-timeline.ts'
-import type { RecordingSession } from '../reading/recording-session.ts'
-
-type RecordingHarnessAudio = Pick<
-  AudioController,
-  'session' | 'currentTime' | 'duration' | 'seek' | 'play' | 'pause'
->
-
-type RecordingHarnessHighlight = Pick<
-  HighlightController,
-  'getActiveTokenKey' | 'getCueIndex' | 'clear' | 'activateCue'
->
-
-type RecordingHarnessTimeline = Pick<PlaybackTimeline, 'syncHighlight'>
-type RecordingHarnessSession = Pick<RecordingSession, 'loadByAudioId'>
+  ReaderPlaybackRecordingHarnessAdapter,
+  ReaderPlaybackRecordingHarnessSessionSnapshot,
+  ReaderPlaybackRecordingHarnessSnapshot,
+} from '../reading/reader-playback.ts'
 
 export interface RecordingHarnessState {
   ready: boolean
@@ -44,7 +29,9 @@ export interface RecordingHarnessSettledState
 
 export interface RecordingHarness {
   ready(): Promise<void>
-  loadAudio(audioId: string): Promise<ActiveAudioSession | null>
+  loadAudio(
+    audioId: string
+  ): Promise<ReaderPlaybackRecordingHarnessSessionSnapshot | null>
   renderAt(seconds: number): Promise<RecordingHarnessRenderState | null>
   renderHighlightAnimationAt(
     seconds: number,
@@ -63,10 +50,7 @@ export interface RecordingHarness {
 export interface RecordingHarnessOptions {
   document: Document
   view: Window
-  audio: RecordingHarnessAudio
-  highlight: RecordingHarnessHighlight
-  timeline: RecordingHarnessTimeline
-  recordingSession: RecordingHarnessSession
+  playback: ReaderPlaybackRecordingHarnessAdapter
   isReaderReady(): boolean
   waitUntilReaderReady(): Promise<void>
   getBook(): HTMLElement
@@ -89,10 +73,7 @@ export function mountRecordingHarness(
   const {
     document,
     view,
-    audio,
-    highlight,
-    timeline,
-    recordingSession,
+    playback,
     isReaderReady,
     waitUntilReaderReady,
     getBook,
@@ -101,10 +82,30 @@ export function mountRecordingHarness(
     throw new Error('Recording Harness is already mounted')
   }
 
+  const hasSessionIdentity = (
+    expected: ReaderPlaybackRecordingHarnessSessionSnapshot,
+    snapshot: ReaderPlaybackRecordingHarnessSnapshot
+  ) =>
+    snapshot.session?.sessionRevision === expected.sessionRevision &&
+    snapshot.session.recording.id === expected.recording.id
+
+  const renderState = (
+    session: ReaderPlaybackRecordingHarnessSessionSnapshot
+  ): RecordingHarnessRenderState | null => {
+    const snapshot = playback.snapshot()
+    if (!hasSessionIdentity(session, snapshot)) return null
+    return {
+      audioId: session.recording.id,
+      currentTime: snapshot.currentTime,
+      duration: snapshot.duration,
+      activeTokenKey: snapshot.activeTokenKey,
+    }
+  }
+
   const renderAt = async (
     seconds: number
   ): Promise<RecordingHarnessRenderState | null> => {
-    const session = audio.session
+    const session = playback.snapshot().session
     if (!session) return null
 
     document.documentElement.style.removeProperty(
@@ -113,25 +114,19 @@ export function mountRecordingHarness(
     document.documentElement.style.removeProperty(
       '--recording-highlight-animation-play-state'
     )
-    audio.seek(seconds)
-    await timeline.syncHighlight()
+    playback.seek(seconds)
+    await playback.syncHighlight()
     await waitForAnimationFrame(view)
-
-    return {
-      audioId: session.recording.id,
-      currentTime: audio.currentTime,
-      duration: audio.duration,
-      activeTokenKey: highlight.getActiveTokenKey(),
-    }
+    return renderState(session)
   }
 
   const settleAt = async (
     seconds: number
   ): Promise<RecordingHarnessSettledState | null> => {
-    const session = audio.session
+    const session = playback.snapshot().session
     if (!session) return null
 
-    await renderAt(seconds)
+    if (!(await renderAt(seconds))) return null
     let stableFrames = 0
     let previousScrollTop = getBook().scrollTop
 
@@ -158,13 +153,10 @@ export function mountRecordingHarness(
       previousScrollTop = scrollTop
     }
 
-    return {
-      audioId: session.recording.id,
-      currentTime: audio.currentTime,
-      duration: audio.duration,
-      activeTokenKey: highlight.getActiveTokenKey(),
-      scrollTop: getBook().scrollTop,
-    }
+    const rendered = renderState(session)
+    return rendered
+      ? { ...rendered, scrollTop: getBook().scrollTop }
+      : null
   }
 
   const renderHighlightAnimationAt = async (
@@ -174,10 +166,10 @@ export function mountRecordingHarness(
     scrollTransition: boolean,
     transitionWaitMs: number
   ): Promise<RecordingHarnessSettledState | null> => {
-    const session = audio.session
+    const session = playback.snapshot().session
     if (!session) return null
 
-    if (settleBeforeAnimation) await settleAt(seconds)
+    if (settleBeforeAnimation && !(await settleAt(seconds))) return null
 
     document.documentElement.style.setProperty(
       '--recording-highlight-animation-delay',
@@ -188,16 +180,11 @@ export function mountRecordingHarness(
       'paused'
     )
     if (scrollTransition || settleBeforeAnimation) {
-      audio.seek(seconds)
-      const cueIndex = highlight.getCueIndex(session.cues, seconds)
-      if (cueIndex >= 0) {
-        highlight.clear()
-        await highlight.activateCue(session.cues[cueIndex], {
-          scroll: scrollTransition,
-        })
-      } else {
-        await timeline.syncHighlight()
-      }
+      playback.seek(seconds)
+      const activated = await playback.activateHighlightAt(seconds, {
+        scroll: scrollTransition,
+      })
+      if (!activated) return null
     }
     await waitForAnimationFrame(view)
     if (transitionWaitMs > 0) {
@@ -206,13 +193,10 @@ export function mountRecordingHarness(
       )
     }
 
-    return {
-      audioId: session.recording.id,
-      currentTime: audio.currentTime,
-      duration: audio.duration,
-      activeTokenKey: highlight.getActiveTokenKey(),
-      scrollTop: getBook().scrollTop,
-    }
+    const rendered = renderState(session)
+    return rendered
+      ? { ...rendered, scrollTop: getBook().scrollTop }
+      : null
   }
 
   const captureRect = (margin = 240) => {
@@ -290,20 +274,23 @@ export function mountRecordingHarness(
 
   const recorder: RecordingHarness = {
     ready: waitUntilReaderReady,
-    loadAudio: (audioId) => recordingSession.loadByAudioId(audioId),
+    loadAudio: (audioId) => playback.loadByAudioId(audioId),
     renderAt,
     renderHighlightAnimationAt,
     settleAt,
-    play: () => audio.play(),
-    pause: () => audio.pause(),
-    state: () => ({
-      ready: isReaderReady(),
-      audioId: audio.session?.recording.id ?? null,
-      duration: audio.duration,
-      currentTime: audio.currentTime,
-      activeTokenKey: highlight.getActiveTokenKey(),
-      scrollTop: getBook().scrollTop,
-    }),
+    play: () => playback.play(),
+    pause: () => playback.pause(),
+    state: () => {
+      const snapshot = playback.snapshot()
+      return {
+        ready: isReaderReady(),
+        audioId: snapshot.session?.recording.id ?? null,
+        duration: snapshot.duration,
+        currentTime: snapshot.currentTime,
+        activeTokenKey: snapshot.activeTokenKey,
+        scrollTop: getBook().scrollTop,
+      }
+    },
     captureRect,
   }
 

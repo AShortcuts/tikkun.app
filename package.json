@@ -6,8 +6,8 @@
   "type": "module",
   "packageManager": "npm@11.19.0",
   "engines": {
-    "node": ">=22.13",
-    "npm": ">=10"
+    "node": "22.23.2",
+    "npm": "11.19.0"
   },
   "scripts": {
     "audio:sync": "node scripts/generate-audio-manifest.mjs",
@@ -18,7 +18,9 @@
     "video:record": "node scripts/record-aliyah-videos.mjs",
     "video:calibrate": "node scripts/record-aliyah-videos.mjs calibrate",
     "video:cleanup": "node scripts/record-aliyah-videos.mjs cleanup",
+    "video:status": "node scripts/record-aliyah-videos.mjs status",
     "video:shut-down": "node scripts/record-aliyah-videos.mjs shutdown",
+    "generated:check": "vitest run --project=node app/data/generated-catalog-validation.test.ts scripts/generate-audio-manifest.test.ts scripts/generate-public-reading-manifest.test.ts scripts/generate-service-worker.test.ts scripts/generate-torah-index.test.ts scripts/generate-video-manifest.test.ts",
     "test": "npm run test:node",
     "test:node": "vitest run --project=node",
     "test:watch": "vitest --project=node",
@@ -26,14 +28,16 @@
     "dev": "vite",
     "build": "npm run torah:index && npm run reading:manifest && vite build && node scripts/finalize-security-headers.mjs && node scripts/generate-service-worker.mjs && node scripts/check-build-budgets.mjs",
     "preview": "vite preview",
+    "preview:verify": "node scripts/verify-preview-artifact.mjs",
     "clean": "rm -rf dist .svelte-kit",
     "lint": "eslint app functions src scripts vite.config.ts vitest.config.ts svelte.config.js",
     "typecheck": "svelte-kit sync && tsc --noEmit && svelte-check --tsconfig ./tsconfig.json",
     "check": "npm run typecheck && npm run lint",
     "test:browser": "vitest run --project=browser",
     "test:browser:webkit": "vitest run --project=webkit",
-    "verify:quick": "npm run check && npm run test:node",
-    "verify": "npm run verify:quick && npm run test:browser && npm run test:browser:webkit && npm run build"
+    "verify:quick": "npm run check && npm run generated:check && npm run test:node",
+    "verify": "npm run verify:quick && npm run test:browser && npm run test:browser:webkit && npm run build",
+    "verify:release": "node scripts/verify-release.mjs"
   },
   "repository": {
     "type": "git",
@@ -60,10 +64,11 @@
     "@types/node": "^25.5.0",
     "@vitest/browser": "4.1.11",
     "@vitest/browser-playwright": "4.1.11",
+    "axe-core": "^4.13.0",
     "eslint": "^10.1.0",
     "eslint-plugin-svelte": "^3.22.0",
     "globals": "^15.9.0",
-    "playwright": "^1.58.2",
+    "playwright": "1.58.2",
     "svelte": "5.56.9",
     "svelte-check": "^4.7.4",
     "tsx": "4.23.12",

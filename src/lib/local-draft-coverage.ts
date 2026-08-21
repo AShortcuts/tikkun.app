@@ -58,7 +58,6 @@ export function getLocalCueDraftStatus(
   }
   if (rawDraft === null) return null
 
-  // Readings is a disclosure-only surface. Invalid authoring data is left in
-  // place for Cue Authoring's lossless recovery flow.
+  // Readings is disclosure-only. Cue Authoring owns invalid draft handling.
   return parseLocalCueDraftStatus(rawDraft, recording, expectedTokenCount)
 }

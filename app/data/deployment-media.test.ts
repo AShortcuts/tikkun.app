@@ -2,6 +2,7 @@ import { expect, test, vi } from 'vitest'
 import type { ParshaAudioRecording } from '../audio/types.ts'
 import { audioRecordings } from './audio-catalog.ts'
 import {
+  appendRecordingMediaVersion,
   resolveDeploymentMediaUrl,
   resolveRecordingMediaUrls,
 } from './deployment-media.ts'
@@ -27,6 +28,23 @@ test('prefixes same-origin recording media for a subpath deployment', () => {
     playSrc: '/pr-preview/pr-42/audio/reader/beresheet/1.m4a',
     downloadSrc: '/pr-preview/pr-42/audio/reader/beresheet/1.m4a',
   })
+})
+
+test('versions playable catalog media by its durable identity', () => {
+  const mediaIdentity = {
+    algorithm: 'sha256' as const,
+    digest: 'a'.repeat(64),
+    byteLength: 123,
+  }
+  expect(
+    resolveRecordingMediaUrls({ ...recording, mediaIdentity }, '/preview')
+  ).toMatchObject({
+    playSrc: `/preview/audio/reader/beresheet/1.m4a?tikkun-media=${mediaIdentity.digest}`,
+    downloadSrc: '/preview/audio/reader/beresheet/1.m4a',
+  })
+  expect(
+    appendRecordingMediaVersion('/audio/file.m4a?quality=high#cue', 'digest')
+  ).toBe('/audio/file.m4a?quality=high&tikkun-media=digest#cue')
 })
 
 test('publishes the generated catalog through the deployment base adapter', () => {

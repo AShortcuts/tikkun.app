@@ -63,6 +63,21 @@ test('loads a recent last reading with display labels', () => {
   })
 })
 
+test('reads the current checkpoint JSON without rewriting it', () => {
+  const storage = createStorage()
+  const checkpoint = {
+    hash: '#/torah/parsha/noach',
+    parshaName: 'Noach',
+    savedAt: now,
+  }
+  storage.setItem('tikkun.last-reading', JSON.stringify(checkpoint))
+
+  expect(loadEligibleLastReading(storage, now)).toEqual(checkpoint)
+  expect(JSON.parse(storage.getItem('tikkun.last-reading') ?? '{}')).toEqual(
+    checkpoint
+  )
+})
+
 test('hides and clears a last reading older than forty eight hours', () => {
   const storage = createStorage()
   saveLastReading(
@@ -78,10 +93,41 @@ test('hides and clears a last reading older than forty eight hours', () => {
   expect(storage.length).toBe(0)
 })
 
+test('does not remove a newer checkpoint that arrives during expired cleanup', () => {
+  const storage = createStorage()
+  saveLastReading(
+    storage,
+    { hash: '#/torah/parsha/noach', parshaName: 'Old' },
+    now - LAST_READING_MAX_AGE_MS - 1
+  )
+  const getItem = storage.getItem.bind(storage)
+  let reads = 0
+  storage.getItem = (key) => {
+    reads += 1
+    if (reads === 2) {
+      storage.setItem(
+        key,
+        JSON.stringify({
+          hash: '#/torah/parsha/beresheet',
+          parshaName: 'New',
+          savedAt: now,
+        })
+      )
+    }
+    return getItem(key)
+  }
+
+  expect(loadEligibleLastReading(storage, now)).toBeNull()
+  expect(JSON.parse(getItem('tikkun.last-reading') ?? '{}')).toMatchObject({
+    parshaName: 'New',
+    savedAt: now,
+  })
+})
+
 test('ignores invalid stored routes', () => {
   const storage = createStorage()
   storage.setItem(
-    'tikkun.last-reading.v1',
+    'tikkun.last-reading',
     JSON.stringify({
       hash: '#/about',
       parshaName: 'About',
@@ -90,11 +136,27 @@ test('ignores invalid stored routes', () => {
   )
 
   expect(loadEligibleLastReading(storage, now)).toBeNull()
-  expect(storage.getItem('tikkun.last-reading.v1')).toBeNull()
-  expect(storage.getItem('tikkun.last-reading.v1:quarantine')).not.toBeNull()
+  expect(storage.getItem('tikkun.last-reading')).not.toBeNull()
 })
 
-test('quarantines a grammar-valid checkpoint that is not routable', () => {
+test('uses no checkpoint for malformed JSON and replaces it on save', () => {
+  vi.spyOn(console, 'error').mockImplementation(() => {})
+  const rawValue = '{bad json'
+  const storage = createStorage()
+  storage.setItem('tikkun.last-reading', rawValue)
+
+  expect(loadEligibleLastReading(storage, now)).toBeNull()
+  expect(storage.getItem('tikkun.last-reading')).toBe(rawValue)
+
+  saveLastReading(
+    storage,
+    { hash: '#/torah/parsha/noach', parshaName: 'Recovered' },
+    now
+  )
+  expect(loadEligibleLastReading(storage, now)?.parshaName).toBe('Recovered')
+})
+
+test('ignores a grammar-valid checkpoint that is not routable', () => {
   const storage = createStorage()
   saveLastReading(
     storage,
@@ -106,14 +168,13 @@ test('quarantines a grammar-valid checkpoint that is not routable', () => {
   )
 
   expect(loadEligibleLastReading(storage, now, () => false)).toBeNull()
-  expect(storage.getItem('tikkun.last-reading.v1')).toBeNull()
-  expect(storage.getItem('tikkun.last-reading.v1:quarantine')).not.toBeNull()
+  expect(storage.getItem('tikkun.last-reading')).not.toBeNull()
 })
 
-test('quarantines an invalid saved timestamp', () => {
+test('ignores an invalid saved timestamp', () => {
   const storage = createStorage()
   storage.setItem(
-    'tikkun.last-reading.v1',
+    'tikkun.last-reading',
     JSON.stringify({
       hash: '#/torah/parsha/noach',
       parshaName: 'Noach',
@@ -122,14 +183,13 @@ test('quarantines an invalid saved timestamp', () => {
   )
 
   expect(loadEligibleLastReading(storage, now)).toBeNull()
-  expect(storage.getItem('tikkun.last-reading.v1')).toBeNull()
-  expect(storage.getItem('tikkun.last-reading.v1:quarantine')).not.toBeNull()
+  expect(storage.getItem('tikkun.last-reading')).not.toBeNull()
 })
 
-test('quarantines an impossible future timestamp instead of retaining it forever', () => {
+test('ignores an impossible future timestamp', () => {
   const storage = createStorage()
   storage.setItem(
-    'tikkun.last-reading.v1',
+    'tikkun.last-reading',
     JSON.stringify({
       hash: '#/torah/parsha/noach',
       parshaName: 'Noach',
@@ -138,8 +198,7 @@ test('quarantines an impossible future timestamp instead of retaining it forever
   )
 
   expect(loadEligibleLastReading(storage, now)).toBeNull()
-  expect(storage.getItem('tikkun.last-reading.v1')).toBeNull()
-  expect(storage.getItem('tikkun.last-reading.v1:quarantine')).not.toBeNull()
+  expect(storage.getItem('tikkun.last-reading')).not.toBeNull()
 })
 
 test('ignores the moving calendar default route', () => {
@@ -168,6 +227,23 @@ test('prefers semantic parsha urls with verse refs for last reading links', () =
 
   expect(createLastReadingHash(run, run.aliyot[0].start)).toBe(
     '#/torah/parsha/beresheet/1-1-1'
+  )
+})
+
+test('uses a semantic combined-parsha URL for scroll checkpoints', () => {
+  const generator = new LeiningGenerator(testSettings)
+  const combined = generator
+    .forHebrewYear(5786)
+    .find((candidate) => candidate.id === '2026-09-05')
+    ?.leinings.find(
+      (leining) => leining.date.title.en === 'Parshat Nitzavim-Vayeilech'
+    )
+  const run = combined?.runs[0]
+
+  if (!run) throw new Error('Missing Nitzavim-Vayeilech run')
+
+  expect(createLastReadingHash(run, run.aliyot[0].start)).toBe(
+    '#/torah/parsha/nitzavim-vayelech/5-29-9'
   )
 })
 

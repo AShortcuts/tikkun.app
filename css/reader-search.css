@@ -43,7 +43,8 @@
   min-height: 3.35rem;
   padding: 0.62rem 0.75rem 0.62rem 0.95rem;
   background: var(--light-accent-color);
-  transition: background-color var(--reader-motion-color) var(--reader-ease-standard);
+  transition: background-color var(--reader-motion-color)
+    var(--reader-ease-standard);
 }
 
 .reader-search-embedded .reader-search-bar {
@@ -143,7 +144,8 @@
 .reader-search-result {
   list-style: none;
   border-radius: 7px;
-  transition: background-color var(--reader-motion-color) var(--reader-ease-standard);
+  transition: background-color var(--reader-motion-color)
+    var(--reader-ease-standard);
 }
 
 .reader-search-result + .reader-search-result {
@@ -294,14 +296,6 @@
 }
 
 @media screen and (max-width: 550px) {
-  .command-palette {
-    padding:
-      max(0.75rem, env(safe-area-inset-top, 0px))
-      max(0.75rem, env(safe-area-inset-right, 0px))
-      max(0.75rem, env(safe-area-inset-bottom, 0px))
-      max(0.75rem, env(safe-area-inset-left, 0px));
-  }
-
   .reader-search {
     width: 100%;
   }

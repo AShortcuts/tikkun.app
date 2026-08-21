@@ -2,10 +2,15 @@
   "audioId": "nasso-7",
   "audioFormat": "m4a",
   "narratorId": "yoni-davidov",
-  "parshaSlug": "nasso",
+  "readingId": "nasso",
   "aliyah": 7,
   "tokenCount": 0,
   "cueCount": 0,
   "tokenizationVersion": "v1",
+  "mediaIdentity": {
+    "algorithm": "sha256",
+    "digest": "c09660e841f83bf7f63765a24479623544d1fb621d372b5e3d26fae007538f6a",
+    "byteLength": 8519198
+  },
   "cues": []
 }

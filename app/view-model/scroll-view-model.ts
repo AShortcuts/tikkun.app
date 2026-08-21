@@ -25,6 +25,12 @@ import {
 } from '../location.ts'
 
 type PageLoader = () => Promise<LineType[]>
+type PageVerse = LineType['verses'][number]
+
+function toRef(verse: PageVerse): Ref {
+  return { b: verse.book, c: verse.chapter, v: verse.verse }
+}
+
 export type PageStartLocation = {
   scroll: ScrollName
   pageNumber: number
@@ -608,18 +614,4 @@ class ContentCursor {
     )
     return request
   }
-}
-
-// TODO(#130): Delete this function & type once we unify these types.
-function toRef(verse: VerseFromJson): Ref {
-  return {
-    b: verse.book,
-    c: verse.chapter,
-    v: verse.verse,
-  }
-}
-type VerseFromJson = {
-  book: number
-  chapter: number
-  verse: number
 }
