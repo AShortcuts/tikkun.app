@@ -44,6 +44,34 @@ _Avoid_: Framework router, Reader Shell, page renderer
 The compact or wide presentation mode selected from the available reader width. It describes layout capacity, not the device or packaging environment.
 _Avoid_: Mobile device, desktop device, Capacitor mode
 
+**Reading Layout**:
+The reflowed reader layout that presents each pasuk as its own right-aligned RTL logical block and lets it wrap naturally at the chosen font size. Every pasuk uses the same visual block rhythm; Reading Layout does not add distinct petuchah or setumah spacing. It is the default mobile portrait layout and does not preserve physical Torah line breaks. Physical Tikkun page numbers and separators are hidden; internal pages remain only as loading and token-identity containers. Pasuk blocks do not become scroll-URL checkpoints; aliyah starts retain that role. The user can choose it from Customize Reader alongside Match Torah Lines.
+_Avoid_: Approximate Torah lines, broken exact mode
+
+**Match Torah Lines**:
+The deliberate Customize Reader layout that preserves the fixed physical Torah line breaks through uniform page scaling and, when necessary, shared zooming or panning. Mobile-landscape Two Sided initially fits both complete mirrored sides, then zooms and pans them as one canvas so they cannot drift. The forehead headings and swap control remain fixed, and re-entering the layout starts from a clean fit.
+_Avoid_: Per-line shrinking, Reading Layout
+
+**One Side**:
+One visible occurrence of the reading. Torah and Tikkun forms occupy the same reading surface rather than appearing beside each other. Desktop uses the existing bottom-right reader button to swap forms. Mobile uses a guarded clean tap on the noninteractive reading area; scrolling, long presses, selection, links, markers, and controls do not trigger a swap. Both interactions preserve the focal position and active audio token. Mobile interaction guidance appears concisely inside Customize Reader rather than as a first-use hint, banner, or persistent copy on the reading surface.
+_Avoid_: Single column
+
+**Two Sided**:
+Two mirrored visual occurrences of one logical token sequence. Both occurrences use identical content, sizing, spacing, wrapping, and scroll geometry; only nekudot and taamim differ. Each form's title is centered over its text, and the sole swap control sits on the forehead between the titles over the pane divider. This placement applies to desktop and mobile-landscape Two Sided modes; the desktop bottom-right form button remains exclusive to One Side. The default order is Tikkun on the right and Torah on the left. A single persisted Two Sided order is shared across readings, reloads, Reading Layout, Match Torah Lines, desktop, and mobile landscape; it does not affect the active One Side form.
+_Avoid_: Independent columns, loosely paired translations
+
+**Two Sided Swap Motion**:
+The responsive transition used by the forehead swap control. Base Hebrew letters and reader geometry remain stationary while nekudot and taamim crossfade between sides, titles use a short directional fade or shift, and the arrows briefly rotate. The transition uses interruptible transform and opacity changes around 180-220ms, never blocks repeated input, and becomes an immediate or minimal fade under reduced motion.
+_Avoid_: Sliding the full reading surface, layout animation, blocking choreography
+
+**Reader Mode Matrix**:
+The product of two independent reader choices: One Side or Two Sided, and Reading Layout or Match Torah Lines. All four combinations are valid, and changing one axis does not silently change the other. Mobile portrait temporarily renders One Side without overwriting a stored Two Sided preference. The unavailable Two Sided choice remains visible with a rotate-phone icon and a concise Landscape indication; rotating back restores Two Sided.
+_Avoid_: Four unrelated renderers, coupled side and line settings
+
+**Shirah Row**:
+A semantic poetic line whose separated spans are read across the row in RTL order. Responsive layouts may reduce the gap and wrap text within each span, but must not stack the spans vertically or change their reading order. In mobile Two Sided Reading Layout, heavier wrapping is preferred over horizontal panning so both complete mirrored sides remain visible.
+_Avoid_: Stacked poetic halves, independent reading columns
+
 **Platform Capability**:
 A browser or native service that is actually available in the current runtime, such as filesystem access or a registered Capacitor plugin. It does not select responsive layout.
 _Avoid_: Mobile layout, compact viewport
@@ -59,6 +87,10 @@ _Avoid_: Telemetry, console transcript, crash upload
 **Aliyah Navigation**:
 The Svelte-rendered reader feature for identifying, selecting, and playing an aliyah. One Module owns the toolbar capsule, compact sheet, segments, and wide rail behind a small TypeScript Interface; Reader Runtime still owns routing, scrolling, playback, recording lookup, and Cue Data.
 _Avoid_: Mobile aliyah logic, desktop aliyah state
+
+**Direct Audio Capsule**:
+The compact, fixed-size Aliyah Navigation split control. Its primary segment plays or pauses the current aliyah with one tap; its smaller chevron segment opens the existing aliyah chooser. Playback state replaces the primary icon in place rather than adding labels, rows, or controls: play, pause, compact loading spinner, retry arrow after failure, or muted disabled play when unavailable. Detailed status and recovery remain in the existing Floating Player, and an unavailable primary segment does not disable the chooser. Starting a newly targeted aliyah reuses the existing exact token-range, mid-line start, overlap-recording, playback-plan, and first-cue rules without inferring a new starting word.
+_Avoid_: Second player, expanding control panel, status copy, whole-capsule picker, automatic playback
 
 **Playback Timeline**:
 The logical clock a reader sees while one or more physical recordings supply an aliyah.
@@ -81,7 +113,7 @@ The TypeScript Module that owns one optional page-virtualization session: active
 _Avoid_: ScrollDisplay, Reader Presentation, playback prewarming
 
 **Reader Settings**:
-The first-use Svelte dialog that presents preferences and owns its form, focus, and browser lifetime behind a small TypeScript mount interface. Its launcher remains ready before the dialog code loads. Reader Runtime still owns the canonical preference state and cross-feature effects.
+The first-use Svelte dialog that presents preferences and owns its form, focus, and browser lifetime behind a small TypeScript mount interface. Its controls apply immediately while the pane remains open; there is no separate Save or Go action. Reading Layout and Match Torah Lines switches preserve the focal logical reading position and uninterrupted playback while resetting only layout-specific zoom or pan state. Its launcher remains ready before the dialog code loads. Reader Runtime still owns the canonical preference state and cross-feature effects.
 _Avoid_: Toolbar state, global settings
 
 **Reader Controls**:

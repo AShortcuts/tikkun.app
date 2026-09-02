@@ -4,9 +4,19 @@
   import ReadingCard from '$lib/components/ReadingCard.svelte'
   import { availableReadings, getRequiredReading } from '$lib/readings'
   import { onMount } from 'svelte'
+  import { Spring } from 'svelte/motion'
 
   type PreviewTheme = 'automatic' | 'light' | 'sepia' | 'dark'
   type MobileThemeSheetState = 'waiting' | 'pinned' | 'released'
+  type StoryStops = {
+    themeStart: number
+    themeSettle: number
+    controlsStart: number
+    controlsSettle: number
+    practiceStart: number
+    practiceSettle: number
+    releaseStart: number
+  }
 
   const featuredReading = getRequiredReading('beresheet')
   const featuredAliyah = featuredReading.aliyot[0]
@@ -43,21 +53,145 @@
     'הָאָרֶץ',
   ] as const
 
+  const storyProgress = new Spring(0, {
+    stiffness: 0.16,
+    damping: 0.82,
+    precision: 0.001,
+  })
+
+  function clamp(value: number, minimum: number, maximum: number) {
+    return Math.min(Math.max(value, minimum), maximum)
+  }
+
+  function clampProgress(value: number) {
+    return clamp(value, 0, 1)
+  }
+
+  function phaseProgress(value: number, start: number, end: number) {
+    if (end <= start) return value >= end ? 1 : 0
+    return clampProgress((value - start) / (end - start))
+  }
+
+  function easeInOut(value: number) {
+    const progress = clampProgress(value)
+    return progress < 0.5
+      ? 4 * progress * progress * progress
+      : 1 - Math.pow(-2 * progress + 2, 3) / 2
+  }
+
+  function mix(start: number, end: number, progress: number) {
+    return start + (end - start) * progress
+  }
+
+  function buildStoryMotion(
+    progress: number,
+    stops: StoryStops,
+    viewportWidth: number,
+    viewportHeight: number
+  ) {
+    const theme = easeInOut(
+      phaseProgress(progress, stops.themeStart, stops.themeSettle)
+    )
+    const practice = easeInOut(
+      phaseProgress(progress, stops.practiceStart, stops.practiceSettle)
+    )
+    const fit = easeInOut(
+      phaseProgress(progress, stops.controlsStart, stops.controlsSettle)
+    )
+    const heading = easeInOut(
+      phaseProgress(
+        progress,
+        mix(stops.themeStart, stops.themeSettle, 0.42),
+        stops.themeSettle
+      )
+    )
+    const controlsReveal = easeInOut(
+      phaseProgress(
+        progress,
+        mix(stops.controlsStart, stops.controlsSettle, 0.42),
+        stops.controlsSettle
+      )
+    )
+    const chapterExit = easeInOut(
+      phaseProgress(
+        progress,
+        mix(stops.controlsSettle, stops.practiceStart, 0.35),
+        stops.practiceStart
+      )
+    )
+    const release = easeInOut(phaseProgress(progress, stops.releaseStart, 1))
+    const paper = theme * (1 - practice)
+
+    const wideLayout = viewportWidth >= 1024
+    const openingX = wideLayout
+      ? clamp(viewportWidth * 0.19, 248, 272)
+      : viewportWidth * 0.18
+    const openingScale = wideLayout ? 0.84 : 0.9
+    const paperX = 0
+    const paperY = clamp(viewportHeight * 0.11, 72, 110)
+    const fittedY = -clamp(viewportHeight * 0.026, 20, 30)
+    const fittedScale = wideLayout ? 0.69 : 0.74
+    const practiceX = viewportWidth * (wideLayout ? -0.2 : -0.22)
+    const practiceY = viewportHeight * 0.025
+    const practiceScale = wideLayout ? 0.61 : 0.58
+
+    const paperReaderX = mix(openingX, paperX, theme)
+    const paperReaderY = mix(0, paperY, theme)
+    const paperReaderScale = mix(openingScale, 0.92, theme)
+    const fittedReaderY = mix(paperReaderY, fittedY, fit)
+    const fittedReaderScale = mix(paperReaderScale, fittedScale, fit)
+
+    return {
+      paper,
+      practice,
+      release,
+      readerX: mix(paperReaderX, practiceX, practice),
+      readerY: mix(fittedReaderY, practiceY, practice),
+      readerScale: mix(fittedReaderScale, practiceScale, practice),
+      rotateX: mix(mix(wideLayout ? 1.8 : 0.8, 0, theme), 0.5, practice),
+      rotateY: mix(mix(wideLayout ? -5.4 : -2.8, 0, theme), 1.2, practice),
+      rotateZ: mix(mix(wideLayout ? -1 : -0.5, 0, theme), -0.2, practice),
+      heroOpacity: 1 - easeInOut(phaseProgress(progress, stops.themeStart, stops.themeSettle)),
+      readerOpacity: 1 - release,
+      themeReveal: heading,
+      themeOpacity: heading > 0.001 ? 1 - chapterExit : 0,
+      themeY: (1 - heading) * 10 - chapterExit * 2.25,
+      controlsOpacity: controlsReveal * (1 - chapterExit),
+      controlsY: (1 - controlsReveal) * 1.75 - chapterExit * 2.25,
+      practiceOpacity: practice * (1 - release),
+      ambientOpacity: 0.42 * (1 - theme),
+    }
+  }
+
   let selectedTheme = $state<PreviewTheme>('light')
   let activeBeat = $state(0)
   let readerLoaded = $state(false)
   let tocPreviewOpen = $state(true)
   let isMobileHero = $state(false)
-  let desktopThemeActive = $state(false)
   let mobileThemeSheetState = $state<MobileThemeSheetState>('waiting')
   let responsiveLayoutReady = $state(false)
+  let viewportWidth = $state(1440)
+  let viewportHeight = $state(900)
+  let storyStops = $state<StoryStops>({
+    themeStart: 0.06,
+    themeSettle: 0.2,
+    controlsStart: 0.25,
+    controlsSettle: 0.3,
+    practiceStart: 0.38,
+    practiceSettle: 0.48,
+    releaseStart: 0.91,
+  })
+  let frontFilmElement: HTMLDivElement | undefined
   let heroReaderStage: HTMLDivElement | undefined
   let heroReaderShell: HTMLDivElement | undefined
   let heroReaderFrame: HTMLIFrameElement | undefined
-  let desktopThemeHandoffElement: HTMLDivElement | undefined
+  let desktopThemeChapterElement: HTMLElement | undefined
+  let desktopThemeFooterElement: HTMLElement | undefined
+  let practiceSectionElement: HTMLElement | undefined
   let mobileThemeSheetElement: HTMLElement | undefined
   let mobileThemeSheetReleaseSentinel: HTMLSpanElement | undefined
-  let frameThemeObserver: MutationObserver | undefined
+  let frameThemeStabilizeFrame: number | undefined
+  let frameThemeStabilizeUntil = 0
 
   const frameScrollRelayCleanups = new WeakMap<HTMLIFrameElement, () => void>()
   const activeFrameScrollRelayCleanups: Array<() => void> = []
@@ -65,32 +199,72 @@
   let selectedThemeLabel = $derived(
     previewThemes.find((theme) => theme.value === selectedTheme)?.label ?? 'Light'
   )
+  let storyMotion = $derived(
+    buildStoryMotion(
+      storyProgress.current,
+      storyStops,
+      viewportWidth,
+      viewportHeight
+    )
+  )
+  let desktopThemeActive = $derived(
+    responsiveLayoutReady && !isMobileHero && storyMotion.paper > 0.48
+  )
+  let desktopPracticeActive = $derived(
+    responsiveLayoutReady &&
+      !isMobileHero &&
+      storyMotion.practiceOpacity > 0.08
+  )
+  let desktopControlsActive = $derived(
+    responsiveLayoutReady &&
+      !isMobileHero &&
+      storyMotion.controlsOpacity > 0.08
+  )
+  let storyMotionStyle = $derived(
+    [
+      `--story-progress: ${(storyProgress.current * 100).toFixed(3)}%`,
+      `--story-paper-opacity: ${storyMotion.paper.toFixed(4)}`,
+      `--story-ambient-opacity: ${storyMotion.ambientOpacity.toFixed(4)}`,
+      `--story-hero-opacity: ${storyMotion.heroOpacity.toFixed(4)}`,
+      `--story-reader-opacity: ${storyMotion.readerOpacity.toFixed(4)}`,
+      `--story-theme-opacity: ${storyMotion.themeOpacity.toFixed(4)}`,
+      `--story-theme-clip: ${((1 - storyMotion.themeReveal) * 100).toFixed(3)}%`,
+      `--story-theme-y: ${storyMotion.themeY.toFixed(3)}rem`,
+      `--story-controls-opacity: ${storyMotion.controlsOpacity.toFixed(4)}`,
+      `--story-controls-y: ${storyMotion.controlsY.toFixed(3)}rem`,
+      `--story-practice-opacity: ${storyMotion.practiceOpacity.toFixed(4)}`,
+      `--story-practice-y: ${((1 - storyMotion.practice) * 2.75).toFixed(3)}rem`,
+      `--story-ambient-y: ${(storyProgress.current * -56).toFixed(3)}px`,
+      `--story-reader-x: ${storyMotion.readerX.toFixed(3)}px`,
+      `--story-reader-y: ${storyMotion.readerY.toFixed(3)}px`,
+      `--story-reader-scale: ${storyMotion.readerScale.toFixed(5)}`,
+      `--story-reader-rotate-x: ${storyMotion.rotateX.toFixed(4)}deg`,
+      `--story-reader-rotate-y: ${storyMotion.rotateY.toFixed(4)}deg`,
+      `--story-reader-rotate-z: ${storyMotion.rotateZ.toFixed(4)}deg`,
+    ].join('; ')
+  )
 
   function applyFrameTheme(frame: HTMLIFrameElement | undefined, theme: PreviewTheme) {
     const root = frame?.contentDocument?.documentElement
     if (!root) return false
-    root.dataset.readerTheme = theme
+    if (root.dataset.readerTheme !== theme) root.dataset.readerTheme = theme
     return true
   }
 
-  function attachFrameThemeOverride(frame: HTMLIFrameElement | undefined) {
-    const root = frame?.contentDocument?.documentElement
-    if (!root) return false
-
-    frameThemeObserver?.disconnect()
-    const keepSelectedThemeApplied = () => {
-      if (root.dataset.readerTheme !== selectedTheme) {
-        root.dataset.readerTheme = selectedTheme
-      }
+  function stabilizeFrameTheme(frame: HTMLIFrameElement | undefined) {
+    if (!frame) return
+    if (frameThemeStabilizeFrame !== undefined) {
+      window.cancelAnimationFrame(frameThemeStabilizeFrame)
     }
-    const themeObserver = new MutationObserver(keepSelectedThemeApplied)
-    themeObserver.observe(root, {
-      attributes: true,
-      attributeFilter: ['data-reader-theme'],
-    })
-    frameThemeObserver = themeObserver
-    keepSelectedThemeApplied()
-    return true
+    frameThemeStabilizeUntil = window.performance.now() + 600
+
+    const syncTheme = () => {
+      frameThemeStabilizeFrame = undefined
+      applyFrameTheme(frame, selectedTheme)
+      if (window.performance.now() >= frameThemeStabilizeUntil) return
+      frameThemeStabilizeFrame = window.requestAnimationFrame(syncTheme)
+    }
+    syncTheme()
   }
 
   function lockFrameScrolling(frame: HTMLIFrameElement | undefined) {
@@ -342,10 +516,6 @@
       console.error(`${frameName} did not expose a same-origin document`)
       return false
     }
-    if (!attachFrameThemeOverride(frame)) {
-      console.error(`${frameName} did not expose an observable theme root`)
-      return false
-    }
     if (!lockFrameScrolling(frame)) {
       console.error(`${frameName} did not expose a same-origin scroll surface`)
       return false
@@ -363,6 +533,7 @@
       selectedTheme,
       'The prototype hero reader'
     )
+    if (readerLoaded) stabilizeFrameTheme(heroReaderFrame)
   }
 
   $effect(() => {
@@ -372,12 +543,17 @@
 
   onMount(() => {
     const mobileHeroQuery = window.matchMedia('(max-width: 47.999rem)')
+    const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
     let mobileThemeSheetSetupFrame: number | undefined
+    let storyLayoutFrame: number | undefined
+    let storyScrollFrame: number | undefined
     let readerEnteredSheetZone = false
     let readerBottomReachedSheet = false
     let readerEntryObserver: IntersectionObserver | undefined
     let readerReleaseObserver: IntersectionObserver | undefined
-    let desktopThemeObserver: IntersectionObserver | undefined
+    const beats = Array.from(
+      document.querySelectorAll<HTMLElement>('.scroll-practice-beat')
+    )
 
     const syncMobileThemeSheetState = () => {
       if (!mobileHeroQuery.matches || !readerEnteredSheetZone) {
@@ -456,52 +632,132 @@
       mobileThemeSheetSetupFrame = window.requestAnimationFrame(setupMobileThemeSheetObservers)
     }
 
-    const setupDesktopThemeObserver = () => {
-      desktopThemeObserver?.disconnect()
-      if (mobileHeroQuery.matches || !desktopThemeHandoffElement) {
-        desktopThemeActive = false
+    const syncActiveBeat = () => {
+      const focusLine = window.innerHeight * 0.52
+      let nextBeat = 0
+      let closestDistance = Number.POSITIVE_INFINITY
+
+      for (const beat of beats) {
+        const rect = beat.getBoundingClientRect()
+        const distance = Math.abs(rect.top + rect.height / 2 - focusLine)
+        if (distance >= closestDistance) continue
+        const parsedBeat = Number.parseInt(beat.dataset.beat ?? '', 10)
+        if (!Number.isInteger(parsedBeat)) continue
+        closestDistance = distance
+        nextBeat = parsedBeat
+      }
+
+      const beatChanged = nextBeat !== activeBeat
+      activeBeat = nextBeat
+      if (beatChanged && nextBeat === 0) tocPreviewOpen = true
+    }
+
+    const syncStoryProgress = (instant = false) => {
+      storyScrollFrame = undefined
+      if (!frontFilmElement) return
+
+      const filmRect = frontFilmElement.getBoundingClientRect()
+      const scrollRange = Math.max(frontFilmElement.offsetHeight - window.innerHeight, 1)
+      const rawProgress = clampProgress(-filmRect.top / scrollRange)
+      const enteringDesktopTheme =
+        !mobileHeroQuery.matches &&
+        rawProgress >= storyStops.themeStart &&
+        rawProgress < storyStops.controlsStart
+      if (enteringDesktopTheme) {
+        if (selectedTheme !== 'light') selectedTheme = 'light'
+        applyFrameTheme(heroReaderFrame, 'light')
+      }
+      if (instant || reducedMotionQuery.matches) {
+        void storyProgress.set(rawProgress, { instant: true })
+      } else {
+        storyProgress.target = rawProgress
+      }
+      syncActiveBeat()
+    }
+
+    const scheduleStoryProgressSync = () => {
+      if (storyScrollFrame !== undefined) return
+      storyScrollFrame = window.requestAnimationFrame(() => syncStoryProgress())
+    }
+
+    const measureStoryLayout = () => {
+      storyLayoutFrame = undefined
+      viewportWidth = window.innerWidth
+      viewportHeight = window.innerHeight
+      if (
+        !frontFilmElement ||
+        !desktopThemeChapterElement ||
+        !desktopThemeFooterElement ||
+        !practiceSectionElement
+      ) {
         return
       }
 
-      desktopThemeObserver = new IntersectionObserver(
-        ([entry]) => {
-          if (!entry) return
-          const activationLine = entry.rootBounds?.bottom ?? window.innerHeight * 0.5
-          desktopThemeActive =
-            entry.isIntersecting || entry.boundingClientRect.top <= activationLine
-        },
-        { rootMargin: '0px 0px -50% 0px' }
+      const filmTop = window.scrollY + frontFilmElement.getBoundingClientRect().top
+      const scrollRange = Math.max(frontFilmElement.offsetHeight - window.innerHeight, 1)
+      const progressAtViewportLine = (element: HTMLElement, viewportLine: number) => {
+        const elementTop = window.scrollY + element.getBoundingClientRect().top
+        return clampProgress(
+          (elementTop - filmTop - window.innerHeight * viewportLine) / scrollRange
+        )
+      }
+
+      const themeStart = progressAtViewportLine(desktopThemeChapterElement, 0.78)
+      const themeSettle = Math.max(
+        themeStart + 0.06,
+        progressAtViewportLine(desktopThemeChapterElement, 0.08)
       )
-      desktopThemeObserver.observe(desktopThemeHandoffElement)
+      const controlsStart = Math.max(
+        themeSettle + 0.018,
+        progressAtViewportLine(desktopThemeFooterElement, 0.99)
+      )
+      const controlsSettle = Math.max(
+        controlsStart + 0.032,
+        progressAtViewportLine(desktopThemeFooterElement, 0.83)
+      )
+      const practiceStart = Math.max(
+        controlsSettle + 0.055,
+        progressAtViewportLine(practiceSectionElement, 0.88)
+      )
+      const practiceSettle = Math.max(
+        practiceStart + 0.06,
+        progressAtViewportLine(practiceSectionElement, 0.12)
+      )
+      const releaseStart = clamp(
+        (frontFilmElement.offsetHeight - window.innerHeight * 1.12) / scrollRange,
+        practiceSettle + 0.12,
+        0.985
+      )
+
+      storyStops = {
+        themeStart,
+        themeSettle,
+        controlsStart,
+        controlsSettle,
+        practiceStart,
+        practiceSettle,
+        releaseStart,
+      }
+      syncStoryProgress(true)
+    }
+
+    const scheduleStoryLayoutMeasurement = () => {
+      if (storyLayoutFrame !== undefined) return
+      storyLayoutFrame = window.requestAnimationFrame(measureStoryLayout)
     }
 
     const syncHeroLayout = () => {
       isMobileHero = mobileHeroQuery.matches
       responsiveLayoutReady = true
       scheduleMobileThemeSheetObserverSetup()
-      setupDesktopThemeObserver()
+      scheduleStoryLayoutMeasurement()
     }
     syncHeroLayout()
     mobileHeroQuery.addEventListener('change', syncHeroLayout)
+    reducedMotionQuery.addEventListener('change', scheduleStoryProgressSync)
+    window.addEventListener('scroll', scheduleStoryProgressSync, { passive: true })
     window.addEventListener('resize', scheduleMobileThemeSheetObserverSetup)
-
-    const beats = document.querySelectorAll<HTMLElement>('.scroll-practice-beat')
-    const beatObserver = new IntersectionObserver(
-      (entries) => {
-        const mostVisibleBeat = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((first, second) => second.intersectionRatio - first.intersectionRatio)[0]
-        if (!(mostVisibleBeat?.target instanceof HTMLElement)) return
-        const nextBeat = Number.parseInt(mostVisibleBeat.target.dataset.beat ?? '', 10)
-        if (Number.isInteger(nextBeat)) {
-          const beatChanged = nextBeat !== activeBeat
-          activeBeat = nextBeat
-          if (beatChanged && nextBeat === 0) tocPreviewOpen = true
-        }
-      },
-      { threshold: [0.35, 0.55, 0.75], rootMargin: '-12% 0px -20% 0px' }
-    )
-    beats.forEach((beat) => beatObserver.observe(beat))
+    window.addEventListener('resize', scheduleStoryLayoutMeasurement)
 
     if (
       !heroReaderStage ||
@@ -518,26 +774,50 @@
     if (mobileThemeSheetElement) {
       mobileThemeSheetResizeObserver.observe(mobileThemeSheetElement)
     }
+    const storyLayoutResizeObserver = new ResizeObserver(
+      scheduleStoryLayoutMeasurement
+    )
+    if (frontFilmElement) storyLayoutResizeObserver.observe(frontFilmElement)
     scheduleMobileThemeSheetObserverSetup()
+    scheduleStoryLayoutMeasurement()
 
     return () => {
       for (const cleanup of [...activeFrameScrollRelayCleanups]) cleanup()
-      beatObserver.disconnect()
       readerEntryObserver?.disconnect()
       readerReleaseObserver?.disconnect()
-      desktopThemeObserver?.disconnect()
-      frameThemeObserver?.disconnect()
       mobileThemeSheetResizeObserver.disconnect()
+      storyLayoutResizeObserver.disconnect()
       if (mobileThemeSheetSetupFrame !== undefined) {
         window.cancelAnimationFrame(mobileThemeSheetSetupFrame)
       }
+      if (storyLayoutFrame !== undefined) {
+        window.cancelAnimationFrame(storyLayoutFrame)
+      }
+      if (storyScrollFrame !== undefined) {
+        window.cancelAnimationFrame(storyScrollFrame)
+      }
+      if (frameThemeStabilizeFrame !== undefined) {
+        window.cancelAnimationFrame(frameThemeStabilizeFrame)
+      }
       mobileHeroQuery.removeEventListener('change', syncHeroLayout)
+      reducedMotionQuery.removeEventListener('change', scheduleStoryProgressSync)
+      window.removeEventListener('scroll', scheduleStoryProgressSync)
       window.removeEventListener('resize', scheduleMobileThemeSheetObserverSetup)
+      window.removeEventListener('resize', scheduleStoryLayoutMeasurement)
     }
   })
 </script>
 
 <svelte:head>
+  <style>
+    html {
+      scroll-behavior: auto !important;
+    }
+  </style>
+  <script>
+    window.history.scrollRestoration = 'manual'
+    window.scrollTo(0, 0)
+  </script>
   <title>Tikkun Reader | Scroll story prototype</title>
   <meta
     name="description"
@@ -628,8 +908,12 @@
 
 <main>
   <div
+    bind:this={frontFilmElement}
     class:mod-theme-active={responsiveLayoutReady && !isMobileHero && desktopThemeActive}
+    class:mod-controls-active={desktopControlsActive}
+    class:mod-practice-active={desktopPracticeActive}
     class="scroll-reader-journey"
+    style={storyMotionStyle}
   >
     <section class="scroll-hero" aria-labelledby="scroll-hero-title">
       <img
@@ -728,22 +1012,55 @@
             </div>
             <p class="scroll-theme-status" aria-live="polite">{selectedThemeLabel} theme selected</p>
           </section>
+
+          <div class="scroll-film-progress" aria-hidden="true"><span></span></div>
+
+          <div
+            class="scroll-stage-practice"
+            data-active-beat={activeBeat}
+            aria-label="Practice walkthrough preview"
+            aria-hidden={!desktopPracticeActive}
+            inert={!desktopPracticeActive}
+          >
+            <div class="scroll-stage-practice-heading">
+              <span aria-hidden="true">0{activeBeat + 1}</span>
+              <p>Live reader workflow</p>
+            </div>
+            <div class="scroll-stage-practice-card">
+              {#key activeBeat}
+                {@render practiceScene(activeBeat, 'film')}
+              {/key}
+            </div>
+            {#key activeBeat}
+              <p class="scroll-beat-status" aria-live="polite">{beatCopy[activeBeat]}</p>
+            {/key}
+          </div>
         </div>
       </div>
     </section>
 
-    <section class="scroll-theme-chapter" id="themes" aria-labelledby="scroll-theme-title">
+    <section
+      class="scroll-theme-chapter"
+      id="themes"
+      aria-labelledby="scroll-theme-title"
+    >
+      <span
+        bind:this={desktopThemeChapterElement}
+        class="scroll-theme-copy-anchor"
+        aria-hidden="true"
+      ></span>
       <div class="scroll-theme-copy">
         <h2 id="scroll-theme-title">Read it your way.</h2>
         <p>Choose the page treatment that keeps the text comfortable and your attention steady.</p>
       </div>
 
-      <div
-        bind:this={desktopThemeHandoffElement}
-        class="scroll-theme-reader-space"
-        aria-hidden="true"
-      ></div>
+      <div class="scroll-theme-reader-space" aria-hidden="true"></div>
 
+      <span
+        bind:this={desktopThemeFooterElement}
+        class="scroll-theme-footer-anchor"
+        aria-hidden="true"
+      ></span>
       <div class="scroll-theme-footer">
         <div class="scroll-theme-controls" aria-label="Reader preview theme">
           {#each previewThemes as theme (theme.value)}
@@ -763,9 +1080,13 @@
         <p class="scroll-theme-status" aria-live="polite">{selectedThemeLabel} theme selected</p>
       </div>
     </section>
-  </div>
 
-  <section class="scroll-practice" id="how-it-works" aria-labelledby="scroll-practice-title">
+  <section
+    bind:this={practiceSectionElement}
+    class="scroll-practice"
+    id="how-it-works"
+    aria-labelledby="scroll-practice-title"
+  >
     <div class="scroll-practice-shell">
       <div class="scroll-practice-intro">
         <h2 id="scroll-practice-title">Practice without losing your place.</h2>
@@ -776,17 +1097,6 @@
       </div>
 
       <div class="scroll-practice-grid">
-        <div class="scroll-practice-sticky">
-          <div class="scroll-practice-visual" data-active-beat={activeBeat}>
-            {#key activeBeat}
-              {@render practiceScene(activeBeat, 'desktop')}
-            {/key}
-          </div>
-          {#key activeBeat}
-            <p class="scroll-beat-status" aria-live="polite">{beatCopy[activeBeat]}</p>
-          {/key}
-        </div>
-
         <div class="scroll-practice-beats">
           <article
             class:mod-active={activeBeat === 0}
@@ -858,6 +1168,7 @@
       </div>
     </div>
   </section>
+  </div>
 
   <section class="scroll-readings" id="readings" aria-labelledby="scroll-readings-title">
     <div class="scroll-readings-heading">
@@ -873,12 +1184,13 @@
       {/each}
     </div>
 
-    <div class="scroll-project-note">
-      <h2>Built one reading at a time.</h2>
+    <section class="scroll-project-note" aria-labelledby="scroll-project-title">
+      <p class="scroll-project-kicker">The work behind the reader</p>
+      <h2 id="scroll-project-title">Built one reading at a time.</h2>
       <p>
         Recordings are aligned to the Torah text by hand, then reviewed before their word timing is marked ready.
       </p>
-      <a href={resolve('/readings/')}>View readings and coverage</a>
-    </div>
+      <a href={resolve('/readings/')}>View readings &amp; coverage</a>
+    </section>
   </section>
 </main>

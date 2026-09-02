@@ -9,11 +9,13 @@ let fixture: HTMLElement | null = null
 let destroy: (() => void) | null = null
 
 afterEach(() => {
+  vi.useRealTimers()
   destroy?.()
   destroy = null
   fixture?.remove()
   fixture = null
   document.documentElement.removeAttribute('data-mobile-player-expanded')
+  document.documentElement.removeAttribute('data-mobile-player-minimized')
 })
 
 test('owns player presentation behind one connected interface', () => {
@@ -166,6 +168,62 @@ test('rejects missing and occupied mount roots', () => {
       })
     )
   ).toThrow('Floating Player requires an empty mount root')
+})
+
+test('settles an idle mobile player into one compact transport and restores it', async () => {
+  vi.useFakeTimers()
+  fixture = document.createElement('section')
+  fixture.innerHTML = '<div data-target-id="floating-player-root"></div>'
+  document.body.appendChild(fixture)
+
+  let player: ReturnType<typeof createFloatingPlayer> | null = null
+  destroy = createMount()((scope) => {
+    player = createFloatingPlayer(scope, {
+      document,
+      view: window,
+      action: vi.fn(),
+    })
+  })
+
+  player!.sync({
+    visible: true,
+    compact: true,
+    expanded: false,
+    playing: true,
+    mobileTitle: 'First Aliyah',
+    mobileReading: 'Beresheet',
+  })
+
+  const root = required<HTMLElement>('[data-target-id="floating-player"]')
+  await vi.advanceTimersByTimeAsync(2_000)
+  player!.sync({ playing: true })
+  player!.syncProgress({ audioRatio: 0.2, currentTime: '0:02' })
+  await vi.advanceTimersByTimeAsync(1_999)
+  expect(root.classList.contains('is-minimized')).toBe(false)
+
+  await vi.advanceTimersByTimeAsync(1)
+  expect(root.classList.contains('is-minimized')).toBe(true)
+  expect(root.getAttribute('aria-label')).toBe('Compact audio player')
+  expect(document.documentElement.dataset.mobilePlayerMinimized).toBe('')
+
+  required<HTMLButtonElement>(
+    '[data-target-id="floating-minimized-summary"]'
+  ).dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+  expect(root.classList.contains('is-minimized')).toBe(false)
+  expect(root.getAttribute('aria-label')).toBe('Audio player')
+
+  await vi.advanceTimersByTimeAsync(4_000)
+  expect(root.classList.contains('is-minimized')).toBe(true)
+
+  player!.sync({ expanded: true })
+  expect(root.classList.contains('is-minimized')).toBe(false)
+  expect(
+    document.documentElement.hasAttribute('data-mobile-player-minimized')
+  ).toBe(false)
+
+  player!.sync({ expanded: false, compact: false })
+  await vi.advanceTimersByTimeAsync(4_000)
+  expect(root.classList.contains('is-minimized')).toBe(false)
 })
 
 function required<ElementType extends Element = HTMLElement>(selector: string) {

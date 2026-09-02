@@ -138,7 +138,7 @@ components:
 
 **Creative North Star: "The Connected Torah Page"**
 
-The scroll story is a near-black reading space in which practice never separates from the Torah page. Editorial Lora copy explains the workflow while one functional, steeply angled Beresheet reader supplies the proof. On desktop, that same reader levels out and settles large in the lower-right of a white paper chapter as the background softly changes around it. Mobile keeps the upright reader and attached theme sheet unchanged. Blue actions lead into practice, and fine hairlines organize the story without turning it into a collection of feature cards.
+The scroll story is a near-black reading space in which practice never separates from the Torah page. Editorial Lora copy explains the workflow while one functional, steeply angled Beresheet reader supplies the proof. On desktop, one local scroll film carries that same reader through the opening, the white paper chapter, and all three practice beats before releasing it into the readings index. Mobile keeps the upright reader and attached theme sheet unchanged. Blue actions lead into practice, and fine hairlines organize the story without turning it into a collection of feature cards.
 
 The world stays restrained until the live reader carries the story into one rounded white paper chapter for theme selection. The journey then returns to the dark practice sequence and readings index with its status-coded aliyah links. This record is scoped to the shipped isolated prototype: a user-pinned, preserve-led scroll story with seed key `PINNED-SCROLL-STORY-2026-08-09`, not a replacement for the public product design.
 
@@ -149,7 +149,8 @@ The world stays restrained until the live reader carries the story into one roun
 - Blue actions reserved for paths into practice and the live reader.
 - A clipped, angled Beresheet reader that remains functional, outlined by a cool-white illuminated frame on desktop.
 - An upright mobile reader with a Light-by-default paper theme sheet attached to its lower edge.
-- One rounded white paper chapter where the same live reader settles into a large, right-weighted reading surface on desktop.
+- One rounded white paper chapter where the same live reader settles into a large, centered reading surface on desktop.
+- One spring-smoothed desktop stage that docks the reader beside the practice story instead of replacing it with another frame.
 - Status-coded circular aliyah deep links.
 - Three product-real scroll scenes: contents, playback, and Continue.
 
@@ -223,9 +224,11 @@ The palette pairs a cool near-black reading world with a single paper interrupti
 
 ## Layout
 
-Mobile uses one-rem content edges and retains its existing stacked sequence. The attached theme sheet rises from the live reader, then the practice demonstration stays sticky while the three narrative beats pass beneath it. At 48rem, the desktop story becomes one continuous reader journey: hero first, theme chapter second, practice third. Content edges widen to two rem, navigation links appear, the theme selector becomes four columns, and each reading row expands into title, aliyah, and action tracks. Header and hero cap at 92rem; practice content caps at 82rem; readings and footer cap at 86rem.
+Mobile uses one-rem content edges and retains its existing stacked sequence. The attached theme sheet rises from the live reader, then the three practice demonstrations continue in normal document flow. At 48rem, the desktop story becomes one continuous reader film: opening first, theme chapter second, practice third. The film owns one sticky `100svh` stage while chapter markers remain ordinary document content. Content edges widen to two rem, navigation links appear, the theme selector becomes four columns, and each reading row expands into title, aliyah, and action tracks. Header and hero cap at 92rem; practice content caps at 82rem; readings and footer cap at 86rem.
 
-At 64rem, the first viewport remains an asymmetric composition with copy in the left third and the live reader oversized, angled, and clipped past the right edge. Root scroll progressively levels and draws that same frame inward while preserving a clear right bias as the reading-space atmosphere crossfades into Paper. The theme title stays fully clipped until the frame begins that inward leg, then rises from behind it without fading as the reader settles large in the lower half. Appearance controls remain in normal flow below its visual footprint and never overlap it. Practice follows in the dark, with its scene sticky at `8svh` while the three beats occupy `76svh` each.
+At 64rem, the first viewport remains an asymmetric composition with copy in the left third and the live reader oversized, angled, and clipped past the right edge. Local film progress progressively levels and centers that same frame as the reading-space atmosphere crossfades into Paper. The theme title stays fully clipped until the frame begins that inward leg, then rises from behind it and holds at the top of the paper chapter. The reader settles large in the lower half before scaling in place to make room for the appearance controls. The controls arrive as the reader clears their space, then the title and controls share one upward fade before the reader docks on the left while Choose, Follow, and Return pass on the right. The paper layer fades back to Reading Space, and the stage releases only after the final beat.
+
+Film progress is measured from real chapter positions, updated once per animation frame, and softened with Svelte's numeric `Spring`. Scroll input itself stays native: there is no smooth-scroll controller and no intercepted page wheel. Fresh loads and reloads reset to the opening before the page restores its normal scroll behavior. The same progress source drives reader geometry, paper crossfade, title reveal, practice scene changes, the fine progress rail, and the final release. Reduced-motion mode removes the spring lag and applies the current state immediately.
 
 At 34rem the brand descriptor appears; below 22rem the aliyah bubbles contract. The implementation is mobile-first and maintains all links, the live reader, and theme controls at every width.
 
@@ -278,7 +281,7 @@ The system is mostly linear: sections and reading rows are horizontal rules with
 - **Shape:** A `1.1rem` clipped cool-white frame with a dark toolbar above a `100 / 67` live same-origin reader viewport.
 - **Depth:** Match the production homepage reader's rest perspective on wide screens, then remove that angle through the root-scroll settling motion. Do not add a separate hover transform to the reader frame.
 - **State:** Keep a centered loading status until the iframe fades in over 220ms. A three-pixel inner Focus Blue border appears when focus enters the reader.
-- **Interaction:** Keep embedded controls active while locking the reader's main scroll surface. Relay wheel and touch movement to the outer story with instant, frame-coalesced updates; preserve nested scrollable controls and never add smooth-scroll animation to the relay. On desktop, root scroll carries this same frame from the angled hero into a large, right-weighted position in the theme chapter.
+- **Interaction:** Keep embedded controls active while locking the reader's main scroll surface. Relay wheel and touch movement to the outer story with instant, frame-coalesced updates; preserve nested scrollable controls and never add smooth-scroll animation to the relay. On desktop, local film progress carries this same frame from the angled hero through theme selection and the practice sequence.
 
 ### Theme Selector
 
@@ -293,7 +296,7 @@ The system is mostly linear: sections and reading rows are horizontal rules with
 - **Contents:** Open a compact contents panel containing the production `AliyahBubbles` component, real cue-status colors, and real aliyah deep links.
 - **Playback:** Reserve the Torah highlight wash and two-pixel progress line for this beat only.
 - **Continue:** Present a recent-place prompt whose Continue action points to the real first-aliyah route; state the product's 48-hour checkpoint window without inventing progress data.
-- **Motion:** Swap scenes with one 320ms settle; give each flow its own entrance rather than recycling the word-highlight effect.
+- **Motion:** Swap scenes with one short settle inside the shared sticky stage; give each flow its own entrance rather than recycling the word-highlight effect.
 
 ### Torah Highlight Row
 

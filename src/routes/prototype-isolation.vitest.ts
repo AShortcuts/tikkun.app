@@ -25,10 +25,19 @@ test('renders public and prototype routes in visibly separate worlds', async () 
   expect(storyRoot.textContent).toContain(
     'A Torah-reading companion by Ocean of Torah'
   )
+  expect(storyRoot.textContent).toContain('The work behind the reader')
   expect(storyDocument.querySelectorAll('iframe')).toHaveLength(1)
   expect(
     storyDocument.querySelector<HTMLIFrameElement>('iframe')?.title
   ).toBe('Interactive Beresheet Torah reader')
+  const storyFilm = required(storyDocument, '.scroll-reader-journey')
+  expect(storyFilm.querySelector('.scroll-practice')).not.toBeNull()
+  expect(storyFilm.querySelector('.scroll-stage-practice')).not.toBeNull()
+  expect(
+    storyDocument.querySelector<HTMLButtonElement>(
+      '.scroll-theme-footer button[data-theme="light"]'
+    )?.getAttribute('aria-pressed')
+  ).toBe('true')
   expect(
     storyDocument.querySelector<HTMLAnchorElement>(
       'a[href$="/reader/#/torah/parsha/beresheet/1-1-1"]'

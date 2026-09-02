@@ -197,3 +197,52 @@ The desktop comparison owns the angle, scale, clipping, rear-reader reveal, cool
 - `npm run check` passed with 0 errors and 0 warnings; `npm test -- src/routes/prototype-isolation.test.ts` passed 3 tests; `npm run build` and `git diff --check` passed.
 
 final result: passed
+
+---
+
+# Mobile Player Design QA
+
+Date: 2026-09-01
+
+## Target
+
+- Selected source: option 1, the centered compact glass transport.
+- Original source dimensions: 853 x 1844.
+- Normalized source: `qa/mobile-player/reference-option-1-390x844.png`.
+- Implementation capture: `qa/mobile-player/implementation-mobile-390x844.png`.
+- CSS viewport: 390 x 844 at 1x density.
+- Verified state: Beresheet, First Aliyah, playing, compact after four seconds idle.
+
+## Behavior
+
+- The full mobile transport appears immediately when playback starts.
+- Four seconds without player interaction settles it into one compact capsule.
+- Playback progress updates do not restart the idle deadline.
+- Tapping the title restores the full transport.
+- The existing speed control remains available from the capsule and opens the full speed popover.
+- The existing expanded mobile sheet still opens and closes.
+- Keyboard-visible focus prevents an automatic collapse while a player control is focused.
+- The desktop transport does not enter the mobile minimized state.
+
+## Visual Comparison
+
+- Pass 1 found the capsule wider and taller than the selected source. This was corrected by tightening the capsule grid, padding, control size, and bottom offset while retaining a 44 px play target.
+- Pass 2 found no unresolved P0, P1, or P2 differences before the explicit control-order follow-up.
+- Full comparison: `qa/mobile-player/comparison-full.png`.
+- Focused player comparison: `qa/mobile-player/comparison-player.png`.
+
+### Compact Control-Order Follow-up
+
+- The user explicitly moved playback speed to the left and play/pause to the right, superseding those two positions in the selected source.
+- The equal 44 px side tracks keep the capsule centered and unchanged in size at 320, 390, and 550 px.
+- DOM order remains primary-first: play/pause, restore summary, then speed. The new visual traversal follows that order from right to left.
+- Both swapped controls restored the full transport; speed opened its existing popover and play/pause changed the live playback state.
+
+## Accessibility And Resilience
+
+- The compact state reuses the real play and speed controls instead of adding duplicate playback entry points.
+- The summary button exposes a descriptive restore label.
+- Reduced-motion and reduced-transparency fallbacks are present.
+- Browser console: zero errors. One pre-existing SvelteKit history API warning is unrelated to the player.
+
+final result: passed

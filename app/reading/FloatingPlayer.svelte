@@ -18,6 +18,8 @@
     connect,
   }: FloatingPlayerComponentProps = $props()
 
+  const MOBILE_PLAYER_IDLE_DELAY_MS = 4_000
+
   let snapshot = $state<FloatingPlayerSnapshot>({
     visible: false,
     untimed: true,
@@ -51,15 +53,19 @@
   let position = $state<FloatingPlayerPosition | null>(null)
   let dragging = $state(false)
   let speedPopoverOpen = $state(false)
+  let minimized = $state(false)
   let playerElement: HTMLElement | null = null
   let mobileClose: HTMLButtonElement | null = null
   let mobileExpand: HTMLButtonElement | null = null
+  let mobileSummary: HTMLButtonElement | null = null
+  let playButton: HTMLButtonElement | null = null
   let seek: HTMLInputElement | null = null
   let speedControl: HTMLElement | null = null
   let speedSlider: HTMLInputElement | null = null
   let dragPointerId: number | null = null
   let seekPointerId: number | null = null
   let speedPointerId: number | null = null
+  let minimizeTimer: number | null = null
 
   const playbackRateLabel = $derived(formatPlaybackRate(snapshot.playbackRate))
   const playLabel = $derived(snapshot.playing ? 'Pause' : 'Play')
@@ -91,6 +97,84 @@
     }
   }
 
+  function cancelMinimizeTimer() {
+    if (minimizeTimer === null) return
+    view.clearTimeout(minimizeTimer)
+    minimizeTimer = null
+  }
+
+  function setMinimized(nextMinimized: boolean) {
+    if (minimized === nextMinimized) return
+    flushSync(() => {
+      minimized = nextMinimized
+    })
+    document.documentElement.toggleAttribute(
+      'data-mobile-player-minimized',
+      nextMinimized
+    )
+  }
+
+  function hasVisiblePlayerFocus() {
+    const activeElement = document.activeElement
+    return Boolean(
+      activeElement instanceof HTMLElement &&
+        playerElement?.contains(activeElement) &&
+        activeElement.matches(':focus-visible')
+    )
+  }
+
+  function canMinimize() {
+    return Boolean(
+      snapshot.visible &&
+        snapshot.compact &&
+        !snapshot.expanded &&
+        !speedPopoverOpen &&
+        seekPointerId === null &&
+        speedPointerId === null &&
+        !hasVisiblePlayerFocus()
+    )
+  }
+
+  function scheduleMinimize() {
+    if (minimized || minimizeTimer !== null || !canMinimize()) return
+    minimizeTimer = view.setTimeout(() => {
+      minimizeTimer = null
+      if (canMinimize()) setMinimized(true)
+    }, MOBILE_PLAYER_IDLE_DELAY_MS)
+  }
+
+  function revealMobileTransport() {
+    cancelMinimizeTimer()
+    setMinimized(false)
+  }
+
+  function notePlayerActivity() {
+    revealMobileTransport()
+    scheduleMinimize()
+  }
+
+  function restoreMobileTransport(keyboardActivation: boolean) {
+    revealMobileTransport()
+    if (keyboardActivation) {
+      requireElement(playButton, 'its play button').focus({
+        preventScroll: true,
+      })
+    } else {
+      mobileSummary?.blur()
+    }
+    scheduleMinimize()
+  }
+
+  function handlePlayerFocusIn() {
+    cancelMinimizeTimer()
+  }
+
+  function handlePlayerFocusOut(event: FocusEvent) {
+    const nextTarget = event.relatedTarget
+    if (nextTarget instanceof Node && playerElement?.contains(nextTarget)) return
+    scheduleMinimize()
+  }
+
   function sync(nextSnapshot: Partial<FloatingPlayerSnapshot>) {
     flushSync(() => {
       snapshot = { ...snapshot, ...nextSnapshot }
@@ -99,6 +183,12 @@
       'data-mobile-player-expanded',
       snapshot.expanded && snapshot.compact
     )
+    if (!snapshot.visible || !snapshot.compact || snapshot.expanded) {
+      cancelMinimizeTimer()
+      setMinimized(false)
+    } else {
+      scheduleMinimize()
+    }
   }
 
   function syncProgress(nextProgress: Partial<FloatingPlayerProgress>) {
@@ -124,6 +214,7 @@
     flushSync(() => {
       speedPopoverOpen = false
     })
+    scheduleMinimize()
   }
 
   function focusMobileClose() {
@@ -147,6 +238,7 @@
   }
 
   function send(nextAction: FloatingPlayerAction) {
+    if (nextAction.type !== 'layout') notePlayerActivity()
     action(nextAction)
   }
 
@@ -159,13 +251,17 @@
   }
 
   function toggleSpeedPopover() {
+    revealMobileTransport()
     flushSync(() => {
       speedPopoverOpen = !speedPopoverOpen
     })
     if (speedPopoverOpen) {
+      cancelMinimizeTimer()
       requireElement(speedSlider, 'its speed slider').focus({
         preventScroll: true,
       })
+    } else {
+      scheduleMinimize()
     }
   }
 
@@ -414,6 +510,7 @@
     resizeObserver.observe(requireElement(playerElement, 'its player element'))
 
     return () => {
+      cancelMinimizeTimer()
       resizeObserver.disconnect()
       document.removeEventListener('pointerdown', onDocumentPointerDown)
       view.removeEventListener('resize', onLayout)
@@ -422,6 +519,7 @@
       view.removeEventListener('pointerup', onPointerFinish)
       view.removeEventListener('pointermove', onPointerMove)
       document.documentElement.removeAttribute('data-mobile-player-expanded')
+      document.documentElement.removeAttribute('data-mobile-player-minimized')
     }
   })
 </script>
@@ -433,6 +531,7 @@
   class:mod-untimed={snapshot.untimed}
   class:is-playing={snapshot.playing}
   class:is-expanded={snapshot.expanded}
+  class:is-minimized={minimized}
   class:mod-expandable={snapshot.visible}
   class:is-dragging={dragging}
   data-target-id="floating-player"
@@ -442,12 +541,16 @@
   aria-modal={snapshot.expanded && snapshot.compact ? 'true' : undefined}
   aria-label={snapshot.expanded && snapshot.compact
     ? 'Expanded audio player'
-    : 'Audio player'}
+    : minimized
+      ? 'Compact audio player'
+      : 'Audio player'}
   style:--audio-progress-ratio={`${progress.audioRatio}`}
   style:--cue-progress-ratio={`${progress.cueRatio}`}
   style:left={position ? `${position.left}px` : undefined}
   style:top={position ? `${position.top}px` : undefined}
   onkeydown={handlePlayerKeydown}
+  onfocusin={handlePlayerFocusIn}
+  onfocusout={handlePlayerFocusOut}
 >
   <div class="floating-player-sheet-handle" aria-hidden="true"></div>
   <header class="floating-player-header">
@@ -546,6 +649,7 @@
       <UiIcon name={snapshot.untimed ? 'rewind10' : 'arrowRight'} />
     </button>
     <button
+      bind:this={playButton}
       class="floating-player-button"
       data-target-id="floating-play"
       type="button"
@@ -555,6 +659,19 @@
       onclick={() => send({ type: 'toggle-playback' })}
     >
       <UiIcon name={snapshot.playing ? 'pause' : 'play'} />
+    </button>
+    <button
+      bind:this={mobileSummary}
+      class="floating-player-minimized-summary"
+      data-target-id="floating-minimized-summary"
+      type="button"
+      aria-label={`Show audio controls for ${snapshot.mobileTitle}`}
+      aria-hidden={!minimized}
+      tabindex={minimized ? 0 : -1}
+      onclick={(event) => restoreMobileTransport(event.detail === 0)}
+    >
+      <strong>{snapshot.mobileTitle}</strong>
+      <span>{snapshot.mobileReading}</span>
     </button>
     <button
       class="floating-player-button"
@@ -755,6 +872,11 @@
       </div>
     </div>
   </div>
+  <span
+    class="floating-player-minimized-progress"
+    data-target-id="floating-minimized-progress"
+    aria-hidden="true"
+  ></span>
 </div>
 
 <button

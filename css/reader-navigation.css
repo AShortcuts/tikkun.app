@@ -1153,6 +1153,11 @@
     .reader-corner-controls.mod-raised {
       --corner-controls-raise-y: -10.5rem;
     }
+
+    html[data-mobile-player-minimized]
+      .reader-corner-controls.mod-raised {
+      --corner-controls-raise-y: -5.25rem;
+    }
   }
 
   @media screen and (max-width: 550px) and (forced-colors: active) {

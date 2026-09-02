@@ -312,7 +312,7 @@
   transform: var(--reader-rest);
   transform-origin: center left;
   transform-style: preserve-3d;
-  transition: transform 680ms cubic-bezier(0.77, 0, 0.175, 1);
+  transition: none;
 }
 
 .prototype-scroll-story .scroll-mobile-theme-release-sentinel {
@@ -456,6 +456,16 @@
   display: none;
   color: var(--scroll-paper-text);
   color-scheme: light;
+}
+
+.prototype-scroll-story .scroll-theme-copy-anchor,
+.prototype-scroll-story .scroll-theme-footer-anchor {
+  display: none;
+}
+
+.prototype-scroll-story .scroll-stage-practice,
+.prototype-scroll-story .scroll-film-progress {
+  display: none;
 }
 
 .prototype-scroll-story .scroll-practice {
@@ -1124,26 +1134,43 @@
 
 .prototype-scroll-story .scroll-project-note {
   display: grid;
-  max-width: 54rem;
-  gap: 1.3rem;
-  margin-top: clamp(6rem, 15vw, 10rem);
+  width: min(100%, 64rem);
+  justify-items: center;
+  gap: 0;
+  margin: clamp(6rem, 15vw, 10rem) auto 0;
+  border-top: 1px solid var(--scroll-line);
+  padding-top: clamp(5.5rem, 9vw, 8rem);
+  text-align: center;
+}
+
+.prototype-scroll-story .scroll-project-kicker {
+  margin: 0;
+  color: #7da9f4;
+  font-family: var(--scroll-ui-font);
+  font-size: 0.9rem;
+  font-weight: 680;
+  letter-spacing: 0.01em;
 }
 
 .prototype-scroll-story .scroll-project-note h2 {
-  max-width: 11ch;
+  max-width: 12ch;
+  margin: 0.85rem auto 0;
+  font-size: clamp(2.5rem, 5vw, 4rem);
 }
 
-.prototype-scroll-story .scroll-project-note p {
-  max-width: 40rem;
-  margin: 0;
+.prototype-scroll-story .scroll-project-note > p:not(.scroll-project-kicker) {
+  max-width: 39rem;
+  margin: 1.5rem auto 0;
   color: var(--scroll-muted);
-  font-size: clamp(1rem, 3vw, 1.16rem);
-  line-height: 1.68;
+  font-size: 1.08rem;
+  line-height: 1.65;
 }
 
 .prototype-scroll-story .scroll-project-note a {
+  justify-content: center;
   width: fit-content;
   min-height: 2.75rem;
+  margin: 1.25rem auto 0;
   color: #9fc2ff;
   font-family: var(--scroll-ui-font);
   font-size: 0.9rem;
@@ -1733,29 +1760,33 @@
   .prototype-scroll-story .scroll-reader-journey {
     --journey-hero-height: clamp(43rem, calc(100svh - 5rem), 54.125rem);
     --journey-reader-width: min(80vw, 72rem);
-    --journey-reader-start: translate3d(clamp(12.75rem, 24vw, 16rem), 0, 0)
-      scale(0.82);
-    --journey-reader-middle: translate3d(
-        clamp(11rem, 16vw, 13rem),
-        clamp(3.5rem, 8svh, 5rem),
-        0
-      )
-      scale(0.9);
-    --journey-reader-end: translate3d(
-        clamp(4rem, 8vw, 7rem),
-        clamp(5.5rem, 10svh, 7rem),
-        0
-      )
-      scale(0.92);
-    --journey-title-rise: clamp(6rem, 12svh, 8rem);
     --journey-stage-top: 6.25rem;
     --journey-stage-margin: 1.25rem;
+    --story-progress: 0%;
+    --story-paper-opacity: 0;
+    --story-ambient-opacity: 0.42;
+    --story-hero-opacity: 1;
+    --story-reader-opacity: 1;
+    --story-theme-opacity: 0;
+    --story-theme-clip: 100%;
+    --story-theme-y: 10rem;
+    --story-controls-opacity: 0;
+    --story-controls-y: 1.75rem;
+    --story-practice-opacity: 0;
+    --story-practice-y: 2.75rem;
+    --story-ambient-y: 0px;
+    --story-reader-x: clamp(12.75rem, 24vw, 16rem);
+    --story-reader-y: 0px;
+    --story-reader-scale: 0.84;
+    --story-reader-rotate-x: 1.8deg;
+    --story-reader-rotate-y: -5.4deg;
+    --story-reader-rotate-z: -1deg;
     position: relative;
     z-index: 1;
     display: grid;
     width: 100%;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: var(--journey-hero-height) auto auto auto;
+    grid-template-rows: var(--journey-hero-height) auto auto auto auto;
     overflow: hidden;
     overflow: clip;
     border-radius: 0 0 clamp(2rem, 5vw, 4.5rem) clamp(2rem, 5vw, 4.5rem);
@@ -1781,23 +1812,13 @@
       rgba(6, 8, 11, 0.28) 62%,
       rgba(6, 8, 11, 0.54) 100%
     );
-    opacity: 1;
-    transition: opacity 720ms cubic-bezier(0.77, 0, 0.175, 1);
+    opacity: var(--story-hero-opacity);
   }
 
   .prototype-scroll-story .scroll-reader-journey::after {
     z-index: 2;
     background: var(--scroll-paper);
-    opacity: 0;
-    transition: opacity 760ms cubic-bezier(0.77, 0, 0.175, 1);
-  }
-
-  .prototype-scroll-story .scroll-reader-journey.mod-theme-active::before {
-    opacity: 0;
-  }
-
-  .prototype-scroll-story .scroll-reader-journey.mod-theme-active::after {
-    opacity: 1;
+    opacity: var(--story-paper-opacity);
   }
 
   .prototype-scroll-story .scroll-hero,
@@ -1817,6 +1838,8 @@
     left: -18vw;
     width: calc(100% + 36vw);
     height: calc(var(--journey-hero-height) + 10rem);
+    opacity: var(--story-ambient-opacity);
+    transform: translate3d(0, var(--story-ambient-y), 0) scale(1.035);
   }
 
   .prototype-scroll-story .scroll-hero-copy {
@@ -1829,6 +1852,7 @@
     margin-top: 0;
     margin-left: max(2rem, calc((100vw - 92rem) / 2));
     align-self: center;
+    opacity: var(--story-hero-opacity);
   }
 
   .prototype-scroll-story .scroll-reader-track {
@@ -1837,7 +1861,7 @@
     display: block;
     min-width: 0;
     grid-column: 1;
-    grid-row: 1 / 4;
+    grid-row: 1 / 6;
     pointer-events: none;
   }
 
@@ -1853,29 +1877,28 @@
     display: block;
     width: var(--journey-reader-width);
     margin: 0 auto;
+    opacity: var(--story-reader-opacity);
     pointer-events: auto;
-    transform: var(--journey-reader-start);
+    transform: translate3d(
+        var(--story-reader-x),
+        var(--story-reader-y),
+        0
+      )
+      scale(var(--story-reader-scale));
     transform-origin: center center;
-    transition: transform 760ms cubic-bezier(0.77, 0, 0.175, 1);
+    will-change: transform;
   }
 
-  .prototype-scroll-story .scroll-reader-journey.mod-theme-active .scroll-reader-motion {
-    transform: var(--journey-reader-end);
-  }
-
-  .prototype-scroll-story .scroll-reader-journey.mod-theme-active .scroll-reader-stack {
-    transform: none;
+  .prototype-scroll-story .scroll-reader-stack {
+    transform: perspective(100rem) rotateX(var(--story-reader-rotate-x))
+      rotateY(var(--story-reader-rotate-y))
+      rotateZ(var(--story-reader-rotate-z));
+    transform-origin: center center;
+    will-change: transform;
   }
 
   .prototype-scroll-story .scroll-reader-note {
-    transition:
-      color 420ms cubic-bezier(0.23, 1, 0.32, 1),
-      opacity 320ms cubic-bezier(0.23, 1, 0.32, 1);
-  }
-
-  .prototype-scroll-story .scroll-reader-journey.mod-theme-active .scroll-reader-note {
-    color: var(--scroll-paper-muted);
-    opacity: 0;
+    opacity: var(--story-hero-opacity);
   }
 
   .prototype-scroll-story .scroll-reader-journey.mod-theme-active .scroll-reader-frame {
@@ -1895,28 +1918,42 @@
   }
 
   .prototype-scroll-story .scroll-theme-copy {
-    position: relative;
+    position: sticky;
     z-index: 3;
+    top: clamp(1.5rem, 3svh, 2.5rem);
     width: min(calc(100% - 4rem), 72rem);
     grid-column: 1;
     grid-row: 2;
-    align-self: center;
+    align-self: start;
     justify-self: center;
     justify-items: center;
     margin: 0;
-    padding: clamp(4rem, 7svh, 5rem) 0 clamp(3rem, 5svh, 4rem);
+    padding: 0 0 clamp(1.5rem, 3svh, 2.25rem);
     color: var(--scroll-paper-text);
+    opacity: var(--story-theme-opacity);
     text-align: center;
-    clip-path: inset(0 0 100% 0);
-    transform: translate3d(0, var(--journey-title-rise), 0);
-    transition:
-      clip-path 360ms cubic-bezier(0.23, 1, 0.32, 1) 180ms,
-      transform 760ms cubic-bezier(0.77, 0, 0.175, 1) 180ms;
+    clip-path: inset(0 0 var(--story-theme-clip) 0);
+    transform: translate3d(0, var(--story-theme-y), 0);
   }
 
-  .prototype-scroll-story .scroll-reader-journey.mod-theme-active .scroll-theme-copy {
-    clip-path: inset(0);
-    transform: none;
+  .prototype-scroll-story .scroll-theme-copy-anchor,
+  .prototype-scroll-story .scroll-theme-footer-anchor {
+    position: relative;
+    display: block;
+    width: 1px;
+    height: 1px;
+    grid-column: 1;
+    align-self: start;
+    justify-self: center;
+    pointer-events: none;
+  }
+
+  .prototype-scroll-story .scroll-theme-copy-anchor {
+    grid-row: 2;
+  }
+
+  .prototype-scroll-story .scroll-theme-footer-anchor {
+    grid-row: 4;
   }
 
   .prototype-scroll-story .scroll-theme-copy h2 {
@@ -1932,7 +1969,7 @@
     z-index: 3;
     width: var(--journey-reader-width);
     max-width: none;
-    aspect-ratio: 100 / 90;
+    aspect-ratio: 100 / 78;
     grid-column: 1;
     grid-row: 3;
     justify-self: center;
@@ -1940,26 +1977,174 @@
   }
 
   .prototype-scroll-story .scroll-theme-footer {
-    position: relative;
-    z-index: 5;
+    position: sticky;
+    z-index: 3;
+    top: calc(100svh - 12.75rem);
     box-sizing: border-box;
     width: min(calc(100% - 4rem), 64rem);
     max-width: none;
     grid-column: 1;
     grid-row: 4;
+    align-self: start;
     justify-self: center;
     margin: clamp(2.5rem, 5vw, 4rem) 0 0;
     padding-bottom: clamp(3.5rem, 6vw, 5rem);
+    opacity: var(--story-controls-opacity);
+    pointer-events: none;
+    transform: translate3d(0, var(--story-controls-y), 0);
+    will-change: opacity, transform;
+  }
+
+  .prototype-scroll-story .scroll-reader-journey.mod-controls-active
+    .scroll-theme-footer {
+    pointer-events: auto;
+  }
+
+  .prototype-scroll-story .scroll-practice {
+    position: relative;
+    z-index: 5;
+    min-height: 390svh;
+    grid-column: 1;
+    grid-row: 5;
+    border-top: 0;
+    padding: clamp(8rem, 16svh, 12rem) 0 clamp(5rem, 10svh, 8rem);
+    background: transparent;
+    pointer-events: none;
+  }
+
+  .prototype-scroll-story .scroll-practice-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(21rem, 0.72fr);
+    column-gap: clamp(4rem, 9vw, 9rem);
+  }
+
+  .prototype-scroll-story .scroll-practice-intro,
+  .prototype-scroll-story .scroll-practice-grid {
+    grid-column: 2;
+    pointer-events: auto;
+  }
+
+  .prototype-scroll-story .scroll-practice-intro {
+    max-width: 34rem;
+    margin: clamp(8rem, 24svh, 15rem) 0 clamp(8rem, 25svh, 16rem);
+    opacity: var(--story-practice-opacity);
+    transform: translate3d(0, var(--story-practice-y), 0);
+  }
+
+  .prototype-scroll-story .scroll-practice-grid {
+    display: block;
+  }
+
+  .prototype-scroll-story .scroll-practice-beats {
+    display: block;
+  }
+
+  .prototype-scroll-story .scroll-practice-beat {
+    min-height: 100svh;
+    border-color: rgba(255, 255, 255, 0.12);
+    opacity: 0.3;
+    transform: translate3d(0, 1.75rem, 0);
+    transition:
+      opacity 360ms cubic-bezier(0.23, 1, 0.32, 1),
+      transform 520ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+
+  .prototype-scroll-story .scroll-practice-beat.mod-active {
+    opacity: 1;
+    transform: none;
+  }
+
+  .prototype-scroll-story .scroll-stage-practice {
+    position: absolute;
+    z-index: 6;
+    bottom: clamp(0.75rem, 4svh, 2.75rem);
+    left: max(2rem, calc((100vw - 82rem) / 2));
+    display: grid;
+    width: min(35rem, 40vw);
+    gap: 0.65rem;
+    opacity: var(--story-practice-opacity);
+    pointer-events: none;
+    transform: translate3d(0, var(--story-practice-y), 0) scale(0.985);
+    transform-origin: bottom left;
+  }
+
+  .prototype-scroll-story .scroll-reader-journey.mod-practice-active
+    .scroll-stage-practice {
+    pointer-events: auto;
+  }
+
+  .prototype-scroll-story .scroll-stage-practice-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0 0.25rem;
+    color: rgba(226, 235, 249, 0.72);
+    font-family: var(--scroll-ui-font);
+    font-size: 0.7rem;
+    font-weight: 680;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+  }
+
+  .prototype-scroll-story .scroll-stage-practice-heading span {
+    color: #8cb7ff;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .prototype-scroll-story .scroll-stage-practice-heading p {
+    margin: 0;
+  }
+
+  .prototype-scroll-story .scroll-stage-practice-card {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid rgba(152, 181, 229, 0.3);
+    border-radius: 1.2rem;
+    padding: clamp(0.85rem, 1.6vw, 1.25rem);
+    background: radial-gradient(
+        circle at 92% 0%,
+        rgba(57, 132, 255, 0.16),
+        transparent 42%
+      ),
+      rgba(8, 12, 17, 0.94);
+    box-shadow: 0 2rem 4.5rem -2.4rem rgba(0, 0, 0, 0.96),
+      0 0 2.4rem -1.5rem rgba(74, 139, 255, 0.7),
+      inset 0 1px rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(1rem);
+  }
+
+  .prototype-scroll-story .scroll-stage-practice .scroll-practice-scene {
+    animation-duration: 420ms;
+  }
+
+  .prototype-scroll-story .scroll-film-progress {
+    position: absolute;
+    z-index: 7;
+    top: 27svh;
+    left: max(0.85rem, calc((100vw - 92rem) / 2 - 1.25rem));
+    display: block;
+    width: 1px;
+    height: 44svh;
+    overflow: hidden;
+    background: rgba(169, 190, 222, 0.18);
+    opacity: 0.58;
+  }
+
+  .prototype-scroll-story .scroll-film-progress span {
+    display: block;
+    width: 100%;
+    height: var(--story-progress);
+    background: linear-gradient(to bottom, #d7e7ff, #5b9cff);
+    box-shadow: 0 0 0.75rem rgba(91, 156, 255, 0.85);
   }
 
   @media (min-width: 64rem) {
-    .prototype-scroll-story .scroll-reader-journey {
-      --journey-reader-start: translate3d(clamp(15.5rem, 19vw, 17rem), 0, 0)
-        scale(0.84);
+    .prototype-scroll-story .scroll-stage-practice {
+      width: min(33rem, 37vw);
     }
 
     .prototype-scroll-story .scroll-reader-stack {
-      --reader-rest: perspective(100rem) rotateX(1.8deg) rotateY(-5.4deg) rotateZ(-1deg);
+      transform-origin: center center;
     }
   }
 }
@@ -2141,7 +2326,7 @@
   }
 
   .prototype-scroll-story .scroll-theme-copy {
-    padding-top: 3rem;
+    padding-top: 0;
     padding-bottom: 2rem;
   }
 
@@ -2151,60 +2336,16 @@
 }
 
 @supports (animation-timeline: scroll()) {
-  @media (min-width: 48rem) {
-    .prototype-scroll-story .scroll-reader-motion {
-      animation: scroll-reader-travel linear both;
+  @media (max-width: 47.999rem) {
+    .prototype-scroll-story .scroll-hero-ambient {
+      animation: scroll-ambient-drift linear both;
       animation-timeline: scroll(root block);
-      animation-range: 0 105svh;
-    }
-
-    .prototype-scroll-story .scroll-reader-stack {
-      animation: scroll-reader-level linear both;
-      animation-timeline: scroll(root block);
-      animation-range: 8svh 105svh;
-    }
-
-    .prototype-scroll-story .scroll-theme-copy {
-      animation: scroll-theme-copy-rise linear both;
-      animation-timeline: scroll(root block);
-      animation-range: 0 105svh;
-    }
-
-    .prototype-scroll-story .scroll-reader-journey::before {
-      animation: scroll-reading-space-depart linear both;
-      animation-timeline: scroll(root block);
-      animation-range: 12svh 92svh;
-    }
-
-    .prototype-scroll-story .scroll-reader-journey::after {
-      animation: scroll-paper-arrive linear both;
-      animation-timeline: scroll(root block);
-      animation-range: 12svh 92svh;
-    }
-
-    .prototype-scroll-story .scroll-reader-note {
-      animation: scroll-reader-note-depart linear both;
-      animation-timeline: scroll(root block);
-      animation-range: 0 48svh;
+      animation-range: 0 110svh;
     }
   }
-
-  .prototype-scroll-story .scroll-hero-ambient {
-    animation: scroll-ambient-drift linear both;
-    animation-timeline: scroll(root block);
-    animation-range: 0 110svh;
-  }
-
 }
 
 @supports (animation-timeline: view()) {
-  .prototype-scroll-story .scroll-practice-beat {
-    animation: scroll-beat-focus linear both;
-    animation-timeline: view(block);
-    animation-range: entry 8% cover 48%;
-  }
-
-  .prototype-scroll-story .scroll-theme-footer,
   .prototype-scroll-story .scroll-readings-heading,
   .prototype-scroll-story .scroll-readings-grid,
   .prototype-scroll-story .scroll-project-note {
