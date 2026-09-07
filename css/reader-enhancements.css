@@ -18,8 +18,147 @@
 
 .reader-main {
   position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
+}
+
+.reader-text-forehead {
+  display: none;
+}
+
+html[data-reader-side-mode='two'] .reader-text-forehead {
+  position: relative;
+  z-index: 3;
+  grid-template-columns: minmax(0, 1fr) 2.4rem minmax(0, 1fr);
+  align-items: center;
+  direction: ltr;
+  width: min(100%, 76rem);
+  min-height: 2.45rem;
+  margin-inline: auto;
+  padding-inline: 0.75rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--text-color) 10%, transparent);
+  background: color-mix(in srgb, var(--paper-color) 94%, transparent);
+  backdrop-filter: blur(12px) saturate(115%);
+}
+
+html[data-reader-text-layout='match'][data-reader-side-mode='two']
+  .reader-text-forehead {
+  width: min(100%, 96rem);
+}
+
+.reader-side-heading {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  color: var(--light-text-color);
+  font-family: var(--hebrew-ui-font-family);
+  font-size: 0.78rem;
+  font-weight: 720;
+}
+
+.reader-side-heading.mod-left {
+  grid-column: 1;
+}
+
+.reader-side-heading.mod-right {
+  grid-column: 3;
+}
+
+.reader-side-heading > span {
+  grid-area: 1 / 1;
+  opacity: 0;
+  transform: translateX(-0.28rem);
+  transition:
+    opacity 190ms var(--reader-ease-standard),
+    transform 200ms cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+.reader-side-heading.mod-left > span {
+  transform: translateX(0.28rem);
+}
+
+html[data-reader-side-order='tikkun-right']
+  .reader-side-heading.mod-left
+  [data-reader-heading-form='torah'],
+html[data-reader-side-order='tikkun-right']
+  .reader-side-heading.mod-right
+  [data-reader-heading-form='tikkun'],
+html[data-reader-side-order='torah-right']
+  .reader-side-heading.mod-left
+  [data-reader-heading-form='tikkun'],
+html[data-reader-side-order='torah-right']
+  .reader-side-heading.mod-right
+  [data-reader-heading-form='torah'] {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.reader-side-swap {
+  grid-column: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.15rem;
+  height: 2.15rem;
+  margin: auto;
+  border: 1px solid color-mix(in srgb, var(--text-color) 14%, transparent);
+  border-radius: 999px;
+  padding: 0;
+  background: color-mix(in srgb, var(--paper-color) 88%, var(--light-accent-color));
+  color: var(--text-color);
+  cursor: pointer;
+  perspective: 3rem;
+  touch-action: manipulation;
+  transition: transform 140ms var(--reader-ease-out);
+}
+
+.reader-side-swap .ui-icon {
+  width: 1rem;
+  height: 1rem;
+  transform-style: preserve-3d;
+  transition: transform 200ms cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+html[data-reader-side-order='torah-right'] .reader-side-swap .ui-icon {
+  transform: rotateY(180deg);
+}
+
+.reader-side-swap:focus-visible {
+  outline: 2px solid var(--reader-focus-color);
+  outline-offset: 2px;
+}
+
+.reader-side-swap:active {
+  transform: scale(var(--reader-control-press-scale));
+}
+
+html[data-reader-side-mode='two'] .reader-corner-controls {
+  display: none;
+}
+
+@media screen and (min-width: 551px) {
+  html[data-reader-side-mode='two'] .reader-text-forehead {
+    display: grid;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader-side-heading > span {
+    transform: none;
+    transition: opacity 100ms var(--reader-ease-standard);
+  }
+
+  .reader-side-swap .ui-icon {
+    transform: none !important;
+    transition: none;
+  }
+
+  .reader-side-swap:active {
+    transform: none;
+  }
 }
 
 .reader-side {

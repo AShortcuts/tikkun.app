@@ -264,7 +264,7 @@ export const publicAliyotByParsha: Readonly<
     {
       "number": 7,
       "audioId": "vayetzei-7",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 177,
       "readerHash": "#/torah/parsha/vayetzei/1-31-43"
     }
@@ -273,14 +273,14 @@ export const publicAliyotByParsha: Readonly<
     {
       "number": 1,
       "audioId": "yitro-1",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 158,
       "readerHash": "#/torah/parsha/yitro/2-18-1"
     },
     {
       "number": 2,
       "audioId": "yitro-2",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 162,
       "readerHash": "#/torah/parsha/yitro/2-18-13"
     },

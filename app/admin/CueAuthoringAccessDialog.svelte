@@ -144,8 +144,7 @@
     <header class="admin-access-header">
       <h2 id="admin-access-title">Cue Authoring</h2>
       <p id="admin-access-description">
-        Enter the local unlock code. This convenience lock prevents accidental
-        access; it is not a security control.
+        Enter the local unlock code to access recording studio features.
       </p>
     </header>
     <form

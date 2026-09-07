@@ -29,6 +29,7 @@ test('updates shell presentation without replacing stable reader targets', () =>
   let titleClicks = 0
   let aboutClicks = 0
   let annotationChanges = 0
+  let sideSwaps = 0
 
   const destroy = mountShell((scope) => {
     shell = createReaderShell(scope, {
@@ -44,6 +45,9 @@ test('updates shell presentation without replacing stable reader targets', () =>
       onAnnotationsChange: (enabled) => {
         annotationChanges += 1
         shell.setAnnotationsEnabled(enabled)
+      },
+      onSwapSides: () => {
+        sideSwaps += 1
       },
     })
   })
@@ -143,6 +147,9 @@ test('updates shell presentation without replacing stable reader targets', () =>
   required<HTMLButtonElement>('[data-target-id="about-link"]').click()
   required<HTMLButtonElement>('[data-target-id="mobile-library"]').click()
   expect(aboutClicks).toBe(2)
+
+  required<HTMLButtonElement>('[data-target-id="reader-side-swap"]').click()
+  expect(sideSwaps).toBe(1)
 
   const annotations = required<HTMLButtonElement>(
     '[data-test-id="annotations-toggle"]'

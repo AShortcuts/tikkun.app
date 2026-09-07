@@ -122,8 +122,8 @@ function mountRoute({
     })
   })
   mountedRoutes.push(destroy)
-  route.start()
-  return { host, route, state }
+  const ready = route.start()
+  return { host, route, state, ready }
 }
 
 async function flushRouteWork() {
@@ -154,7 +154,107 @@ test('canonicalizes hashless startup before completing the first reader render',
   await flushRouteWork()
 
   expect(host.readerReady).toHaveBeenCalledOnce()
-  expect(host.pickerChanged).toHaveBeenCalledWith(false)
+  expect(host.pickerChanged).not.toHaveBeenCalled()
+})
+
+test('sets the requested title before rendering and waits for positioning at startup', async () => {
+  setHash('#/torah/parsha/beshalach/2-15-1')
+  let finishPositioning!: () => void
+  const complete = new Promise<void>((resolve) => { finishPositioning = resolve })
+  const host = createHost({ ...createRendering(), complete })
+  const { state, ready } = mountRoute({ host })
+  let settled = false
+  void ready.then(() => { settled = true })
+
+  expect(state.title).toBe('בשלח')
+  expect(host.renderReader).toHaveBeenCalledOnce()
+  await flushRouteWork()
+  expect(host.readerReady).toHaveBeenCalledOnce()
+  expect(settled).toBe(false)
+
+  finishPositioning()
+  await ready
+  expect(settled).toBe(true)
+})
+
+test('uses a neutral title for physical-page routes until the viewport resolves it', async () => {
+  setHash('#/torah/page/242')
+  const { state, ready } = mountRoute()
+  expect(state.title).toBe('תיקון קוראים')
+  await ready
+})
+
+test('rejects startup when the current reading cannot finish positioning', async () => {
+  const failure = new Error('target positioning failed')
+  let rejectPositioning!: (error: unknown) => void
+  const complete = new Promise<void>((_resolve, reject) => {
+    rejectPositioning = reject
+  })
+  vi.spyOn(console, 'error').mockImplementation(() => {})
+  const { ready } = mountRoute({ host: createHost({ ...createRendering(), complete }) })
+  const rejection = expect(ready).rejects.toBe(failure)
+  rejectPositioning(failure)
+  await rejection
+})
+
+test('ignores a superseded startup failure and waits for the current reading', async () => {
+  setHash('#/torah/parsha/beshalach/2-15-1')
+  let rejectPrevious!: (error: unknown) => void
+  let finishCurrent!: () => void
+  const previous = createRendering()
+  const current = createRendering()
+  const host = createHost({
+    ...previous,
+    complete: new Promise<void>((_resolve, reject) => { rejectPrevious = reject }),
+  })
+  const { route, state, ready } = mountRoute({ host })
+  vi.mocked(host.renderReader).mockReturnValue({
+    ...current,
+    complete: new Promise<void>((resolve) => { finishCurrent = resolve }),
+  })
+  route.navigate('#/torah/parsha/haazinu/5-32-1')
+  await vi.waitFor(() => expect(host.renderReader).toHaveBeenCalledTimes(2))
+  rejectPrevious(new Error('superseded load failed'))
+  let settled = false
+  void ready.then(() => { settled = true })
+  await flushRouteWork()
+  expect(settled).toBe(false)
+  expect(state.title).toBe('האזינו')
+  finishCurrent()
+  await ready
+})
+
+test('finishes startup on the not-found screen without waiting for reader content', async () => {
+  setHash('#/torah/page/9999')
+  const { state, ready, host } = mountRoute()
+  await ready
+  expect(state.view).toBe('optional')
+  expect(host.renderReader).not.toHaveBeenCalled()
+})
+
+test('keeps a picker opened during rendering until picker navigation begins', async () => {
+  setHash('#/next')
+  let resolveReady!: () => void
+  const ready = new Promise<void>((resolve) => {
+    resolveReady = resolve
+  })
+  const host = createHost({
+    ...createRendering(),
+    ready,
+  })
+  const { route, state } = mountRoute({ host })
+
+  route.togglePicker({ animate: true })
+  await flushRouteWork()
+  expect(state.pickerOpen).toBe(true)
+
+  resolveReady()
+  await flushRouteWork()
+  expect(host.readerReady).toHaveBeenCalledOnce()
+  expect(state.pickerOpen).toBe(true)
+
+  route.navigate('#/next')
+  expect(state.pickerOpen).toBe(false)
 })
 
 test('canonicalizes reader aliases without starting a second render', () => {

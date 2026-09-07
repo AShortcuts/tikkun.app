@@ -27,6 +27,7 @@ export type MobileAliyahCapsule = Readonly<{
   target: AliyahNavigationTarget | null
   label: string
   playbackState: MobileAliyahCapsuleState
+  audioAvailable?: boolean
 }>
 
 export type AliyahToolbarState = Readonly<{

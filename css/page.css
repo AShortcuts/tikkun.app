@@ -3,11 +3,31 @@
   --verse-gutter-text-gap: 1ch;
   --aliyah-column-width: 8.5ch;
   --aliyah-gutter-gap: 0.85ch;
+  --match-line-height: 1.8rem;
+  --match-divider-offset: 0.5ch;
+  --reader-two-side-gap: clamp(0.65rem, 1.5vw, 1.25rem);
+  --reading-verse-rail-width: 2.75rem;
   --aliyah-indicator-max-width: var(--aliyah-column-width);
   --line-side-balance-width: calc(
     var(--verse-column-width) + var(--verse-gutter-text-gap) +
       var(--aliyah-column-width)
   );
+}
+
+@media screen and (max-width: 550px) {
+  .tikkun-book[data-target-id='tikkun-book'][data-reader-layout='match'][data-reader-sides='two']
+    .line {
+    grid-template-columns:
+      var(--line-side-balance-width)
+      minmax(0, 1fr)
+      var(--verse-column-width)
+      minmax(0, var(--aliyah-column-width));
+  }
+
+  .tikkun-book[data-target-id='tikkun-book'][data-reader-layout='match'][data-reader-sides='two']
+    .location-indicator.mod-verses {
+    transform: none;
+  }
 }
 
 .tikkun-page {
@@ -81,9 +101,14 @@
   min-width: 11rem;
   max-width: min(17rem, calc(100vw - 1rem));
   padding: 0.52rem 0.62rem;
-  border: 1px solid color-mix(in srgb, var(--medium-accent-color) 82%, transparent);
+  border: 1px solid
+    color-mix(in srgb, var(--medium-accent-color) 82%, transparent);
   border-radius: var(--button-border-radius);
-  background-color: color-mix(in srgb, var(--paper-color) 94%, var(--heavy-accent-color));
+  background-color: color-mix(
+    in srgb,
+    var(--paper-color) 94%,
+    var(--heavy-accent-color)
+  );
   box-shadow: 0 0.65rem 1.6rem oklch(0% 0 0 / 0.18);
   color: var(--text-color);
   direction: ltr;
@@ -127,6 +152,7 @@
 @media screen and (max-width: 1180px) {
   .tikkun-page {
     --aliyah-column-width: 9.2ch;
+    --match-line-height: 1.65rem;
     font-size: 1.65rem;
   }
 }
@@ -134,6 +160,7 @@
 @media screen and (max-width: 1120px) {
   .tikkun-page {
     --aliyah-column-width: 7.6ch;
+    --match-line-height: 1.4rem;
     font-size: 1.4rem;
   }
 }
@@ -141,6 +168,7 @@
 @media screen and (max-width: 870px) {
   .tikkun-page {
     --aliyah-column-width: 7ch;
+    --match-line-height: 1.15rem;
     font-size: 1.15rem;
   }
 }
@@ -148,12 +176,14 @@
 @media screen and (max-width: 670px) {
   .tikkun-page {
     --aliyah-column-width: 5.35ch;
+    --match-line-height: 1rem;
     font-size: 1rem;
   }
 }
 
 @media screen and (max-width: 385px) {
   .tikkun-page {
+    --match-line-height: 0.92rem;
     font-size: 0.92rem;
   }
 }
@@ -195,8 +225,19 @@
   direction: rtl;
   grid-column: 2;
   text-align: justify;
+  min-width: 0;
+  width: 100%;
+}
+
+.reader-text-side {
+  min-width: 0;
+  direction: rtl;
+}
+
+.reader-text-flow {
   display: flex;
   justify-content: space-between;
+  gap: 1ch;
   min-width: 0;
   width: 100%;
 }
@@ -231,6 +272,7 @@
 @media screen and (max-width: 455px) {
   .tikkun-page {
     --verse-gutter-text-gap: 0ch;
+    --match-divider-offset: 0ch;
   }
 
   .line {
@@ -256,21 +298,15 @@
 }
 
 .column {
-  flex: 1;
+  flex: 0 1 max-content;
   display: flex;
   justify-content: space-between;
-  min-width: 18ch;
-  /* HACK: This provides the most gap possible for עשרת בני המן in מגילת אסתר without compromising the layout for האזינו */
+  min-width: 0;
+  max-width: 100%;
 }
 
-.column:nth-child(2) {
-  /*HACK: this rule is a special hack for פרשת האזינו
-    to properly display the columns:
-        a) with space between the columns
-        b) without the column line breaking into two
-  */
-  margin-right: 5em;
-  width: 12em;
+.column:only-child {
+  flex: 1 1 auto;
 }
 
 .fragment {
@@ -288,13 +324,14 @@
   --reader-highlight-inner-radius: max(
     0px,
     calc(
-      var(--reader-highlight-border-radius) -
-        var(--reader-highlight-expansion)
+      var(--reader-highlight-border-radius) - var(--reader-highlight-expansion)
     )
   );
   --reader-active-highlight-fill-surface: var(--reader-highlight-fill-surface);
   --reader-active-highlight-fill-tint: var(--reader-highlight-fill-tint);
-  --reader-active-highlight-outline-color: var(--reader-highlight-outline-color);
+  --reader-active-highlight-outline-color: var(
+    --reader-highlight-outline-color
+  );
 
   background-color: transparent;
   box-shadow:
@@ -324,11 +361,11 @@
   border-radius: var(--reader-highlight-inner-radius);
   box-shadow:
     0 0 0 var(--reader-highlight-outline-offset)
-    var(--reader-active-highlight-fill-surface),
+      var(--reader-active-highlight-fill-surface),
     0 0 0 var(--reader-highlight-expansion)
-    var(--reader-active-highlight-outline-color),
+      var(--reader-active-highlight-outline-color),
     0 0 var(--reader-highlight-glow) var(--reader-highlight-expansion)
-    var(--reader-active-highlight-fill-tint);
+      var(--reader-active-highlight-fill-tint);
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
@@ -343,14 +380,18 @@
   --reader-active-highlight-fill-surface: color-mix(
     in oklch,
     var(--paper-color, white) var(--reader-highlight-fill-alpha-inverse-percent),
-    var(--reader-recording-issue-highlight-fill-color) var(--reader-highlight-fill-alpha-percent)
+    var(--reader-recording-issue-highlight-fill-color)
+      var(--reader-highlight-fill-alpha-percent)
   );
   --reader-active-highlight-fill-tint: color-mix(
     in oklch,
-    var(--reader-recording-issue-highlight-fill-color) var(--reader-highlight-fill-alpha-percent),
+    var(--reader-recording-issue-highlight-fill-color)
+      var(--reader-highlight-fill-alpha-percent),
     transparent
   );
-  --reader-active-highlight-outline-color: var(--reader-recording-issue-highlight-color);
+  --reader-active-highlight-outline-color: var(
+    --reader-recording-issue-highlight-color
+  );
 }
 
 html[data-reader-theme='dark'] .word[data-recording-issue] {
@@ -401,6 +442,487 @@ html[data-reader-theme='dark'] .word[data-recording-issue] {
   content: '';
   width: 100%;
   display: inline-block;
+}
+
+.tikkun-book[data-reader-layout='match'] .line {
+  line-height: var(--match-line-height);
+}
+
+.tikkun-book[data-reader-layout='match'][data-reader-sides='two'] .tikkun-page {
+  position: relative;
+  font-size: clamp(0.95rem, 1.45vw, 1.35rem);
+}
+
+.tikkun-book[data-reader-layout='match'][data-reader-sides='two'] .line {
+  line-height: min(
+    var(--match-line-height),
+    max(1.08em, calc(var(--match-line-height) * 0.92))
+  );
+}
+
+.tikkun-book[data-reader-layout='match'][data-reader-sides='two']
+  .tikkun-page::after {
+  position: absolute;
+  inset-block: 0;
+  left: calc(50% + var(--match-divider-offset));
+  width: 1px;
+  background: color-mix(in srgb, var(--page-ink-color) 16%, transparent);
+  content: '';
+  pointer-events: none;
+}
+
+.tikkun-book[data-reader-layout='match'][data-reader-sides='two']
+  .tikkun-page
+  table {
+  width: min(100%, 96rem);
+}
+
+.tikkun-book[data-reader-layout='match'][data-reader-sides='two']
+  .line-content {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+  column-gap: clamp(0.65rem, 1.5vw, 1.25rem);
+  direction: ltr;
+}
+
+html[data-reader-side-order='tikkun-right']
+  .tikkun-book[data-reader-layout='match'][data-reader-sides='two']
+  .reader-text-side.mod-tikkun,
+html[data-reader-side-order='torah-right']
+  .tikkun-book[data-reader-layout='match'][data-reader-sides='two']
+  .reader-text-side.mod-torah {
+  grid-column: 3;
+}
+
+html[data-reader-side-order='tikkun-right']
+  .tikkun-book[data-reader-layout='match'][data-reader-sides='two']
+  .reader-text-side.mod-torah,
+html[data-reader-side-order='torah-right']
+  .tikkun-book[data-reader-layout='match'][data-reader-sides='two']
+  .reader-text-side.mod-tikkun {
+  grid-column: 1;
+}
+
+.tikkun-book[data-reader-layout='match'][data-reader-sides='two']
+  .reader-text-side {
+  grid-row: 1;
+}
+
+.tikkun-book[data-reader-layout='match'][data-reader-sides='two']
+  tr:not([data-shirah-kind]) .reader-text-flow {
+  font-size: var(--match-text-scale, 1em);
+}
+
+@media screen and (min-width: 551px) {
+  .tikkun-book[data-reader-layout='match']
+    tr[data-shirah-kind='sea']
+    > .line {
+    contain: inline-size;
+  }
+
+  .tikkun-book[data-reader-layout='match']
+    tr[data-shirah-kind='sea']
+    .line-content {
+    width: var(--match-shirah-inline-size, 100%);
+    justify-self: end;
+    transform: translateX(var(--match-shirah-inline-offset, 0px));
+  }
+
+  .tikkun-book[data-reader-layout='match']
+    tr[data-shirah-kind='sea']
+    .line-gutter {
+    transform: translateX(var(--match-shirah-inline-offset, 0px));
+  }
+
+  .tikkun-book[data-reader-layout='match']
+    tr[data-shirah-kind='sea']
+    .line-gutter.mod-aliyot {
+    display: var(--match-shirah-aliyah-display, flex);
+  }
+
+  .tikkun-book[data-reader-layout='match']
+    tr[data-shirah-kind='sea']
+    .column {
+    display: grid;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 0;
+    width: 100%;
+  }
+
+  .tikkun-book[data-reader-layout='match']
+    tr[data-shirah-kind='sea']
+    .fragment {
+    grid-column: var(--match-shirah-track);
+    grid-row: 1;
+  }
+
+  .tikkun-book[data-reader-layout='match']
+    tr[data-shirah-kind='sea']
+    .fragment {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .tikkun-book[data-reader-layout='match']
+    tr[data-shirah-pattern='fragments-3']
+    .fragment:first-child {
+    text-align: right;
+  }
+
+  .tikkun-book[data-reader-layout='match']
+    tr[data-shirah-pattern='fragments-3']
+    .fragment:last-child,
+  .tikkun-book[data-reader-layout='match']
+    tr[data-shirah-pattern='closing']
+    .fragment:last-child {
+    text-align: left;
+  }
+}
+
+.tikkun-book[data-reader-layout='match']
+  tr[data-shirah-kind='haazinu'] > .line {
+  contain: inline-size;
+}
+
+.tikkun-book[data-reader-layout='match'][data-reader-sides='one']
+  table:has(tr[data-shirah-kind='haazinu']) {
+  /* Keep the deployed page measure: its widest first span, 12em second column,
+     5em separation, gutters, and 4px outer table spacing. This sizes only
+     the ordinary text; the song retains its independent, measured gap. */
+  width: min(100%, calc(
+    max(18ch, var(--match-haazinu-page-first-span-width, 0px)) +
+    max(18ch, 12em) + 5em + var(--line-side-balance-width) +
+    var(--verse-column-width) + var(--aliyah-column-width) + 4px
+  ));
+}
+
+.tikkun-book[data-reader-layout='match']
+  tr[data-shirah-kind='haazinu'] .line-content {
+  width: var(--match-shirah-inline-size, 100%);
+  justify-self: end;
+  transform: translateX(var(--match-shirah-inline-offset, 0px));
+}
+
+.tikkun-book[data-reader-layout='match']
+  tr[data-shirah-kind='haazinu'] .line-gutter {
+  transform: translateX(var(--match-shirah-inline-offset, 0px));
+}
+
+.tikkun-book[data-reader-layout='match']
+  tr[data-shirah-kind='haazinu'] .line-gutter.mod-aliyot {
+  display: var(--match-shirah-aliyah-display, flex);
+}
+
+.tikkun-book[data-reader-layout='match']
+  tr[data-shirah-kind='haazinu'] .reader-text-flow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--match-haazinu-gap, 0px);
+  font-size: var(--match-shirah-text-scale, 1em);
+  width: 100%;
+}
+
+.tikkun-book[data-reader-layout='match']
+  tr[data-shirah-kind='haazinu'] .fragment {
+  width: 100%;
+  min-width: 0;
+  white-space: normal;
+}
+
+.tikkun-book[data-reader-layout='match']
+  tr[data-shirah-kind='sea'] .reader-text-flow {
+  font-size: var(--match-shirah-text-scale, 1em);
+}
+
+.match-shirah-measure {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  inset: 0 auto auto 0;
+  direction: rtl;
+}
+
+.match-shirah-measure .fragment {
+  display: block;
+  width: max-content;
+  max-width: none;
+  white-space: nowrap;
+  text-align: start;
+  text-align-last: start;
+}
+
+.match-shirah-measure .fragment::after {
+  content: none;
+}
+
+.tikkun-book[data-reader-layout='match'][data-reader-sides='two']
+  .match-shirah-measure .reader-text-flow {
+  width: max-content;
+  font-size: 1em;
+}
+
+.tikkun-book[data-reader-layout='reading'] {
+  overflow-x: hidden;
+}
+
+.tikkun-book[data-reader-layout='reading'] .tikkun-page {
+  width: min(100%, 54rem);
+  margin-inline: auto;
+  padding-block: 0;
+  border-bottom: 0;
+  font-size: 1.55rem;
+}
+
+.tikkun-book[data-reader-layout='reading'] .tikkun-page:not(:first-child),
+.tikkun-book[data-reader-layout='reading'] .tikkun-page:not(:last-child) {
+  padding-block: 0;
+  border-bottom: 0;
+}
+
+.tikkun-book[data-reader-layout='reading'] .tikkun-page-number,
+.tikkun-book[data-reader-layout='reading'] .line-gutter.mod-aliyot {
+  display: none !important;
+}
+
+.reader-reading-page {
+  min-width: 0;
+}
+
+.reader-reading-page-side {
+  position: relative;
+  min-width: 0;
+  direction: rtl;
+  line-height: 1.62;
+  text-align: right;
+}
+
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='one']
+  .reader-reading-page-side {
+  line-height: 1.72;
+}
+
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='one'] {
+  --reading-verse-rail-width: 2.75rem;
+  position: relative;
+  padding-left: max(1rem, calc((100% - 54rem) / 2));
+  padding-right: max(
+    calc(1rem + var(--reading-verse-rail-width)),
+    calc((100% - 54rem) / 2 + var(--reading-verse-rail-width))
+  );
+}
+
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='one']
+  .tikkun-page,
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='one']
+  .reader-reading-page,
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='one']
+  .reader-reading-page-side {
+  display: inline;
+  position: static;
+}
+
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='one']
+  .reader-text-side,
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='one']
+  .reader-text-flow,
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='one'] .column,
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='one'] .fragment {
+  display: contents;
+}
+
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='one']
+  .fragment::after {
+  content: none;
+}
+
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='one']
+  .mod-reading-line,
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='one']
+  .mod-reading-line
+  .line-content {
+  display: inline;
+  position: static;
+  direction: inherit;
+  line-height: inherit;
+  width: auto;
+}
+
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='one']
+  .mod-reading-line
+  .line-gutter.mod-verses {
+  position: absolute;
+  top: var(--reading-verse-gutter-top, 0);
+  right: max(1rem, calc((100% - 54rem) / 2));
+  left: auto;
+  display: flex !important;
+  direction: ltr;
+  width: var(--reading-verse-rail-width);
+}
+
+.tikkun-book[data-reader-layout='reading'] .reader-pasuk-break {
+  display: block;
+  content: '';
+  margin-block-end: 0.58em;
+}
+
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  .tikkun-page {
+  width: min(100%, calc(76rem + 2 * var(--verse-column-width)));
+  font-size: clamp(1rem, 1.55vw, 1.35rem);
+}
+
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  .reader-reading-page {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+  column-gap: var(--reader-two-side-gap);
+  box-sizing: border-box;
+  direction: ltr;
+  padding-inline: var(--reading-verse-rail-width);
+}
+
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  .reader-reading-page::after {
+  position: absolute;
+  inset-block: 0;
+  left: 50%;
+  width: 1px;
+  background: color-mix(in srgb, var(--page-ink-color) 16%, transparent);
+  content: '';
+}
+
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  .reader-reading-page-side {
+  position: static;
+  grid-row: 1;
+}
+
+html[data-reader-side-order='tikkun-right']
+  .tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  .reader-reading-page-side.mod-tikkun,
+html[data-reader-side-order='torah-right']
+  .tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  .reader-reading-page-side.mod-torah {
+  grid-column: 3;
+}
+
+html[data-reader-side-order='tikkun-right']
+  .tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  .reader-reading-page-side.mod-torah,
+html[data-reader-side-order='torah-right']
+  .tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  .reader-reading-page-side.mod-tikkun {
+  grid-column: 1;
+}
+
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  .mod-reading-line {
+  position: static;
+  display: inline;
+  direction: rtl;
+  line-height: inherit;
+}
+
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  .mod-reading-line
+  .line-content {
+  display: contents;
+}
+
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  .mod-reading-line
+  .reader-text-side,
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  .mod-reading-line
+  .reader-text-flow,
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  .mod-reading-line
+  .column,
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  .mod-reading-line
+  .fragment {
+  display: contents;
+}
+
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  .word[data-token-key] {
+  box-sizing: border-box;
+  display: inline-block;
+  inline-size: var(--reader-paired-word-width, auto);
+}
+
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  .fragment::after {
+  content: none;
+}
+
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  .line-gutter.mod-verses {
+  position: absolute;
+  top: var(--reading-verse-gutter-top, 0);
+  right: 0;
+  left: auto;
+  width: var(--reading-verse-rail-width);
+  display: none !important;
+}
+
+html[data-reader-side-order='tikkun-right']
+  .tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  .reader-reading-page-side.mod-tikkun
+  .line-gutter.mod-verses,
+html[data-reader-side-order='torah-right']
+  .tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  .reader-reading-page-side.mod-torah
+  .line-gutter.mod-verses {
+  display: flex !important;
+}
+
+@media screen and (max-width: 920px) {
+  .tikkun-book[data-reader-sides='two'] .line {
+    grid-template-columns:
+      var(--verse-column-width)
+      minmax(0, 1fr)
+      var(--verse-column-width)
+      0;
+  }
+
+  .tikkun-book[data-reader-sides='two'] .line-gutter.mod-aliyot {
+    display: none;
+  }
+}
+
+@media screen and (max-width: 550px) {
+  .tikkun-book[data-target-id='tikkun-book'][data-reader-layout='match'][data-reader-sides='two'] {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x pan-y pinch-zoom;
+  }
+
+  .tikkun-book[data-target-id='tikkun-book'][data-reader-layout='match'][data-reader-sides='two']
+    .tikkun-page {
+    width: 100%;
+    min-width: 0;
+    font-size: min(1rem, calc(2.2222vw - 0.04444rem));
+  }
+
+  .tikkun-book[data-target-id='tikkun-book'][data-reader-layout='match'][data-reader-sides='two']
+    .tikkun-page
+    table {
+    width: 100%;
+  }
+
+  .tikkun-book[data-target-id='tikkun-book'][data-reader-layout='match'][data-reader-sides='two']
+    .line-content {
+    white-space: nowrap;
+  }
+
+  .tikkun-book[data-reader-layout='reading'] .tikkun-page {
+    width: auto;
+    padding-inline: 0;
+    font-size: clamp(1.3rem, 6.2vw, 1.55rem);
+  }
 }
 
 .location-indicator {
@@ -568,12 +1090,12 @@ html[data-reader-theme='dark'] .word[data-recording-issue] {
 }
 
 .aliyah-audio-button:disabled {
-  opacity: 0.4;
+  color: var(--light-text-color);
+  background: var(--light-accent-color);
   cursor: not-allowed;
 }
 
-html[data-reader-mode='admin-authoring']
-  .aliyah-audio-button.is-missing-audio {
+html[data-reader-mode='admin-authoring'] .aliyah-audio-button.is-missing-audio {
   background: color-mix(
     in srgb,
     var(--admin-missing-audio-color) 14%,
@@ -597,7 +1119,7 @@ html[data-reader-mode='admin-authoring']
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .aliyah-audio-button:not(.is-active):hover {
+  .aliyah-audio-button:not(.is-active):not(:disabled):hover {
     background: color-mix(in srgb, dodgerblue 20%, transparent);
   }
 
@@ -624,7 +1146,6 @@ html[data-reader-mode='admin-authoring']
 }
 
 @media screen and (max-width: 550px) {
-
   .line-gutter.mod-aliyot,
   .location-indicator.mod-aliyot {
     display: none;
@@ -696,12 +1217,20 @@ html[data-reader-mode='admin-authoring']
 
   .aliyah-start-marker-rule::before {
     right: calc(50% + 1.38rem);
-    background: linear-gradient(to left, var(--aliyah-start-accent), transparent);
+    background: linear-gradient(
+      to left,
+      var(--aliyah-start-accent),
+      transparent
+    );
   }
 
   .aliyah-start-marker-rule::after {
     left: calc(50% + 1.38rem);
-    background: linear-gradient(to right, var(--aliyah-start-accent), transparent);
+    background: linear-gradient(
+      to right,
+      var(--aliyah-start-accent),
+      transparent
+    );
   }
 
   .aliyah-start-marker-capsule {
@@ -713,11 +1242,16 @@ html[data-reader-mode='admin-authoring']
     min-width: 2.38rem;
     height: 0.88rem;
     box-sizing: border-box;
-    border: 1px solid color-mix(in srgb, var(--aliyah-start-accent) 38%, transparent);
+    border: 1px solid
+      color-mix(in srgb, var(--aliyah-start-accent) 38%, transparent);
     border-radius: 999px;
     padding: 0 0.38rem;
     background: color-mix(in srgb, var(--paper-color) 86%, transparent);
-    color: color-mix(in srgb, var(--aliyah-start-accent) 78%, var(--page-ink-color));
+    color: color-mix(
+      in srgb,
+      var(--aliyah-start-accent) 78%,
+      var(--page-ink-color)
+    );
     font-family: var(--hebrew-ui-font-family);
     font-size: 0.55rem;
     font-weight: 650;
@@ -738,7 +1272,9 @@ html[data-reader-mode='admin-authoring']
     display: inline-flex;
     width: 0.92rem;
     height: 0.92rem;
-    filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--paper-color) 76%, transparent));
+    filter: drop-shadow(
+      0 1px 1px color-mix(in srgb, var(--paper-color) 76%, transparent)
+    );
     transform: translateX(-50%);
     transition:
       opacity var(--reader-motion-color) var(--reader-ease-standard),
@@ -752,7 +1288,11 @@ html[data-reader-mode='admin-authoring']
   }
 
   .aliyah-start-marker:focus-visible .aliyah-start-marker-capsule {
-    border-color: color-mix(in srgb, var(--aliyah-start-accent) 62%, transparent);
+    border-color: color-mix(
+      in srgb,
+      var(--aliyah-start-accent) 62%,
+      transparent
+    );
   }
 
   .aliyah-start-marker:focus-visible .aliyah-start-chevron {
@@ -761,7 +1301,11 @@ html[data-reader-mode='admin-authoring']
 
   @media (hover: hover) and (pointer: fine) {
     .aliyah-start-marker:hover .aliyah-start-marker-capsule {
-      border-color: color-mix(in srgb, var(--aliyah-start-accent) 62%, transparent);
+      border-color: color-mix(
+        in srgb,
+        var(--aliyah-start-accent) 62%,
+        transparent
+      );
     }
 
     .aliyah-start-marker:hover .aliyah-start-chevron {

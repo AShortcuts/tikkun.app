@@ -23,6 +23,9 @@ const preferences: ReaderPreferences = {
   themeMode: 'dark',
   customBackgroundColor: '#eee6d6',
   customTextColor: '#3b3026',
+  readerTextLayout: 'match',
+  readerSideMode: 'one',
+  readerSideOrder: 'tikkun-right',
 }
 
 test('recording mode is enabled through search params without changing hash routing', () => {

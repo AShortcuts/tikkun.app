@@ -542,6 +542,9 @@
   })
 
   onMount(() => {
+    window.history.scrollRestoration = 'manual'
+    window.scrollTo({ top: 0, behavior: 'instant' })
+
     const mobileHeroQuery = window.matchMedia('(max-width: 47.999rem)')
     const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
     let mobileThemeSheetSetupFrame: number | undefined
@@ -809,15 +812,6 @@
 </script>
 
 <svelte:head>
-  <style>
-    html {
-      scroll-behavior: auto !important;
-    }
-  </style>
-  <script>
-    window.history.scrollRestoration = 'manual'
-    window.scrollTo(0, 0)
-  </script>
   <title>Tikkun Reader | Scroll story prototype</title>
   <meta
     name="description"

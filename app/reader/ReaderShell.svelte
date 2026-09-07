@@ -14,6 +14,7 @@
     onTitleClick,
     onAboutClick,
     onAnnotationsChange,
+    onSwapSides = () => {},
     connect,
   }: ReaderShellComponentProps = $props()
 
@@ -37,7 +38,7 @@
 
   const mobileTitleQuery = '(max-width: 550px)'
   const mobileTitleFontProperty = '--mobile-parsha-title-font-size'
-  const minimumMobileTitleFontSize = 10
+  const minimumMobileTitleFontSize = 9
 
   const readerChromeVisible = $derived(view === 'reader' && !pickerOpen)
 
@@ -278,6 +279,31 @@
     </div>
 
     <div class="reader-main" style="direction: rtl">
+      <div
+        class="reader-text-forehead"
+        data-target-id="reader-text-forehead"
+        aria-label="Torah and Tikkun sides"
+      >
+        <div class="reader-side-heading mod-left" lang="he" dir="rtl">
+          <span data-reader-heading-form="torah">תורה</span>
+          <span data-reader-heading-form="tikkun">תיקון</span>
+        </div>
+        <button
+          class="reader-side-swap"
+          data-target-id="reader-side-swap"
+          data-reader-no-form-toggle="true"
+          type="button"
+          title="Swap Torah and Tikkun sides"
+          aria-label="Swap Torah and Tikkun sides"
+          onclick={onSwapSides}
+        >
+          <UiIcon name="arrowLeftRight" />
+        </button>
+        <div class="reader-side-heading mod-right" lang="he" dir="rtl">
+          <span data-reader-heading-form="torah">תורה</span>
+          <span data-reader-heading-form="tikkun">תיקון</span>
+        </div>
+      </div>
       <div
         class="tikkun-book"
         class:mod-annotations-on={annotationsEnabled}

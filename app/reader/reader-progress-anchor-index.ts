@@ -2,7 +2,8 @@ import type { LeiningRun } from '../calendar-model/model-types.ts'
 import type { PlaybackAliyahIndex } from '../reading/aliyah-dom-target.ts'
 import { parseAliyahIndex } from '../reading/aliyah-identity.ts'
 
-const ALIYAH_PROGRESS_ANCHOR_SELECTOR = '[data-line-index][data-aliyah-starts]'
+const ALIYAH_PROGRESS_ANCHOR_SELECTOR =
+  '[data-line-index][data-aliyah-starts]:not([data-reader-mirror])'
 
 export type ReaderProgressAnchorInvalidation =
   | 'reader-model'

@@ -34,6 +34,7 @@ import {
   type ReaderProgressAnchorInvalidation,
   type ReaderProgressAnchorSnapshot,
 } from './reader-progress-anchor-index.ts'
+import type { ReaderPagePresentation } from '../reader-presentation.ts'
 
 export interface ReaderDisplaySessionLease {
   readonly generation: number
@@ -73,6 +74,7 @@ export interface ReaderDisplaySession {
   viewportRange(): ViewportRange | null
   resetViewport(): void
   refreshViewport(): void
+  setPagePresentation(presentation: ReaderPagePresentation, beforeLayout?: () => void): boolean
   progressSnapshot(): ReaderProgressAnchorSnapshot
   progressAnchorForElement(element: HTMLElement): ReaderProgressAnchor | null
   invalidateProgressAnchors(reason: ReaderProgressAnchorInvalidation): void
@@ -639,6 +641,18 @@ export function createReaderDisplaySession({
     },
     refreshViewport() {
       viewportTracker?.refresh()
+    },
+    setPagePresentation(nextPresentation, beforeLayout) {
+      if (!activeDisplay) return false
+      if (activeDisplay.usesPresentation(nextPresentation)) return false
+      renderedLinesByLocationKey.clear()
+      markerElementsByKey.clear()
+      const changed = activeDisplay.setPresentation(nextPresentation, beforeLayout)
+      if (!changed) return false
+      progressAnchors.invalidate('text-layout')
+      viewportTracker?.refresh()
+      presentation.invalidateAfterLayout('reader-position')
+      return true
     },
     progressSnapshot: () => progressAnchors.snapshot(),
     progressAnchorForElement: (element) =>

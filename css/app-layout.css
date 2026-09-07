@@ -56,6 +56,8 @@ html.mod-theme-transition .toolbar-button {
 [data-recording-mode='true'] [data-target-id='admin-panel'],
 [data-recording-mode='true'] [data-target-id='floating-player'],
 [data-recording-mode='true'] [data-target-id='reader-progress-mobile'],
+[data-recording-mode='true'] [data-target-id='settings-toggle'],
+[data-recording-mode='true'] [data-target-id='settings-pane'],
 [data-recording-mode='true'] [data-target-id='admin-access-dialog'],
 [data-recording-mode='true'] [data-target-id='recording-issue-modal'],
 [data-recording-mode='true'] .reader-side {

@@ -33,6 +33,10 @@
     display: none !important;
   }
 
+  .toolbar-button[data-target-id='settings-toggle'] {
+    display: none !important;
+  }
+
   .tikkun-book {
     scroll-padding-bottom: calc(12rem + env(safe-area-inset-bottom, 0px));
   }

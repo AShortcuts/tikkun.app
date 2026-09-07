@@ -1,5 +1,6 @@
 import { HDate } from '@hebcal/hdate'
 import type { LeiningGenerator } from '../calendar-model/generator.ts'
+import { getBookName } from '../calendar-model/hebcal-conversions.ts'
 import {
   LeiningInstanceId,
   LeiningRunType,
@@ -15,6 +16,7 @@ import {
   semanticParshaUrlForLeining,
 } from '../view-model/navigation/parsha-routes.ts'
 import renderLeiningTitle from './render-leining-title.ts'
+import { listTorahBooks } from './torah-reference.ts'
 
 export const ALIYAH_HOVER_FLYOUT_QUERY =
   '(hover: hover) and (pointer: fine) and (min-width: 716px)'
@@ -23,6 +25,12 @@ export const POPUP_VIEWPORT_MARGIN = 12
 const POPUP_ANCHOR_GAP = 6
 const PARSHA_CHOICE_SOURCE_LOOKBACK_YEARS = 3
 const PARSHA_CHOICE_SOURCE_WINDOW_YEARS = 20
+const ordinalDayByRoman = new Map([
+  ['I', '1st day'],
+  ['II', '2nd day'],
+  ['VII', '7th day'],
+  ['VIII', '8th day'],
+])
 
 const aliyahLabels = new Map<LeiningAliyah['index'], string>([
   [1, '1st - ראשון'],
@@ -82,6 +90,7 @@ export type ParshaAliyahChoiceGroup = {
 export type ParshaPickerEntry = {
   id: string
   label: string
+  englishLabel: string
   href: string
   aliyahGroups: ParshaAliyahChoiceGroup[]
 }
@@ -162,6 +171,53 @@ function firstRunOf(leining: LeiningInstance): LeiningRun {
     )
   }
   return run
+}
+
+const torahBookLabelByNumber = new Map(
+  listTorahBooks().map(({ number, label }) => [number, label])
+)
+
+function englishBookLabel(ref: LeiningAliyah['start']) {
+  if (ref.scroll === 'torah') {
+    return torahBookLabelByNumber.get(ref.b) ?? getBookName(ref)
+  }
+  return getBookName(ref)
+}
+
+function englishLeiningTitle(leining: LeiningInstance) {
+  let title = leining.date.title.en
+    .replace(/\b(VIII|VII|II|I)\b/, (day) => ordinalDayByRoman.get(day) ?? day)
+    .replace(/\s+\((on [^)]+)\)$/i, ' $1')
+
+  if (leining.id === LeiningInstanceId.Mincha) title += ' Mincha'
+  if (leining.id === LeiningInstanceId.Maariv) title += ' Maariv'
+  return title
+}
+
+function englishReadingLabel(leining: LeiningInstance) {
+  const run = firstRunOf(leining)
+  const firstAliyah = run.aliyot[0]
+  const lastAliyah = run.aliyot.at(-1)
+  if (!firstAliyah || !lastAliyah) {
+    throw new Error(
+      `Leining ${leining.date.title.en || leining.id} has no reading range`
+    )
+  }
+
+  const start = firstAliyah.start
+  const end = lastAliyah.end
+  const startBook = englishBookLabel(start)
+  const endBook = englishBookLabel(end)
+  const startRef = `${start.c}:${start.v}`
+  const sameBook = start.scroll === end.scroll && start.b === end.b
+  const endRef =
+    sameBook && start.c === end.c ? String(end.v) : `${end.c}:${end.v}`
+  let range = `${startBook} ${startRef}`
+
+  if (!sameBook) range += `-${endBook} ${endRef}`
+  else if (start.c !== end.c || start.v !== end.v) range += `-${endRef}`
+
+  return `${englishLeiningTitle(leining)} (${range})`
 }
 
 function parshaTitle(leining: LeiningInstance) {
@@ -421,6 +477,7 @@ export function buildParshaPickerModel(
         ? `parsha-aliyot-${choiceId++}`
         : leiningKey(leining),
       label,
+      englishLabel: englishReadingLabel(leining),
       href: navigationHrefForLeining(leining),
       aliyahGroups,
     }

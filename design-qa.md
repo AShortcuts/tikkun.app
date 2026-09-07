@@ -40,6 +40,111 @@ The homepage follows the selected desktop-first direction: concise practical cop
 
 final result: passed
 
+---
+
+# Reader Settings Option 1 Design QA
+
+Date: 2026-09-03
+
+## Evidence
+
+- Selected visual truth: `/Users/adambh/.codex/generated_images/01a06363-460b-7dd0-a3e0-0ee75cba3358/exec-a6c4ba33-2955-44b4-94b0-eba0bddb99a9.png` at 1000 x 1573 px.
+- Implementation capture: `qa/reader-settings/implementation-option-1-desktop-full.png`, a 922 x 648 browser-harness capture of the live 1280 x 900 Reader frame.
+- Focused source crop: `qa/reader-settings/reference-option-1-panel.png`.
+- Focused implementation crop: `qa/reader-settings/implementation-option-1-panel.png`.
+- Combined comparison: `qa/reader-settings/comparison-option-1.png`; selected mockup is left and implementation is right.
+- Live route: `http://127.0.0.1:5176/reader/#/torah/parsha/beresheet`.
+- Verified state: dark Beresheet Reader, Reading category, Match, One Side, Reader position, and the Shift preference off.
+
+## Findings
+
+- P0: none.
+- P1: none.
+- P2: none remaining.
+- Follow-up: `LAYOUT` and `READER` now use the mockup's muted, compact, tracked uppercase treatment; the underlying heading text remains semantic title case.
+- The implementation preserves the mockup's icon-only rail, two-column setting rows, grouped segmented controls, circular header actions, and bordered Shift switch.
+- The pane is intentionally more concise than the source: it removes the mockup's unused lower space, reduces vertical padding, and keeps the full Reading category immediately scannable.
+- The desktop Two Sided helper remains `Mirrored`, while compact portrait correctly shows `Landscape`; this preserves the real availability rule instead of copying static mockup text.
+- Existing product typography, theme tokens, icons, and preference behavior remain implementation truth.
+
+## Functional And Responsive Checks
+
+- Live category navigation and the Shift switch were exercised in the in-app browser; the original Reading category and off state were restored.
+- Live checks at 1280 x 900 and 390 x 844 showed no clipping or horizontal overflow. The responsive browser matrix also passed across 320-1280 px, all themes, reduced motion, forced colors, and 200% reflow.
+- Focused Reader Settings and progress runtime tests passed: 11 tests across 2 files.
+- Typecheck passed with 0 errors and 0 warnings; targeted ESLint and targeted `git diff --check` passed.
+- `npx vite build` passed. The full wrapper `npm run build` stops before Vite on the unrelated existing Vayetzei manual-work manifest invariant.
+- Browser console errors and warnings: none; only Vite connection and hot-update debug entries were present.
+
+final result: passed
+
+---
+
+# Reader Settings Pane Design QA
+
+Date: 2026-09-02
+
+## Target And State
+
+- Source visual truth: `/Users/adambh/.codex/generated_images/01a06363-460b-7dd0-a3e0-0ee75cba3358/exec-a3bbcada-9a38-47ff-96c2-b19bb4cbebe8.png` at 1682 x 976 px.
+- Implementation captures: transient Codex in-app browser captures at 1682 x 976, 1440 x 900, 768 x 900, 390 x 844, and 320 x 700 CSS px at 1x density. The browser API did not expose a persistent screenshot path.
+- Combined comparison: a temporary in-app browser canvas placed the 1682 x 976 source and a same-size live Reader iframe side by side, normalized together to a 1682 x 488 comparison capture. The temporary comparison files were removed after review.
+- Focused comparison: no separate crop was needed because the Reader Settings pane is the only modified visual region and remained fully visible in the combined comparison.
+- Verified state: dark Beresheet reader, Reading category active, Match and One Side selected, Yoni Davidov selected, and playback at 1x.
+- Geometry: the pane is 500 px wide, with a 56 px icon rail on desktop and a 48 px rail on compact mobile.
+
+## Fidelity And Iteration
+
+- The implementation preserves the approved dark glass surface, restrained blue active state, thin rail indicator, Lucide icon family, one-line header, instant-apply check, and compact reset and close actions.
+- Reading is the primary surface. Appearance, Playback, and More are real switchable groups instead of visually uniform stacked sections.
+- Labels and controls use a denser inline layout than the source mockup, following the approved request to make option 3 more concise. Existing offline, support, theme, highlight, and playback controls remain available through progressive disclosure.
+- P0: none. P1: none. P2: none.
+- First responsive pass: `Reader Settings` wrapped at 320 px. The mobile header gaps were tightened and the title now remains on one line.
+- Final responsive pass: no horizontal overflow at 768, 390, 320 px; the mobile pane measures 378.8125 px inside a 390 px viewport and 308.8125 px inside a 320 px viewport.
+
+## Functional And Accessibility Checks
+
+- All four icon-only categories expose accessible names, pressed state, controls relationships, visible focus, and keyboard activation.
+- The advanced-reading row opens Playback; the playback stepper changed 1x to 1.05x and back; Reading/Match changed instantly and was restored to Match.
+- Escape closes the dialog, returns focus to Reader settings, and reopening focuses Close reader settings.
+- Compact mobile keeps Two Sided visible but disabled with its Landscape explanation. A cold mobile load hides the desktop settings trigger, then loads and styles the pane from Reader Controls without a flash of the desktop trigger.
+- Reader Settings CSS is emitted as its own 18.48 kB lazy asset; the main CSS asset is 155.02 kB and remains below the 170 kB build budget.
+- `npm run typecheck`, targeted ESLint, `npm run build`, and five affected browser suites pass: 5 files and 17 tests.
+- Browser console: one existing special-Hebrew-letter alignment error from `app/special-letter-layout.ts` was observed; no Reader Settings error was produced.
+
+final result: passed
+
+## Reader Settings hierarchy follow-up
+
+Date: 2026-09-02
+
+### Target and evidence
+
+- Source visual truth: `/Users/adambh/.codex/generated_images/01a06363-460b-7dd0-a3e0-0ee75cba3358/exec-a3bbcada-9a38-47ff-96c2-b19bb4cbebe8.png` at 1682 x 976 px, plus the user's requested hierarchy and checkmark refinements.
+- Implementation: the live Reader at `http://127.0.0.1:5176/reader/#/torah/parsha/beresheet` in the Codex in-app browser.
+- Full-view comparison: a temporary comparison canvas placed the 1682 x 976 source beside a live 1682 x 976 Reader iframe. Both were normalized to 628 x 364.39 px at 1x density inside a 1280 x 720 capture. The temporary files were removed after review.
+- Focused comparison: a second temporary canvas placed the cropped source pane beside the current 389 x 697 mobile Reading capture. It was used to judge the requested header and section changes, not desktop proportions. The temporary files were removed after review.
+- State: dark Beresheet reader; Reading and Playback categories checked separately; Match, One Side, Reader position, Yoni Davidov, and 1x playback selected.
+
+### Fidelity surfaces
+
+- Fonts and typography: existing Reader Settings typography, weights, line height, wrapping, and hierarchy remain intact. The moved labels stay readable at both desktop and compact widths.
+- Spacing and layout rhythm: the 56 px desktop rail and 48 px compact rail remain unchanged. Reset and Close now measure 37.59375 x 37.59375 px with a computed `50%` radius. The 389 px viewport has zero horizontal overflow and a 377.8125 px pane.
+- Colors and visual tokens: the decorative green instant-status check and blue selected-option check glyphs are gone. The restrained blue active surfaces remain as the selection affordance, while native checkbox marks remain only where they communicate an actual boolean control.
+- Image and icon fidelity: no new image assets were needed. Existing Lucide rail, reset, and close icons remain sharp and use the established Reader token colors.
+- Copy and content: Reading position appears first under Reading > Reader. The bordered Shift/Nekudot preference is the section's final control. Ba'al Koreh and Playback speed remain under Playback > Audio; Auto-scroll remains under Playback > Behavior.
+
+### Findings and checks
+
+- P0: none. P1: none. P2: none. The first post-change comparison passed without a visual-fix iteration.
+- Reading, Playback, Shift preference, Reading position, playback stepper, and keyboard focus behavior all remained functional. The redundant Playback settings shortcut is absent. Changed preferences were restored after the interaction pass.
+- The latest focused browser pass confirms a 1 px solid border, 14 px radius, the Shift preference after Reading position, no Playback shortcut, and zero horizontal overflow at 389 px.
+- The five affected browser suites pass: 5 files and 17 tests. The latest targeted rerun passes 3 files and 12 tests. `npm run typecheck`, targeted ESLint, and `npm run build` pass.
+- Browser-test diagnostics showed only the existing SvelteKit history API warnings; no Reader Settings error was produced.
+- Production output keeps Reader Settings in a 17.77 kB lazy CSS asset. The main CSS asset is 155.16 kB and remains below budget.
+
+final result: passed
+
 ## Mobile title depth follow-up
 
 - Source visual truth: `/Users/adambh/Library/Caches/Clop/images/38626.png` (194 x 96 px, Display P3, 2x source density).

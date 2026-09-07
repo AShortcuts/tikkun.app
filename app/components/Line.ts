@@ -7,6 +7,11 @@ import { tokenizeReaderWords } from '../reader/word-tokenization.ts'
 import { createSpecialLetterRenderer } from '../special-letters.ts'
 import textFilter from '../text-filter.ts'
 import { iconMarkup } from './icons.ts'
+import { seaShirahLayout } from './sea-shirah-layout.ts'
+import {
+  defaultReaderPagePresentation,
+  type ReaderPagePresentation,
+} from '../reader-presentation.ts'
 
 const petuchaClass = (isPetucha: boolean) => (isPetucha ? 'mod-petucha' : '')
 const setumaClass = (column: unknown[]) =>
@@ -17,6 +22,8 @@ const escapeAttribute = (value: string) =>
     .replace(/"/g, '&quot;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
+const stripHebrewMarks = (text: string) =>
+  text.normalize('NFD').replace(/\p{M}/gu, '')
 
 const renderWords = ({
   annotatedText,
@@ -27,6 +34,7 @@ const renderWords = ({
   fragmentIndex,
   renderAnnotatedSpecialLetters,
   renderUnannotatedSpecialLetters,
+  readingLayout,
 }: {
   annotatedText: string
   unannotatedText: string
@@ -36,30 +44,32 @@ const renderWords = ({
   fragmentIndex: number
   renderAnnotatedSpecialLetters: (text: string) => string
   renderUnannotatedSpecialLetters: (text: string) => string
+  readingLayout: boolean
 }) => {
   const annotatedWords = tokenizeReaderWords(annotatedText)
   const unannotatedWords = tokenizeReaderWords(unannotatedText)
   const wordCount = Math.max(annotatedWords.length, unannotatedWords.length)
 
   return Array.from({ length: wordCount }, (_, wordIndex) => {
-      const annotatedWord = annotatedWords[wordIndex]
-      const unannotatedWord = unannotatedWords[wordIndex]
-      const annotatedMarkup = annotatedWord
-        ? renderAnnotatedSpecialLetters(annotatedWord.text)
-        : ''
-      const unannotatedMarkup = unannotatedWord
-        ? renderUnannotatedSpecialLetters(unannotatedWord.text)
-        : ''
-      const activeWord = annotationsEnabled ? annotatedWord : unannotatedWord
-      const activeMarkup = annotationsEnabled
-        ? annotatedMarkup
-        : unannotatedMarkup
-      const alternateMarkup = annotationsEnabled
-        ? unannotatedMarkup
-        : annotatedMarkup
-      const tokenKey = `${pageNumber}:${lineIndex}:${fragmentIndex}:${wordIndex}`
-      return `<span
-        class="word ${activeWord?.isKri ? 'ktiv-kri' : ''}"
+    const annotatedWord = annotatedWords[wordIndex]
+    const unannotatedWord = unannotatedWords[wordIndex]
+    const annotatedMarkup = annotatedWord
+      ? renderAnnotatedSpecialLetters(annotatedWord.text)
+      : ''
+    const unannotatedMarkup = unannotatedWord
+      ? renderUnannotatedSpecialLetters(unannotatedWord.text)
+      : ''
+    const activeWord = annotationsEnabled ? annotatedWord : unannotatedWord
+    const activeMarkup = annotationsEnabled
+      ? annotatedMarkup
+      : unannotatedMarkup
+    const alternateMarkup = annotationsEnabled
+      ? unannotatedMarkup
+      : annotatedMarkup
+    const tokenKey = `${pageNumber}:${lineIndex}:${fragmentIndex}:${wordIndex}`
+    const endsPasuk = Boolean(annotatedWord?.text.includes('׃'))
+    return `<span
+        class="word ${activeWord?.isKri ? 'ktiv-kri' : ''}${endsPasuk ? ' mod-sof-pasuk' : ''}"
         data-token-key="${tokenKey}"
         data-page-number="${pageNumber}"
         data-line-index="${lineIndex}"
@@ -73,9 +83,12 @@ const renderWords = ({
         data-annotations-on-kri="${Boolean(annotatedWord?.isKri)}"
         data-annotations-off-kri="${Boolean(unannotatedWord?.isKri)}"
         ${activeWord ? '' : 'hidden'}
-      >${activeMarkup}</span>`
-    })
-    .join(' ')
+      >${activeMarkup}</span>${
+        readingLayout && endsPasuk
+          ? '<br class="reader-pasuk-break" aria-hidden="true">'
+          : ''
+      }`
+  }).join(' ')
 }
 
 const addLabelBreakOpportunities = (label: string) =>
@@ -122,7 +135,7 @@ const renderLabelBadge = (
   label: string,
   runId: string | undefined,
   aliyah: LeiningAliyah | undefined,
-  run: RenderedLineInfo['run']
+  run: RenderedLineInfo['run'],
 ) => `
   <span
     class="aliyah-badge${aliyah?.index ? ' mod-with-audio' : ''}"
@@ -150,7 +163,7 @@ const renderLabelBadge = (
 const renderAliyahLink = (
   label: string,
   run: RenderedLineInfo['run'],
-  aliyah: LeiningAliyah | undefined
+  aliyah: LeiningAliyah | undefined,
 ) => {
   if (!run || !aliyah?.start) return ''
 
@@ -167,6 +180,169 @@ const renderAliyahLink = (
   `
 }
 
+type ReaderTextSurface = 'single' | 'tikkun' | 'torah'
+
+type MatchShirahLayout = {
+  kind: 'haazinu' | 'sea'
+  pattern:
+    | 'columns-2'
+    | 'fragments-2'
+    | 'fragments-3'
+    | 'extended-left'
+    | 'opening'
+    | 'penultimate'
+    | 'closing'
+}
+
+const getMatchShirahLayout = (
+  text: string[][],
+  reference: RenderedLineInfo['focalRef'],
+  pageNumber: number,
+  lineIndex: number,
+): MatchShirahLayout | null => {
+  const seaLayout =
+    reference?.b === 2 &&
+    seaShirahLayout(pageNumber, lineIndex)
+  if (seaLayout) return { kind: 'sea', pattern: seaLayout.pattern }
+  if (!reference) return null
+
+  if (
+    reference.b === 5 &&
+    reference.c === 32 &&
+    reference.v >= 1 &&
+    reference.v <= 43 &&
+    text.length === 2
+  ) {
+    return { kind: 'haazinu', pattern: 'columns-2' }
+  }
+
+  return null
+}
+
+const renderTextFlow = ({
+  text,
+  references,
+  annotationsEnabled,
+  pageNumber,
+  lineIndex,
+  presentation,
+  surface,
+  seaLayout,
+}: {
+  text: string[][]
+  references: (
+    | RenderedLineInfo['focalRef']
+    | RenderedLineInfo['verses'][number]
+  )[]
+  annotationsEnabled: boolean
+  pageNumber: number
+  lineIndex: number
+  presentation: ReaderPagePresentation
+  surface: ReaderTextSurface
+  seaLayout?: ReturnType<typeof seaShirahLayout>
+}) => {
+  const fixedAnnotations =
+    surface === 'tikkun' ? true : surface === 'torah' ? false : null
+  const enabled = fixedAnnotations ?? annotationsEnabled
+  const renderAnnotatedSpecialLetters = createSpecialLetterRenderer(references)
+  const renderUnannotatedSpecialLetters =
+    createSpecialLetterRenderer(references)
+
+  return `<div
+    class="reader-text-side mod-${surface}"
+    data-reader-canonical="${surface !== 'torah'}"
+    ${fixedAnnotations === null ? '' : `data-reader-annotations="${enabled ? 'on' : 'off'}"`}
+    ${surface === 'torah' ? 'aria-hidden="true"' : ''}
+  >
+    <div class="reader-text-flow">
+      ${text
+        .map(
+          (column, columnIndex) => `
+        <div class="column">
+          ${column
+            .map((fragment, fragmentIndex) => {
+              const track = seaLayout?.tracks[fragmentIndex]
+              const annotatedText = textFilter({
+                text: fragment,
+                annotated: true,
+              })
+              const unannotatedText =
+                presentation.layout === 'reading' && presentation.sides === 'two'
+                  ? stripHebrewMarks(annotatedText)
+                  : textFilter({ text: fragment, annotated: false })
+
+              return `
+            <span class="fragment ${setumaClass(column)}"${track ? ` style="--match-shirah-track: ${track[0]} / span ${track[1]}"` : ''}>${renderWords(
+              {
+                annotatedText,
+                unannotatedText,
+                annotationsEnabled: enabled,
+                pageNumber,
+                lineIndex,
+                fragmentIndex: columnIndex * 100 + fragmentIndex,
+                renderAnnotatedSpecialLetters,
+                renderUnannotatedSpecialLetters,
+                readingLayout: presentation.layout === 'reading',
+              },
+            )}</span>
+          `
+            })
+            .join('')}
+        </div>
+      `,
+        )
+        .join('')}
+    </div>
+  </div>`
+}
+
+const renderLineAttributes = ({
+  pageNumber,
+  lineIndex,
+  run,
+  aliyahStarts,
+  startTitle,
+  startLabel,
+  startVerse,
+  mirror,
+}: {
+  pageNumber: number
+  lineIndex: number
+  run: RenderedLineInfo['run']
+  aliyahStarts: LeiningAliyah[]
+  startTitle: string
+  startLabel: string
+  startVerse: string
+  mirror: boolean
+}) => `
+    data-line-index="${lineIndex}"
+    data-page-number="${pageNumber}"
+    ${mirror ? 'data-reader-mirror="true"' : 'data-class="line"'}
+    ${run ? `data-run-id="${run.id}"` : ''}
+    ${
+      !mirror && aliyahStarts.length
+        ? `data-aliyah-starts="${aliyahStarts
+            .map((aliyah) => aliyah.index)
+            .join(',')}"`
+        : ''
+    }
+    ${
+      !mirror && aliyahStarts.length && startTitle
+        ? `data-aliyah-start-title="${escapeAttribute(startTitle)}"`
+        : ''
+    }
+    ${
+      !mirror && aliyahStarts.length && startLabel
+        ? `data-aliyah-start-label="${escapeAttribute(startLabel)}"`
+        : ''
+    }
+    ${
+      !mirror && aliyahStarts.length && startVerse
+        ? `data-aliyah-start-verse="${escapeAttribute(startVerse)}"`
+        : ''
+    }
+  `
+
 const Line = ({
   pageNumber,
   text,
@@ -178,82 +354,136 @@ const Line = ({
   run,
   lineIndex,
   annotationsEnabled = true,
+  presentation = defaultReaderPagePresentation,
+  surface = 'single',
+  mirror = false,
+  renderVerseGutter = true,
+  pageReference,
 }: {
   pageNumber: number
   lineIndex: number
   annotationsEnabled?: boolean
+  presentation?: ReaderPagePresentation
+  surface?: ReaderTextSurface
+  mirror?: boolean
+  renderVerseGutter?: boolean
+  pageReference?: RenderedLineInfo['focalRef']
 } & RenderedLineInfo) => {
   const startLabel = aliyahStartLabel(aliyahStarts)
   const startTitle = aliyahStartTitle(run)
   const startVerse = aliyahStartVerseRange(aliyahStarts)
   const references = [focalRef, ...verses]
-  const renderAnnotatedSpecialLetters = createSpecialLetterRenderer(references)
-  const renderUnannotatedSpecialLetters = createSpecialLetterRenderer(references)
+  const shirahReference = verses[0] ?? focalRef ?? pageReference
+  const matchShirahLayout =
+    presentation.layout === 'match'
+      ? getMatchShirahLayout(
+          text,
+          shirahReference,
+          pageNumber,
+          lineIndex,
+        )
+      : null
+  const isShirah =
+    presentation.layout === 'match'
+      ? text.length > 1 || matchShirahLayout !== null
+      : false
+  const lineAttributes = renderLineAttributes({
+    pageNumber,
+    lineIndex,
+    run,
+    aliyahStarts,
+    startTitle,
+    startLabel,
+    startVerse,
+    mirror,
+  })
+  const textSurfaces =
+    presentation.sides === 'two' && surface === 'single'
+      ? (['tikkun', 'torah'] as const)
+          .map((side) =>
+            renderTextFlow({
+              text,
+              references,
+              annotationsEnabled,
+              pageNumber,
+              lineIndex,
+              presentation,
+              surface: side,
+              seaLayout: matchShirahLayout?.kind === 'sea'
+                ? seaShirahLayout(pageNumber, lineIndex)
+                : null,
+            }),
+          )
+          .join('')
+      : renderTextFlow({
+          text,
+          references,
+          annotationsEnabled,
+          pageNumber,
+          lineIndex,
+          presentation,
+          surface,
+          seaLayout:
+            matchShirahLayout?.kind === 'sea'
+              ? seaShirahLayout(pageNumber, lineIndex)
+              : null,
+        })
+
+  if (presentation.layout === 'reading') {
+    return `
+      <div
+        class="${mirror ? 'reader-mirror-line' : 'line'} mod-reading-line${
+          isShirah ? ' mod-shirah' : ''
+        }"
+        ${lineAttributes}
+      >
+        <div class="line-content">${textSurfaces}</div>
+        ${
+          renderVerseGutter
+            ? `<div class="line-gutter mod-verses">
+                <span class="location-indicator mod-verses">${displayRange.asVersesRange(
+                  verses,
+                )}</span>
+              </div>`
+            : ''
+        }
+        ${
+          mirror
+            ? ''
+            : `<div class="line-gutter mod-aliyot">
+                <span class="location-indicator mod-aliyot" data-target-id="aliyot-range">${labels
+                  .map((label, idx) =>
+                    renderLabelBadge(label, run?.id, aliyahStarts[idx], run),
+                  )
+                  .join('')}</span>
+              </div>`
+        }
+      </div>
+    `
+  }
 
   return `
   <tr
-    data-class="line"
-    data-line-index="${lineIndex}"
-    data-page-number="${pageNumber}"
-    ${run ? `data-run-id="${run.id}"` : ''}
+    class="${isShirah ? 'mod-shirah' : ''}"
+    ${lineAttributes}
     ${
-      aliyahStarts.length
-        ? `data-aliyah-starts="${aliyahStarts
-            .map((aliyah) => aliyah.index)
-            .join(',')}"`
-        : ''
-    }
-    ${
-      aliyahStarts.length && startTitle
-        ? `data-aliyah-start-title="${escapeAttribute(startTitle)}"`
-        : ''
-    }
-    ${
-      aliyahStarts.length && startLabel
-        ? `data-aliyah-start-label="${escapeAttribute(startLabel)}"`
-        : ''
-    }
-    ${
-      aliyahStarts.length && startVerse
-        ? `data-aliyah-start-verse="${escapeAttribute(startVerse)}"`
+      matchShirahLayout
+        ? `data-shirah-kind="${matchShirahLayout.kind}" data-shirah-pattern="${matchShirahLayout.pattern}"`
         : ''
     }
   >
     <td class="line ${petuchaClass(isPetucha)}">
-      <div class="line-content">
-        ${text
-          .map(
-            (column, columnIndex) => `
-          <div class="column">
-            ${column
-              .map(
-                (fragment, fragmentIndex) => `
-              <span class="fragment ${setumaClass(column)}">${renderWords({
-                  annotatedText: textFilter({ text: fragment, annotated: true }),
-                  unannotatedText: textFilter({ text: fragment, annotated: false }),
-                  annotationsEnabled,
-                  pageNumber,
-                  lineIndex,
-                  fragmentIndex: columnIndex * 100 + fragmentIndex,
-                  renderAnnotatedSpecialLetters,
-                  renderUnannotatedSpecialLetters,
-                })}</span>
-            `
-              )
-              .join('')}
-          </div>
-        `
-          )
-          .join('')}
-      </div>
+      <div class="line-content">${textSurfaces}</div>
       <div class="line-gutter mod-verses">
         <span class="location-indicator mod-verses">${displayRange.asVersesRange(
-          verses
+          verses,
         )}</span>
       </div>
       <div class="line-gutter mod-aliyot">
         <span class="location-indicator mod-aliyot" data-target-id="aliyot-range">${labels
-          .map((label, idx) => renderLabelBadge(label, run?.id, aliyahStarts[idx], run))
+          .map((label, idx) =>
+            renderLabelBadge(label, run?.id, aliyahStarts[idx], run),
+          )
           .join('')}</span>
       </div>
     </td>

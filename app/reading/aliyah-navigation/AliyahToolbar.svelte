@@ -33,16 +33,32 @@
       target: null,
       label: 'ראשון',
       playbackState: 'default',
+      audioAvailable: false,
     },
   })
   let compactOpen = $state(false)
   let compactToggle: HTMLButtonElement
+  let compactActionState = $state<'idle' | 'loading' | 'error'>('idle')
+
+  const compactAudioAvailable = $derived(
+    toolbarState.compact.audioAvailable ?? false
+  )
 
   function sync(nextState: AliyahToolbarState) {
+    const targetChanged = !isSameAliyahNavigationTarget(
+      toolbarState.compact.target,
+      nextState.compact.target
+    )
     flushSync(() => {
       toolbarState = {
         current: { ...nextState.current },
         compact: { ...nextState.compact },
+      }
+      if (
+        targetChanged ||
+        nextState.compact.playbackState !== 'default'
+      ) {
+        compactActionState = 'idle'
       }
     })
   }
@@ -117,6 +133,38 @@
     await onPlayCurrent(toolbarState.current.target)
   }
 
+  async function playCompact() {
+    const target = toolbarState.compact.target
+    if (!target || !compactAudioAvailable || compactActionState === 'loading') {
+      return
+    }
+
+    compactActionState =
+      toolbarState.compact.playbackState === 'default' ? 'loading' : 'idle'
+    try {
+      await onPlayCurrent(target)
+      compactActionState = 'idle'
+    } catch (error) {
+      console.error('Failed to play the current aliyah', error)
+      compactActionState = 'error'
+    }
+  }
+
+  function compactPlayLabel() {
+    if (!compactAudioAvailable) {
+      return `Recording unavailable for ${toolbarState.compact.label}`
+    }
+    if (compactActionState === 'loading') {
+      return `Loading ${toolbarState.compact.label}`
+    }
+    if (compactActionState === 'error') {
+      return `Retry ${toolbarState.compact.label}`
+    }
+    return `${
+      toolbarState.compact.playbackState === 'playing' ? 'Pause' : 'Play'
+    } ${toolbarState.compact.label}`
+  }
+
   const toolbar: AliyahToolbar = {
     sync,
     setCueStatus,
@@ -130,48 +178,68 @@
   })
 </script>
 
-<button
-  bind:this={compactToggle}
-  class="mobile-aliyah-picker-toggle"
+<div
+  class="mobile-aliyah-capsule"
   class:u-hidden={!toolbarState.compact.visible}
   class:is-loaded={toolbarState.compact.playbackState === 'loaded'}
   class:is-playing={toolbarState.compact.playbackState === 'playing'}
-  data-target-id="mobile-aliyah-picker-toggle"
+  class:is-loading={compactActionState === 'loading'}
+  class:is-error={compactActionState === 'error'}
+  class:is-unavailable={!compactAudioAvailable}
+  data-target-id="mobile-aliyah-capsule"
   data-run-id={toolbarState.compact.target?.runId ?? ''}
   data-aliyah-index={toolbarState.compact.target
     ? `${toolbarState.compact.target.aliyahIndex}`
     : ''}
   data-playback-state={toolbarState.compact.playbackState}
-  type="button"
-  title={toolbarState.compact.playbackState === 'playing'
-    ? 'Choose aliyah; current aliyah is playing'
-    : toolbarState.compact.playbackState === 'loaded'
-      ? 'Choose aliyah; current aliyah is paused'
-      : 'Choose aliyah'}
-  aria-haspopup="dialog"
-  aria-expanded={compactOpen}
-  aria-controls="mobile-aliyah-picker"
-  onclick={toggleCompact}
 >
-  <span
-    class="mobile-aliyah-picker-speaker"
-    class:u-hidden={toolbarState.compact.playbackState !== 'playing'}
-    data-target-id="mobile-aliyah-picker-speaker"
-    aria-hidden="true"
+  <button
+    class="mobile-aliyah-play-toggle"
+    data-target-id="mobile-aliyah-play-toggle"
+    type="button"
+    title={compactPlayLabel()}
+    aria-label={compactPlayLabel()}
+    disabled={!compactAudioAvailable || compactActionState === 'loading'}
+    onclick={() => void playCompact()}
   >
-    <UiIcon name="speakerHigh" />
-  </span>
-  <span data-target-id="mobile-current-aliyah">
-    {toolbarState.compact.label}
-  </span>
-  <span
-    class="mobile-aliyah-picker-chevron"
-    data-target-id="mobile-aliyah-picker-chevron"
-    aria-hidden="true"
+    <span class="mobile-aliyah-play-icon" aria-hidden="true">
+      {#if compactActionState === 'loading'}
+        <span class="mobile-aliyah-spinner"></span>
+      {:else if compactActionState === 'error'}
+        <UiIcon name="replay" />
+      {:else}
+        <UiIcon
+          name={toolbarState.compact.playbackState === 'playing'
+            ? 'pause'
+            : 'play'}
+        />
+      {/if}
+    </span>
+    <span data-target-id="mobile-current-aliyah">
+      {toolbarState.compact.label}
+    </span>
+  </button>
+  <button
+    bind:this={compactToggle}
+    class="mobile-aliyah-picker-toggle"
+    data-target-id="mobile-aliyah-picker-toggle"
+    type="button"
+    title="Choose aliyah"
+    aria-label="Choose aliyah"
+    aria-haspopup="dialog"
+    aria-expanded={compactOpen}
+    aria-controls="mobile-aliyah-picker"
+    onclick={toggleCompact}
   >
-    <UiIcon name={compactOpen ? 'chevronUp' : 'chevronDown'} />
-  </span>
-</button>
+    <span
+      class="mobile-aliyah-picker-chevron"
+      data-target-id="mobile-aliyah-picker-chevron"
+      aria-hidden="true"
+    >
+      <UiIcon name={compactOpen ? 'chevronUp' : 'chevronDown'} />
+    </span>
+  </button>
+</div>
 
 <span
   class="toolbar-current-aliyah-label"

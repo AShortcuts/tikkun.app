@@ -4,7 +4,7 @@
   import '../../../css/master.css'
 
   type ReaderAppModule = {
-    startApp(): unknown
+    startApp(): { readonly ready: Promise<void> }
     stopApp(): void
   }
 
@@ -15,9 +15,11 @@
   let {
     aboutHref,
     loadApp = loadDefaultReaderApp,
+    reloadPage = () => window.location.reload(),
   }: {
     aboutHref: string
     loadApp?: () => Promise<ReaderAppModule>
+    reloadPage?: () => void
   } = $props()
 
   let bootState = $state<ReaderBootState>('loading')
@@ -25,25 +27,37 @@
   let disposed = false
   let bootRevision = 0
   let stopApp: (() => void) | null = null
+  let reloadOnRetry = false
+
+  function retryReader() {
+    // Failed dynamic text imports can remain cached for this document's lifetime.
+    if (reloadOnRetry) reloadPage()
+    else void bootReader()
+  }
 
   async function bootReader() {
     const revision = ++bootRevision
     bootState = 'loading'
+    reloadOnRetry = false
 
     let app: ReaderAppModule | null = null
     try {
       app = await loadApp()
       if (disposed || revision !== bootRevision) return
 
-      app.startApp()
+      const reader = app.startApp()
       if (disposed || revision !== bootRevision) {
         app.stopApp()
         return
       }
 
       stopApp = () => app?.stopApp()
+      reloadOnRetry = true
+      await reader.ready
+      if (disposed || revision !== bootRevision) return
       bootState = 'ready'
     } catch (error) {
+      if (disposed || revision !== bootRevision) return
       if (app) {
         try {
           app.stopApp()
@@ -54,7 +68,7 @@
           )
         }
       }
-      if (disposed || revision !== bootRevision) return
+      stopApp = null
       console.error('Failed to start the Reader', error)
       bootState = 'failed'
     }
@@ -163,7 +177,7 @@
           <h1>Reader couldn’t start</h1>
           <p>Try again, or continue from the reading index.</p>
           <div class="reader-boot-actions">
-            <button type="button" onclick={() => void bootReader()}>
+            <button type="button" onclick={retryReader}>
               Try again
             </button>
             <a href={resolve('/readings/')}>Reading index</a>

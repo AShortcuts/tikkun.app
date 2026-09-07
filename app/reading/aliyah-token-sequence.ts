@@ -27,10 +27,19 @@ const toSequencedWord = (word: HTMLElement): SequencedWord => ({
   annotatedText: annotatedText(word),
 })
 
-const annotatedWordsIn = (node: ParentNode) =>
-  [...node.querySelectorAll<HTMLElement>('.fragment .word')].filter(
+const annotatedWordsIn = (node: ParentNode) => {
+  const canonicalWords = [
+    ...node.querySelectorAll<HTMLElement>(
+      '[data-reader-canonical="true"] .fragment .word'
+    ),
+  ]
+  const words = canonicalWords.length
+    ? canonicalWords
+    : [...node.querySelectorAll<HTMLElement>('.fragment .word')]
+  return words.filter(
     (word) => word.dataset.annotationsOnPresent !== 'false'
   )
+}
 
 function exactAliyahStartContext({
   book,

@@ -13,7 +13,7 @@ test('builds public coverage from generated recordings and cue data', () => {
   expect(coverageSummary).toEqual({
     readingsWithAudio: 10,
     availableAliyot: 70,
-    syncedReadings: 5,
+    syncedReadings: 6,
   })
   expect(availableReadings.every((reading) => reading.availableAliyot.length > 0)).toBe(
     true
@@ -64,7 +64,7 @@ test('filters coverage by practical status and English or Hebrew name', () => {
 
 test('uses manual rows only for active work while generated cues decide readiness', () => {
   expect(getRequiredReading('beresheet').statusLabel).toBe('Word sync ready')
-  expect(getRequiredReading('vayetzei').statusLabel).toBe('Sync in progress')
+  expect(getRequiredReading('vayetzei').statusLabel).toBe('Word sync ready')
   expect(getRequiredReading('nasso').statusLabel).toBe('Recording review')
   expect(getRequiredReading('behalotecha').statusLabel).toBe('Audio available')
   expect(getRequiredReading('vayelech').statusLabel).toBe('Audio available')

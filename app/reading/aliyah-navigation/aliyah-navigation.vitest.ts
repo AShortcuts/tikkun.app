@@ -77,6 +77,7 @@ test('renders both navigation presentations behind one typed interface', async (
       target: { runId: 'run-a', aliyahIndex: 2 },
       label: 'שני',
       playbackState: 'loaded',
+      audioAvailable: true,
     },
   })
   await flushPromises()
@@ -124,10 +125,16 @@ test('renders both navigation presentations behind one typed interface', async (
   required<HTMLButtonElement>(
     '[data-target-id="toolbar-current-aliyah-audio"]'
   ).click()
+  required<HTMLButtonElement>(
+    '[data-target-id="mobile-aliyah-play-toggle"]'
+  ).click()
   await flushPromises()
 
   expect(selected).toEqual([{ runId: 'run-a', aliyahIndex: 1 }])
-  expect(playedCurrent).toEqual([{ runId: 'run-a', aliyahIndex: 2 }])
+  expect(playedCurrent).toEqual([
+    { runId: 'run-a', aliyahIndex: 2 },
+    { runId: 'run-a', aliyahIndex: 2 },
+  ])
   expect(
     getMobileAliyahCapsuleState({ loaded: true, playing: false })
   ).toBe('loaded')
@@ -198,6 +205,67 @@ test('preserves compact pause, navigation, close-before-play, and focus behavior
 
   playDeferred.resolve(pausedPlayback)
   await flushPromises()
+})
+
+test('marks only unavailable compact audio as neutral and keeps its picker usable', async () => {
+  const pendingPlay = deferred<void>()
+  const playCurrent = vi.fn(() => pendingPlay.promise)
+  const navigation = mountNavigation({ onPlayCurrent: playCurrent })
+  navigation.syncContent({
+    desktop: snapshot,
+    compact: snapshot,
+    authoringEnabled: false,
+  })
+  const syncAvailability = (audioAvailable: boolean) => navigation.syncToolbar({
+    current: {
+      labelVisible: true,
+      label: 'שני',
+      target: { runId: 'run-a', aliyahIndex: 2 },
+      audioAvailable,
+      authoringAvailable: false,
+      authoringEnabled: false,
+      cueStatus: null,
+      playing: false,
+    },
+    compact: {
+      visible: true,
+      target: { runId: 'run-a', aliyahIndex: 2 },
+      label: 'שני',
+      playbackState: 'default',
+      audioAvailable,
+    },
+  })
+
+  syncAvailability(false)
+  const capsule = required('[data-target-id="mobile-aliyah-capsule"]')
+  const play = required<HTMLButtonElement>('[data-target-id="mobile-aliyah-play-toggle"]')
+  const picker = required<HTMLButtonElement>('[data-target-id="mobile-aliyah-picker-toggle"]')
+  expect(capsule.classList).toContain('is-unavailable')
+  expect(play.disabled).toBe(true)
+  expect(play.getAttribute('aria-label')).toBe('Recording unavailable for שני')
+  play.click()
+  expect(playCurrent).not.toHaveBeenCalled()
+  expect(picker.disabled).toBe(false)
+  picker.click()
+  expect(navigation.isCompactOpen()).toBe(true)
+  picker.click()
+
+  syncAvailability(true)
+  expect(capsule.classList).not.toContain('is-unavailable')
+  expect(play.disabled).toBe(false)
+  play.click()
+  await flushPromises()
+  expect(playCurrent).toHaveBeenCalledOnce()
+  expect(play.disabled).toBe(true)
+  expect(capsule.classList).toContain('is-loading')
+  expect(capsule.classList).not.toContain('is-unavailable')
+
+  pendingPlay.resolve()
+  await flushPromises()
+  expect(play.disabled).toBe(false)
+  syncAvailability(false)
+  expect(capsule.classList).toContain('is-unavailable')
+  expect(play.disabled).toBe(true)
 })
 
 test('exposes missing-audio recording targets only while authoring is active', async () => {

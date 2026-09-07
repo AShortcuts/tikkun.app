@@ -1,3 +1,4 @@
+import '../../css/reader-settings.css'
 import { flushSync, mount, unmount } from 'svelte'
 import type { AudioNarrator } from '../audio/types.ts'
 import type { MountScope } from '../lifecycle/mount.ts'

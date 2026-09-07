@@ -1,6 +1,7 @@
 <script lang="ts">
   import { flushSync, onMount } from 'svelte'
   import UiIcon from '../components/UiIcon.svelte'
+  import type { IconName } from '../components/icons.ts'
   import type {
     OfflineRecordingDownloadSnapshot,
     OfflineRecordingRemovalResult,
@@ -15,6 +16,8 @@
     type ReaderPreferences,
   } from '../reader-preferences.ts'
   import SupportDiagnosticsActions from '../support/SupportDiagnosticsActions.svelte'
+  import { COMPACT_READER_QUERY } from '../adaptive/reader-viewport.ts'
+  import { hexToOklch, oklchToHex, oklchGradient, editorChromaMax, type OklchColor } from './oklch-color.ts'
   import type {
     ReaderSettings,
     ReaderSettingsComponentProps,
@@ -71,17 +74,47 @@
   let themeTransitionTimer = 0
   let customThemeTimer = 0
   let pendingCustomThemeUpdates: Partial<ReaderPreferences> | null = null
+  let compactViewportMedia: MediaQueryList | null = null
+  let compactViewport = $state(false)
+  type SettingsCategory = 'reading' | 'appearance' | 'playback' | 'more'
+  let activeCategory = $state<SettingsCategory>('reading')
+
+  const settingsCategories: readonly {
+    id: SettingsCategory
+    label: string
+    icon: IconName
+  }[] = [
+    { id: 'reading', label: 'Reading', icon: 'bookText' },
+    { id: 'appearance', label: 'Appearance', icon: 'settings2' },
+    { id: 'playback', label: 'Playback', icon: 'playOutline' },
+    { id: 'more', label: 'More', icon: 'circleEllipsis' },
+  ]
 
   const customThemePresets = [
     { label: 'Parchment', background: '#eee6d6', text: '#3b3026' },
     { label: 'Paper', background: '#fcfcfd', text: '#191c22' },
     { label: 'Night', background: '#191c22', text: '#f8f7f3' },
+    { label: 'Sage', background: '#e6ede5', text: '#233a2c' },
+    { label: 'Slate', background: '#233344', text: '#e5edf4' },
+    { label: 'Rose', background: '#f2e5e2', text: '#563a3e' },
   ] as const
 
-  const customBackgroundHsl = $derived(
-    hexToHsl(preferences.customBackgroundColor)
-  )
-  const customTextHsl = $derived(hexToHsl(preferences.customTextColor))
+  type ColorEditor = { hex: string; color: OklchColor }
+  function readColorEditor(hex: string, previous?: ColorEditor): ColorEditor {
+    if (previous?.hex.toLowerCase() === hex.toLowerCase()) return previous
+    const color = hexToOklch(hex)
+    if (color.chroma === 0 && previous) color.hue = previous.color.hue
+    return { hex, color }
+  }
+  let backgroundEditor = $state(readColorEditor(readPreferences().customBackgroundColor))
+  let textEditor = $state(readColorEditor(readPreferences().customTextColor))
+  const customBackgroundOklch = $derived(backgroundEditor.color)
+  const customTextOklch = $derived(textEditor.color)
+
+  function syncColorEditors() {
+    backgroundEditor = readColorEditor(preferences.customBackgroundColor, backgroundEditor)
+    textEditor = readColorEditor(preferences.customTextColor, textEditor)
+  }
   const customContrast = $derived(
     colorContrastRatio(
       preferences.customBackgroundColor,
@@ -291,6 +324,7 @@
   function refreshPreferences() {
     flushSync(() => {
       preferences = readPreferences()
+      syncColorEditors()
     })
   }
 
@@ -323,6 +357,7 @@
   function previewCustomTheme(updates: Partial<ReaderPreferences>) {
     const nextUpdates = { themeMode: 'custom' as const, ...updates }
     preferences = mergeReaderPreferences(preferences, nextUpdates)
+    syncColorEditors()
     applyReaderPreferences(preferences)
     pendingCustomThemeUpdates = {
       ...pendingCustomThemeUpdates,
@@ -351,24 +386,23 @@
 
   function updateCustomColor(
     target: 'background' | 'text',
-    channel: 'hue' | 'tone',
+    channel: keyof OklchColor,
     rawValue: string
   ) {
     const value = Number.parseFloat(rawValue)
     if (!Number.isFinite(value)) return
     const current = target === 'background'
-      ? customBackgroundHsl
-      : customTextHsl
-    const hue = channel === 'hue' ? value : current.hue
-    const saturation = channel === 'hue'
-      ? Math.max(current.saturation, target === 'background' ? 18 : 24)
-      : current.saturation
-    const lightness = channel === 'tone' ? value : current.lightness
-    const color = hslToHex(hue, saturation, lightness)
+      ? customBackgroundOklch
+      : customTextOklch
+    const color = { ...current, [channel]: channel === 'lightness' ? value / 100 : value }
+    const hex = oklchToHex(color)
+    // Retain editing coordinates through grayscale, gamut fitting and hex rounding.
+    if (target === 'background') backgroundEditor = { hex, color }
+    else textEditor = { hex, color }
     previewCustomTheme(
       target === 'background'
-        ? { customBackgroundColor: color }
-        : { customTextColor: color }
+        ? { customBackgroundColor: hex }
+        : { customTextColor: hex }
     )
   }
 
@@ -378,68 +412,6 @@
       customBackgroundColor: background,
       customTextColor: text,
     })
-  }
-
-  function hueGradient(color: { saturation: number; lightness: number }) {
-    const saturation = Math.max(color.saturation, 18)
-    return `linear-gradient(to right, hsl(0 ${saturation}% ${color.lightness}%), hsl(60 ${saturation}% ${color.lightness}%), hsl(120 ${saturation}% ${color.lightness}%), hsl(180 ${saturation}% ${color.lightness}%), hsl(240 ${saturation}% ${color.lightness}%), hsl(300 ${saturation}% ${color.lightness}%), hsl(360 ${saturation}% ${color.lightness}%))`
-  }
-
-  function toneGradient(color: { hue: number; saturation: number }) {
-    return `linear-gradient(to right, #050505, hsl(${color.hue} ${color.saturation}% 50%), #fafafa)`
-  }
-
-  function hexToHsl(color: string) {
-    const channels = [1, 3, 5].map(
-      (offset) => Number.parseInt(color.slice(offset, offset + 2), 16) / 255
-    )
-    const [red, green, blue] = channels
-    const maximum = Math.max(red, green, blue)
-    const minimum = Math.min(red, green, blue)
-    const delta = maximum - minimum
-    const lightness = (maximum + minimum) / 2
-    let hue = 0
-    if (delta) {
-      if (maximum === red) hue = ((green - blue) / delta) % 6
-      else if (maximum === green) hue = (blue - red) / delta + 2
-      else hue = (red - green) / delta + 4
-      hue = (hue * 60 + 360) % 360
-    }
-    const saturation = delta
-      ? delta / (1 - Math.abs(2 * lightness - 1))
-      : 0
-    return {
-      hue: Math.round(hue),
-      saturation: Math.round(saturation * 100),
-      lightness: Math.round(lightness * 100),
-    }
-  }
-
-  function hslToHex(hue: number, saturation: number, lightness: number) {
-    const normalizedHue = ((hue % 360) + 360) % 360
-    const normalizedSaturation = Math.max(0, Math.min(100, saturation)) / 100
-    const normalizedLightness = Math.max(0, Math.min(100, lightness)) / 100
-    const chroma =
-      (1 - Math.abs(2 * normalizedLightness - 1)) * normalizedSaturation
-    const segment = normalizedHue / 60
-    const secondary = chroma * (1 - Math.abs((segment % 2) - 1))
-    const [red, green, blue] = segment < 1
-      ? [chroma, secondary, 0]
-      : segment < 2
-        ? [secondary, chroma, 0]
-        : segment < 3
-          ? [0, chroma, secondary]
-          : segment < 4
-            ? [0, secondary, chroma]
-            : segment < 5
-              ? [secondary, 0, chroma]
-              : [chroma, 0, secondary]
-    const match = normalizedLightness - chroma / 2
-    return `#${[red, green, blue]
-      .map((channel) => Math.round((channel + match) * 255)
-        .toString(16)
-        .padStart(2, '0'))
-      .join('')}`
   }
 
   function updateFiniteNumber(
@@ -455,6 +427,15 @@
       setPlaybackRate(nextRate)
       refreshPreferences()
     })
+  }
+
+  function adjustPlaybackRate(delta: number) {
+    const nextRate = Math.min(
+      3,
+      Math.max(0.5, Number((preferences.playbackRate + delta).toFixed(2)))
+    )
+    setPlaybackRate(nextRate)
+    refreshPreferences()
   }
 
   function open({
@@ -501,6 +482,19 @@
   const settings: ReaderSettings = { open, close, sync }
 
   onMount(() => {
+    compactViewportMedia = view.matchMedia(COMPACT_READER_QUERY)
+    compactViewport = compactViewportMedia.matches
+    const handleCompactViewportChange = (event: MediaQueryListEvent) => {
+      compactViewport = event.matches
+    }
+    if (typeof compactViewportMedia.addEventListener === 'function') {
+      compactViewportMedia.addEventListener(
+        'change',
+        handleCompactViewportChange
+      )
+    } else if (typeof compactViewportMedia.addListener === 'function') {
+      compactViewportMedia.addListener(handleCompactViewportChange)
+    }
     const unsubscribeOffline = offlineTorah.subscribe((nextSnapshot) => {
       offlineSnapshot = nextSnapshot
     })
@@ -528,6 +522,14 @@
     return () => {
       unsubscribeOffline()
       unsubscribeOfflineRecording()
+      if (typeof compactViewportMedia?.removeEventListener === 'function') {
+        compactViewportMedia.removeEventListener(
+          'change',
+          handleCompactViewportChange
+        )
+      } else if (typeof compactViewportMedia?.removeListener === 'function') {
+        compactViewportMedia.removeListener(handleCompactViewportChange)
+      }
       ownerDocument.removeEventListener('pointerdown', handleOutsidePointer)
       cancelScheduledFocus()
       if (themeTransitionTimer) view.clearTimeout(themeTransitionTimer)
@@ -551,22 +553,24 @@
   aria-labelledby="reader-settings-title"
   aria-hidden={!isOpen}
 >
-  <div class="settings-pane-header">
-    <h2 id="reader-settings-title">Reader Settings</h2>
+  <header class="settings-pane-header">
+    <div class="settings-pane-title">
+      <h2 id="reader-settings-title">Reader Settings</h2>
+    </div>
     <div class="settings-pane-header-actions">
       <button
-        class="toolbar-button mod-icon-label"
+        class="toolbar-button mod-icon-label settings-header-action"
         type="button"
         data-target-id="settings-reset-highlight"
-        aria-label="Reset highlight settings"
-        title="Reset highlight settings"
+        aria-label="Reset current-word highlight"
+        title="Reset current-word highlight"
         onclick={() => updatePreferences(getDefaultHighlightPreferences())}
       >
         <UiIcon name="replay" />
       </button>
       <button
         bind:this={closeButton}
-        class="toolbar-button mod-icon-label"
+        class="toolbar-button mod-icon-label settings-header-action"
         type="button"
         data-target-id="settings-close"
         aria-label="Close reader settings"
@@ -576,56 +580,197 @@
         <UiIcon name="x" />
       </button>
     </div>
-  </div>
+  </header>
 
-  <form class="settings-form" data-target-id="settings-form">
-    <section class="settings-section">
-      <h3 class="settings-section-title">Reading</h3>
-      <label class="settings-field">
-        <span class="settings-field-copy">
-          <span class="settings-field-label">Ba'al Koreh</span>
-          <span class="settings-field-helper"
-            >Chooses whose recording the play buttons use.</span
-          >
-        </span>
-        <select
-          data-target-id="settings-narrator"
-          value={preferences.narratorId}
-          onchange={(event) =>
-            updatePreferences({ narratorId: event.currentTarget.value })}
+  <div class="settings-pane-body">
+    <nav class="settings-category-nav" aria-label="Reader settings categories">
+      {#each settingsCategories as category (category.id)}
+        <button
+          class="settings-category-tab"
+          class:is-active={activeCategory === category.id}
+          type="button"
+          data-settings-category={category.id}
+          aria-label={category.label}
+          title={category.label}
+          aria-pressed={activeCategory === category.id}
+          aria-controls={`reader-settings-${category.id}-panel`}
+          onclick={() => (activeCategory = category.id)}
         >
-          {#each narrators as narrator (narrator.id)}
-            <option value={narrator.id}>{narrator.displayName}</option>
-          {/each}
-        </select>
-      </label>
+          <UiIcon name={category.icon} />
+        </button>
+      {/each}
+    </nav>
 
-      <label class="settings-field mod-inline-compact">
-        <span class="settings-field-copy">
-          <span class="settings-field-label">Playback speed</span>
-          <span class="settings-field-helper"
-            >Makes the recording play slower or faster.</span
+    <form class="settings-form" data-target-id="settings-form">
+      <div
+        class="settings-category-panel mod-reading"
+        data-settings-panel="reading"
+        id="reader-settings-reading-panel"
+        hidden={activeCategory !== 'reading'}
+        aria-label="Reading settings"
+      >
+        <h3 class="settings-panel-title">Reading</h3>
+        <section class="settings-section">
+          <h4 class="settings-section-title">Layout</h4>
+          <div
+            class="settings-reader-presentation"
+            data-target-id="settings-reader-presentation"
           >
-        </span>
-        <div class="settings-number-input">
-          <input
-            data-target-id="settings-playback-rate"
-            type="number"
-            min="0.5"
-            max="3"
-            step="0.05"
-            inputmode="decimal"
-            value={Number(preferences.playbackRate.toFixed(2))}
-            onchange={(event) => applyPlaybackRate(event.currentTarget.value)}
-            onblur={(event) => applyPlaybackRate(event.currentTarget.value)}
-          />
-          <span>x</span>
-        </div>
-      </label>
-    </section>
+            <div class="settings-reader-choice">
+              <span class="settings-field-label">Line layout</span>
+          <div
+            class="settings-segmented-control"
+            data-target-id="settings-reader-text-layout"
+          >
+            <button
+              class="settings-segmented-option"
+              class:is-active={preferences.readerTextLayout === 'reading'}
+              type="button"
+              data-reader-text-layout="reading"
+              aria-pressed={preferences.readerTextLayout === 'reading'}
+              onclick={() =>
+                updatePreferences({ readerTextLayout: 'reading' })}
+            >
+              <span>Reading</span>
+              <small>Natural</small>
+            </button>
+            <button
+              class="settings-segmented-option"
+              class:is-active={preferences.readerTextLayout === 'match'}
+              type="button"
+              data-reader-text-layout="match"
+              aria-pressed={preferences.readerTextLayout === 'match'}
+              onclick={() =>
+                updatePreferences({ readerTextLayout: 'match' })}
+            >
+              <span>Match</span>
+              <small>Torah lines</small>
+            </button>
+          </div>
+            </div>
 
-    <section class="settings-section">
-      <h3 class="settings-section-title">Offline</h3>
+            <div class="settings-reader-choice">
+              <span class="settings-field-label">Sides</span>
+          <div
+            class="settings-segmented-control"
+            data-target-id="settings-reader-side-mode"
+          >
+            <button
+              class="settings-segmented-option"
+              class:is-active={preferences.readerSideMode === 'one'}
+              type="button"
+              data-reader-side-mode="one"
+              aria-pressed={preferences.readerSideMode === 'one'}
+              onclick={() => updatePreferences({ readerSideMode: 'one' })}
+            >
+              <span>One Side</span>
+              <small>Tap text on mobile</small>
+            </button>
+            <button
+              class="settings-segmented-option"
+              class:is-active={preferences.readerSideMode === 'two'}
+              type="button"
+              data-reader-side-mode="two"
+              aria-pressed={preferences.readerSideMode === 'two'}
+              disabled={compactViewport}
+              title={compactViewport
+                ? 'Rotate to landscape for Two Sided'
+                : 'Show Torah and Tikkun together'}
+              onclick={() => updatePreferences({ readerSideMode: 'two' })}
+            >
+              <span>Two Sided</span>
+              <small class="settings-landscape-label">
+                {#if compactViewport}<UiIcon name="phoneRotate" />{/if}
+                {compactViewport ? 'Landscape' : 'Mirrored'}
+              </small>
+            </button>
+          </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <h4 class="settings-section-title">Reader</h4>
+          <div class="settings-field mod-reader-controls">
+            <div class="settings-reader-choice mod-position">
+              <span class="settings-field-copy">
+                <span class="settings-field-label">Reading center</span>
+                <span class="settings-field-helper"
+                  >Where the active word sits.</span
+                >
+              </span>
+              <div
+                class="settings-segmented-control"
+                data-target-id="settings-focal-point-mode"
+              >
+                <button
+                  class="settings-segmented-option"
+                  class:is-active={preferences.focalPointMode === 'reader'}
+                  type="button"
+                  data-focal-point-mode="reader"
+                  aria-pressed={preferences.focalPointMode === 'reader'}
+                  onclick={() =>
+                    updatePreferences({ focalPointMode: 'reader' })}
+                >
+                  <span>Reader</span>
+                  <small>Symmetrical</small>
+                </button>
+                <button
+                  class="settings-segmented-option"
+                  class:is-active={preferences.focalPointMode === 'browser'}
+                  type="button"
+                  data-focal-point-mode="browser"
+                  aria-pressed={preferences.focalPointMode === 'browser'}
+                  onclick={() =>
+                    updatePreferences({ focalPointMode: 'browser' })}
+                >
+                  <span>Browser</span>
+                  <small>Pushes higher</small>
+                </button>
+              </div>
+            </div>
+            <div class="settings-reader-tool">
+              <span class="settings-field-label">Focal Measure</span>
+              <button
+                type="button"
+                class="settings-secondary-action"
+                data-target-id="debug-focal-measure-toggle">Focal Measure</button
+              >
+            </div>
+          </div>
+
+          <label class="settings-field mod-checkbox mod-card mod-switch">
+            <span class="settings-field-copy">
+              <span class="settings-field-label">Disable Shift for Nekudot</span>
+              <span class="settings-field-helper"
+                >Keep Shift from hiding vowels.</span
+              >
+            </span>
+            <input
+              data-target-id="settings-disable-shift-hide"
+              type="checkbox"
+              role="switch"
+              checked={preferences.disableShiftNekudotHide}
+              onchange={(event) =>
+                updatePreferences({
+                  disableShiftNekudotHide: event.currentTarget.checked,
+                })}
+            />
+          </label>
+        </section>
+      </div>
+
+      <div
+        class="settings-category-panel"
+        data-settings-panel="more"
+        id="reader-settings-more-panel"
+        hidden={activeCategory !== 'more'}
+        aria-label="More settings"
+      >
+        <h3 class="settings-panel-title">More</h3>
+
+        <section class="settings-section">
+      <h4 class="settings-section-title">Offline</h4>
       <div class="settings-field settings-offline-field">
         <span class="settings-field-copy">
           <span class="settings-field-label">Torah pages</span>
@@ -741,10 +886,19 @@
           >
         {/if}
       </div>
-    </section>
+        </section>
+      </div>
 
-    <section class="settings-section">
-      <h3 class="settings-section-title">Page Look</h3>
+      <div
+        class="settings-category-panel"
+        data-settings-panel="appearance"
+        id="reader-settings-appearance-panel"
+        hidden={activeCategory !== 'appearance'}
+        aria-label="Appearance settings"
+      >
+        <h3 class="settings-panel-title">Appearance</h3>
+        <section class="settings-section">
+      <h4 class="settings-section-title">Page Look</h4>
       <div class="settings-field settings-theme-field">
         <span class="settings-field-copy">
           <span class="settings-field-label">Theme</span>
@@ -764,7 +918,7 @@
             aria-pressed={preferences.themeMode === 'automatic'}
             onclick={() => updatePreferences({ themeMode: 'automatic' })}
           >
-            <span>Aa</span>
+            <span lang="he" dir="rtl" aria-hidden="true">אָב</span>
             <small>System</small>
           </button
           >
@@ -776,7 +930,7 @@
             aria-pressed={preferences.themeMode === 'light'}
             onclick={() => updatePreferences({ themeMode: 'light' })}
           >
-            <span>Aa</span>
+            <span lang="he" dir="rtl" aria-hidden="true">אָב</span>
             <small>Light</small>
           </button
           >
@@ -788,7 +942,7 @@
             aria-pressed={preferences.themeMode === 'sepia'}
             onclick={() => updatePreferences({ themeMode: 'sepia' })}
           >
-            <span>Aa</span>
+            <span lang="he" dir="rtl" aria-hidden="true">אָב</span>
             <small>Sepia</small>
           </button
           >
@@ -800,7 +954,7 @@
             aria-pressed={preferences.themeMode === 'dark'}
             onclick={() => updatePreferences({ themeMode: 'dark' })}
           >
-            <span>Aa</span>
+            <span lang="he" dir="rtl" aria-hidden="true">אָב</span>
             <small>Dark</small>
           </button
           >
@@ -814,8 +968,8 @@
             style:color={preferences.customTextColor}
             onclick={() => updatePreferences({ themeMode: 'custom' })}
           >
-            <span>Aa</span>
-            <small>Custom</small>
+            <span lang="he" dir="rtl" aria-hidden="true">אָב</span>
+            <small style:color={recommendedThemeTextColor(preferences.customBackgroundColor)}>Custom</small>
           </button
           >
         </div>
@@ -833,41 +987,72 @@
             >
               בְּרֵאשִׁית בָּרָא אֱלֹהִים
             </div>
+            <span class="settings-field-helper" id="custom-oklch-help">
+              Chroma is color intensity. Colors fit to sRGB when needed.
+            </span>
 
             <div class="settings-custom-color">
               <div class="settings-custom-color-heading">
                 <span>Background</span>
-                <output>{preferences.customBackgroundColor.toUpperCase()}</output>
+                <div class="settings-custom-color-value">
+                  <output>{preferences.customBackgroundColor.toUpperCase()}</output>
+                  <input
+                    type="color"
+                    aria-label="Background color"
+                    value={preferences.customBackgroundColor}
+                    oninput={(event) => previewCustomTheme({ customBackgroundColor: event.currentTarget.value })}
+                    onchange={commitCustomThemeUpdates}
+                  />
+                </div>
               </div>
-              <label>
-                <span class="u-visually-hidden">Background hue</span>
+              <label class="settings-custom-tone">
+                <span>Hue</span>
                 <input
                   type="range"
                   data-target-id="settings-custom-background-hue"
                   min="0"
                   max="360"
                   step="1"
-                  value={customBackgroundHsl.hue}
+                  value={customBackgroundOklch.hue}
                   aria-label="Background hue"
-                  style={`--settings-slider-gradient: ${hueGradient(customBackgroundHsl)}`}
+                  aria-valuetext={`${Math.round(customBackgroundOklch.hue)} degrees`}
+                  style={`--settings-slider-gradient: ${oklchGradient(customBackgroundOklch, 'hue')}`}
                   oninput={(event) =>
                     updateCustomColor('background', 'hue', event.currentTarget.value)}
                   onchange={commitCustomThemeUpdates}
                 />
               </label>
               <label class="settings-custom-tone">
-                <span>Tone</span>
+                <span>Chroma</span>
+                <input
+                  type="range"
+                  data-target-id="settings-custom-background-chroma"
+                  min="0"
+                  max={editorChromaMax(customBackgroundOklch)}
+                  step="0.001"
+                  value={customBackgroundOklch.chroma}
+                  aria-label="Background chroma"
+                  aria-describedby="custom-oklch-help"
+                  aria-valuetext={`${customBackgroundOklch.chroma.toFixed(3)} chroma`}
+                  style={`--settings-slider-gradient: ${oklchGradient(customBackgroundOklch, 'chroma')}`}
+                  oninput={(event) => updateCustomColor('background', 'chroma', event.currentTarget.value)}
+                  onchange={commitCustomThemeUpdates}
+                />
+              </label>
+              <label class="settings-custom-tone">
+                <span>Lightness</span>
                 <input
                   type="range"
                   data-target-id="settings-custom-background-tone"
                   min="0"
                   max="100"
-                  step="1"
-                  value={customBackgroundHsl.lightness}
-                  aria-label="Background tone"
-                  style={`--settings-slider-gradient: ${toneGradient(customBackgroundHsl)}`}
+                  step="0.1"
+                  value={customBackgroundOklch.lightness * 100}
+                  aria-label="Background lightness"
+                  aria-valuetext={`${(customBackgroundOklch.lightness * 100).toFixed(1)} percent lightness`}
+                  style={`--settings-slider-gradient: ${oklchGradient(customBackgroundOklch, 'lightness')}`}
                   oninput={(event) =>
-                    updateCustomColor('background', 'tone', event.currentTarget.value)}
+                    updateCustomColor('background', 'lightness', event.currentTarget.value)}
                   onchange={commitCustomThemeUpdates}
                 />
               </label>
@@ -876,37 +1061,65 @@
             <div class="settings-custom-color">
               <div class="settings-custom-color-heading">
                 <span>Text</span>
-                <output>{preferences.customTextColor.toUpperCase()}</output>
+                <div class="settings-custom-color-value">
+                  <output>{preferences.customTextColor.toUpperCase()}</output>
+                  <input
+                    type="color"
+                    aria-label="Text color"
+                    value={preferences.customTextColor}
+                    oninput={(event) => previewCustomTheme({ customTextColor: event.currentTarget.value })}
+                    onchange={commitCustomThemeUpdates}
+                  />
+                </div>
               </div>
-              <label>
-                <span class="u-visually-hidden">Text hue</span>
+              <label class="settings-custom-tone">
+                <span>Hue</span>
                 <input
                   type="range"
                   data-target-id="settings-custom-text-hue"
                   min="0"
                   max="360"
                   step="1"
-                  value={customTextHsl.hue}
+                  value={customTextOklch.hue}
                   aria-label="Text hue"
-                  style={`--settings-slider-gradient: ${hueGradient(customTextHsl)}`}
+                  aria-valuetext={`${Math.round(customTextOklch.hue)} degrees`}
+                  style={`--settings-slider-gradient: ${oklchGradient(customTextOklch, 'hue')}`}
                   oninput={(event) =>
                     updateCustomColor('text', 'hue', event.currentTarget.value)}
                   onchange={commitCustomThemeUpdates}
                 />
               </label>
               <label class="settings-custom-tone">
-                <span>Tone</span>
+                <span>Chroma</span>
+                <input
+                  type="range"
+                  data-target-id="settings-custom-text-chroma"
+                  min="0"
+                  max={editorChromaMax(customTextOklch)}
+                  step="0.001"
+                  value={customTextOklch.chroma}
+                  aria-label="Text chroma"
+                  aria-describedby="custom-oklch-help"
+                  aria-valuetext={`${customTextOklch.chroma.toFixed(3)} chroma`}
+                  style={`--settings-slider-gradient: ${oklchGradient(customTextOklch, 'chroma')}`}
+                  oninput={(event) => updateCustomColor('text', 'chroma', event.currentTarget.value)}
+                  onchange={commitCustomThemeUpdates}
+                />
+              </label>
+              <label class="settings-custom-tone">
+                <span>Lightness</span>
                 <input
                   type="range"
                   data-target-id="settings-custom-text-tone"
                   min="0"
                   max="100"
-                  step="1"
-                  value={customTextHsl.lightness}
-                  aria-label="Text tone"
-                  style={`--settings-slider-gradient: ${toneGradient(customTextHsl)}`}
+                  step="0.1"
+                  value={customTextOklch.lightness * 100}
+                  aria-label="Text lightness"
+                  aria-valuetext={`${(customTextOklch.lightness * 100).toFixed(1)} percent lightness`}
+                  style={`--settings-slider-gradient: ${oklchGradient(customTextOklch, 'lightness')}`}
                   oninput={(event) =>
-                    updateCustomColor('text', 'tone', event.currentTarget.value)}
+                    updateCustomColor('text', 'lightness', event.currentTarget.value)}
                   onchange={commitCustomThemeUpdates}
                 />
               </label>
@@ -920,6 +1133,8 @@
                     preferences.customTextColor === preset.text}
                   type="button"
                   data-custom-theme-preset={preset.label.toLowerCase()}
+                  style:background-color={preset.background}
+                  style:color={preset.text}
                   onclick={() =>
                     applyCustomThemePreset(preset.background, preset.text)}
                 >{preset.label}</button>
@@ -953,8 +1168,8 @@
       </div>
     </section>
 
-    <section class="settings-section">
-      <h3 class="settings-section-title">Current Word</h3>
+        <section class="settings-section">
+      <h4 class="settings-section-title">Current Word</h4>
       <label class="settings-field mod-inline-compact">
         <span class="settings-field-copy">
           <span class="settings-field-label">Fill color</span>
@@ -1171,94 +1386,98 @@
           />
         </div>
       </label>
-    </section>
-
-    <section class="settings-section">
-      <h3 class="settings-section-title">Behavior</h3>
-      <label class="settings-field mod-checkbox">
-        <input
-          data-target-id="settings-auto-scroll"
-          type="checkbox"
-          checked={preferences.autoScrollWithPlayback}
-          onchange={(event) =>
-            updatePreferences({
-              autoScrollWithPlayback: event.currentTarget.checked,
-            })}
-        />
-        <span class="settings-field-copy">
-          <span class="settings-field-label">Auto-scroll with playback</span>
-          <span class="settings-field-helper"
-            >Keeps the current word in view while audio plays.</span
-          >
-        </span>
-      </label>
-
-      <label class="settings-field mod-checkbox">
-        <input
-          data-target-id="settings-disable-shift-hide"
-          type="checkbox"
-          checked={preferences.disableShiftNekudotHide}
-          onchange={(event) =>
-            updatePreferences({
-              disableShiftNekudotHide: event.currentTarget.checked,
-            })}
-        />
-        <span class="settings-field-copy">
-          <span class="settings-field-label"
-            >Disable Shift key for Nekudot hiding</span
-          >
-          <span class="settings-field-helper"
-            >Hold Shift to temporarily switch between nikkud and plain
-            text.</span
-          >
-        </span>
-      </label>
-
-      <div class="settings-field">
-        <span class="settings-field-copy">
-          <span class="settings-field-label">Reading position</span>
-          <span class="settings-field-helper"
-            >Controls where the current word is centered while loading and
-            auto-scrolling.</span
-          >
-        </span>
-        <div
-          class="settings-segmented-control"
-          data-target-id="settings-focal-point-mode"
-        >
-          <button
-            class="settings-segmented-option"
-            class:is-active={preferences.focalPointMode === 'reader'}
-            type="button"
-            data-focal-point-mode="reader"
-            aria-pressed={preferences.focalPointMode === 'reader'}
-            onclick={() => updatePreferences({ focalPointMode: 'reader' })}
-          >
-            <span>Reader</span>
-            <small>Symmetrical and original</small>
-          </button>
-          <button
-            class="settings-segmented-option"
-            class:is-active={preferences.focalPointMode === 'browser'}
-            type="button"
-            data-focal-point-mode="browser"
-            aria-pressed={preferences.focalPointMode === 'browser'}
-            onclick={() => updatePreferences({ focalPointMode: 'browser' })}
-          >
-            <span>Browser</span>
-            <small>Pushes text higher up</small>
-          </button>
-        </div>
-        <button
-          type="button"
-          class="toolbar-button mod-icon-label"
-          data-target-id="debug-focal-measure-toggle">Focal Measure</button
-        >
+        </section>
       </div>
-    </section>
 
-    <section class="settings-section">
-      <h3 class="settings-section-title">Support</h3>
+      <div
+        class="settings-category-panel"
+        data-settings-panel="playback"
+        id="reader-settings-playback-panel"
+        hidden={activeCategory !== 'playback'}
+        aria-label="Playback settings"
+      >
+        <h3 class="settings-panel-title">Playback</h3>
+        <section class="settings-section">
+          <h4 class="settings-section-title">Audio</h4>
+          <label class="settings-field mod-control-row">
+            <span class="settings-field-label">Ba'al Koreh</span>
+            <select
+              data-target-id="settings-narrator"
+              value={preferences.narratorId}
+              onchange={(event) =>
+                updatePreferences({ narratorId: event.currentTarget.value })}
+            >
+              {#each narrators as narrator (narrator.id)}
+                <option value={narrator.id}>{narrator.displayName}</option>
+              {/each}
+            </select>
+          </label>
+
+          <label class="settings-field mod-control-row">
+            <span class="settings-field-label">Playback speed</span>
+            <div class="settings-playback-stepper">
+              <button
+                type="button"
+                aria-label="Decrease playback speed"
+                disabled={preferences.playbackRate <= 0.5}
+                onclick={() => adjustPlaybackRate(-0.05)}
+              >
+                <UiIcon name="minus" />
+              </button>
+              <input
+                data-target-id="settings-playback-rate"
+                type="number"
+                min="0.5"
+                max="3"
+                step="0.05"
+                inputmode="decimal"
+                aria-label="Playback speed"
+                value={Number(preferences.playbackRate.toFixed(2))}
+                onchange={(event) => applyPlaybackRate(event.currentTarget.value)}
+                onblur={(event) => applyPlaybackRate(event.currentTarget.value)}
+              />
+              <span aria-hidden="true">x</span>
+              <button
+                type="button"
+                aria-label="Increase playback speed"
+                disabled={preferences.playbackRate >= 3}
+                onclick={() => adjustPlaybackRate(0.05)}
+              >
+                <UiIcon name="plus" />
+              </button>
+            </div>
+          </label>
+        </section>
+
+        <section class="settings-section">
+          <h4 class="settings-section-title">Behavior</h4>
+          <label class="settings-field mod-checkbox">
+            <input
+              data-target-id="settings-auto-scroll"
+              type="checkbox"
+              checked={preferences.autoScrollWithPlayback}
+              onchange={(event) =>
+                updatePreferences({
+                  autoScrollWithPlayback: event.currentTarget.checked,
+                })}
+            />
+            <span class="settings-field-copy">
+              <span class="settings-field-label">Auto-scroll with playback</span>
+              <span class="settings-field-helper"
+                >Keeps the current word in view while audio plays.</span
+              >
+            </span>
+          </label>
+        </section>
+      </div>
+
+      <div
+        class="settings-category-panel mod-continuation"
+        hidden={activeCategory !== 'more'}
+        aria-label="Support settings"
+      >
+        <section class="settings-section">
+      <h4 class="settings-section-title">Support</h4>
       <div class="settings-field">
         <span class="settings-field-copy">
           <span class="settings-field-label">Diagnostic report</span>
@@ -1270,6 +1489,8 @@
         </span>
         <SupportDiagnosticsActions variant="reader" />
       </div>
-    </section>
-  </form>
+        </section>
+      </div>
+    </form>
+  </div>
 </div>

@@ -4,9 +4,12 @@ import type {
   ParshaAudioRecording,
 } from '../audio/types.ts'
 import { createMount } from '../lifecycle/mount.ts'
+import { hexToOklch, oklchToHex } from './oklch-color.ts'
 import {
   defaultReaderPreferences,
   mergeReaderPreferences,
+  colorContrastRatio,
+  themeModes,
   type ReaderPreferences,
 } from '../reader-preferences.ts'
 import {
@@ -96,6 +99,125 @@ test('replacement mounts keep one settings lifetime and preserve focus behavior'
   expect(second.updatePreferences).toHaveBeenCalledTimes(1)
 })
 
+test('switches four accessible icon-only settings categories', async () => {
+  const state = createState()
+  let settings: ReaderSettings | null = null
+
+  destroy = createMount()((scope) => {
+    settings = createReaderSettings(scope, createOptions(state))
+  })
+  settings!.open()
+
+  const categoryButtons = Array.from(
+    fixture.querySelectorAll<HTMLButtonElement>('[data-settings-category]')
+  )
+  expect(categoryButtons).toHaveLength(4)
+  expect(categoryButtons.map((button) => button.getAttribute('aria-label'))).toEqual([
+    'Reading',
+    'Appearance',
+    'Playback',
+    'More',
+  ])
+  expect(categoryButtons.every((button) => button.textContent?.trim() === '')).toBe(
+    true
+  )
+
+  const reading = required<HTMLButtonElement>(
+    '[data-settings-category="reading"]'
+  )
+  const appearance = required<HTMLButtonElement>(
+    '[data-settings-category="appearance"]'
+  )
+  const playback = required<HTMLButtonElement>(
+    '[data-settings-category="playback"]'
+  )
+  const readingPanel = required<HTMLElement>('#reader-settings-reading-panel')
+  const playbackPanel = required<HTMLElement>('#reader-settings-playback-panel')
+  expect(reading.getAttribute('aria-pressed')).toBe('true')
+  expect(readingPanel.hasAttribute('hidden')).toBe(false)
+  expect(
+    required('[data-target-id="settings-disable-shift-hide"]').closest(
+      '[data-settings-panel]'
+    )
+  ).toBe(readingPanel)
+  expect(
+    required('[data-target-id="settings-focal-point-mode"]').closest(
+      '[data-settings-panel]'
+    )
+  ).toBe(readingPanel)
+  expect(
+    required('[data-target-id="settings-narrator"]').closest(
+      '[data-settings-panel]'
+    )
+  ).toBe(playbackPanel)
+  expect(
+    required('[data-target-id="settings-playback-rate"]').closest(
+      '[data-settings-panel]'
+    )
+  ).toBe(playbackPanel)
+  const focalPointMode = required('[data-target-id="settings-focal-point-mode"]')
+  const disableShift = required('[data-target-id="settings-disable-shift-hide"]')
+  const focalMeasure = required<HTMLButtonElement>(
+    '[data-target-id="debug-focal-measure-toggle"]'
+  )
+  const sectionTitle = readingPanel.querySelector<HTMLElement>(
+    '.settings-section-title'
+  )
+  expect(sectionTitle).not.toBeNull()
+  if (!sectionTitle) throw new Error('Reading section title unavailable')
+  const sectionTitleStyle = getComputedStyle(sectionTitle)
+  expect(sectionTitleStyle.textTransform).toBe('uppercase')
+  expect(Number.parseFloat(sectionTitleStyle.letterSpacing)).toBeGreaterThan(0)
+  const readingChoices = readingPanel.querySelectorAll('.settings-reader-choice')
+  expect(readingChoices).toHaveLength(3)
+  expect(
+    focalPointMode.closest('.settings-reader-choice')?.classList
+  ).toContain('mod-position')
+  expect(focalMeasure.classList).toContain('settings-secondary-action')
+  expect(focalMeasure.closest('.settings-reader-tool')).not.toBeNull()
+  expect(readingPanel.textContent).toContain('Where the active word sits.')
+  expect(readingPanel.textContent).toContain('Keep Shift from hiding vowels.')
+  expect(disableShift.getAttribute('role')).toBe('switch')
+  expect(disableShift.closest('.settings-field')?.classList).toContain(
+    'mod-switch'
+  )
+  expect(
+    focalPointMode.compareDocumentPosition(disableShift) &
+      Node.DOCUMENT_POSITION_FOLLOWING
+  ).not.toBe(0)
+  expect(disableShift.closest('.settings-field')?.classList).toContain(
+    'mod-card'
+  )
+  expect(fixture.querySelector('.settings-advanced-link')).toBeNull()
+  expect(fixture.querySelector('.settings-instant-status')).toBeNull()
+  expect(fixture.querySelector('.settings-selected-check')).toBeNull()
+  expect(
+    required('[data-target-id="settings-reset-highlight"]').classList
+  ).toContain('settings-header-action')
+  expect(required('[data-target-id="settings-close"]').classList).toContain(
+    'settings-header-action'
+  )
+
+  appearance.click()
+  await vi.waitFor(() => {
+    expect(appearance.getAttribute('aria-pressed')).toBe('true')
+    expect(reading.getAttribute('aria-pressed')).toBe('false')
+    expect(
+      required('#reader-settings-reading-panel').hasAttribute('hidden')
+    ).toBe(true)
+    expect(
+      required('#reader-settings-appearance-panel').hasAttribute('hidden')
+    ).toBe(false)
+  })
+
+  playback.click()
+  await vi.waitFor(() => {
+    expect(playback.getAttribute('aria-pressed')).toBe('true')
+    expect(playbackPanel.hasAttribute('hidden')).toBe(false)
+    expect(readingPanel.hasAttribute('hidden')).toBe(true)
+  })
+})
+
 test('settings synchronize representative controls and release scheduled effects', () => {
   vi.spyOn(window, 'matchMedia').mockReturnValue({
     matches: false,
@@ -149,6 +271,15 @@ test('settings synchronize representative controls and release scheduled effects
   required<HTMLButtonElement>('[data-theme-mode="custom"]').click()
   expect(state.preferences.themeMode).toBe('custom')
   expect(required('[data-target-id="settings-custom-theme"]')).toBeTruthy()
+  for (const group of fixture.querySelectorAll('.settings-custom-color')) {
+    expect([...group.querySelectorAll('label > span')].map((label) => label.textContent))
+      .toEqual(['Hue', 'Chroma', 'Lightness'])
+    expect([...group.querySelectorAll('input[type="range"]')].map((input) => input.getAttribute('aria-label')?.split(' ').at(-1)))
+      .toEqual(['hue', 'chroma', 'lightness'])
+  }
+  expect(required('#reader-settings-reading-panel').textContent).toContain('Reading center')
+  expect([...fixture.querySelectorAll('[data-theme-mode] > span')].every((sample) => sample.textContent === 'אָב')).toBe(true)
+  expect(fixture.querySelectorAll('[data-custom-theme-preset]')).toHaveLength(6)
   required<HTMLButtonElement>('[data-custom-theme-preset="night"]').click()
   expect(state.preferences.customBackgroundColor).toBe('#191c22')
   expect(state.preferences.customTextColor).toBe('#f8f7f3')
@@ -164,11 +295,26 @@ test('settings synchronize representative controls and release scheduled effects
   backgroundTone.dispatchEvent(new Event('change', { bubbles: true }))
   expect(state.preferences.customBackgroundColor).toBe(previewedBackground)
 
+  const chroma = required<HTMLInputElement>('[data-target-id="settings-custom-background-chroma"]')
+  chroma.value = '0.4'
+  chroma.dispatchEvent(new Event('input', { bubbles: true }))
+  chroma.dispatchEvent(new Event('change', { bubbles: true }))
+  expect(state.preferences.customBackgroundColor).not.toBe(previewedBackground)
+  const colorPicker = required<HTMLInputElement>('input[aria-label="Text color"]')
+  colorPicker.value = '#008877'
+  colorPicker.dispatchEvent(new Event('input', { bubbles: true }))
+  colorPicker.dispatchEvent(new Event('change', { bubbles: true }))
+  expect(state.preferences.customTextColor).toBe('#008877')
+
   state.preferences = mergeReaderPreferences(state.preferences, {
     customBackgroundColor: '#aaaaaa',
     customTextColor: '#999999',
   })
   settings!.sync()
+  const caption = required<HTMLElement>('[data-theme-mode="custom"] small')
+  const rgb = getComputedStyle(caption).color.match(/\d+/g)!.slice(0, 3)
+  const captionColor = '#' + rgb.map((channel) => Number(channel).toString(16).padStart(2, '0')).join('')
+  expect(colorContrastRatio('#aaaaaa', captionColor)).toBeGreaterThanOrEqual(4.5)
   expect(
     required('[data-target-id="settings-custom-contrast"]').textContent
   ).toContain('Current colors remain allowed')
@@ -205,6 +351,81 @@ test('settings synchronize representative controls and release scheduled effects
   expect(
     document.documentElement.classList.contains('mod-theme-transition')
   ).toBe(false)
+})
+
+test.each(themeModes)('opening the editor preserves saved colors and the %s theme', async (themeMode) => {
+  const state = createState()
+  state.preferences = mergeReaderPreferences(state.preferences, {
+    themeMode,
+    customBackgroundColor: '#ABCDEF',
+    customTextColor: '#123456',
+  })
+  const original = { ...state.preferences }
+  let settings: ReaderSettings | null = null
+  destroy = createMount()((scope) => {
+    settings = createReaderSettings(scope, createOptions(state))
+  })
+  settings!.open()
+  required<HTMLButtonElement>('[data-settings-category="appearance"]').click()
+  settings!.close()
+  settings!.open()
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  expect(state.preferences).toEqual(original)
+  expect(state.updatePreferences).not.toHaveBeenCalled()
+  if (themeMode !== 'custom') required<HTMLButtonElement>('[data-theme-mode="custom"]').click()
+  expect(state.preferences.customBackgroundColor).toBe('#ABCDEF')
+  expect(state.preferences.customTextColor).toBe('#123456')
+  expect(Number(required<HTMLInputElement>('[aria-label="Background lightness"]').value))
+    .toBeCloseTo(hexToOklch('#ABCDEF').lightness * 100, 0)
+})
+
+test('keeps OKLCH slider intent through gray, gamut fitting, commits and external colors', async () => {
+  const state = createState()
+  state.preferences = mergeReaderPreferences(state.preferences, {
+    themeMode: 'custom', customBackgroundColor: '#888888', customTextColor: '#123456',
+  })
+  let settings: ReaderSettings | null = null
+  destroy = createMount()((scope) => {
+    settings = createReaderSettings(scope, createOptions(state))
+  })
+  settings!.open()
+  const setRange = (label: string, value: string, commit = true) => {
+    const input = required<HTMLInputElement>(`[aria-label="${label}"]`)
+    input.value = value
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    if (commit) input.dispatchEvent(new Event('change', { bubbles: true }))
+    return Number(input.value)
+  }
+  setRange('Background hue', '280')
+  expect(state.preferences.customBackgroundColor).toBe('#888888')
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  setRange('Background chroma', '0.08')
+  expect(state.preferences.customBackgroundColor).toBe(oklchToHex({
+    ...hexToOklch('#888888'), hue: 280, chroma: 0.08,
+  }))
+  setRange('Background lightness', '60')
+  const chosenChroma = setRange('Background chroma', '0.4')
+  const fitted = state.preferences.customBackgroundColor
+  setRange('Background lightness', '0')
+  expect(state.preferences.customBackgroundColor).toBe('#000000')
+  setRange('Background lightness', '60')
+  expect(state.preferences.customBackgroundColor).toBe(fitted)
+  expect(state.preferences.customTextColor).toBe('#123456')
+  expect(Number(required<HTMLInputElement>('[aria-label="Background chroma"]').value)).toBe(chosenChroma)
+
+  const picker = required<HTMLInputElement>('input[aria-label="Background color"]')
+  picker.value = '#008877'
+  picker.dispatchEvent(new Event('input', { bubbles: true }))
+  picker.dispatchEvent(new Event('change', { bubbles: true }))
+  const picked = hexToOklch('#008877')
+  setRange('Background hue', '120', false)
+  settings!.close()
+  expect(state.preferences.customBackgroundColor).toBe(oklchToHex({ ...picked, hue: 120 }))
+
+  state.preferences = mergeReaderPreferences(state.preferences, { customTextColor: '#ff8800' })
+  settings!.sync()
+  setRange('Text lightness', '50')
+  expect(state.preferences.customTextColor).toBe(oklchToHex({ ...hexToOklch('#ff8800'), lightness: 0.5 }))
 })
 
 test('downloads and removes only the active recording after explicit requests', async () => {

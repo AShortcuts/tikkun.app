@@ -15,6 +15,7 @@ export type IconName =
   | 'chevronLeft'
   | 'arrowLeft'
   | 'arrowRight'
+  | 'arrowLeftRight'
   | 'circleEllipsis'
   | 'skipBack'
   | 'skipForward'
@@ -39,6 +40,9 @@ export type IconName =
   | 'fileDown'
   | 'audioLines'
   | 'search'
+  | 'phoneRotate'
+  | 'minus'
+  | 'plus'
 
 // Icons are from https://lucide.dev/icons v1.0.
 // Keep every horizontal arrow alias on the shared full-stem geometry.
@@ -120,6 +124,12 @@ const iconPaths: Record<IconName, string> = {
   chevronLeft: arrowLeftPaths,
   arrowLeft: arrowLeftPaths,
   arrowRight: arrowRightPaths,
+  arrowLeftRight: `
+    <path d="M7 7h12" />
+    <path d="m16 4 3 3-3 3" />
+    <path d="M17 17H5" />
+    <path d="m8 14-3 3 3 3" />
+  `,
   circleEllipsis: `
     <circle cx="12" cy="12" r="10" />
     <path d="M17 12h.01" />
@@ -232,6 +242,18 @@ const iconPaths: Record<IconName, string> = {
   search: `
     <circle cx="11" cy="11" r="8" />
     <path d="m21 21-4.35-4.35" />
+  `,
+  phoneRotate: `
+    <rect x="7" y="3" width="10" height="16" rx="2" />
+    <path d="M10 22a9 9 0 0 0 10-10" />
+    <path d="m17 14 3-2 2 3" />
+  `,
+  minus: `
+    <path d="M5 12h14" />
+  `,
+  plus: `
+    <path d="M12 5v14" />
+    <path d="M5 12h14" />
   `,
 }
 

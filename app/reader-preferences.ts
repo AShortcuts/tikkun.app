@@ -5,6 +5,14 @@ import {
   requirePersistedJsonMutation,
   type PersistedJsonRevision,
 } from './persistence/persisted-state.ts'
+import {
+  isReaderSideMode,
+  isReaderSideOrder,
+  isReaderTextLayout,
+  type ReaderSideMode,
+  type ReaderSideOrder,
+  type ReaderTextLayout,
+} from './reader-presentation.ts'
 
 const STORAGE_KEY = 'tikkun.reader-preferences'
 
@@ -48,6 +56,9 @@ export interface ReaderPreferences {
   themeMode: ThemeMode
   customBackgroundColor: string
   customTextColor: string
+  readerTextLayout: ReaderTextLayout
+  readerSideMode: ReaderSideMode
+  readerSideOrder: ReaderSideOrder
 }
 
 export interface LoadedReaderPreferences {
@@ -71,6 +82,16 @@ export const defaultReaderPreferences: ReaderPreferences = {
   themeMode: 'automatic',
   customBackgroundColor: defaultCustomThemeColors.background,
   customTextColor: defaultCustomThemeColors.text,
+  readerTextLayout: 'match',
+  readerSideMode: 'one',
+  readerSideOrder: 'tikkun-right',
+}
+
+function defaultReaderTextLayout(): ReaderTextLayout {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return defaultReaderPreferences.readerTextLayout
+  }
+  return window.matchMedia('(max-width: 550px)').matches ? 'reading' : 'match'
 }
 
 function rootCssValue(name: string) {
@@ -92,6 +113,7 @@ function rootCssColor(name: string, fallback: string) {
 export function getDefaultReaderPreferences(): ReaderPreferences {
   return {
     ...defaultReaderPreferences,
+    readerTextLayout: defaultReaderTextLayout(),
     highlightFill: rootCssColor(
       '--reader-highlight-fill',
       defaultReaderPreferences.highlightFill
@@ -223,6 +245,15 @@ function normalizeReaderPreferences(
       candidate.customTextColor,
       defaults.customTextColor
     ),
+    readerTextLayout: isReaderTextLayout(candidate.readerTextLayout)
+      ? candidate.readerTextLayout
+      : defaults.readerTextLayout,
+    readerSideMode: isReaderSideMode(candidate.readerSideMode)
+      ? candidate.readerSideMode
+      : defaults.readerSideMode,
+    readerSideOrder: isReaderSideOrder(candidate.readerSideOrder)
+      ? candidate.readerSideOrder
+      : defaults.readerSideOrder,
   }
 }
 
@@ -317,6 +348,9 @@ export function applyReaderPreferences(preferences: ReaderPreferences) {
   const fillAlphaInversePercent = `${(1 - preferences.highlightOpacity) * 100}%`
 
   root.dataset.readerTheme = preferences.themeMode
+  root.dataset.readerTextLayout = preferences.readerTextLayout
+  root.dataset.readerSideMode = preferences.readerSideMode
+  root.dataset.readerSideOrder = preferences.readerSideOrder
   root.style.setProperty(
     '--reader-custom-background-color',
     preferences.customBackgroundColor

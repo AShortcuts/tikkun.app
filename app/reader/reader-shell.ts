@@ -26,6 +26,7 @@ export interface ReaderShellOptions {
   onTitleClick(): void
   onAboutClick(): void
   onAnnotationsChange(enabled: boolean): void
+  onSwapSides?(): void
 }
 
 export interface ReaderShellComponentProps
@@ -72,6 +73,7 @@ export function createReaderShell(
       onTitleClick: options.onTitleClick,
       onAboutClick: options.onAboutClick,
       onAnnotationsChange: options.onAnnotationsChange,
+      onSwapSides: options.onSwapSides,
       connect: (connectedShell: ReaderShell) => {
         shell = connectedShell
       },

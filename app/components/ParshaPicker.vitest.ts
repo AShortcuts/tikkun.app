@@ -247,6 +247,20 @@ test('uses mobile Library depth without a Go button', async () => {
   expect(picker.textContent).toContain('Torah Reference')
   expect(picker.textContent).toContain('Calendar')
 
+  requiredButton(picker, '[data-mobile-destination="holidays"]').click()
+  await tick()
+  expect(picker.textContent).toContain('Purim (Shemot 17:8-16)')
+  expect(picker.textContent).not.toContain('Open reading')
+  requiredButton(picker, '.mobile-library-back').click()
+  await tick()
+
+  requiredButton(picker, '[data-mobile-destination="megillot"]').click()
+  await tick()
+  expect(picker.textContent).toContain('Purim (Esther 1:1-10:3)')
+  expect(picker.textContent).not.toContain('Open reading')
+  requiredButton(picker, '.mobile-library-back').click()
+  await tick()
+
   requiredButton(picker, '[data-mobile-book="3"]').click()
   await tick()
   expect(requiredButton(picker, '.mobile-library-back').textContent).toContain(

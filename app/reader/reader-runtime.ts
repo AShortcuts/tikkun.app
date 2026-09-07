@@ -10,6 +10,7 @@ import {
   type CalendarSettings,
 } from '../calendar-settings.ts'
 import { applyAnnotationMode } from '../components/annotation-rendering.ts'
+import { applyReaderPageLayout } from '../components/reader-page-layout.ts'
 import { alignSmallSpecialLettersWhenFontsReady } from '../special-letter-layout.ts'
 import type { ViewportRange } from '../viewport-tracker.ts'
 import {
@@ -51,6 +52,10 @@ import {
   type ReaderPreferences,
   saveReaderPreferences,
 } from '../reader-preferences.ts'
+import {
+  effectiveReaderSideMode,
+  type ReaderPagePresentation,
+} from '../reader-presentation.ts'
 import {
   PersistedStateConflictError,
   type PersistedJsonRevision,
@@ -159,6 +164,7 @@ import { resolveReaderProgressPresentation } from './reader-progress-presentatio
 import {
   createReaderRoute,
   INITIAL_READER_TITLE,
+  formatTopBarTitle,
   type ReaderRoute,
   type ReaderRouteRendering,
 } from '../reader/reader-route.ts'
@@ -219,6 +225,7 @@ import {
 } from '../reader-scroll.ts'
 
 export interface ReaderRuntime {
+  readonly ready: Promise<void>
   destroy(): void
 }
 
@@ -522,6 +529,14 @@ export function startReaderRuntime({
     getReaderShell().setAnnotationsEnabled(enabled)
     const book = getBook()
     applyAnnotationMode(book, enabled)
+    if (
+      book.dataset.readerLayout === 'match' &&
+      book.dataset.readerSides === 'one'
+    ) {
+      book.querySelectorAll<HTMLElement>('.tikkun-page').forEach((page) => {
+        applyReaderPageLayout(page, { layout: 'match', sides: 'one' })
+      })
+    }
     const displaySession = readerDisplaySessionGlobal
     displaySession?.invalidateProgressAnchors('annotations')
     const activeDisplay = displaySession?.capture()
@@ -747,6 +762,38 @@ export function startReaderRuntime({
     return document.querySelector<HTMLElement>('[data-target-id="tikkun-book"]')!
   }
 
+  function getEffectiveReaderPagePresentation(): ReaderPagePresentation {
+    return {
+      layout: readerPreferences.readerTextLayout,
+      sides: effectiveReaderSideMode(
+        readerPreferences.readerSideMode,
+        isCompactReaderViewport()
+      ),
+    }
+  }
+
+  function syncEffectiveReaderPagePresentation({
+    rerender = true,
+    beforeLayout,
+  }: { rerender?: boolean; beforeLayout?: () => void } = {}) {
+    const book = getBook()
+    const presentation = getEffectiveReaderPagePresentation()
+    // The display must capture the old geometry before these attributes change.
+    const changed = rerender &&
+      (readerDisplaySessionGlobal?.setPagePresentation(presentation, beforeLayout) ?? false)
+    if (!changed) beforeLayout?.()
+    book.dataset.readerLayout = presentation.layout
+    book.dataset.readerSides = presentation.sides
+    if (!changed) return false
+    readerDisplaySessionGlobal?.invalidateProgressAnchors('text-layout')
+    const activeSignal = readerDisplaySessionGlobal?.capture()?.signal
+    if (activeSignal) scheduleSpecialLetterAlignment(book, activeSignal)
+    scheduleAliyahStartMarkerLayout(book)
+    invalidateReaderPositionAfterLayout()
+    void readerPlaybackGlobal?.syncHighlight({ scroll: false })
+    return true
+  }
+
   function getReaderShell() {
     if (!readerShellGlobal) throw new Error('Reader Shell is not mounted')
     return readerShellGlobal
@@ -758,10 +805,6 @@ export function startReaderRuntime({
 
   function isCompactReaderViewport() {
     return readerViewportGlobal?.isCompact() ?? false
-  }
-
-  function formatTopBarTitle(title: string | undefined) {
-    return title?.replace(/^פרשת /, '') ?? 'Tikkun'
   }
 
   function isEditableTarget(target: EventTarget | null) {
@@ -2600,6 +2643,17 @@ export function startReaderRuntime({
         mobilePlaybackSession?.runId === mobileRunId &&
         mobilePlaybackSession?.aliyahIndex === mobileAliyahIndex
     )
+    const mobileTarget =
+      mobileRunId && mobileAliyahIndex
+        ? { runId: mobileRunId, aliyahIndex: mobileAliyahIndex }
+        : null
+    const mobileAudioAvailable = Boolean(
+      mobileTarget &&
+        (getAliyahNavigationRecording(mobileTarget, {
+          includePreviousOverlap: true,
+        }) ||
+          cueAuthoringGlobal?.isActive())
+    )
 
     aliyahNavigationGlobal?.syncToolbar({
       current: {
@@ -2624,10 +2678,7 @@ export function startReaderRuntime({
             mobileAliyahIndex &&
             !isTableOfContentsVisible
         ),
-        target:
-          mobileRunId && mobileAliyahIndex
-            ? { runId: mobileRunId, aliyahIndex: mobileAliyahIndex }
-            : null,
+        target: mobileTarget,
         label: mobileAliyahIndex
           ? formatAliyahLabel(mobileAliyahIndex)
           : '—',
@@ -2635,6 +2686,7 @@ export function startReaderRuntime({
           loaded: mobilePlaybackLoaded,
           playing: mobilePlaybackLoaded && mobilePlaybackPlaying,
         }),
+        audioAvailable: mobileAudioAvailable,
       },
     })
   }
@@ -2976,6 +3028,11 @@ export function startReaderRuntime({
     const scrollTarget = shouldSmoothRecenter
       ? getReaderFocalPointScrollTarget(getBook())
       : null
+    const shouldUpdatePagePresentation =
+      (updates.readerTextLayout !== undefined &&
+        updates.readerTextLayout !== readerPreferences.readerTextLayout) ||
+      (updates.readerSideMode !== undefined &&
+        updates.readerSideMode !== readerPreferences.readerSideMode)
 
     let nextPreferences = mergeReaderPreferences(readerPreferences, updates)
     try {
@@ -3015,7 +3072,13 @@ export function startReaderRuntime({
       }
     }
     readerPreferences = nextPreferences
-    applyReaderPreferences(readerPreferences)
+    if (shouldUpdatePagePresentation) {
+      syncEffectiveReaderPagePresentation({
+        beforeLayout: () => applyReaderPreferences(readerPreferences),
+      })
+    } else {
+      applyReaderPreferences(readerPreferences)
+    }
     recenterReaderFocalPoint(scrollTarget, { behavior: 'smooth' })
     refreshReaderChrome()
   }
@@ -3074,6 +3137,7 @@ export function startReaderRuntime({
   bookmarks = loadedBookmarks.bookmarks
   bookmarkRevision = loadedBookmarks.revision
 
+  let ready!: Promise<void>
   const destroy = mountReaderRuntime((scope) => {
   const readerShell = createReaderShell(scope, {
     document,
@@ -3088,6 +3152,14 @@ export function startReaderRuntime({
       readerRouteGlobal?.toggleAbout()
     },
     onAnnotationsChange: setAnnotationsEnabled,
+    onSwapSides: () => {
+      updateReaderPreferencesFromSettings({
+        readerSideOrder:
+          readerPreferences.readerSideOrder === 'tikkun-right'
+            ? 'torah-right'
+            : 'tikkun-right',
+      })
+    },
   })
   readerShellGlobal = readerShell
   scope.own(() => {
@@ -3096,6 +3168,11 @@ export function startReaderRuntime({
   const book = getBook()
   const readerViewport = createReaderViewport(scope, window)
   readerViewportGlobal = readerViewport
+  syncEffectiveReaderPagePresentation({ rerender: false })
+  readerViewport.onChange(() => {
+    syncEffectiveReaderPagePresentation()
+    readerSettingsGlobal?.sync()
+  })
   scope.own(() => {
     if (readerViewportGlobal === readerViewport) {
       readerViewportGlobal = null
@@ -3595,6 +3672,105 @@ export function startReaderRuntime({
     { signal: scope.signal }
   )
 
+  let readerFormTap:
+    | {
+        pointerId: number
+        startX: number
+        startY: number
+        startedAt: number
+        canceled: boolean
+        readyAt: number | null
+      }
+    | null = null
+  const readerFormTapBlockedSelector = [
+    'button',
+    'a',
+    'input',
+    'select',
+    'textarea',
+    '[contenteditable="true"]',
+    '[data-reader-no-form-toggle="true"]',
+  ].join(',')
+
+  book.addEventListener(
+    'pointerdown',
+    (event) => {
+      const target = event.target
+      if (
+        !isCompactReaderViewport() ||
+        !(target instanceof Element) ||
+        !target.closest('.reader-text-side') ||
+        target.closest(readerFormTapBlockedSelector)
+      ) {
+        readerFormTap = null
+        return
+      }
+      readerFormTap = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        startedAt: performance.now(),
+        canceled: false,
+        readyAt: null,
+      }
+    },
+    { passive: true, signal: scope.signal }
+  )
+  book.addEventListener(
+    'pointermove',
+    (event) => {
+      if (!readerFormTap || readerFormTap.pointerId !== event.pointerId) return
+      if (
+        Math.hypot(
+          event.clientX - readerFormTap.startX,
+          event.clientY - readerFormTap.startY
+        ) > 8
+      ) {
+        readerFormTap.canceled = true
+      }
+    },
+    { passive: true, signal: scope.signal }
+  )
+  book.addEventListener(
+    'pointerup',
+    (event) => {
+      if (!readerFormTap || readerFormTap.pointerId !== event.pointerId) return
+      const heldFor = performance.now() - readerFormTap.startedAt
+      readerFormTap.readyAt =
+        !readerFormTap.canceled && heldFor < 450 ? performance.now() : null
+    },
+    { passive: true, signal: scope.signal }
+  )
+  book.addEventListener(
+    'pointercancel',
+    () => {
+      readerFormTap = null
+    },
+    { passive: true, signal: scope.signal }
+  )
+
+  function consumeReaderFormTap(event: MouseEvent) {
+    const tap = readerFormTap
+    readerFormTap = null
+    if (
+      !tap?.readyAt ||
+      performance.now() - tap.readyAt > 500 ||
+      getEffectiveReaderPagePresentation().sides !== 'one'
+    ) {
+      return false
+    }
+    const target = event.target
+    if (
+      !(target instanceof Element) ||
+      !target.closest('.reader-text-side') ||
+      target.closest(readerFormTapBlockedSelector)
+    ) {
+      return false
+    }
+    const selection = window.getSelection()
+    return !selection || selection.isCollapsed
+  }
+
   book.addEventListener('click', async (event) => {
     const target = event.target as HTMLElement
     const playButton = target.closest<HTMLButtonElement>('[data-audio-button="true"]')
@@ -3612,6 +3788,15 @@ export function startReaderRuntime({
 
     const word = target.closest<HTMLElement>('.word')
     const playback = readerPlayback.snapshot()
+    if (
+      consumeReaderFormTap(event) &&
+      (!word || !playback.session)
+    ) {
+      event.preventDefault()
+      setAnnotationsEnabled(!annotationsEnabled)
+      focusReaderSurface()
+      return
+    }
     if (!word || !playback.session) return
     const tokenKey = word.dataset.tokenKey ?? null
     if (!tokenKey) return
@@ -3861,7 +4046,7 @@ export function startReaderRuntime({
   scope.own(() => {
     if (readerRouteGlobal === readerRoute) readerRouteGlobal = null
   })
-  readerRoute.start()
+  ready = readerRoute.start()
 
   scope.own(() => {
     if (readerNoticeTimer !== null) {
@@ -3885,5 +4070,5 @@ export function startReaderRuntime({
   if (launchLastReading) lastReadingPromptGlobal?.show(launchLastReading)
   })
 
-  return { destroy }
+  return { ready, destroy }
 }

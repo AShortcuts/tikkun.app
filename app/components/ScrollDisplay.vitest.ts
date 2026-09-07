@@ -6,7 +6,7 @@ import {
   ScrollViewModel,
 } from '../view-model/scroll-view-model'
 import { ScrollDisplay } from './ScrollDisplay'
-import { getCenteredElementScrollTop } from '../reader-scroll'
+import { getCenteredElementScrollTop, getReaderFocalPointClientY, setReaderFocalPointMode } from '../reader-scroll'
 import '/css/master.css'
 
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
@@ -106,6 +106,49 @@ test('renders absolute page numbers inside the page table decoration', async () 
   expect(caption?.textContent).toMatch(/^\d+$/)
 })
 
+test('switches one display between Match, Reading, and mirrored sides', async () => {
+  const display = await renderRun('2025-10-04:shacharis,main')
+  expect(root.querySelector('table')).not.toBeNull()
+
+  expect(
+    display.setPresentation({ layout: 'reading', sides: 'one' })
+  ).toBe(true)
+  expect(root.dataset.readerLayout).toBe('reading')
+  expect(root.dataset.readerSides).toBe('one')
+  expect(root.querySelector('.reader-reading-page')).not.toBeNull()
+  expect(
+    root.querySelector<HTMLElement>('[data-aliyah-starts]')
+      ?.getBoundingClientRect().height
+  ).toBeGreaterThan(0)
+
+  expect(
+    display.setPresentation({ layout: 'reading', sides: 'two' })
+  ).toBe(true)
+  const readingLines = [
+    ...root.querySelectorAll<HTMLElement>('.mod-reading-line'),
+  ]
+  expect(readingLines.length).toBeGreaterThan(0)
+  readingLines.forEach((line) => {
+    expect(line.querySelectorAll('.reader-text-side')).toHaveLength(1)
+  })
+  const canonicalLines = root.querySelectorAll(
+    '.reader-reading-page-side.mod-tikkun [data-class="line"]'
+  )
+  const mirrorLines = root.querySelectorAll(
+    '.reader-reading-page-side.mod-torah [data-reader-mirror]'
+  )
+  expect(mirrorLines).toHaveLength(canonicalLines.length)
+  expect(
+    root.querySelectorAll('[data-reader-canonical="true"]').length
+  ).toBe(canonicalLines.length)
+  expect(root.querySelectorAll('[data-aliyah-starts][data-reader-mirror]')).toHaveLength(
+    0
+  )
+  expect(
+    display.setPresentation({ layout: 'reading', sides: 'two' })
+  ).toBe(false)
+})
+
 test('centers the first token for the starting line', async () => {
   // Use Noach for scroll-position regressions: Beresheet is clamped at
   // the top, so it cannot reveal playback-time scroll adjustments.
@@ -124,6 +167,44 @@ test('centers the first token for the starting line', async () => {
   const expectedScrollTop = getCenteredElementScrollTop(root, token)
 
   expect(Math.abs(root.scrollTop - expectedScrollTop)).toBeLessThan(5)
+})
+
+test.each(['match', 'reading'] as const)('preserves the focal token across %s side switches', async (layout) => {
+  root.style.height = '650px'
+  root.style.width = '1000px'
+  root.dataset.readerLayout = layout
+  root.dataset.readerSides = 'two'
+  document.documentElement.dataset.readerSideOrder = 'tikkun-right'
+  const display = await renderRun('2025-10-04:shacharis,main')
+  try {
+    for (const focalMode of ['browser', 'reader'] as const) {
+      setReaderFocalPointMode(focalMode)
+      const words = [...root.querySelectorAll<HTMLElement>('[data-reader-canonical="true"] .word:not([hidden])')]
+      const word = words.find((candidate) => candidate.dataset.lineIndex === '24')!
+      root.scrollTop = getCenteredElementScrollTop(root, word)
+      const focalY = getReaderFocalPointClientY(root)
+      const focalWord = words.filter((candidate) => candidate.getClientRects().length).sort((a, b) => {
+        const aRect = a.getBoundingClientRect(), bRect = b.getBoundingClientRect()
+        return Math.abs((aRect.top + aRect.bottom) / 2 - focalY) - Math.abs((bRect.top + bRect.bottom) / 2 - focalY)
+      })[0]
+      const key = focalWord.dataset.tokenKey
+      const offset = () => {
+        const current = [...root.querySelectorAll<HTMLElement>('[data-reader-canonical="true"] .word')].find((candidate) => candidate.dataset.tokenKey === key)!
+        const rect = current.getBoundingClientRect()
+        return (rect.top + rect.bottom) / 2 - getReaderFocalPointClientY(root)
+      }
+      const before = offset()
+      for (const sides of ['one', 'two', 'one', 'two'] as const) {
+        display.setPresentation({ layout, sides })
+        await new Promise(requestAnimationFrame)
+        expect(Math.abs(offset() - before), `${layout}:${focalMode}:${sides}:${key}:before=${before}:after=${offset()}`).toBeLessThan(2)
+      }
+    }
+  } finally {
+    display.destroy()
+    setReaderFocalPointMode('reader')
+    delete document.documentElement.dataset.readerSideOrder
+  }
 })
 
 test('mounting the next Yitro page preserves the focal word exactly', async () => {

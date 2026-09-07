@@ -50,7 +50,40 @@ beforeEach(() => {
   } as Document
 })
 
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
+
+test('defaults a new compact reader to Reading without changing the desktop default', () => {
+  vi.stubGlobal('window', {
+    matchMedia: () => ({ matches: true }),
+  })
+
+  expect(loadReaderPreferences().readerTextLayout).toBe('reading')
+  expect(defaultReaderPreferences.readerTextLayout).toBe('match')
+})
+
+test('persists and applies the independent reader presentation choices', () => {
+  saveReaderPreferences({
+    ...defaultReaderPreferences,
+    readerTextLayout: 'reading',
+    readerSideMode: 'two',
+    readerSideOrder: 'torah-right',
+  })
+
+  const preferences = loadReaderPreferences()
+  applyReaderPreferences(preferences)
+
+  expect(preferences).toMatchObject({
+    readerTextLayout: 'reading',
+    readerSideMode: 'two',
+    readerSideOrder: 'torah-right',
+  })
+  expect(document.documentElement.dataset.readerTextLayout).toBe('reading')
+  expect(document.documentElement.dataset.readerSideMode).toBe('two')
+  expect(document.documentElement.dataset.readerSideOrder).toBe('torah-right')
+})
 
 test('loads sepia as a saved theme mode', () => {
   localStorage.setItem(

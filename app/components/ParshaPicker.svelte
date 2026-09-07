@@ -811,7 +811,7 @@
                         onclick={(event) => navigateLink(event, entry.href)}
                       >
                         <strong dir="rtl">{entry.label}</strong>
-                        <small>Open reading</small>
+                        <small lang="en">{entry.englishLabel}</small>
                         <span aria-hidden="true"><UiIcon name="arrowRight" /></span>
                       </a>
                     </li>
@@ -830,7 +830,7 @@
                       onclick={(event) => navigateLink(event, entry.href)}
                     >
                       <strong dir="rtl">{entry.label}</strong>
-                      <small>Open reading</small>
+                      <small lang="en">{entry.englishLabel}</small>
                       <span aria-hidden="true"><UiIcon name="arrowRight" /></span>
                     </a>
                   </li>

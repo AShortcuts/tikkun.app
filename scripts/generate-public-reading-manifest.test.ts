@@ -92,7 +92,7 @@ async function withCueFixture(
   }
 }
 
-test('current manual work plans agree with generated public truth', () => {
+test('current manual work plans structurally cover generated public readings', () => {
   expect(() =>
     validateRecordingWorkPlans({
       recordings: audioRecordings,
@@ -111,7 +111,7 @@ test('checked-in public reading manifest matches its authoritative sources', asy
   expect(checkedInContents).toBe(contents)
 })
 
-test('rejects stale planned or active states that contradict published assets', () => {
+test('keeps published asset truth independent from manual workflow labels', () => {
   expect(() =>
     validateRecordingWorkPlans({
       recordings: [availableRecording],
@@ -125,7 +125,7 @@ test('rejects stale planned or active states that contradict published assets', 
       ],
       publicAliyotByParsha: { beresheet: publicAliyot('missing') },
     })
-  ).toThrow('marked Planned but published audio exists')
+  ).not.toThrow()
 
   expect(() =>
     validateRecordingWorkPlans({
@@ -140,10 +140,10 @@ test('rejects stale planned or active states that contradict published assets', 
       ],
       publicAliyotByParsha: { beresheet: publicAliyot('cued') },
     })
-  ).toThrow('active manual work but published cues are word-sync ready')
+  ).not.toThrow()
 })
 
-test('rejects review without audio and missing maintained rows', () => {
+test('allows manual review metadata without audio and rejects missing maintained rows', () => {
   expect(() =>
     validateRecordingWorkPlans({
       recordings: [],
@@ -157,7 +157,7 @@ test('rejects review without audio and missing maintained rows', () => {
       ],
       publicAliyotByParsha: {},
     })
-  ).toThrow('needs review but has no published audio')
+  ).not.toThrow()
 
   expect(() =>
     validateRecordingWorkPlans({

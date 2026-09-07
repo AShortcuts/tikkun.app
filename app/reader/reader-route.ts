@@ -14,7 +14,11 @@ import {
 } from '../view-model/navigation/url-parser.ts'
 import type { ReaderShell } from './reader-shell.ts'
 
-export const INITIAL_READER_TITLE = 'בראשית'
+export const INITIAL_READER_TITLE = 'תיקון קוראים'
+
+export function formatTopBarTitle(title: string | undefined) {
+  return title?.replace(/^פרשת /, '') ?? INITIAL_READER_TITLE
+}
 
 const DEFAULT_READER_HASH = '#/next'
 const OPTIONAL_ROUTE_TITLE = 'תיקון קוראים'
@@ -52,7 +56,7 @@ export interface ReaderRouteSnapshot {
 }
 
 export interface ReaderRoute {
-  start(): void
+  start(): Promise<void>
   navigate(
     hash: string,
     options?: {
@@ -125,6 +129,14 @@ export function createReaderRoute(
   )
 
   let started = false
+  let startup: {
+    resolve(): void
+    reject(error: unknown): void
+  } | null = null
+  const finishStartup = () => {
+    startup?.resolve()
+    startup = null
+  }
   let optionalRouteController: AbortController | null = null
   let picker: ReturnType<typeof createParshaPicker> | null = null
   let pickerLoading = false
@@ -197,6 +209,7 @@ export function createReaderRoute(
       saveReadingAfterRender = true
       host.dismissLastReadingPrompt()
     }
+    if (picker || pickerLoading) closePicker()
 
     if (view.location.hash === hash) {
       const route = parseHash(hash)
@@ -448,6 +461,7 @@ export function createReaderRoute(
     previousReading: LastReading | null
   ) => {
     abortOptionalRoute()
+    setTitle(formatTopBarTitle(route.model.initialTitle))
     shell.setView('reader')
     optionalView.innerHTML = ''
 
@@ -476,7 +490,6 @@ export function createReaderRoute(
 
     const readerReady = rendering.ready.then(() => {
       if (!isCurrent()) return
-      closePicker()
       host.readerReady()
       if (previousReading && previousReading.hash !== nextReaderHash) {
         host.showReturnToPreviousReading(previousReading)
@@ -488,9 +501,13 @@ export function createReaderRoute(
         if (!isCurrent()) return
         if (shouldSaveReading) host.saveReadingPosition()
         revealPageNumber(nextReaderHash, rendering)
+        finishStartup()
       })
       .catch((error) => {
-        if (isCurrent()) console.error('Failed to render reader route', error)
+        if (!isCurrent()) return
+        console.error('Failed to render reader route', error)
+        startup?.reject(error)
+        startup = null
       })
   }
 
@@ -499,10 +516,12 @@ export function createReaderRoute(
     returnReadingAfterRender = null
     if (route.view === 'not-found') {
       renderNotFound()
+      finishStartup()
       return
     }
     if (route.view === 'about' || route.view === 'cue-analytics') {
       renderOptionalRoute(route)
+      finishStartup()
       return
     }
     renderReaderRoute(route, previousReading)
@@ -523,6 +542,9 @@ export function createReaderRoute(
   const start = () => {
     if (started) throw new Error('Reader Route is already started')
     started = true
+    const ready = new Promise<void>((resolve, reject) => {
+      startup = { resolve, reject }
+    })
 
     view.addEventListener(
       'hashchange',
@@ -541,10 +563,12 @@ export function createReaderRoute(
         model: ScrollViewModel.forDate(options.createGenerator(), new Date()),
       }
     renderRoute(initialRoute)
+    return ready
   }
 
   scope.own(() => {
     abortOptionalRoute()
+    startup = null
     activeRendering = null
     pickerRequestGeneration += 1
     pickerLoading = false

@@ -510,6 +510,8 @@
   }
 
   .mobile-library-button,
+  .mobile-aliyah-capsule,
+  .mobile-aliyah-play-toggle,
   .mobile-aliyah-picker-toggle,
   .mobile-aliyah-segments,
   .mobile-aliyah-picker,
@@ -692,90 +694,135 @@
         background: color-mix(in srgb, var(--text-color) 10%, transparent);
       }
     }
-    .mobile-aliyah-picker-toggle:not(.u-hidden) {
-      position: relative;
-      isolation: isolate;
+    .mobile-aliyah-capsule:not(.u-hidden) {
       grid-column: 3;
       grid-row: 1;
       justify-self: start;
       display: inline-flex;
       align-items: center;
-      justify-content: center;
-      min-width: 4rem;
-      min-height: 2.75rem;
-      gap: 0.24rem;
-      border: 0;
-      border-radius: 999px;
-      padding: 0.38rem 0.55rem 0.38rem 0.75rem;
-      background: transparent;
-      color: var(--mobile-reader-blue);
-      cursor: pointer;
-      direction: ltr;
-      font: inherit;
-      font-size: 0.94rem;
-      font-weight: 720;
-      white-space: nowrap;
-    }
-    .mobile-aliyah-picker-toggle [data-target-id='mobile-current-aliyah'] {
-      display: inline-flex;
-      align-items: center;
-      align-self: center;
-      min-height: 1rem;
-      line-height: 1;
-    }
-    .mobile-aliyah-picker-speaker .ui-icon,
-    .mobile-aliyah-picker-chevron .ui-icon {
-      display: block;
-    }
-    .mobile-aliyah-picker-toggle::before {
-      content: '';
-      position: absolute;
-      inset: 0.25rem 0.12rem;
-      z-index: -1;
+      width: 4.9rem;
+      height: 2.75rem;
+      overflow: hidden;
       border: 1.5px solid var(--mobile-reader-blue);
       border-radius: 999px;
       background: color-mix(in srgb, var(--mobile-reader-blue) 9%, transparent);
+      color: var(--mobile-reader-blue);
+      direction: ltr;
+      font: inherit;
+      white-space: nowrap;
       transition:
         background-color var(--reader-motion-color) var(--reader-ease-standard),
-        transform var(--reader-motion-fast) var(--reader-ease-out);
+        border-color var(--reader-motion-color) var(--reader-ease-standard),
+        color var(--reader-motion-color) var(--reader-ease-standard);
     }
-    .mobile-aliyah-picker-toggle:active::before {
+
+    .mobile-aliyah-play-toggle,
+    .mobile-aliyah-picker-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.84rem;
+      font-weight: 750;
+      line-height: 1;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .mobile-aliyah-play-toggle {
+      flex: 1 1 auto;
+      min-width: 0;
+      gap: 0.22rem;
+      padding-inline: 0.42rem 0.3rem;
+    }
+
+    .mobile-aliyah-picker-toggle {
+      flex: 0 0 1.42rem;
+      border-left: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+    }
+
+    .mobile-aliyah-play-toggle:active,
+    .mobile-aliyah-picker-toggle:active {
       background: color-mix(in srgb, currentColor 17%, transparent);
-      transform: scale(var(--reader-control-press-scale));
     }
-    .mobile-aliyah-picker-toggle.is-loaded {
+
+    .mobile-aliyah-capsule.is-loaded {
       color: var(--mobile-reader-gold);
-    }
-    .mobile-aliyah-picker-toggle.is-loaded::before {
       border-color: var(--mobile-reader-gold);
       background: color-mix(in srgb, var(--mobile-reader-gold) 9%, transparent);
     }
-    .mobile-aliyah-picker-toggle.is-playing {
+
+    .mobile-aliyah-capsule.is-playing {
       color: #18191d;
-    }
-    .mobile-aliyah-picker-toggle.is-playing::before {
       border-color: var(--mobile-reader-gold);
       background: var(--mobile-reader-gold);
       box-shadow: 0 7px 18px
         color-mix(in srgb, var(--mobile-reader-gold) 18%, transparent);
     }
+
+    .mobile-aliyah-capsule.is-error {
+      color: #c2410c;
+      border-color: color-mix(in srgb, #c2410c 72%, transparent);
+      background: color-mix(in srgb, #c2410c 9%, transparent);
+    }
+
+    .mobile-aliyah-capsule.is-unavailable {
+      color: var(--light-text-color);
+      border-color: var(--mobile-reader-border);
+      background: var(--mobile-reader-control-surface);
+      box-shadow: none;
+    }
+
+    .mobile-aliyah-play-toggle:disabled {
+      cursor: default;
+    }
+
+    .mobile-aliyah-play-toggle:focus-visible,
     .mobile-aliyah-picker-toggle:focus-visible {
       outline: none;
-    }
-    .mobile-aliyah-picker-toggle:focus-visible::before {
       box-shadow:
-        0 0 0 2px var(--paper-color),
-        0 0 0 4px var(--mobile-reader-blue);
+        inset 0 0 0 2px var(--paper-color),
+        inset 0 0 0 4px var(--mobile-reader-blue);
     }
-    .mobile-aliyah-picker-speaker .ui-icon {
+
+    .mobile-aliyah-play-icon,
+    .mobile-aliyah-picker-chevron {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: none;
+    }
+
+    .mobile-aliyah-play-icon .ui-icon {
       width: 0.95rem;
       height: 0.95rem;
-      stroke-width: 1.8;
     }
+
     .mobile-aliyah-picker-chevron .ui-icon {
-      width: 1rem;
-      height: 1rem;
+      width: 0.82rem;
+      height: 0.82rem;
       stroke-width: 2.4;
+    }
+
+    .mobile-aliyah-spinner {
+      width: 0.78rem;
+      height: 0.78rem;
+      border: 1.5px solid color-mix(in srgb, currentColor 28%, transparent);
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: mobile-aliyah-spinner 650ms linear infinite;
+    }
+
+    @keyframes mobile-aliyah-spinner {
+      to {
+        transform: rotate(360deg);
+      }
     }
     .toolbar-button.mod-icon-label.toolbar-overflow-toggle {
       grid-column: 3;
@@ -1163,6 +1210,7 @@
   @media screen and (max-width: 550px) and (forced-colors: active) {
     .mobile-library-button:focus-visible,
     .parsha-title:focus-visible,
+    .mobile-aliyah-play-toggle:focus-visible,
     .mobile-aliyah-picker-toggle:focus-visible,
     .toolbar-button.mod-icon-label.toolbar-overflow-toggle:focus-visible,
     .mobile-aliyah-segment:focus-visible,
@@ -1196,7 +1244,7 @@
 
   @media screen and (max-width: 350px) {
     .toolbar-content {
-      --mobile-toolbar-side-controls-width: 7rem;
+      --mobile-toolbar-side-controls-width: 7.35rem;
     }
     .mobile-library-button {
       font-size: 0;
@@ -1204,9 +1252,8 @@
     .mobile-library-button .mobile-library-icon {
       margin-right: 0;
     }
-    .mobile-aliyah-picker-toggle:not(.u-hidden) {
-      min-width: 3.7rem;
-      padding: 0.38rem 0.3rem 0.38rem 0.45rem;
+    .mobile-aliyah-capsule:not(.u-hidden) {
+      width: 4.35rem;
       font-size: 0.86rem;
     }
     .mobile-aliyah-picker-chevron .ui-icon {
@@ -1239,6 +1286,8 @@
   @media (prefers-reduced-motion: reduce) {
     .mobile-library-button,
     .parsha-title,
+    .mobile-aliyah-capsule,
+    .mobile-aliyah-play-toggle,
     .toolbar-button.mod-icon-label.toolbar-overflow-toggle,
     .mobile-aliyah-picker-toggle::before,
     .mobile-aliyah-segment,
@@ -1269,6 +1318,7 @@
   }
 
   [data-recording-mode='true'] .mobile-library-button,
+  [data-recording-mode='true'] .mobile-aliyah-capsule,
   [data-recording-mode='true'] .mobile-aliyah-picker-toggle,
   [data-recording-mode='true'] .mobile-aliyah-segments,
   [data-recording-mode='true'] .mobile-aliyah-picker {

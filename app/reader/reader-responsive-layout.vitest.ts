@@ -221,6 +221,7 @@ async function selectTheme(
   const pane = required<HTMLElement>(document, '[data-target-id="settings-pane"]')
   assertNoDocumentOverflow(document, view, `${width}px open Reader Settings`)
   assertFullyReachable(pane, view, `${width}px Reader Settings`)
+  await showSettingsCategory(pane, view, 'appearance')
 
   const themeButtons = Array.from(
     pane.querySelectorAll<HTMLButtonElement>('[data-theme-mode]')
@@ -299,6 +300,30 @@ async function openSettings(document: Document, view: Window, width: number) {
   return returnFocus
 }
 
+async function showSettingsCategory(
+  pane: HTMLElement,
+  view: Window,
+  category: 'reading' | 'appearance' | 'playback' | 'more'
+) {
+  const button = required<HTMLButtonElement>(
+    pane,
+    `[data-settings-category="${category}"]`
+  )
+  button.click()
+  await vi.waitFor(
+    () => {
+      expect(button.getAttribute('aria-pressed')).toBe('true')
+      expect(
+        isRendered(
+          view,
+          required(pane, `#reader-settings-${category}-panel`)
+        )
+      ).toBe(true)
+    },
+    { timeout: 5_000, interval: 25 }
+  )
+}
+
 async function exerciseAccessibilityModeControls(
   targetFrame: HTMLIFrameElement,
   width: number,
@@ -321,6 +346,7 @@ async function exerciseAccessibilityModeControls(
   assertNoDocumentOverflow(document, view, `${context} Reader Settings`)
   assertFullyReachable(pane, view, `${context} Reader Settings`)
   assertFullyReachable(close, view, `${context} Settings close control`)
+  await showSettingsCategory(pane, view, 'appearance')
 
   const automaticTheme = required<HTMLButtonElement>(
     pane,

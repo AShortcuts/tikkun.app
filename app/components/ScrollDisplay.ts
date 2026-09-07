@@ -7,13 +7,23 @@ import {
 } from '../view-model/scroll-view-model'
 import Page from './Page.ts'
 import utils from './utils.ts'
-import { centerElementInScrollRoot } from '../reader-scroll.ts'
+import {
+  centerElementInScrollRoot,
+  getReaderFocalPointClientY,
+} from '../reader-scroll.ts'
 import {
   createPageLifecycleSnapshot,
   measurePageHeight,
   type PageLifecycleSnapshot,
   type PageMountState,
 } from './page-lifecycle.ts'
+import {
+  defaultReaderPagePresentation,
+  isReaderSideMode,
+  isReaderTextLayout,
+  type ReaderPagePresentation,
+} from '../reader-presentation.ts'
+import { applyReaderPageLayout } from './reader-page-layout.ts'
 
 const { htmlToElement, purgeNode } = utils
 
@@ -73,8 +83,22 @@ export class ScrollDisplay {
   private edgeLoadingReady = false
   private pendingInitialCenterScrollTop: number | null = null
   private edgeLoadPromise: Promise<Element | null> | null = null
+  private presentation: ReaderPagePresentation
+  private readonly pageLayoutObserver: ResizeObserver | null
+  private pageLayoutFrame = 0
+  private presentationAnchor: ScrollPreservationAnchor | null = null
 
-  constructor(readonly viewModel: ScrollViewModel, readonly root: HTMLElement) {
+  constructor(
+    readonly viewModel: ScrollViewModel,
+    readonly root: HTMLElement,
+  ) {
+    this.presentation = readPagePresentation(root)
+    applyPagePresentation(root, this.presentation)
+    this.pageLayoutObserver =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => this.schedulePageLayoutRefresh())
+    this.pageLayoutObserver?.observe(root)
     root.scrollTop = 0
     purgeNode(root)
     root.addEventListener('scroll', this.handleEdgeScroll, { passive: true })
@@ -100,13 +124,14 @@ export class ScrollDisplay {
         }
 
         return lines[lineIndex]
-      }
+      },
     )
     this.scrolled = this.rendered.then(async (line) => {
       // Wait for parsha picker to close (from `this.rendered`)
       // so that we become measurable.
       await waitForDocumentFonts()
       await new Promise(requestAnimationFrame)
+      this.refreshMountedPageLayouts()
       this.scrollTo({ element: line })
       this.edgeLoadingReady = true
     })
@@ -117,6 +142,81 @@ export class ScrollDisplay {
     this.edgeLoadingReady = false
     this.pendingInitialCenterScrollTop = null
     this.root.removeEventListener('scroll', this.handleEdgeScroll)
+    this.pageLayoutObserver?.disconnect()
+    if (this.pageLayoutFrame) cancelAnimationFrame(this.pageLayoutFrame)
+    this.pageLayoutFrame = 0
+  }
+
+  setPresentation(presentation: ReaderPagePresentation, beforeLayout?: () => void) {
+    if (
+      this.presentation.layout === presentation.layout &&
+      this.presentation.sides === presentation.sides
+    ) {
+      return false
+    }
+
+    const priorAnchor = this.presentationAnchor
+    const priorWord = priorAnchor && findPreservedWord(this.root, priorAnchor)
+    // Several words can share the center after reflow. Keep the same logical
+    // word on a return switch unless the reader has moved away from it.
+    const anchor = priorWord && Math.abs(
+      getViewportOffset(this.root, priorWord, priorAnchor.alignment) - priorAnchor.viewportOffset,
+    ) < 1 ? priorAnchor : getScrollPreservationAnchor(this.root)
+    const rerendered: { page: RenderedPageInfo; node: HTMLElement }[] = []
+    this.mutatePreservingViewport(null, () => {
+      beforeLayout?.()
+      this.presentation = { ...presentation }
+      applyPagePresentation(this.root, this.presentation)
+      for (const record of this.pageMounts.values()) {
+        const node = record.node
+        const page = node?.tikkunPage
+        if (!node || !page || record.state !== 'mounted') continue
+        node.replaceChildren(
+          htmlToElement(
+            Page(page, {
+              annotationsEnabled: this.annotationsEnabled(),
+              presentation: this.presentation,
+            }),
+          ),
+        )
+        applyReaderPageLayout(node, this.presentation)
+        record.measuredHeight = measurePageHeight(node)
+        this.touchPageRecord(record)
+        rerendered.push({ page, node })
+      }
+
+      for (const { page, node } of rerendered) {
+        this.dispatchPageRendered(page, node)
+      }
+    }, anchor)
+    this.presentationAnchor = anchor
+    if (this.presentation.layout === 'reading') {
+      this.schedulePageLayoutRefresh()
+    }
+    return true
+  }
+
+  usesPresentation(presentation: ReaderPagePresentation) {
+    return (
+      this.presentation.layout === presentation.layout &&
+      this.presentation.sides === presentation.sides
+    )
+  }
+
+  private schedulePageLayoutRefresh() {
+    if (this.disposed || this.pageLayoutFrame) return
+    this.pageLayoutFrame = requestAnimationFrame(() => {
+      this.pageLayoutFrame = 0
+      this.refreshMountedPageLayouts()
+    })
+  }
+
+  private refreshMountedPageLayouts() {
+    for (const record of this.pageMounts.values()) {
+      if (record.state !== 'mounted' || !record.node?.isConnected) continue
+      applyReaderPageLayout(record.node, this.presentation)
+      record.measuredHeight = measurePageHeight(record.node)
+    }
   }
 
   private scrollTo({ element }: { element: HTMLElement }) {
@@ -131,7 +231,7 @@ export class ScrollDisplay {
   private generateRender(insertPosition: InsertPosition) {
     return (
       entry: RenderedEntry,
-      { preserveViewport = true }: { preserveViewport?: boolean } = {}
+      { preserveViewport = true }: { preserveViewport?: boolean } = {},
     ) => {
       const wasEvicted =
         entry.type === 'page' &&
@@ -146,16 +246,16 @@ export class ScrollDisplay {
         return renderedNode
       }
       const node = preserveViewport
-        ? this.mutatePreservingViewport(
-            entry.contentIndex,
-            render
-          )
+        ? this.mutatePreservingViewport(entry.contentIndex, render)
         : render()
       if (this.disposed) return node
       if (entry.type === 'page' && wasEvicted) {
         this.dispatchPageRemounted(entry.pageNumber, node)
       }
       this.dispatchPageRendered(entry, node)
+      if (this.presentation.layout === 'reading') {
+        this.schedulePageLayoutRefresh()
+      }
       return node
     }
   }
@@ -222,7 +322,7 @@ export class ScrollDisplay {
           entry,
           node,
         },
-      })
+      }),
     )
   }
 
@@ -233,15 +333,15 @@ export class ScrollDisplay {
           pageNumber,
           node,
         },
-      })
+      }),
     )
   }
 
   private mutatePreservingViewport<T>(
     affectedContentIndex: number | null,
-    mutation: () => T
+    mutation: () => T,
+    anchor = getScrollPreservationAnchor(this.root),
   ) {
-    const anchor = getScrollPreservationAnchor(this.root)
     const previousScrollHeight = this.root.scrollHeight
     const previousScrollTop = this.root.scrollTop
     const result = mutation()
@@ -264,7 +364,7 @@ export class ScrollDisplay {
     return [...this.renderedPages.entries()]
       .sort(([left], [right]) => left - right)
       .flatMap(([, node]) =>
-        node.tikkunPage ? [node.tikkunPage.pageNumber] : []
+        node.tikkunPage ? [node.tikkunPage.pageNumber] : [],
       )
   }
 
@@ -276,7 +376,7 @@ export class ScrollDisplay {
 
   private getViewportAnchorPageRecord() {
     const mountedRecords = [...this.pageMounts.values()].filter(
-      (record) => record.state === 'mounted' && record.node?.isConnected
+      (record) => record.state === 'mounted' && record.node?.isConnected,
     )
     if (!mountedRecords.length) return null
 
@@ -304,7 +404,7 @@ export class ScrollDisplay {
 
   isPageMounted(pageNumber: number) {
     return this.getPageRecords(pageNumber).some(
-      (record) => record.state === 'mounted' && record.node?.isConnected
+      (record) => record.state === 'mounted' && record.node?.isConnected,
     )
   }
 
@@ -327,11 +427,15 @@ export class ScrollDisplay {
    */
   async ensurePageMountedForNavigation(
     pageNumber: number,
-    hint?: PageOccurrenceHint
+    hint?: PageOccurrenceHint,
   ) {
     if (this.disposed) return null
-    const targetEntry = await this.viewModel.fetchPageByPageNumber(pageNumber, hint)
-    if (this.disposed || !targetEntry || targetEntry.type !== 'page') return null
+    const targetEntry = await this.viewModel.fetchPageByPageNumber(
+      pageNumber,
+      hint,
+    )
+    if (this.disposed || !targetEntry || targetEntry.type !== 'page')
+      return null
 
     const targetIndex = targetEntry.contentIndex
     const anchorIndex = this.getViewportAnchorPageRecord()?.contentIndex
@@ -380,7 +484,7 @@ export class ScrollDisplay {
     const existing = this.renderedEntries.get(entry.contentIndex)
     if (existing?.isConnected) return existing
     const node = this.mutatePreservingViewport(entry.contentIndex, () =>
-      this.mountMessageEntry(entry)
+      this.mountMessageEntry(entry),
     )
     if (!this.disposed) this.dispatchPageRendered(entry, node)
     return node
@@ -395,7 +499,7 @@ export class ScrollDisplay {
     }
 
     const evicted = this.getPageRecords(pageNumber).find(
-      (record) => record.state === 'evicted'
+      (record) => record.state === 'evicted',
     )
     if (evicted) return this.mountPageByContentIndex(evicted.contentIndex)
 
@@ -410,7 +514,7 @@ export class ScrollDisplay {
     this.pageNumberMountPromises.set(pageNumber, mountPromise)
     void mountPromise.then(
       () => this.clearPageNumberMount(pageNumber, mountPromise),
-      () => this.clearPageNumberMount(pageNumber, mountPromise)
+      () => this.clearPageNumberMount(pageNumber, mountPromise),
     )
     return mountPromise
   }
@@ -435,14 +539,14 @@ export class ScrollDisplay {
     if (existing) existing.mountPromise = mountPromise
     void mountPromise.then(
       () => this.clearContentMount(contentIndex, mountPromise),
-      () => this.clearContentMount(contentIndex, mountPromise)
+      () => this.clearContentMount(contentIndex, mountPromise),
     )
     return mountPromise
   }
 
   private clearPageNumberMount(
     pageNumber: number,
-    mountPromise: Promise<HTMLElement | null>
+    mountPromise: Promise<HTMLElement | null>,
   ) {
     if (this.pageNumberMountPromises.get(pageNumber) === mountPromise) {
       this.pageNumberMountPromises.delete(pageNumber)
@@ -451,7 +555,7 @@ export class ScrollDisplay {
 
   private clearContentMount(
     contentIndex: number,
-    mountPromise: Promise<HTMLElement | null>
+    mountPromise: Promise<HTMLElement | null>,
   ) {
     if (this.contentMountPromises.get(contentIndex) === mountPromise) {
       this.contentMountPromises.delete(contentIndex)
@@ -470,7 +574,7 @@ export class ScrollDisplay {
     const node = this.mutatePreservingViewport(entry.contentIndex, () =>
       wasEvicted && existing.placeholderNode
         ? this.mountEvictedPage(entry, existing)
-        : this.mountPageEntry(entry, 'beforeend')
+        : this.mountPageEntry(entry, 'beforeend'),
     )
     if (wasEvicted) this.dispatchPageRemounted(entry.pageNumber, node)
     this.dispatchPageRendered(entry, node)
@@ -485,7 +589,7 @@ export class ScrollDisplay {
 
   private getNearestMountedPageRecord(pageNumber: number) {
     const mountedRecords = this.getPageRecords(pageNumber).filter(
-      (record) => record.state === 'mounted' && record.node?.isConnected
+      (record) => record.state === 'mounted' && record.node?.isConnected,
     )
     if (mountedRecords.length <= 1) return mountedRecords[0] ?? null
 
@@ -519,7 +623,7 @@ export class ScrollDisplay {
     const placeholder = renderPagePlaceholder(
       record.pageNumber,
       record.contentIndex,
-      measuredHeight
+      measuredHeight,
     )
 
     this.mutatePreservingViewport(record.contentIndex, () => {
@@ -539,7 +643,7 @@ export class ScrollDisplay {
           pageNumber: record.pageNumber,
           node,
         },
-      })
+      }),
     )
     return true
   }
@@ -554,7 +658,7 @@ export class ScrollDisplay {
     marginPx?: number
   } = {}) {
     return this.getEvictedPageRecordsNearViewport({ marginPx }).map(
-      (record) => record.pageNumber
+      (record) => record.pageNumber,
     )
   }
 
@@ -569,10 +673,7 @@ export class ScrollDisplay {
     const nearRecords: PageMountRecord[] = []
 
     for (const record of this.pageMounts.values()) {
-      if (
-        record.state !== 'evicted' ||
-        !record.placeholderNode?.isConnected
-      ) {
+      if (record.state !== 'evicted' || !record.placeholderNode?.isConnected) {
         continue
       }
 
@@ -583,7 +684,7 @@ export class ScrollDisplay {
     }
 
     return nearRecords.sort(
-      (left, right) => left.contentIndex - right.contentIndex
+      (left, right) => left.contentIndex - right.contentIndex,
     )
   }
 
@@ -606,7 +707,7 @@ export class ScrollDisplay {
         state: record.state,
         measuredHeight: record.measuredHeight,
         lastAccessedAt: record.lastAccessedAt,
-      }))
+      })),
     )
   }
 
@@ -614,7 +715,7 @@ export class ScrollDisplay {
     const record = this.setPageRecord(
       page.contentIndex,
       page.pageNumber,
-      'mounted'
+      'mounted',
     )
     record.node = node
     record.placeholderNode = null
@@ -626,7 +727,7 @@ export class ScrollDisplay {
   private setPageRecord(
     contentIndex: number,
     pageNumber: number,
-    state: PageMountState
+    state: PageMountState,
   ) {
     const existing = this.pageMounts.get(contentIndex)
     if (existing) {
@@ -668,19 +769,32 @@ export class ScrollDisplay {
     return this.accessCounter
   }
 
-  private mountPageEntry(page: RenderedPageInfo, insertPosition: InsertPosition) {
-    if (this.disposed) return renderPageNode(page, this.annotationsEnabled())
+  private mountPageEntry(
+    page: RenderedPageInfo,
+    insertPosition: InsertPosition,
+  ) {
+    if (this.disposed) {
+      return renderPageNode(page, this.annotationsEnabled(), this.presentation)
+    }
     const existing = this.pageMounts.get(page.contentIndex)
     if (existing?.state === 'mounted' && existing.node?.isConnected) {
       this.touchPageRecord(existing)
       return existing.node
     }
-    if (existing?.state === 'evicted' && existing.placeholderNode?.isConnected) {
+    if (
+      existing?.state === 'evicted' &&
+      existing.placeholderNode?.isConnected
+    ) {
       return this.mountEvictedPage(page, existing)
     }
 
-    const node = renderPageNode(page, this.annotationsEnabled())
+    const node = renderPageNode(
+      page,
+      this.annotationsEnabled(),
+      this.presentation,
+    )
     this.insertEntryNodeInOrder(page.contentIndex, node, insertPosition)
+    applyReaderPageLayout(node, this.presentation)
     this.renderedPages.set(page.contentIndex, node)
     this.renderedEntries.set(page.contentIndex, node)
     this.markPageMounted(page, node)
@@ -689,7 +803,7 @@ export class ScrollDisplay {
 
   private mountMessageEntry(
     message: RenderedMessageInfo,
-    fallbackInsertPosition: InsertPosition = 'beforeend'
+    fallbackInsertPosition: InsertPosition = 'beforeend',
   ) {
     const existing = this.renderedEntries.get(message.contentIndex)
     if (existing?.isConnected) return existing
@@ -699,7 +813,7 @@ export class ScrollDisplay {
     this.insertEntryNodeInOrder(
       message.contentIndex,
       node,
-      fallbackInsertPosition
+      fallbackInsertPosition,
     )
     this.renderedEntries.set(message.contentIndex, node)
     return node
@@ -708,7 +822,7 @@ export class ScrollDisplay {
   private insertEntryNodeInOrder(
     contentIndex: number,
     node: Element,
-    fallbackInsertPosition: InsertPosition = 'beforeend'
+    fallbackInsertPosition: InsertPosition = 'beforeend',
   ) {
     const nextNode = this.getNextKnownEntryDomNode(contentIndex)
     if (nextNode) {
@@ -737,9 +851,14 @@ export class ScrollDisplay {
   }
 
   private mountEvictedPage(page: RenderedPageInfo, record: PageMountRecord) {
-    const node = renderPageNode(page, this.annotationsEnabled())
+    const node = renderPageNode(
+      page,
+      this.annotationsEnabled(),
+      this.presentation,
+    )
     if (this.disposed) return node
     record.placeholderNode?.replaceWith(node)
+    applyReaderPageLayout(node, this.presentation)
     this.renderedPages.set(page.contentIndex, node)
     this.renderedEntries.set(page.contentIndex, node)
     this.markPageMounted(page, node)
@@ -751,13 +870,19 @@ export class ScrollDisplay {
   }
 }
 
-function renderPageNode(page: RenderedPageInfo, annotationsEnabled: boolean) {
+function renderPageNode(
+  page: RenderedPageInfo,
+  annotationsEnabled: boolean,
+  presentation: ReaderPagePresentation,
+) {
   const node = document.createElement('div')
   node.classList.add('tikkun-page')
   node.dataset.contentIndex = `${page.contentIndex}`
   node.tikkunPage = page
 
-  node.appendChild(htmlToElement(Page(page, { annotationsEnabled })))
+  node.appendChild(
+    htmlToElement(Page(page, { annotationsEnabled, presentation })),
+  )
 
   return node
 }
@@ -768,14 +893,14 @@ function distanceFromElement(node: Element, viewportCenter: number) {
     ? 0
     : Math.min(
         Math.abs(rect.top - viewportCenter),
-        Math.abs(rect.bottom - viewportCenter)
+        Math.abs(rect.bottom - viewportCenter),
       )
 }
 
 function renderPagePlaceholder(
   pageNumber: number,
   contentIndex: number,
-  height: number
+  height: number,
 ) {
   const node = document.createElement('div')
   node.className = 'tikkun-page-placeholder'
@@ -801,21 +926,28 @@ function renderMessageNode(entry: RenderedMessageInfo) {
 }
 
 function getFirstVisibleWord(line: HTMLElement) {
-  return [...line.querySelectorAll<HTMLElement>('.word')].find((word) => {
-    const rect = word.getBoundingClientRect()
-    return rect.width > 0 && rect.height > 0
-  }) ?? null
+  return (
+    [...line.querySelectorAll<HTMLElement>('.word')].find((word) => {
+      const rect = word.getBoundingClientRect()
+      return rect.width > 0 && rect.height > 0
+    }) ?? null
+  )
 }
 
 function getScrollPreservationAnchor(
-  root: HTMLElement
+  root: HTMLElement,
 ): ScrollPreservationAnchor | null {
-  const rootRect = root.getBoundingClientRect()
-  const focalY = rootRect.top + root.clientHeight / 2
+  const focalY = getReaderFocalPointClientY(root)
   let closestLine: HTMLElement | null = null
   let closestDistance = Number.POSITIVE_INFINITY
 
-  for (const line of root.querySelectorAll<HTMLElement>('[data-line-index]')) {
+  const words = [...root.querySelectorAll<HTMLElement>(
+    '[data-reader-canonical="true"] .word:not([hidden])',
+  )].filter(isVisibleElement)
+  const candidates = words.length ? words : root.querySelectorAll<HTMLElement>(
+    '[data-class="line"]',
+  )
+  for (const line of candidates) {
     const rect = line.getBoundingClientRect()
     const distance = Math.abs((rect.top + rect.bottom) / 2 - focalY)
     if (distance >= closestDistance) continue
@@ -825,7 +957,8 @@ function getScrollPreservationAnchor(
 
   if (!closestLine) return null
   const contentIndex = Number(
-    closestLine.closest<HTMLElement>('[data-content-index]')?.dataset.contentIndex
+    closestLine.closest<HTMLElement>('[data-content-index]')?.dataset
+      .contentIndex,
   )
   const pageNumber = Number(closestLine.dataset.pageNumber)
   const lineIndex = Number(closestLine.dataset.lineIndex)
@@ -837,18 +970,15 @@ function getScrollPreservationAnchor(
     return null
   }
 
-  const activeWord = [
-    ...closestLine.querySelectorAll<HTMLElement>('.word.is-active-word'),
-  ].find(isVisibleElement)
-  const target = activeWord ?? getFirstVisibleWord(closestLine) ?? closestLine
-  const alignment = target === closestLine ? 'top' : 'center'
+  const target = getFirstVisibleWord(closestLine) ?? closestLine
+  const alignment = target.matches('.word') ? 'center' : 'top'
   return {
     contentIndex,
     pageNumber,
     lineIndex,
     tokenKey: target.dataset.tokenKey ?? null,
     alignment,
-    viewportOffset: getViewportOffset(rootRect, target, alignment),
+    viewportOffset: getViewportOffset(root, target, alignment),
   }
 }
 
@@ -863,28 +993,21 @@ function restoreScrollPreservationAnchor(
     affectedContentIndex: number | null
     previousScrollHeight: number
     previousScrollTop: number
-  }
+  },
 ) {
   if (!anchor) return
   const entry = root.querySelector<HTMLElement>(
-    `[data-content-index="${anchor.contentIndex}"]`
+    `[data-content-index="${anchor.contentIndex}"]`,
   )
+  const matchingWord = findPreservedWord(root, anchor)
   const line = entry?.querySelector<HTMLElement>(
-    `[data-page-number="${anchor.pageNumber}"][data-line-index="${anchor.lineIndex}"]`
+    `[data-page-number="${anchor.pageNumber}"][data-line-index="${anchor.lineIndex}"]`,
   )
-  if (line) {
-    const matchingWord = anchor.tokenKey
-      ? [...line.querySelectorAll<HTMLElement>('.word')].find(
-          (word) =>
-            word.dataset.tokenKey === anchor.tokenKey &&
-            isVisibleElement(word)
-        ) ?? null
-      : null
-    const target = matchingWord ?? line
+  const target = matchingWord ?? line
+  if (target) {
     const alignment = matchingWord ? anchor.alignment : 'top'
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      const rootRect = root.getBoundingClientRect()
-      const currentOffset = getViewportOffset(rootRect, target, alignment)
+      const currentOffset = getViewportOffset(root, target, alignment)
       const correction = currentOffset - anchor.viewportOffset
       if (Math.abs(correction) <= 0.5) break
       root.scrollTop += correction
@@ -901,24 +1024,53 @@ function restoreScrollPreservationAnchor(
   }
 }
 
+function findPreservedWord(root: HTMLElement, anchor: ScrollPreservationAnchor) {
+  if (!anchor.tokenKey) return null
+  const entry = root.querySelector<HTMLElement>(
+    `[data-content-index="${anchor.contentIndex}"]`,
+  )
+  return [...(entry?.querySelectorAll<HTMLElement>(
+    '[data-reader-canonical="true"] .word',
+  ) ?? [])].find((word) => word.dataset.tokenKey === anchor.tokenKey && isVisibleElement(word)) ?? null
+}
+
 function isVisibleElement(element: HTMLElement) {
   const rect = element.getBoundingClientRect()
   return rect.width > 0 && rect.height > 0
 }
 
 function getViewportOffset(
-  rootRect: DOMRect,
+  root: HTMLElement,
   element: HTMLElement,
-  alignment: ScrollPreservationAnchor['alignment']
+  alignment: ScrollPreservationAnchor['alignment'],
 ) {
   const rect = element.getBoundingClientRect()
   const elementPosition =
     alignment === 'center' ? (rect.top + rect.bottom) / 2 : rect.top
-  return elementPosition - rootRect.top
+  return elementPosition - getReaderFocalPointClientY(root)
 }
 
 async function waitForDocumentFonts() {
   const fonts = document.fonts
   if (!fonts || fonts.status === 'loaded') return
   await fonts.ready
+}
+
+function readPagePresentation(root: HTMLElement): ReaderPagePresentation {
+  return {
+    layout: isReaderTextLayout(root.dataset.readerLayout)
+      ? root.dataset.readerLayout
+      : defaultReaderPagePresentation.layout,
+    sides: isReaderSideMode(root.dataset.readerSides)
+      ? root.dataset.readerSides
+      : defaultReaderPagePresentation.sides,
+  }
+}
+
+function applyPagePresentation(
+  root: HTMLElement,
+  presentation: ReaderPagePresentation,
+) {
+  root.dataset.readerLayout = presentation.layout
+  root.dataset.readerSides = presentation.sides
 }

@@ -145,6 +145,24 @@ test('finds Beresheet by its canonical route spelling', () => {
   expect(result?.englishLabel).toContain('Bereshit')
 })
 
+test('describes holiday and Megillah destinations with their English ranges', () => {
+  const model = buildParshaPickerModel(generator)
+  const holidayLabels = model.holidayColumns
+    .flat()
+    .map(({ englishLabel }) => englishLabel)
+
+  expect(holidayLabels).toContain('Purim (Shemot 17:8-16)')
+  expect(holidayLabels).toContain(
+    "Asara B'Tevet Mincha (Shemot 32:11-34:10)"
+  )
+  expect(
+    holidayLabels.some((label) => label.startsWith('Sukkot 1st day'))
+  ).toBe(true)
+  expect(model.megillot.map(({ englishLabel }) => englishLabel)).toContain(
+    'Purim (Esther 1:1-10:3)'
+  )
+})
+
 test('positions bottom-edge aliyah popup directly above the selected parsha', () => {
   expect(calculateAnchoredPopupPosition({
       triggerRect: { left: 900, top: 650, right: 1100, bottom: 690 },

@@ -12,7 +12,6 @@
 @import './toolbar.css' layer(shell);
 @import './reader-enhancements.css' layer(feature);
 @import './reader-navigation.css';
-@import './reader-settings.css';
 @import './mobile-reader.css' layer(responsive);
 @import './reader-player.css';
 

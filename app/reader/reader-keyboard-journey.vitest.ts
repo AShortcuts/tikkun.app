@@ -182,6 +182,11 @@ test('supports the critical Reader journey with only the keyboard', async () => 
   })
   await expect.element(settingsClose).toHaveFocus()
 
+  required<HTMLButtonElement>(
+    frameDocument,
+    '[data-settings-category="playback"]'
+  ).click()
+
   const autoScroll = appFrame.getByRole('checkbox', {
     name: /Auto-scroll with playback/,
   })

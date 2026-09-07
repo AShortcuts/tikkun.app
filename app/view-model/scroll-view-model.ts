@@ -142,6 +142,7 @@ export abstract class ScrollViewModel {
     lineNumber: number
   }>
   readonly resolver: Promise<ScrollResolver>
+  readonly initialTitle: string | undefined
 
   protected constructor(
     readonly generator: LeiningGenerator,
@@ -151,6 +152,12 @@ export abstract class ScrollViewModel {
     private readonly displayTitleByRunId: Record<string, string> = {},
     initialRunId?: string
   ) {
+    const initialRun = relevantRuns.find((run) => run.id === initialRunId)
+    // Page-number routes use a seed run, not the reading on that page.
+    this.initialTitle =
+      !('pageNumber' in initialRef) && initialRun
+        ? this.displayTitleForRun(initialRun)
+        : undefined
     this.resolver = loadScroll(initialRef.scroll)
     const startingInfo = this.loadAndConsumeScroll(initialRef, initialRunId)
     this.contentCursor = startingInfo.then(

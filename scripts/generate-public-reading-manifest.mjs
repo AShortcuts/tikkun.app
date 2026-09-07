@@ -243,15 +243,6 @@ export function createPublicAliyotByParsha({
   )
 }
 
-function isWordSyncReady(aliyot) {
-  return (
-    aliyot.length === 7 &&
-    aliyot.every(
-      (aliyah) => aliyah.audioId !== null && aliyah.cueStatus === 'cued'
-    )
-  )
-}
-
 export function validateRecordingWorkPlans({
   recordings,
   workRows,
@@ -284,27 +275,6 @@ export function validateRecordingWorkPlans({
     if (parshaSlug && !aliyot) {
       throw new Error(
         `Published audio for ${work.parshaEnglish} is missing from public reading manifest`
-      )
-    }
-
-    const hasAudio = aliyot?.some((aliyah) => aliyah.audioId !== null) ?? false
-    const wordSyncReady = aliyot ? isWordSyncReady(aliyot) : false
-    if (work.workStatus === 'Planned' && hasAudio) {
-      throw new Error(
-        `${work.parshaEnglish} is marked Planned but published audio exists`
-      )
-    }
-    if (work.workStatus === 'Needs review' && !hasAudio) {
-      throw new Error(
-        `${work.parshaEnglish} needs review but has no published audio`
-      )
-    }
-    if (
-      wordSyncReady &&
-      (work.workStatus === 'Active' || work.workStatus === 'Needs review')
-    ) {
-      throw new Error(
-        `${work.parshaEnglish} has active manual work but published cues are word-sync ready`
       )
     }
   }
