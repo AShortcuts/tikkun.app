@@ -753,7 +753,7 @@ export function createReaderPlayback(
       recordingSession.lookup(run, aliyahIndex),
     loadRecording,
     isTargetActive: (target) =>
-      isActivePlaybackTarget(audioController.session, target),
+      isActivePlaybackTarget(audioController.session, audioController.session?.passage ? { ...target, recordingId: null } : target),
     authorizePlayback(...recordings) {
       const recording = recordings.find(
         (candidate): candidate is AudioRecording =>

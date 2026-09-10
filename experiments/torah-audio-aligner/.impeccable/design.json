@@ -1,0 +1,473 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-09T19:31:27.517Z",
+  "title": "Design System: Torah Audio Aligner - Private beta",
+  "extensions": {
+    "colorMeta": {
+      "blue": {
+        "role": "primary",
+        "displayName": "Restrained Blue",
+        "tonalRamp": [
+          "oklch(15.00% 0.10776 249.89)",
+          "oklch(26.43% 0.10776 249.89)",
+          "oklch(37.86% 0.10776 249.89)",
+          "oklch(49.29% 0.10776 249.89)",
+          "oklch(60.71% 0.10776 249.89)",
+          "oklch(72.14% 0.10776 249.89)",
+          "oklch(83.57% 0.10776 249.89)",
+          "oklch(95.00% 0.10776 249.89)"
+        ]
+      },
+      "blue-soft": {
+        "role": "primary",
+        "displayName": "Soft Blue",
+        "tonalRamp": [
+          "oklch(15.00% 0.01946 240.74)",
+          "oklch(26.43% 0.01946 240.74)",
+          "oklch(37.86% 0.01946 240.74)",
+          "oklch(49.29% 0.01946 240.74)",
+          "oklch(60.71% 0.01946 240.74)",
+          "oklch(72.14% 0.01946 240.74)",
+          "oklch(83.57% 0.01946 240.74)",
+          "oklch(95.00% 0.01946 240.74)"
+        ]
+      },
+      "blue-hover": {
+        "role": "primary",
+        "displayName": "Blue Hover",
+        "tonalRamp": [
+          "oklch(15.00% 0.09506 248.50)",
+          "oklch(26.43% 0.09506 248.50)",
+          "oklch(37.86% 0.09506 248.50)",
+          "oklch(49.29% 0.09506 248.50)",
+          "oklch(60.71% 0.09506 248.50)",
+          "oklch(72.14% 0.09506 248.50)",
+          "oklch(83.57% 0.09506 248.50)",
+          "oklch(95.00% 0.09506 248.50)"
+        ]
+      },
+      "blue-active": {
+        "role": "primary",
+        "displayName": "Blue Press",
+        "tonalRamp": [
+          "oklch(15.00% 0.08396 250.44)",
+          "oklch(26.43% 0.08396 250.44)",
+          "oklch(37.86% 0.08396 250.44)",
+          "oklch(49.29% 0.08396 250.44)",
+          "oklch(60.71% 0.08396 250.44)",
+          "oklch(72.14% 0.08396 250.44)",
+          "oklch(83.57% 0.08396 250.44)",
+          "oklch(95.00% 0.08396 250.44)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Warm Paper",
+        "tonalRamp": [
+          "oklch(15.00% 0.00539 95.10)",
+          "oklch(26.43% 0.00539 95.10)",
+          "oklch(37.86% 0.00539 95.10)",
+          "oklch(49.29% 0.00539 95.10)",
+          "oklch(60.71% 0.00539 95.10)",
+          "oklch(72.14% 0.00539 95.10)",
+          "oklch(83.57% 0.00539 95.10)",
+          "oklch(95.00% 0.00539 95.10)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Tool Surface",
+        "tonalRamp": [
+          "oklch(15.00% 0.00673 97.35)",
+          "oklch(26.43% 0.00673 97.35)",
+          "oklch(37.86% 0.00673 97.35)",
+          "oklch(49.29% 0.00673 97.35)",
+          "oklch(60.71% 0.00673 97.35)",
+          "oklch(72.14% 0.00673 97.35)",
+          "oklch(83.57% 0.00673 97.35)",
+          "oklch(95.00% 0.00673 97.35)"
+        ]
+      },
+      "panel": {
+        "role": "neutral",
+        "displayName": "Light Panel",
+        "tonalRamp": [
+          "oklch(15.00% 0.00410 91.45)",
+          "oklch(26.43% 0.00410 91.45)",
+          "oklch(37.86% 0.00410 91.45)",
+          "oklch(49.29% 0.00410 91.45)",
+          "oklch(60.71% 0.00410 91.45)",
+          "oklch(72.14% 0.00410 91.45)",
+          "oklch(83.57% 0.00410 91.45)",
+          "oklch(95.00% 0.00410 91.45)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Dark Ink",
+        "tonalRamp": [
+          "oklch(15.00% 0.01442 226.55)",
+          "oklch(26.43% 0.01442 226.55)",
+          "oklch(37.86% 0.01442 226.55)",
+          "oklch(49.29% 0.01442 226.55)",
+          "oklch(60.71% 0.01442 226.55)",
+          "oklch(72.14% 0.01442 226.55)",
+          "oklch(83.57% 0.01442 226.55)",
+          "oklch(95.00% 0.01442 226.55)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted Ink",
+        "tonalRamp": [
+          "oklch(15.00% 0.01285 226.17)",
+          "oklch(26.43% 0.01285 226.17)",
+          "oklch(37.86% 0.01285 226.17)",
+          "oklch(49.29% 0.01285 226.17)",
+          "oklch(60.71% 0.01285 226.17)",
+          "oklch(72.14% 0.01285 226.17)",
+          "oklch(83.57% 0.01285 226.17)",
+          "oklch(95.00% 0.01285 226.17)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Divider Gray",
+        "tonalRamp": [
+          "oklch(15.00% 0.00582 128.53)",
+          "oklch(26.43% 0.00582 128.53)",
+          "oklch(37.86% 0.00582 128.53)",
+          "oklch(49.29% 0.00582 128.53)",
+          "oklch(60.71% 0.00582 128.53)",
+          "oklch(72.14% 0.00582 128.53)",
+          "oklch(83.57% 0.00582 128.53)",
+          "oklch(95.00% 0.00582 128.53)"
+        ]
+      },
+      "white": {
+        "role": "neutral",
+        "displayName": "White on Blue",
+        "tonalRamp": [
+          "oklch(15.00% 0.00000 0.00)",
+          "oklch(26.43% 0.00000 0.00)",
+          "oklch(37.86% 0.00000 0.00)",
+          "oklch(49.29% 0.00000 0.00)",
+          "oklch(60.71% 0.00000 0.00)",
+          "oklch(72.14% 0.00000 0.00)",
+          "oklch(83.57% 0.00000 0.00)",
+          "oklch(95.00% 0.00000 0.00)"
+        ]
+      },
+      "green": {
+        "role": "semantic",
+        "displayName": "Reviewed Timing",
+        "tonalRamp": [
+          "oklch(15.00% 0.08381 160.37)",
+          "oklch(26.43% 0.08381 160.37)",
+          "oklch(37.86% 0.08381 160.37)",
+          "oklch(49.29% 0.08381 160.37)",
+          "oklch(60.71% 0.08381 160.37)",
+          "oklch(72.14% 0.08381 160.37)",
+          "oklch(83.57% 0.08381 160.37)",
+          "oklch(95.00% 0.08381 160.37)"
+        ]
+      },
+      "amber": {
+        "role": "semantic",
+        "displayName": "Listening Uncertainty",
+        "tonalRamp": [
+          "oklch(15.00% 0.09467 65.94)",
+          "oklch(26.43% 0.09467 65.94)",
+          "oklch(37.86% 0.09467 65.94)",
+          "oklch(49.29% 0.09467 65.94)",
+          "oklch(60.71% 0.09467 65.94)",
+          "oklch(72.14% 0.09467 65.94)",
+          "oklch(83.57% 0.09467 65.94)",
+          "oklch(95.00% 0.09467 65.94)"
+        ]
+      },
+      "danger": {
+        "role": "semantic",
+        "displayName": "Removal Text",
+        "tonalRamp": [
+          "oklch(15.00% 0.13238 26.71)",
+          "oklch(26.43% 0.13238 26.71)",
+          "oklch(37.86% 0.13238 26.71)",
+          "oklch(49.29% 0.13238 26.71)",
+          "oklch(60.71% 0.13238 26.71)",
+          "oklch(72.14% 0.13238 26.71)",
+          "oklch(83.57% 0.13238 26.71)",
+          "oklch(95.00% 0.13238 26.71)"
+        ]
+      },
+      "error-surface": {
+        "role": "semantic",
+        "displayName": "Error Surface",
+        "tonalRamp": [
+          "oklch(15.00% 0.01899 29.55)",
+          "oklch(26.43% 0.01899 29.55)",
+          "oklch(37.86% 0.01899 29.55)",
+          "oklch(49.29% 0.01899 29.55)",
+          "oklch(60.71% 0.01899 29.55)",
+          "oklch(72.14% 0.01899 29.55)",
+          "oklch(83.57% 0.01899 29.55)",
+          "oklch(95.00% 0.01899 29.55)"
+        ]
+      },
+      "error-ink": {
+        "role": "semantic",
+        "displayName": "Error Ink",
+        "tonalRamp": [
+          "oklch(15.00% 0.11901 27.15)",
+          "oklch(26.43% 0.11901 27.15)",
+          "oklch(37.86% 0.11901 27.15)",
+          "oklch(49.29% 0.11901 27.15)",
+          "oklch(60.71% 0.11901 27.15)",
+          "oklch(72.14% 0.11901 27.15)",
+          "oklch(83.57% 0.11901 27.15)",
+          "oklch(95.00% 0.11901 27.15)"
+        ]
+      },
+      "disabled-surface": {
+        "role": "neutral",
+        "displayName": "Disabled Surface",
+        "tonalRamp": [
+          "oklch(15.00% 0.00542 117.93)",
+          "oklch(26.43% 0.00542 117.93)",
+          "oklch(37.86% 0.00542 117.93)",
+          "oklch(49.29% 0.00542 117.93)",
+          "oklch(60.71% 0.00542 117.93)",
+          "oklch(72.14% 0.00542 117.93)",
+          "oklch(83.57% 0.00542 117.93)",
+          "oklch(95.00% 0.00542 117.93)"
+        ]
+      },
+      "disabled-ink": {
+        "role": "neutral",
+        "displayName": "Disabled Ink",
+        "tonalRamp": [
+          "oklch(15.00% 0.01328 217.66)",
+          "oklch(26.43% 0.01328 217.66)",
+          "oklch(37.86% 0.01328 217.66)",
+          "oklch(49.29% 0.01328 217.66)",
+          "oklch(60.71% 0.01328 217.66)",
+          "oklch(72.14% 0.01328 217.66)",
+          "oklch(83.57% 0.01328 217.66)",
+          "oklch(95.00% 0.01328 217.66)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Application Heading",
+        "purpose": "Compact local Lora application title."
+      },
+      "headline": {
+        "displayName": "Passage and Review Headings",
+        "purpose": "Local Lora for passage, review, and batch queue titles."
+      },
+      "body": {
+        "displayName": "Operational Text",
+        "purpose": "Existing system sans-serif controls and text."
+      },
+      "label": {
+        "displayName": "Field Labels",
+        "purpose": "Compact explicit form labels."
+      },
+      "supporting": {
+        "displayName": "Supporting Copy",
+        "purpose": "Muted instructions and review context."
+      },
+      "compact-row": {
+        "displayName": "Recording Row Text",
+        "purpose": "Compact recording titles; saved queue titles use the observed semibold variant."
+      },
+      "compact-meta": {
+        "displayName": "Recording Metadata",
+        "purpose": "Muted library availability labels and mobile batch navigation status."
+      },
+      "hebrew": {
+        "displayName": "Hebrew Passage",
+        "purpose": "Local Stam for canonical annotated words."
+      }
+    },
+    "shadows": [
+      {
+        "name": "review-overlay",
+        "value": "-14px 8px 35px -30px #26344080",
+        "purpose": "Faint separation at the desktop review panel edge."
+      },
+      {
+        "name": "mobile-transport",
+        "value": "0 -10px 28px -25px #26344080",
+        "purpose": "Faint upward separation for sticky mobile playback."
+      }
+    ],
+    "motion": [
+      {
+        "name": "button-state",
+        "value": "background-color 150ms ease,color 150ms ease",
+        "purpose": "Brief hover and press color feedback."
+      },
+      {
+        "name": "passage-scroll",
+        "value": "smooth",
+        "purpose": "Passage scroll behavior; reduced-motion preference switches to auto."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "transition:none;scroll-behavior:auto",
+        "purpose": "Respect prefers-reduced-motion: reduce."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "mobile-max",
+        "value": "700px"
+      },
+      {
+        "name": "batch-stack-max",
+        "value": "900px"
+      },
+      {
+        "name": "compact-max",
+        "value": "980px"
+      },
+      {
+        "name": "wide-min",
+        "value": "1500px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Blue review, playback, and cue-draft actions.",
+      "html": "<button class=\"ds-primary\">Mark timing reviewed &amp; next</button>",
+      "css": ".ds-primary{font:550 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--ink,#252e32);min-height:36px;padding:7px 12px;border:1px solid var(--line,#d7d9d5);border-radius:7px;background:var(--panel,#fdfcf9);cursor:pointer;white-space:nowrap;transition:background-color 150ms ease,color 150ms ease;}.ds-primary:hover:not(:disabled){background:var(--surface,#f1f0eb);}.ds-primary:active:not(:disabled){background:var(--blue-soft,#dce9f3);}.ds-primary:disabled{color:#596366;background:#edeeea;cursor:not-allowed;}.ds-primary:focus-visible{outline:2px solid var(--blue,#245f96);outline-offset:3px;}@media(prefers-reduced-motion:reduce){.ds-primary{transition:none;}}.ds-primary{background:var(--blue,#245f96);color:white;border-color:var(--blue,#245f96);}.ds-primary:hover:not(:disabled){background:#174d7b;}.ds-primary:active:not(:disabled){background:#103b63;}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Conventional bordered action for saving, replay, and alignment.",
+      "html": "<button class=\"ds-secondary\">Replay word</button>",
+      "css": ".ds-secondary{font:550 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--ink,#252e32);min-height:36px;padding:7px 12px;border:1px solid var(--line,#d7d9d5);border-radius:7px;background:var(--panel,#fdfcf9);cursor:pointer;white-space:nowrap;transition:background-color 150ms ease,color 150ms ease;}.ds-secondary:hover:not(:disabled){background:var(--surface,#f1f0eb);}.ds-secondary:active:not(:disabled){background:var(--blue-soft,#dce9f3);}.ds-secondary:disabled{color:#596366;background:#edeeea;cursor:not-allowed;}.ds-secondary:focus-visible{outline:2px solid var(--blue,#245f96);outline-offset:3px;}@media(prefers-reduced-motion:reduce){.ds-secondary{transition:none;}}"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Low-emphasis undo, redo, close, and dismiss controls.",
+      "html": "<button class=\"ds-quiet\">Close</button>",
+      "css": ".ds-quiet{font:550 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--ink,#252e32);min-height:36px;padding:7px 12px;border:1px solid var(--line,#d7d9d5);border-radius:7px;background:var(--panel,#fdfcf9);cursor:pointer;white-space:nowrap;transition:background-color 150ms ease,color 150ms ease;}.ds-quiet:hover:not(:disabled){background:var(--surface,#f1f0eb);}.ds-quiet:active:not(:disabled){background:var(--blue-soft,#dce9f3);}.ds-quiet:disabled{color:#596366;background:#edeeea;cursor:not-allowed;}.ds-quiet:focus-visible{outline:2px solid var(--blue,#245f96);outline-offset:3px;}@media(prefers-reduced-motion:reduce){.ds-quiet{transition:none;}}.ds-quiet{border-color:transparent;background:transparent;}"
+    },
+    {
+      "name": "Text Button",
+      "kind": "button",
+      "refersTo": "button-text",
+      "description": "Compact contextual onset and correction action.",
+      "html": "<button class=\"ds-text\">Set onset at playhead</button>",
+      "css": ".ds-text{font:550 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--ink,#252e32);min-height:36px;padding:7px 12px;border:1px solid var(--line,#d7d9d5);border-radius:7px;background:var(--panel,#fdfcf9);cursor:pointer;white-space:nowrap;transition:background-color 150ms ease,color 150ms ease;}.ds-text:hover:not(:disabled){background:var(--surface,#f1f0eb);}.ds-text:active:not(:disabled){background:var(--blue-soft,#dce9f3);}.ds-text:disabled{color:#596366;background:#edeeea;cursor:not-allowed;}.ds-text:focus-visible{outline:2px solid var(--blue,#245f96);outline-offset:3px;}@media(prefers-reduced-motion:reduce){.ds-text{transition:none;}}.ds-text{border:0;background:transparent;min-height:32px;color:var(--blue,#245f96);font-size:12px;padding:5px 0;text-align:left;}"
+    },
+    {
+      "name": "Word Onset Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Numeric onset with paired 20 millisecond nudges.",
+      "html": "<div class=\"ds-timing\"><label class=\"ds-onset-label\" for=\"ds-onset\">Word onset <span class=\"ds-unit\">seconds</span></label><div class=\"ds-nudge\"><button class=\"ds-nudge-button\" aria-label=\"Move onset 20 milliseconds earlier\">−20 ms</button><input class=\"ds-onset\" id=\"ds-onset\" type=\"number\" min=\"0\" step=\"0.02\" inputmode=\"decimal\" value=\"1.420\"><button class=\"ds-nudge-button\" aria-label=\"Move onset 20 milliseconds later\">+20 ms</button></div></div>",
+      "css": ".ds-timing{max-width:420px;color:var(--ink,#252e32);}.ds-onset-label{display:block;margin-bottom:8px;font:600 12px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}.ds-unit{color:var(--muted,#5b6468);font-weight:400;margin-left:5px;}.ds-nudge{display:grid;grid-template-columns:63px minmax(0,1fr) 63px;gap:5px;}.ds-nudge-button{font:550 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--ink,#252e32);min-height:36px;padding:7px 12px;border:1px solid var(--line,#d7d9d5);border-radius:7px;background:var(--panel,#fdfcf9);cursor:pointer;white-space:nowrap;transition:background-color 150ms ease,color 150ms ease;}.ds-nudge-button:hover:not(:disabled){background:var(--surface,#f1f0eb);}.ds-nudge-button:active:not(:disabled){background:var(--blue-soft,#dce9f3);}.ds-nudge-button:disabled{color:#596366;background:#edeeea;cursor:not-allowed;}.ds-nudge-button:focus-visible{outline:2px solid var(--blue,#245f96);outline-offset:3px;}@media(prefers-reduced-motion:reduce){.ds-nudge-button{transition:none;}}.ds-nudge-button{font-size:11px;padding:7px 4px;}.ds-onset{font:400 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--ink,#252e32);padding:8px 10px;max-width:100%;min-width:0;border:1px solid var(--line,#d7d9d5);border-radius:7px;background:var(--panel,#fdfcf9);accent-color:var(--blue,#245f96);caret-color:var(--blue,#245f96);}.ds-onset:focus-visible{outline:2px solid var(--blue,#245f96);outline-offset:3px;}.ds-onset{text-align:center;font-weight:600;padding:8px 2px;font-variant-numeric:tabular-nums;}"
+    },
+    {
+      "name": "Word Navigation",
+      "kind": "nav",
+      "description": "Previous and Next controls surround the current occurrence count.",
+      "html": "<nav class=\"ds-word-nav\" aria-label=\"Word navigation\"><button class=\"ds-nav-button\" disabled>Previous</button><span class=\"ds-position\">1 / 144</span><button class=\"ds-nav-button\">Next</button></nav>",
+      "css": ".ds-word-nav{display:flex;align-items:center;justify-content:space-between;gap:6px;max-width:420px;}.ds-nav-button{font:550 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--ink,#252e32);min-height:36px;padding:7px 12px;border:1px solid var(--line,#d7d9d5);border-radius:7px;background:var(--panel,#fdfcf9);cursor:pointer;white-space:nowrap;transition:background-color 150ms ease,color 150ms ease;}.ds-nav-button:hover:not(:disabled){background:var(--surface,#f1f0eb);}.ds-nav-button:active:not(:disabled){background:var(--blue-soft,#dce9f3);}.ds-nav-button:disabled{color:#596366;background:#edeeea;cursor:not-allowed;}.ds-nav-button:focus-visible{outline:2px solid var(--blue,#245f96);outline-offset:3px;}@media(prefers-reduced-motion:reduce){.ds-nav-button{transition:none;}}.ds-nav-button{padding:6px 9px;font-size:11px;min-height:32px;}.ds-position{font:400 11px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--muted,#5b6468);font-variant-numeric:tabular-nums;}"
+    },
+    {
+      "name": "Private Beta Status",
+      "kind": "chip",
+      "description": "Existing compact status marker beside the application title.",
+      "html": "<span class=\"ds-beta\">Private beta</span>",
+      "css": ".ds-beta{font:400 11px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:inline-block;background:var(--surface,#f1f0eb);border-radius:5px;padding:5px 7px;color:var(--muted,#5b6468);white-space:nowrap;}"
+    },
+    {
+      "name": "Selected Hebrew Word",
+      "kind": "custom",
+      "refersTo": "word",
+      "description": "Actual annotated word with selected fill and timing-reviewed dot.",
+      "html": "<button class=\"ds-word ds-selected ds-reviewed\" lang=\"he\" dir=\"rtl\" aria-pressed=\"true\" aria-label=\"וַיְדַבֵּר, Numbers 8:1, occurrence 1, timing reviewed\">וַיְדַבֵּר</button>",
+      "css": "@font-face{font-family:Stam;src:url(/fonts/stam.ttf) format(\"truetype\");font-display:swap;}.ds-word{font:550 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--ink,#252e32);min-height:36px;padding:7px 12px;border:1px solid var(--line,#d7d9d5);border-radius:7px;background:var(--panel,#fdfcf9);cursor:pointer;white-space:nowrap;transition:background-color 150ms ease,color 150ms ease;}.ds-word:hover:not(:disabled){background:var(--surface,#f1f0eb);}.ds-word:active:not(:disabled){background:var(--blue-soft,#dce9f3);}.ds-word:disabled{color:#596366;background:#edeeea;cursor:not-allowed;}.ds-word:focus-visible{outline:2px solid var(--blue,#245f96);outline-offset:3px;}@media(prefers-reduced-motion:reduce){.ds-word{transition:none;}}.ds-word{font-family:Stam,serif;font-size:29px;font-weight:400;line-height:1.75;min-width:32px;min-height:48px;padding:1px 7px 3px;display:inline-block;background:transparent;border:1px solid transparent;border-radius:6px;position:relative;margin:0 1px 3px;white-space:normal;}.ds-word:hover:not(:disabled){background:#e9ece9;}.ds-word.ds-selected{border-color:var(--blue,#245f96);background:var(--blue-soft,#dce9f3);}.ds-word.ds-playing{background:var(--blue,#245f96);color:white;}.ds-reviewed:after{content:\"\";position:absolute;bottom:0;left:calc(50% - 2px);width:4px;height:4px;border-radius:50%;background:var(--green,#317253);}.ds-playing.ds-reviewed:after{background:white;}.ds-flagged:before{content:\"\";position:absolute;top:2px;right:2px;width:5px;height:5px;border-radius:50%;background:var(--amber,#825219);}"
+    },
+    {
+      "name": "Review Header and Error",
+      "kind": "custom",
+      "description": "Review keeps Close, playback, elapsed time, and recovery inside its visible header.",
+      "html": "<div class=\"ds-review-header\"><div class=\"ds-review-heading\"><h2 class=\"ds-review-title\">Review &amp; export</h2><button class=\"ds-review-close\">Close</button></div><div class=\"ds-review-transport\"><button class=\"ds-review-play\">Play audio</button><output class=\"ds-review-time\">0:00 / 3:52</output></div><div class=\"ds-review-error\" role=\"alert\"><p class=\"ds-error-copy\">Add a listening decision before resolving this flag.</p><div class=\"ds-recovery\"><button class=\"ds-recovery-button\">Download edits</button><button class=\"ds-review-dismiss\">Dismiss</button></div></div></div>",
+      "css": "@font-face{font-family:Lora;src:url(/fonts/lora.ttf) format(\"truetype\");font-display:swap;}.ds-review-header{color:var(--ink,#252e32);background:var(--panel,#fdfcf9);padding:16px 26px 12px;border-bottom:1px solid var(--line,#d7d9d5);}.ds-review-heading{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:12px;}.ds-review-title{margin:0;font:400 22px Lora,Georgia,serif;}.ds-review-transport{display:flex;align-items:center;justify-content:space-between;gap:12px;}.ds-review-time{font:400 12px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-variant-numeric:tabular-nums;color:var(--muted,#5b6468);}.ds-review-close{font:550 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--ink,#252e32);min-height:36px;padding:7px 12px;border:1px solid var(--line,#d7d9d5);border-radius:7px;background:var(--panel,#fdfcf9);cursor:pointer;white-space:nowrap;transition:background-color 150ms ease,color 150ms ease;}.ds-review-close:hover:not(:disabled){background:var(--surface,#f1f0eb);}.ds-review-close:active:not(:disabled){background:var(--blue-soft,#dce9f3);}.ds-review-close:disabled{color:#596366;background:#edeeea;cursor:not-allowed;}.ds-review-close:focus-visible{outline:2px solid var(--blue,#245f96);outline-offset:3px;}@media(prefers-reduced-motion:reduce){.ds-review-close{transition:none;}}.ds-review-close{border-color:transparent;background:transparent;}.ds-review-play{font:550 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--ink,#252e32);min-height:36px;padding:7px 12px;border:1px solid var(--line,#d7d9d5);border-radius:7px;background:var(--panel,#fdfcf9);cursor:pointer;white-space:nowrap;transition:background-color 150ms ease,color 150ms ease;}.ds-review-play:hover:not(:disabled){background:var(--surface,#f1f0eb);}.ds-review-play:active:not(:disabled){background:var(--blue-soft,#dce9f3);}.ds-review-play:disabled{color:#596366;background:#edeeea;cursor:not-allowed;}.ds-review-play:focus-visible{outline:2px solid var(--blue,#245f96);outline-offset:3px;}@media(prefers-reduced-motion:reduce){.ds-review-play{transition:none;}}.ds-review-play{background:var(--blue,#245f96);color:white;border-color:var(--blue,#245f96);}.ds-review-play:hover:not(:disabled){background:#174d7b;}.ds-review-play:active:not(:disabled){background:#103b63;}.ds-review-error{margin-top:12px;padding:12px;border-radius:7px;background:#fcebe8;color:#7c2722;font:400 12px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}.ds-error-copy{margin:0;}.ds-recovery{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}.ds-recovery-button{font:550 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--ink,#252e32);min-height:36px;padding:7px 12px;border:1px solid var(--line,#d7d9d5);border-radius:7px;background:var(--panel,#fdfcf9);cursor:pointer;white-space:nowrap;transition:background-color 150ms ease,color 150ms ease;}.ds-recovery-button:hover:not(:disabled){background:var(--surface,#f1f0eb);}.ds-recovery-button:active:not(:disabled){background:var(--blue-soft,#dce9f3);}.ds-recovery-button:disabled{color:#596366;background:#edeeea;cursor:not-allowed;}.ds-recovery-button:focus-visible{outline:2px solid var(--blue,#245f96);outline-offset:3px;}@media(prefers-reduced-motion:reduce){.ds-recovery-button{transition:none;}}.ds-review-dismiss{font:550 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--ink,#252e32);min-height:36px;padding:7px 12px;border:1px solid var(--line,#d7d9d5);border-radius:7px;background:var(--panel,#fdfcf9);cursor:pointer;white-space:nowrap;transition:background-color 150ms ease,color 150ms ease;}.ds-review-dismiss:hover:not(:disabled){background:var(--surface,#f1f0eb);}.ds-review-dismiss:active:not(:disabled){background:var(--blue-soft,#dce9f3);}.ds-review-dismiss:disabled{color:#596366;background:#edeeea;cursor:not-allowed;}.ds-review-dismiss:focus-visible{outline:2px solid var(--blue,#245f96);outline-offset:3px;}@media(prefers-reduced-motion:reduce){.ds-review-dismiss{transition:none;}}.ds-review-dismiss{border-color:transparent;background:transparent;}.ds-recovery-button,.ds-review-dismiss{color:#7c2722;}"
+    },
+    {
+      "name": "Batch Workspace Navigation",
+      "kind": "nav",
+      "description": "Pressed-state switches preserve context: Batch saves edits, pauses audio, and hides the recording row, save/undo/redo tools, passage, and playback.",
+      "html": "<nav class=\"ds-batch-navigation\" aria-label=\"Aligner workspace\"><button class=\"ds-batch-switch\" aria-pressed=\"false\">Review recording</button><button class=\"ds-batch-switch\" aria-pressed=\"true\">Batch &amp; review</button><span class=\"ds-batch-summary\" role=\"status\">Opening queue…</span></nav>",
+      "css": ".ds-batch-switch{font:550 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--ink,#252e32);min-height:36px;padding:7px 12px;border:1px solid var(--line,#d7d9d5);border-radius:7px;background:var(--panel,#fdfcf9);cursor:pointer;white-space:nowrap;transition:background-color 150ms ease,color 150ms ease;}.ds-batch-switch:hover:not(:disabled){background:var(--surface,#f1f0eb);}.ds-batch-switch:active:not(:disabled){background:var(--blue-soft,#dce9f3);}.ds-batch-switch:disabled{color:#596366;background:#edeeea;cursor:not-allowed;}.ds-batch-switch:focus-visible{outline:2px solid var(--blue,#245f96);outline-offset:3px;}@media(prefers-reduced-motion:reduce){.ds-batch-switch{transition:none;}}.ds-batch-navigation{display:flex;gap:8px;align-items:center;padding:8px 28px;border-bottom:1px solid var(--line,#d7d9d5);background:var(--paper,#faf9f5);color:var(--ink,#252e32);font:400 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}.ds-batch-switch{border-color:transparent;background:transparent;}.ds-batch-navigation .ds-batch-switch[aria-pressed=true]{color:var(--blue,#245f96);background:var(--blue-soft,#dce9f3);}.ds-batch-summary{margin-left:auto;font-size:12px;color:var(--muted,#5b6468);}@media(max-width:700px){.ds-batch-navigation{padding:8px 16px;flex-wrap:wrap;}.ds-batch-switch{flex:1;font-size:12px;}.ds-batch-summary{flex-basis:100%;margin-left:0;font-size:11px;}}"
+    },
+    {
+      "name": "Quick Review",
+      "kind": "custom",
+      "description": "Initially open inspector disclosure pairs pasuk replay with the next unreviewed word; full-width timing review and reading-flag actions retain explicit disabled states.",
+      "html": "<details class=\"ds-quick-details\" open><summary class=\"ds-quick-summary\">Quick review</summary><div class=\"ds-quick-review\"><div class=\"ds-quick-pair\"><button class=\"ds-quick-button\">Replay pasuk</button><button class=\"ds-quick-button\">Next unreviewed</button></div><button class=\"ds-quick-button\">Mark pasuk reviewed &amp; next</button><button class=\"ds-quick-button\" disabled>No remaining reading flags</button></div></details>",
+      "css": ".ds-quick-button{font:550 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--ink,#252e32);min-height:36px;padding:7px 12px;border:1px solid var(--line,#d7d9d5);border-radius:7px;background:var(--panel,#fdfcf9);cursor:pointer;white-space:nowrap;transition:background-color 150ms ease,color 150ms ease;}.ds-quick-button:hover:not(:disabled){background:var(--surface,#f1f0eb);}.ds-quick-button:active:not(:disabled){background:var(--blue-soft,#dce9f3);}.ds-quick-button:disabled{color:#596366;background:#edeeea;cursor:not-allowed;}.ds-quick-button:focus-visible{outline:2px solid var(--blue,#245f96);outline-offset:3px;}@media(prefers-reduced-motion:reduce){.ds-quick-button{transition:none;}}.ds-quick-details{border-top:1px solid var(--line,#d7d9d5);margin-top:16px;color:var(--ink,#252e32);}.ds-quick-summary{font:550 13px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;cursor:pointer;min-height:44px;padding:13px 0;}.ds-quick-summary:focus-visible{outline:2px solid var(--blue,#245f96);outline-offset:3px;}.ds-quick-review{display:grid;gap:8px;}.ds-quick-button{white-space:normal;font-size:12px;}.ds-quick-pair{display:grid;grid-template-columns:1fr 1fr;gap:8px;}"
+    },
+    {
+      "name": "Details Disclosure",
+      "kind": "custom",
+      "description": "Native disclosure progressively reveals optional correction controls.",
+      "html": "<details class=\"ds-details\"><summary class=\"ds-summary\">Word details &amp; corrections</summary><div class=\"ds-detail-body\"><label class=\"ds-note-label\" for=\"ds-note\">Review note</label><textarea class=\"ds-note\" id=\"ds-note\" rows=\"2\" maxlength=\"2000\" placeholder=\"What did you hear?\"></textarea></div></details>",
+      "css": ".ds-details{border-top:1px solid var(--line,#d7d9d5);margin-top:16px;color:var(--ink,#252e32);}.ds-summary{font:550 13px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;cursor:pointer;min-height:44px;padding:13px 0;}.ds-summary:focus-visible{outline:2px solid var(--blue,#245f96);outline-offset:3px;}.ds-detail-body{display:grid;gap:10px;padding:0 0 16px;}.ds-note-label{font:600 12px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}.ds-note{font:400 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--ink,#252e32);padding:8px 10px;max-width:100%;min-width:0;border:1px solid var(--line,#d7d9d5);border-radius:7px;background:var(--panel,#fdfcf9);accent-color:var(--blue,#245f96);caret-color:var(--blue,#245f96);}.ds-note:focus-visible{outline:2px solid var(--blue,#245f96);outline-offset:3px;}.ds-note{resize:vertical;}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Listen, locate, correct.",
+    "overview": "This private extension uses Tikkun's established visual world: warm paper, dark ink, restrained blue, local Lora headings, and local Stam Hebrew. The passage carries the visual emphasis; conventional authoring controls support listening and correction.\n\nOperate mode favors compact tools, visible review state, and progressively disclosed details. This document records the built private surfaces only; the surface contracts remain in `private-ui.brief.md` and `batch-ui.brief.md`, and product constraints remain in `PRODUCT.md`.",
+    "keyCharacteristics": [
+      "Warm, flat reading surfaces with restrained tool contrast.",
+      "Large RTL Hebrew paired with compact controls and tabular times.",
+      "Blue selection and playback, green timing review, amber uncertainty.",
+      "Persistent playback access and contextual error recovery."
+    ],
+    "rules": [
+      {
+        "name": "The State Meaning Rule",
+        "body": "Blue denotes selection or playback; green denotes timing reviewed; amber denotes uncertainty requiring listening.",
+        "section": "colors"
+      },
+      {
+        "name": "The Local Scroll Rule",
+        "body": "Advancing or following words scrolls the passage container, preserving the operator's document position.",
+        "section": "layout"
+      },
+      {
+        "name": "The Visible Recovery Rule",
+        "body": "Review keeps its own playback control and moves errors with Download edits and Dismiss into the visible panel.",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "Do preserve local Lora and Stam roles and readable Hebrew diacritics.",
+      "Do show uncertainty beside the word or review decision it affects.",
+      "Do retain visible focus, explicit disabled states, and playback access.",
+      "Do use disclosure sections for optional corrections and review settings."
+    ],
+    "donts": [
+      "Don't turn timing-reviewed green into pronunciation or taamim certification.",
+      "Don't move the whole document when advancing a word inside the passage.",
+      "Don't obscure errors or playback behind the mobile review dialog.",
+      "Don't promote this private extension's layout into a replacement public Tikkun identity."
+    ]
+  }
+}

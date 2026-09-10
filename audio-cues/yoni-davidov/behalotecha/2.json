@@ -4,13 +4,2190 @@
   "narratorId": "yoni-davidov",
   "readingId": "behalotecha",
   "aliyah": 2,
-  "tokenCount": 0,
-  "cueCount": 0,
-  "tokenizationVersion": "v1",
+  "tokenCount": 166,
+  "cueCount": 166,
+  "tokenizationVersion": "v2",
   "mediaIdentity": {
     "algorithm": "sha256",
     "digest": "0dfa68bce8936507d1058a93b5f8b0ebb216ffe7a976c232d943d52c27ab1195",
     "byteLength": 1856248
   },
-  "cues": []
+  "savedAt": "2026-09-09T23:19:24.382Z",
+  "issues": [],
+  "cues": [
+    {
+      "cueNumber": 1,
+      "timeStart": 0,
+      "pageNumber": 162,
+      "lineIndex": 34,
+      "fragmentIndex": 0,
+      "wordIndex": 3,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 2,
+      "timeStart": 1.692,
+      "pageNumber": 162,
+      "lineIndex": 34,
+      "fragmentIndex": 0,
+      "wordIndex": 4,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 3,
+      "timeStart": 2.392,
+      "pageNumber": 162,
+      "lineIndex": 34,
+      "fragmentIndex": 0,
+      "wordIndex": 5,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 4,
+      "timeStart": 4.652,
+      "pageNumber": 162,
+      "lineIndex": 34,
+      "fragmentIndex": 0,
+      "wordIndex": 6,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 5,
+      "timeStart": 5.932,
+      "pageNumber": 162,
+      "lineIndex": 34,
+      "fragmentIndex": 0,
+      "wordIndex": 7,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 6,
+      "timeStart": 6.112,
+      "pageNumber": 162,
+      "lineIndex": 35,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 7,
+      "timeStart": 6.432,
+      "pageNumber": 162,
+      "lineIndex": 35,
+      "fragmentIndex": 0,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 8,
+      "timeStart": 7.372,
+      "pageNumber": 162,
+      "lineIndex": 35,
+      "fragmentIndex": 0,
+      "wordIndex": 2,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 9,
+      "timeStart": 8.052,
+      "pageNumber": 162,
+      "lineIndex": 35,
+      "fragmentIndex": 0,
+      "wordIndex": 3,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 10,
+      "timeStart": 9.932,
+      "pageNumber": 162,
+      "lineIndex": 35,
+      "fragmentIndex": 0,
+      "wordIndex": 4,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 11,
+      "timeStart": 10.592,
+      "pageNumber": 162,
+      "lineIndex": 35,
+      "fragmentIndex": 0,
+      "wordIndex": 5,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 12,
+      "timeStart": 12.112,
+      "pageNumber": 162,
+      "lineIndex": 35,
+      "fragmentIndex": 0,
+      "wordIndex": 6,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 13,
+      "timeStart": 13.872,
+      "pageNumber": 162,
+      "lineIndex": 35,
+      "fragmentIndex": 0,
+      "wordIndex": 7,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 14,
+      "timeStart": 18.472,
+      "pageNumber": 162,
+      "lineIndex": 36,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 15,
+      "timeStart": 19.132,
+      "pageNumber": 162,
+      "lineIndex": 36,
+      "fragmentIndex": 0,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 16,
+      "timeStart": 19.772,
+      "pageNumber": 162,
+      "lineIndex": 36,
+      "fragmentIndex": 0,
+      "wordIndex": 2,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 17,
+      "timeStart": 20.452,
+      "pageNumber": 162,
+      "lineIndex": 36,
+      "fragmentIndex": 0,
+      "wordIndex": 3,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 18,
+      "timeStart": 21.572,
+      "pageNumber": 162,
+      "lineIndex": 36,
+      "fragmentIndex": 0,
+      "wordIndex": 4,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 19,
+      "timeStart": 22.572,
+      "pageNumber": 162,
+      "lineIndex": 36,
+      "fragmentIndex": 0,
+      "wordIndex": 5,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 20,
+      "timeStart": 22.872,
+      "pageNumber": 162,
+      "lineIndex": 36,
+      "fragmentIndex": 0,
+      "wordIndex": 6,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 21,
+      "timeStart": 24.072,
+      "pageNumber": 162,
+      "lineIndex": 36,
+      "fragmentIndex": 0,
+      "wordIndex": 7,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 22,
+      "timeStart": 28.232,
+      "pageNumber": 162,
+      "lineIndex": 37,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 23,
+      "timeStart": 30.812,
+      "pageNumber": 162,
+      "lineIndex": 37,
+      "fragmentIndex": 0,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 24,
+      "timeStart": 33.952,
+      "pageNumber": 162,
+      "lineIndex": 37,
+      "fragmentIndex": 0,
+      "wordIndex": 2,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 25,
+      "timeStart": 34.352,
+      "pageNumber": 162,
+      "lineIndex": 37,
+      "fragmentIndex": 0,
+      "wordIndex": 3,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 26,
+      "timeStart": 34.652,
+      "pageNumber": 162,
+      "lineIndex": 37,
+      "fragmentIndex": 0,
+      "wordIndex": 4,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 27,
+      "timeStart": 35.092,
+      "pageNumber": 162,
+      "lineIndex": 37,
+      "fragmentIndex": 0,
+      "wordIndex": 5,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 28,
+      "timeStart": 36.472,
+      "pageNumber": 162,
+      "lineIndex": 37,
+      "fragmentIndex": 0,
+      "wordIndex": 6,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 29,
+      "timeStart": 37.012,
+      "pageNumber": 162,
+      "lineIndex": 38,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 30,
+      "timeStart": 38.472,
+      "pageNumber": 162,
+      "lineIndex": 38,
+      "fragmentIndex": 0,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 31,
+      "timeStart": 40.052,
+      "pageNumber": 162,
+      "lineIndex": 38,
+      "fragmentIndex": 0,
+      "wordIndex": 2,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 32,
+      "timeStart": 40.272,
+      "pageNumber": 162,
+      "lineIndex": 38,
+      "fragmentIndex": 0,
+      "wordIndex": 3,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 33,
+      "timeStart": 40.672,
+      "pageNumber": 162,
+      "lineIndex": 38,
+      "fragmentIndex": 0,
+      "wordIndex": 4,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 34,
+      "timeStart": 41.352,
+      "pageNumber": 162,
+      "lineIndex": 38,
+      "fragmentIndex": 0,
+      "wordIndex": 5,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 35,
+      "timeStart": 41.712,
+      "pageNumber": 162,
+      "lineIndex": 38,
+      "fragmentIndex": 0,
+      "wordIndex": 6,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 36,
+      "timeStart": 43.412,
+      "pageNumber": 162,
+      "lineIndex": 38,
+      "fragmentIndex": 0,
+      "wordIndex": 7,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 37,
+      "timeStart": 44.672,
+      "pageNumber": 162,
+      "lineIndex": 39,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 38,
+      "timeStart": 46.092,
+      "pageNumber": 162,
+      "lineIndex": 39,
+      "fragmentIndex": 0,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 39,
+      "timeStart": 49.032,
+      "pageNumber": 162,
+      "lineIndex": 39,
+      "fragmentIndex": 0,
+      "wordIndex": 2,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 40,
+      "timeStart": 49.712,
+      "pageNumber": 162,
+      "lineIndex": 39,
+      "fragmentIndex": 0,
+      "wordIndex": 3,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 41,
+      "timeStart": 50.352,
+      "pageNumber": 162,
+      "lineIndex": 39,
+      "fragmentIndex": 0,
+      "wordIndex": 4,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 42,
+      "timeStart": 50.772,
+      "pageNumber": 162,
+      "lineIndex": 39,
+      "fragmentIndex": 0,
+      "wordIndex": 5,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 43,
+      "timeStart": 52.712,
+      "pageNumber": 162,
+      "lineIndex": 40,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 44,
+      "timeStart": 53.372,
+      "pageNumber": 162,
+      "lineIndex": 40,
+      "fragmentIndex": 0,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 45,
+      "timeStart": 54.412,
+      "pageNumber": 162,
+      "lineIndex": 40,
+      "fragmentIndex": 0,
+      "wordIndex": 2,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 46,
+      "timeStart": 56.072,
+      "pageNumber": 162,
+      "lineIndex": 40,
+      "fragmentIndex": 0,
+      "wordIndex": 3,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 47,
+      "timeStart": 57.752,
+      "pageNumber": 162,
+      "lineIndex": 40,
+      "fragmentIndex": 0,
+      "wordIndex": 4,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 48,
+      "timeStart": 59.072,
+      "pageNumber": 162,
+      "lineIndex": 40,
+      "fragmentIndex": 0,
+      "wordIndex": 5,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 49,
+      "timeStart": 59.572,
+      "pageNumber": 162,
+      "lineIndex": 40,
+      "fragmentIndex": 0,
+      "wordIndex": 6,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 50,
+      "timeStart": 60.712,
+      "pageNumber": 162,
+      "lineIndex": 41,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 51,
+      "timeStart": 61.072,
+      "pageNumber": 162,
+      "lineIndex": 41,
+      "fragmentIndex": 0,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 52,
+      "timeStart": 62.772,
+      "pageNumber": 162,
+      "lineIndex": 41,
+      "fragmentIndex": 0,
+      "wordIndex": 2,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 53,
+      "timeStart": 65.952,
+      "pageNumber": 162,
+      "lineIndex": 41,
+      "fragmentIndex": 0,
+      "wordIndex": 3,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 54,
+      "timeStart": 69.252,
+      "pageNumber": 162,
+      "lineIndex": 41,
+      "fragmentIndex": 0,
+      "wordIndex": 4,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 55,
+      "timeStart": 70.452,
+      "pageNumber": 162,
+      "lineIndex": 41,
+      "fragmentIndex": 0,
+      "wordIndex": 5,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 56,
+      "timeStart": 71.012,
+      "pageNumber": 163,
+      "lineIndex": 0,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 57,
+      "timeStart": 73.632,
+      "pageNumber": 163,
+      "lineIndex": 0,
+      "fragmentIndex": 0,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 58,
+      "timeStart": 77.972,
+      "pageNumber": 163,
+      "lineIndex": 0,
+      "fragmentIndex": 0,
+      "wordIndex": 2,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 59,
+      "timeStart": 78.272,
+      "pageNumber": 163,
+      "lineIndex": 0,
+      "fragmentIndex": 0,
+      "wordIndex": 3,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 60,
+      "timeStart": 79.452,
+      "pageNumber": 163,
+      "lineIndex": 0,
+      "fragmentIndex": 0,
+      "wordIndex": 4,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 61,
+      "timeStart": 84.392,
+      "pageNumber": 163,
+      "lineIndex": 0,
+      "fragmentIndex": 0,
+      "wordIndex": 5,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 62,
+      "timeStart": 85.312,
+      "pageNumber": 163,
+      "lineIndex": 0,
+      "fragmentIndex": 0,
+      "wordIndex": 6,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 63,
+      "timeStart": 85.652,
+      "pageNumber": 163,
+      "lineIndex": 1,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 64,
+      "timeStart": 86.232,
+      "pageNumber": 163,
+      "lineIndex": 1,
+      "fragmentIndex": 0,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 65,
+      "timeStart": 86.792,
+      "pageNumber": 163,
+      "lineIndex": 1,
+      "fragmentIndex": 0,
+      "wordIndex": 2,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 66,
+      "timeStart": 89.292,
+      "pageNumber": 163,
+      "lineIndex": 1,
+      "fragmentIndex": 0,
+      "wordIndex": 3,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 67,
+      "timeStart": 90.412,
+      "pageNumber": 163,
+      "lineIndex": 1,
+      "fragmentIndex": 0,
+      "wordIndex": 4,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 68,
+      "timeStart": 90.812,
+      "pageNumber": 163,
+      "lineIndex": 1,
+      "fragmentIndex": 0,
+      "wordIndex": 5,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 69,
+      "timeStart": 91.772,
+      "pageNumber": 163,
+      "lineIndex": 1,
+      "fragmentIndex": 0,
+      "wordIndex": 6,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 70,
+      "timeStart": 93.252,
+      "pageNumber": 163,
+      "lineIndex": 2,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": [
+          {
+            "id": "f40ea3ce029d284d:event:0",
+            "kind": "ambiguous_repeated_prefix",
+            "message": "Possible restart or rearticulation. Listen to the word and its lead-in.",
+            "status": "reviewed",
+            "sourceTime": 93.48
+          }
+        ]
+      }
+    },
+    {
+      "cueNumber": 71,
+      "timeStart": 96.215,
+      "pageNumber": 163,
+      "lineIndex": 2,
+      "fragmentIndex": 0,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "pending",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 72,
+      "timeStart": 96.572,
+      "pageNumber": 163,
+      "lineIndex": 2,
+      "fragmentIndex": 0,
+      "wordIndex": 2,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 73,
+      "timeStart": 97.312,
+      "pageNumber": 163,
+      "lineIndex": 2,
+      "fragmentIndex": 0,
+      "wordIndex": 3,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 74,
+      "timeStart": 98.612,
+      "pageNumber": 163,
+      "lineIndex": 2,
+      "fragmentIndex": 0,
+      "wordIndex": 4,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 75,
+      "timeStart": 99.192,
+      "pageNumber": 163,
+      "lineIndex": 2,
+      "fragmentIndex": 0,
+      "wordIndex": 5,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 76,
+      "timeStart": 101.712,
+      "pageNumber": 163,
+      "lineIndex": 2,
+      "fragmentIndex": 0,
+      "wordIndex": 6,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 77,
+      "timeStart": 101.952,
+      "pageNumber": 163,
+      "lineIndex": 3,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 78,
+      "timeStart": 103.532,
+      "pageNumber": 163,
+      "lineIndex": 3,
+      "fragmentIndex": 0,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 79,
+      "timeStart": 104.072,
+      "pageNumber": 163,
+      "lineIndex": 3,
+      "fragmentIndex": 0,
+      "wordIndex": 2,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 80,
+      "timeStart": 105.452,
+      "pageNumber": 163,
+      "lineIndex": 3,
+      "fragmentIndex": 0,
+      "wordIndex": 3,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 81,
+      "timeStart": 106.792,
+      "pageNumber": 163,
+      "lineIndex": 3,
+      "fragmentIndex": 0,
+      "wordIndex": 4,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 82,
+      "timeStart": 107.432,
+      "pageNumber": 163,
+      "lineIndex": 3,
+      "fragmentIndex": 0,
+      "wordIndex": 5,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 83,
+      "timeStart": 108.812,
+      "pageNumber": 163,
+      "lineIndex": 4,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 84,
+      "timeStart": 109.832,
+      "pageNumber": 163,
+      "lineIndex": 4,
+      "fragmentIndex": 0,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 85,
+      "timeStart": 114.712,
+      "pageNumber": 163,
+      "lineIndex": 4,
+      "fragmentIndex": 0,
+      "wordIndex": 2,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 86,
+      "timeStart": 115.672,
+      "pageNumber": 163,
+      "lineIndex": 4,
+      "fragmentIndex": 0,
+      "wordIndex": 3,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 87,
+      "timeStart": 115.972,
+      "pageNumber": 163,
+      "lineIndex": 4,
+      "fragmentIndex": 0,
+      "wordIndex": 4,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 88,
+      "timeStart": 116.632,
+      "pageNumber": 163,
+      "lineIndex": 4,
+      "fragmentIndex": 0,
+      "wordIndex": 5,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 89,
+      "timeStart": 118.332,
+      "pageNumber": 163,
+      "lineIndex": 4,
+      "fragmentIndex": 0,
+      "wordIndex": 6,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 90,
+      "timeStart": 118.632,
+      "pageNumber": 163,
+      "lineIndex": 5,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 91,
+      "timeStart": 118.932,
+      "pageNumber": 163,
+      "lineIndex": 5,
+      "fragmentIndex": 0,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 92,
+      "timeStart": 119.912,
+      "pageNumber": 163,
+      "lineIndex": 5,
+      "fragmentIndex": 0,
+      "wordIndex": 2,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 93,
+      "timeStart": 120.212,
+      "pageNumber": 163,
+      "lineIndex": 5,
+      "fragmentIndex": 0,
+      "wordIndex": 3,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 94,
+      "timeStart": 122.392,
+      "pageNumber": 163,
+      "lineIndex": 5,
+      "fragmentIndex": 0,
+      "wordIndex": 4,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 95,
+      "timeStart": 123.172,
+      "pageNumber": 163,
+      "lineIndex": 5,
+      "fragmentIndex": 0,
+      "wordIndex": 5,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 96,
+      "timeStart": 126.792,
+      "pageNumber": 163,
+      "lineIndex": 5,
+      "fragmentIndex": 0,
+      "wordIndex": 6,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 97,
+      "timeStart": 127.592,
+      "pageNumber": 163,
+      "lineIndex": 6,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 98,
+      "timeStart": 129.192,
+      "pageNumber": 163,
+      "lineIndex": 6,
+      "fragmentIndex": 0,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 99,
+      "timeStart": 129.892,
+      "pageNumber": 163,
+      "lineIndex": 6,
+      "fragmentIndex": 0,
+      "wordIndex": 2,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 100,
+      "timeStart": 130.292,
+      "pageNumber": 163,
+      "lineIndex": 6,
+      "fragmentIndex": 0,
+      "wordIndex": 3,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 101,
+      "timeStart": 131.312,
+      "pageNumber": 163,
+      "lineIndex": 6,
+      "fragmentIndex": 0,
+      "wordIndex": 4,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 102,
+      "timeStart": 132.712,
+      "pageNumber": 163,
+      "lineIndex": 6,
+      "fragmentIndex": 0,
+      "wordIndex": 5,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 103,
+      "timeStart": 133.092,
+      "pageNumber": 163,
+      "lineIndex": 6,
+      "fragmentIndex": 0,
+      "wordIndex": 6,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 104,
+      "timeStart": 133.972,
+      "pageNumber": 163,
+      "lineIndex": 6,
+      "fragmentIndex": 0,
+      "wordIndex": 7,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 105,
+      "timeStart": 135.292,
+      "pageNumber": 163,
+      "lineIndex": 7,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 106,
+      "timeStart": 136.532,
+      "pageNumber": 163,
+      "lineIndex": 7,
+      "fragmentIndex": 0,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 107,
+      "timeStart": 138.072,
+      "pageNumber": 163,
+      "lineIndex": 7,
+      "fragmentIndex": 0,
+      "wordIndex": 2,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 108,
+      "timeStart": 139.952,
+      "pageNumber": 163,
+      "lineIndex": 7,
+      "fragmentIndex": 0,
+      "wordIndex": 3,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 109,
+      "timeStart": 145.412,
+      "pageNumber": 163,
+      "lineIndex": 7,
+      "fragmentIndex": 0,
+      "wordIndex": 4,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 110,
+      "timeStart": 145.832,
+      "pageNumber": 163,
+      "lineIndex": 7,
+      "fragmentIndex": 0,
+      "wordIndex": 5,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 111,
+      "timeStart": 149.232,
+      "pageNumber": 163,
+      "lineIndex": 7,
+      "fragmentIndex": 0,
+      "wordIndex": 6,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 112,
+      "timeStart": 149.892,
+      "pageNumber": 163,
+      "lineIndex": 8,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 113,
+      "timeStart": 150.712,
+      "pageNumber": 163,
+      "lineIndex": 8,
+      "fragmentIndex": 0,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 114,
+      "timeStart": 151.212,
+      "pageNumber": 163,
+      "lineIndex": 8,
+      "fragmentIndex": 0,
+      "wordIndex": 2,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 115,
+      "timeStart": 152.532,
+      "pageNumber": 163,
+      "lineIndex": 8,
+      "fragmentIndex": 0,
+      "wordIndex": 3,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 116,
+      "timeStart": 152.892,
+      "pageNumber": 163,
+      "lineIndex": 8,
+      "fragmentIndex": 0,
+      "wordIndex": 4,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 117,
+      "timeStart": 154.112,
+      "pageNumber": 163,
+      "lineIndex": 8,
+      "fragmentIndex": 0,
+      "wordIndex": 5,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 118,
+      "timeStart": 154.612,
+      "pageNumber": 163,
+      "lineIndex": 8,
+      "fragmentIndex": 0,
+      "wordIndex": 6,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 119,
+      "timeStart": 155.572,
+      "pageNumber": 163,
+      "lineIndex": 9,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 120,
+      "timeStart": 158.992,
+      "pageNumber": 163,
+      "lineIndex": 9,
+      "fragmentIndex": 0,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 121,
+      "timeStart": 159.412,
+      "pageNumber": 163,
+      "lineIndex": 9,
+      "fragmentIndex": 0,
+      "wordIndex": 2,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 122,
+      "timeStart": 159.752,
+      "pageNumber": 163,
+      "lineIndex": 9,
+      "fragmentIndex": 0,
+      "wordIndex": 3,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 123,
+      "timeStart": 160.593,
+      "pageNumber": 163,
+      "lineIndex": 9,
+      "fragmentIndex": 0,
+      "wordIndex": 4,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 124,
+      "timeStart": 163.312,
+      "pageNumber": 163,
+      "lineIndex": 9,
+      "fragmentIndex": 0,
+      "wordIndex": 5,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 125,
+      "timeStart": 164.932,
+      "pageNumber": 163,
+      "lineIndex": 9,
+      "fragmentIndex": 0,
+      "wordIndex": 6,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 126,
+      "timeStart": 165.412,
+      "pageNumber": 163,
+      "lineIndex": 10,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 127,
+      "timeStart": 166.432,
+      "pageNumber": 163,
+      "lineIndex": 10,
+      "fragmentIndex": 1,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 128,
+      "timeStart": 167.072,
+      "pageNumber": 163,
+      "lineIndex": 10,
+      "fragmentIndex": 1,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 129,
+      "timeStart": 169.052,
+      "pageNumber": 163,
+      "lineIndex": 10,
+      "fragmentIndex": 1,
+      "wordIndex": 2,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 130,
+      "timeStart": 169.732,
+      "pageNumber": 163,
+      "lineIndex": 11,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 131,
+      "timeStart": 170.812,
+      "pageNumber": 163,
+      "lineIndex": 11,
+      "fragmentIndex": 0,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 132,
+      "timeStart": 172.032,
+      "pageNumber": 163,
+      "lineIndex": 11,
+      "fragmentIndex": 0,
+      "wordIndex": 2,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 133,
+      "timeStart": 172.452,
+      "pageNumber": 163,
+      "lineIndex": 11,
+      "fragmentIndex": 0,
+      "wordIndex": 3,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 134,
+      "timeStart": 173.512,
+      "pageNumber": 163,
+      "lineIndex": 11,
+      "fragmentIndex": 0,
+      "wordIndex": 4,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 135,
+      "timeStart": 177.352,
+      "pageNumber": 163,
+      "lineIndex": 11,
+      "fragmentIndex": 0,
+      "wordIndex": 5,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 136,
+      "timeStart": 177.772,
+      "pageNumber": 163,
+      "lineIndex": 11,
+      "fragmentIndex": 0,
+      "wordIndex": 6,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 137,
+      "timeStart": 178.332,
+      "pageNumber": 163,
+      "lineIndex": 12,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 138,
+      "timeStart": 178.692,
+      "pageNumber": 163,
+      "lineIndex": 12,
+      "fragmentIndex": 0,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 139,
+      "timeStart": 180.432,
+      "pageNumber": 163,
+      "lineIndex": 12,
+      "fragmentIndex": 0,
+      "wordIndex": 2,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 140,
+      "timeStart": 180.912,
+      "pageNumber": 163,
+      "lineIndex": 12,
+      "fragmentIndex": 0,
+      "wordIndex": 3,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 141,
+      "timeStart": 181.392,
+      "pageNumber": 163,
+      "lineIndex": 12,
+      "fragmentIndex": 0,
+      "wordIndex": 4,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 142,
+      "timeStart": 182.712,
+      "pageNumber": 163,
+      "lineIndex": 12,
+      "fragmentIndex": 0,
+      "wordIndex": 5,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 143,
+      "timeStart": 184.832,
+      "pageNumber": 163,
+      "lineIndex": 12,
+      "fragmentIndex": 0,
+      "wordIndex": 6,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 144,
+      "timeStart": 185.232,
+      "pageNumber": 163,
+      "lineIndex": 13,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 145,
+      "timeStart": 186.252,
+      "pageNumber": 163,
+      "lineIndex": 13,
+      "fragmentIndex": 0,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": [
+          {
+            "id": "f40ea3ce029d284d:event:1",
+            "kind": "uncertain_region_anchor",
+            "message": "The boundary between alignment regions needs timing review.",
+            "status": "reviewed",
+            "sourceTime": 186.44
+          }
+        ]
+      }
+    },
+    {
+      "cueNumber": 146,
+      "timeStart": 186.632,
+      "pageNumber": 163,
+      "lineIndex": 13,
+      "fragmentIndex": 0,
+      "wordIndex": 2,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 147,
+      "timeStart": 187.072,
+      "pageNumber": 163,
+      "lineIndex": 13,
+      "fragmentIndex": 0,
+      "wordIndex": 3,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 148,
+      "timeStart": 188.272,
+      "pageNumber": 163,
+      "lineIndex": 13,
+      "fragmentIndex": 0,
+      "wordIndex": 4,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 149,
+      "timeStart": 189.672,
+      "pageNumber": 163,
+      "lineIndex": 13,
+      "fragmentIndex": 0,
+      "wordIndex": 5,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 150,
+      "timeStart": 190.252,
+      "pageNumber": 163,
+      "lineIndex": 13,
+      "fragmentIndex": 0,
+      "wordIndex": 6,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 151,
+      "timeStart": 191.312,
+      "pageNumber": 163,
+      "lineIndex": 14,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 152,
+      "timeStart": 191.592,
+      "pageNumber": 163,
+      "lineIndex": 14,
+      "fragmentIndex": 0,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 153,
+      "timeStart": 193.512,
+      "pageNumber": 163,
+      "lineIndex": 14,
+      "fragmentIndex": 0,
+      "wordIndex": 2,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 154,
+      "timeStart": 195.352,
+      "pageNumber": 163,
+      "lineIndex": 14,
+      "fragmentIndex": 0,
+      "wordIndex": 3,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 155,
+      "timeStart": 198.392,
+      "pageNumber": 163,
+      "lineIndex": 14,
+      "fragmentIndex": 0,
+      "wordIndex": 4,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 156,
+      "timeStart": 201.692,
+      "pageNumber": 163,
+      "lineIndex": 14,
+      "fragmentIndex": 0,
+      "wordIndex": 5,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 157,
+      "timeStart": 202.252,
+      "pageNumber": 163,
+      "lineIndex": 14,
+      "fragmentIndex": 0,
+      "wordIndex": 6,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 158,
+      "timeStart": 202.532,
+      "pageNumber": 163,
+      "lineIndex": 15,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 159,
+      "timeStart": 202.972,
+      "pageNumber": 163,
+      "lineIndex": 15,
+      "fragmentIndex": 0,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 160,
+      "timeStart": 204.692,
+      "pageNumber": 163,
+      "lineIndex": 15,
+      "fragmentIndex": 0,
+      "wordIndex": 2,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 161,
+      "timeStart": 205.892,
+      "pageNumber": 163,
+      "lineIndex": 15,
+      "fragmentIndex": 0,
+      "wordIndex": 3,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 162,
+      "timeStart": 206.032,
+      "pageNumber": 163,
+      "lineIndex": 15,
+      "fragmentIndex": 0,
+      "wordIndex": 4,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 163,
+      "timeStart": 207.112,
+      "pageNumber": 163,
+      "lineIndex": 15,
+      "fragmentIndex": 0,
+      "wordIndex": 5,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 164,
+      "timeStart": 208.172,
+      "pageNumber": 163,
+      "lineIndex": 15,
+      "fragmentIndex": 0,
+      "wordIndex": 6,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 165,
+      "timeStart": 209.152,
+      "pageNumber": 163,
+      "lineIndex": 16,
+      "fragmentIndex": 0,
+      "wordIndex": 0,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    },
+    {
+      "cueNumber": 166,
+      "timeStart": 213.432,
+      "pageNumber": 163,
+      "lineIndex": 16,
+      "fragmentIndex": 0,
+      "wordIndex": 1,
+      "review": {
+        "source": "torah-audio-aligner",
+        "status": "reviewed",
+        "flags": []
+      }
+    }
+  ]
 }

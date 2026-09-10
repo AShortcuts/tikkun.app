@@ -1,3 +1,4 @@
+import type { PassageAudioState } from '../passage-audio.ts'
 import {
   LeiningRunType,
   type LeiningAliyah,
@@ -30,6 +31,7 @@ export type AliyahNavigationItem = Readonly<{
   compactLabel: string
   audioKey: string | null
   recordingKey: string | null
+  audioState?: PassageAudioState
 }>
 
 export type AliyahNavigationPlayback = Readonly<{
@@ -71,6 +73,10 @@ export function aliyahNavigationEntryKey({
   return `${run.id}:${aliyah.index}`
 }
 
+export function aliyahNavigationItemResourceKey(item: AliyahNavigationItem) {
+  return `${item.key}:${item.audioKey ?? ''}:${item.recordingKey ?? ''}:${item.audioState ? 'passage' : 'recording'}:${item.audioState?.problem ?? ''}:${item.audioState?.issue ?? ''}:${item.audioState?.canPlay ?? ''}`
+}
+
 export function getAliyahNavigationEntriesForRun(
   currentRun: LeiningRun
 ): AliyahNavigationEntry[] {
@@ -101,6 +107,7 @@ export function createAliyahNavigationSnapshot({
   getAudio: (entry: AliyahNavigationEntry) => Readonly<{
     playbackKey: string | null
     recordingKey: string | null
+  audioState?: PassageAudioState
   }>
 }): AliyahNavigationSnapshot {
   const items = entries.map((entry): AliyahNavigationItem => {
@@ -114,13 +121,11 @@ export function createAliyahNavigationSnapshot({
       compactLabel: aliyah.index === 'Maftir' ? 'M' : `${aliyah.index}`,
       audioKey: audio.playbackKey,
       recordingKey: audio.recordingKey,
+      audioState: audio.audioState,
     }
   })
   const itemSignature = items
-    .map(
-      (item) =>
-        `${item.key}:${item.audioKey ?? ''}:${item.recordingKey ?? ''}`
-    )
+    .map(aliyahNavigationItemResourceKey)
     .join('|')
 
   return {

@@ -592,6 +592,20 @@ function assertReaderLayout(document: Document, view: Window, context: string) {
       false
     )
     expect(isRendered(view, settings), `${context} desktop Settings control`).toBe(true)
+
+    const bookmarkIcon = required<SVGElement>(bookmark, '.ui-icon')
+    const settingsIcon = required<SVGElement>(settings, '.ui-icon')
+    expect(bookmarkIcon.getBoundingClientRect().width, `${context} Bookmark icon size`)
+      .toBe(settingsIcon.getBoundingClientRect().width)
+    const about = required<HTMLButtonElement>(document, '[data-target-id="about-link"]')
+    expect(view.getComputedStyle(about).fontSize, `${context} About text size`).toBe('16px')
+    const aboutText = document.createRange()
+    aboutText.selectNodeContents(about)
+    expect(
+      Math.abs(aboutText.getBoundingClientRect().left +
+        settingsIcon.getBoundingClientRect().right - view.innerWidth),
+      `${context} About text and Settings icon have mirrored inner edges`
+    ).toBeLessThanOrEqual(1)
   }
 
   const book = required<HTMLElement>(document, '[data-target-id="tikkun-book"]')

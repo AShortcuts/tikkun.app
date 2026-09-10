@@ -38,6 +38,20 @@
       "form": { "type": "small" }
     },
     {
+      "id": "numbers-10-35-inverted-nun",
+      "verse": { "book": 4, "chapter": 10, "verse": 35 },
+      "word": { "text": "׆", "occurrence": 1 },
+      "letter": { "text": "׆", "position": 1 },
+      "form": { "type": "inverted" }
+    },
+    {
+      "id": "numbers-10-36-inverted-nun",
+      "verse": { "book": 4, "chapter": 10, "verse": 36 },
+      "word": { "text": "׆", "occurrence": 1 },
+      "letter": { "text": "׆", "position": 1 },
+      "form": { "type": "inverted" }
+    },
+    {
       "id": "numbers-25-11-small-yod",
       "verse": { "book": 4, "chapter": 25, "verse": 11 },
       "word": { "text": "פינחס", "occurrence": 1 },

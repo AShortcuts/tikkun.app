@@ -473,7 +473,7 @@
   padding: 0.55rem 0.7rem;
   border-radius: 14px;
   border: 1px solid color-mix(in srgb, var(--medium-accent-color) 20%, transparent);
-  background: color-mix(in srgb, var(--paper-color) 96%, transparent);
+  background: var(--paper-color);
   box-shadow: 0 14px 30px -22px black;
   pointer-events: none;
   z-index: 2;

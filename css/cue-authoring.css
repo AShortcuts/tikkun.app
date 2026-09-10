@@ -125,6 +125,12 @@
   padding: 1rem;
 }
 
+.recording-issue-word {
+  margin: 0.35rem 0 0.8rem;
+  color: var(--light-text-color);
+  font-size: 0.9rem;
+}
+
 .recording-issue-options {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
@@ -143,8 +149,23 @@
   text-align: left;
 }
 
-.recording-issue-option:hover {
+.recording-issue-option:hover,
+.recording-issue-option[aria-pressed="true"] {
   background: var(--light-accent-color);
+}
+
+.recording-issue-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.recording-issue-actions [data-target-id="recording-issue-remove"] {
+  margin-inline-end: auto;
+}
+
+.recording-issue-actions .toolbar-button:disabled {
+  cursor: not-allowed;
 }
 
 .recording-issue-note {
@@ -155,7 +176,8 @@
   font-size: 0.9rem;
 }
 
-.recording-issue-note input {
+.recording-issue-note input,
+.recording-issue-note select {
   border: 1px solid color-mix(in srgb, var(--text-color) 14%, transparent);
   border-radius: 7px;
   padding: 0.52rem 0.62rem;
@@ -191,18 +213,17 @@
 
 .admin-waveform-bars {
   position: relative;
-  display: flex;
-  align-items: center;
   height: 100%;
-  gap: 1px;
 }
 
-.admin-waveform-bar {
-  flex: 1;
-  min-width: 1px;
-  height: max(2px, calc(var(--waveform-peak, 0) * 100%));
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--text-color) 34%, transparent);
+.admin-waveform-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: color-mix(in srgb, var(--text-color) 34%, transparent);
+  pointer-events: none;
 }
 
 .admin-waveform-cue,
@@ -861,4 +882,39 @@ html.mod-theme-transition .admin-access-input {
     color 260ms ease,
     border-color 260ms ease,
     box-shadow 260ms ease;
+}
+
+.admin-cue-row.is-flagged {
+  background: #fff0dc;
+  border-color: #d9a36b;
+  color: #633510;
+}
+.admin-cue-row.is-flagged:hover,
+.admin-cue-row.is-flagged.is-selected {
+  background: #ffe2bb;
+  border-color: #a55817;
+}
+.admin-cue-row.is-flagged .admin-cue-index,
+.admin-cue-row.is-flagged .admin-cue-time,
+.admin-cue-row.is-flagged .admin-cue-delta,
+.admin-cue-row.is-flagged .admin-cue-note,
+.admin-cue-flag {
+  color: #633510;
+}
+.admin-cue-flag {
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.admin-flag-review {
+  display: grid;
+  gap: 0.5rem;
+}
+.admin-flag-message {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.5rem;
+  background: #fff0dc;
+  color: #633510;
+  font-size: 0.8rem;
+  line-height: 1.45;
 }

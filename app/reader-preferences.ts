@@ -41,6 +41,7 @@ const preferenceRanges = {
 export type ThemeMode = (typeof themeModes)[number]
 
 export interface ReaderPreferences {
+  reducedMotion: 'automatic' | 'on' | 'off'
   narratorId: string
   playbackRate: number
   highlightFill: string
@@ -67,6 +68,7 @@ export interface LoadedReaderPreferences {
 }
 
 export const defaultReaderPreferences: ReaderPreferences = {
+  reducedMotion: 'automatic',
   narratorId: 'yoni-davidov',
   playbackRate: 1,
   highlightFill: '#ffd700',
@@ -195,6 +197,8 @@ function normalizeReaderPreferences(
 ): ReaderPreferences {
   const candidate = isRecord(value) ? value : {}
   return {
+    reducedMotion: candidate.reducedMotion === 'on' || candidate.reducedMotion === 'off'
+      || candidate.reducedMotion === 'automatic' ? candidate.reducedMotion : defaults.reducedMotion,
     narratorId:
       typeof candidate.narratorId === 'string' && candidate.narratorId.trim()
         ? candidate.narratorId.trim()
@@ -343,6 +347,7 @@ export function mergeReaderPreferences(
 
 export function applyReaderPreferences(preferences: ReaderPreferences) {
   const root = document.documentElement
+  root.dataset.readerReducedMotion = preferences.reducedMotion
   const fillTint = toRgba(preferences.highlightFill, preferences.highlightOpacity)
   const fillAlphaPercent = `${preferences.highlightOpacity * 100}%`
   const fillAlphaInversePercent = `${(1 - preferences.highlightOpacity) * 100}%`

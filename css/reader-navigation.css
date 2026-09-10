@@ -6,10 +6,16 @@
   }
 
   .app-toolbar {
+    --header-control-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--text-color) 8%, transparent),
+      0 2px 3px #00000010;
+    --header-bookmark-color: color-mix(in srgb, #d84f5b 76%, var(--text-color));
+    --header-audio-ink: light-dark(#006bc7, #62b3ff);
+    --header-audio-surface: color-mix(in srgb, var(--paper-color) 84%, #0a84ff);
     border-bottom: 1px solid transparent;
     flex-shrink: 0;
     box-shadow: 0 0 8px -4px black;
-    padding: 5px 0;
+    padding: 10px 0;
     position: sticky;
     top: 0;
     background: color-mix(in srgb, var(--paper-color) 94%, transparent);
@@ -238,8 +244,10 @@
   .reader-controls-root {
     display: contents;
   }
-  .toolbar-content {
+  .app-toolbar .toolbar-content {
     display: flex;
+    width: 100%;
+    max-width: 680px;
     padding: 0 10px;
     gap: 0.5rem;
   }
@@ -257,13 +265,21 @@
   }
   .parsha-title {
     background-color: var(--light-accent-color);
-    padding: 0.5em 3em;
+    min-width: 140px;
+    min-height: 40px;
+    padding: 0 13px;
     border: none;
-    border-radius: var(--button-border-radius);
+    border-radius: 16px;
+    box-shadow: var(--header-control-shadow);
     color: var(--text-color);
     direction: rtl;
     cursor: pointer;
-    font-size: 1.2rem;
+    font-size: 21px;
+    font-family: var(--hebrew-ui-font-family);
+    font-synthesis: none;
+    font-weight: 720;
+    line-height: 1;
+    white-space: nowrap;
   }
 
   .toolbar-current-aliyah-label {
@@ -373,7 +389,6 @@
     }
   }
 
-  .parsha-title,
   .toolbar-current-aliyah-label,
   .aliyah-rail-button,
   .mobile-aliyah-picker-toggle [data-target-id='mobile-current-aliyah'],
@@ -386,6 +401,22 @@
 
 @layer feature {
   /* feature navigation ownership */
+
+  .app-toolbar .toolbar-button {
+    min-height: 36px;
+    min-width: 44px;
+    border-radius: 14px;
+    box-shadow: var(--header-control-shadow);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .app-toolbar [data-target-id='about-link'] {
+    padding-inline: 12px;
+    font-size: 16px;
+    text-align: left;
+  }
 
   @media screen and (max-width: 550px) {
     .command-palette {
@@ -457,6 +488,12 @@
     height: 0.95rem;
   }
 
+  .app-toolbar .toolbar-button .ui-icon {
+    width: 20px;
+    height: 20px;
+    stroke-width: 1.7;
+  }
+
   @media screen and (max-width: 715px) {
     .reader-corner-controls {
       bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
@@ -526,14 +563,14 @@
       --mobile-aliyah-playing-text: #fff;
     }
     .app-toolbar {
-      padding: max(0.35rem, env(safe-area-inset-top, 0px)) 0 0;
+      padding: max(12px, env(safe-area-inset-top, 0px)) 0 12px;
       border-bottom: none;
       background: color-mix(in srgb, var(--paper-color) 96%, transparent);
       box-shadow: none;
       backdrop-filter: blur(24px) saturate(135%);
     }
     .toolbar-content {
-      --mobile-toolbar-side-controls-width: 7.9375rem;
+      --mobile-toolbar-side-controls-width: 126px;
       position: relative;
       display: grid;
       grid-template-columns:
@@ -543,8 +580,8 @@
       align-items: center;
       width: 100%;
       max-width: none;
-      min-height: 3.75rem;
-      gap: 0.4rem;
+      min-height: 44px;
+      gap: 4px;
       padding: 0 0.375rem;
     }
     .toolbar-wrapper.mod-left {
@@ -587,11 +624,11 @@
       width: 2.75rem;
       min-width: 2.75rem;
       min-height: 2.75rem;
-      border: 1px solid var(--mobile-reader-border);
-      border-radius: 0.85rem;
+      border: 0;
+      border-radius: 14px;
       padding: 0;
-      background: var(--mobile-reader-control-surface);
-      box-shadow: var(--mobile-reader-control-shadow);
+      background: var(--light-accent-color);
+      box-shadow: var(--header-control-shadow);
       color: var(--text-color);
       cursor: pointer;
       font: inherit;
@@ -614,17 +651,17 @@
       width: 2.75rem;
       min-width: 2.75rem;
       min-height: 2.75rem;
-      margin-left: 3.1rem;
-      border: 1px solid var(--mobile-reader-border);
-      border-radius: 0.85rem;
+      margin-left: 49px;
+      border: 0;
+      border-radius: 14px;
       padding: 0;
-      background: var(--mobile-reader-control-surface);
-      box-shadow: var(--mobile-reader-control-shadow);
+      background: var(--light-accent-color);
+      box-shadow: var(--header-control-shadow);
       color: var(--text-color);
     }
     .toolbar-button.mod-icon-label[data-target-id='bookmark-current'] .ui-icon {
-      width: 1.2rem;
-      height: 1.2rem;
+      width: 20px;
+      height: 20px;
     }
     .mobile-library-button:active {
       background: color-mix(in srgb, var(--text-color) 12%, transparent);
@@ -651,23 +688,24 @@
       line-height: 0;
     }
     .mobile-library-icon .ui-icon {
-      width: 1.45rem;
-      height: 1.45rem;
+      width: 20px;
+      height: 20px;
+      stroke-width: 1.7;
     }
     .parsha-title {
       width: fit-content;
-      min-width: min(6rem, 100%);
+      min-width: 0;
       max-width: min(11.5rem, 100%);
-      min-height: 3rem;
-      border: 1px solid var(--mobile-reader-border);
-      border-radius: 999px;
-      padding: 0.35rem 1.05rem;
+      min-height: 44px;
+      border: 0;
+      border-radius: 16px;
+      padding: 0 13px;
       overflow: hidden;
-      background: var(--mobile-reader-control-surface);
-      box-shadow: var(--mobile-reader-control-shadow);
+      background: var(--light-accent-color);
+      box-shadow: var(--header-control-shadow);
       color: var(--text-color);
       cursor: pointer;
-      font-size: var(--mobile-parsha-title-font-size, 1.4rem);
+      font-size: var(--mobile-parsha-title-font-size, 22px);
       font-weight: 720;
       line-height: 1;
       text-overflow: clip;
@@ -700,20 +738,16 @@
       justify-self: start;
       display: inline-flex;
       align-items: center;
-      width: 4.9rem;
+      width: 77px;
       height: 2.75rem;
       overflow: hidden;
-      border: 1.5px solid var(--mobile-reader-blue);
+      border: 0;
       border-radius: 999px;
-      background: color-mix(in srgb, var(--mobile-reader-blue) 9%, transparent);
-      color: var(--mobile-reader-blue);
+      background: var(--header-audio-surface);
+      color: var(--header-audio-ink);
       direction: ltr;
       font: inherit;
       white-space: nowrap;
-      transition:
-        background-color var(--reader-motion-color) var(--reader-ease-standard),
-        border-color var(--reader-motion-color) var(--reader-ease-standard),
-        color var(--reader-motion-color) var(--reader-ease-standard);
     }
 
     .mobile-aliyah-play-toggle,
@@ -728,8 +762,8 @@
       color: inherit;
       cursor: pointer;
       font: inherit;
-      font-size: 0.84rem;
-      font-weight: 750;
+      font-size: 12px;
+      font-weight: 700;
       line-height: 1;
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
@@ -738,13 +772,19 @@
     .mobile-aliyah-play-toggle {
       flex: 1 1 auto;
       min-width: 0;
-      gap: 0.22rem;
-      padding-inline: 0.42rem 0.3rem;
+      gap: 3px;
+      padding-inline: 5px 0;
     }
 
     .mobile-aliyah-picker-toggle {
-      flex: 0 0 1.42rem;
-      border-left: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+      flex: 0 0 20px;
+      border-left: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+      color: var(--text-color);
+      opacity: 1;
+    }
+
+    .mobile-aliyah-capsule.is-playing .mobile-aliyah-picker-toggle {
+      color: inherit;
     }
 
     .mobile-aliyah-play-toggle:active,
@@ -762,8 +802,7 @@
       color: #18191d;
       border-color: var(--mobile-reader-gold);
       background: var(--mobile-reader-gold);
-      box-shadow: 0 7px 18px
-        color-mix(in srgb, var(--mobile-reader-gold) 18%, transparent);
+      box-shadow: none;
     }
 
     .mobile-aliyah-capsule.is-error {
@@ -775,7 +814,7 @@
     .mobile-aliyah-capsule.is-unavailable {
       color: var(--light-text-color);
       border-color: var(--mobile-reader-border);
-      background: var(--mobile-reader-control-surface);
+      background: var(--light-accent-color);
       box-shadow: none;
     }
 
@@ -800,14 +839,14 @@
     }
 
     .mobile-aliyah-play-icon .ui-icon {
-      width: 0.95rem;
-      height: 0.95rem;
+      width: 12px;
+      height: 12px;
     }
 
     .mobile-aliyah-picker-chevron .ui-icon {
-      width: 0.82rem;
-      height: 0.82rem;
-      stroke-width: 2.4;
+      width: 11px;
+      height: 11px;
+      stroke-width: 1.7;
     }
 
     .mobile-aliyah-spinner {
@@ -834,7 +873,7 @@
       width: 2.75rem;
       min-width: 2.75rem;
       min-height: 2.75rem;
-      border-radius: 999px;
+      border-radius: 14px;
       padding: 0;
       background: var(--light-accent-color);
       color: var(--text-color);
@@ -851,9 +890,9 @@
       transform: scale(var(--reader-control-press-scale));
     }
     .toolbar-button.mod-icon-label.toolbar-overflow-toggle .ui-icon {
-      width: 1.2rem;
-      height: 1.2rem;
-      stroke-width: 2;
+      width: 20px;
+      height: 20px;
+      stroke-width: 1.7;
     }
     .toolbar-overflow-menu {
       top: calc(100% + 0.35rem);
@@ -1071,9 +1110,6 @@
         var(--paper-color)
       );
     }
-    .mobile-aliyah-card.is-unavailable {
-      grid-template-columns: minmax(0, 1fr);
-    }
     .mobile-aliyah-card-main {
       align-self: stretch;
       min-width: 0;
@@ -1104,13 +1140,12 @@
     }
     .mobile-aliyah-card-label {
       display: block;
-      overflow: hidden;
       color: var(--text-color);
       font-size: 1.05rem;
       font-weight: 750;
       line-height: 1.15;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      overflow-wrap: anywhere;
+      white-space: normal;
     }
     .mobile-aliyah-card.is-current .mobile-aliyah-card-label {
       color: var(--mobile-reader-gold);
@@ -1118,15 +1153,14 @@
     .mobile-aliyah-card-status {
       display: block;
       margin-top: 0.3rem;
-      overflow: hidden;
       color: var(--light-text-color);
       direction: ltr;
       font-size: 0.78rem;
       font-variant-numeric: tabular-nums;
       line-height: 1.2;
       text-align: right;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      overflow-wrap: anywhere;
+      white-space: normal;
     }
     .mobile-aliyah-card.is-playing .mobile-aliyah-card-status {
       width: max-content;
@@ -1151,9 +1185,7 @@
       background: var(--mobile-reader-blue);
       color: white;
       cursor: pointer;
-      transition:
-        background-color var(--reader-motion-color) var(--reader-ease-standard),
-        transform var(--reader-motion-fast) var(--reader-ease-out);
+      transition: transform var(--reader-motion-fast) var(--reader-ease-out);
     }
     .mobile-aliyah-play:active {
       transform: scale(var(--reader-control-press-scale));
@@ -1244,7 +1276,12 @@
 
   @media screen and (max-width: 350px) {
     .toolbar-content {
-      --mobile-toolbar-side-controls-width: 7.35rem;
+      --mobile-toolbar-side-controls-width: 113px;
+      padding-inline: 4px;
+      gap: 2px;
+    }
+    .toolbar-button.mod-icon-label[data-target-id='bookmark-current'] {
+      margin-left: 45px;
     }
     .mobile-library-button {
       font-size: 0;
@@ -1253,18 +1290,21 @@
       margin-right: 0;
     }
     .mobile-aliyah-capsule:not(.u-hidden) {
-      width: 4.35rem;
-      font-size: 0.86rem;
+      width: 68px;
     }
-    .mobile-aliyah-picker-chevron .ui-icon {
-      width: 0.85rem;
-      height: 0.85rem;
+    .mobile-aliyah-play-toggle {
+      font-size: 10px;
+      gap: 2px;
+      padding-left: 3px;
+    }
+    .mobile-aliyah-picker-toggle {
+      flex-basis: 18px;
     }
     .parsha-title {
-      min-width: min(5.5rem, 100%);
+      min-width: 0;
       max-width: min(11.5rem, 100%);
-      padding-inline: 0.8rem;
-      font-size: var(--mobile-parsha-title-font-size, 1.2rem);
+      padding-inline: 5px;
+      font-size: var(--mobile-parsha-title-font-size, 18px);
     }
     .mobile-aliyah-card-status {
       font-size: 0.72rem;
@@ -1357,5 +1397,130 @@
     to {
       opacity: 0;
     }
+  }
+}
+
+@layer overrides {
+  .app-toolbar :is(.toolbar-button, .parsha-title, .mobile-library-button,
+    .mobile-aliyah-play-toggle, .mobile-aliyah-picker-toggle) {
+    transition: transform var(--reader-motion-fast) var(--reader-ease-out);
+  }
+  .app-toolbar :is(.toolbar-button, .parsha-title, .mobile-library-button):active {
+    box-shadow: var(--header-control-shadow);
+    opacity: 1;
+  }
+  .app-toolbar:not([data-header-pointer]) :is(.toolbar-button, .parsha-title,
+    .mobile-library-button, .mobile-aliyah-play-toggle, .mobile-aliyah-picker-toggle):active {
+    transform: none;
+  }
+  .app-toolbar[data-header-pointer] :is(.toolbar-button, .parsha-title,
+    .mobile-library-button, .mobile-aliyah-play-toggle, .mobile-aliyah-picker-toggle):not(:disabled):not([aria-disabled='true']):active {
+    transform: scale(var(--reader-control-press-scale));
+  }
+  .app-toolbar [data-target-id='bookmark-current'][aria-pressed='true'] {
+    color: var(--header-bookmark-color);
+  }
+  .app-toolbar :is(.toolbar-button, .parsha-title, .mobile-library-button):focus-visible {
+    outline: 2px solid var(--reader-focus-color);
+    outline-offset: 3px;
+    box-shadow: var(--header-control-shadow);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .app-toolbar :is(.toolbar-button, .parsha-title, .mobile-library-button):not(:disabled):hover {
+      background: var(--medium-accent-color);
+    }
+    .app-toolbar :is(.mobile-aliyah-play-toggle, .mobile-aliyah-picker-toggle):not(:disabled):not([aria-disabled='true']):hover {
+      background: color-mix(in srgb, currentColor 10%, transparent);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .app-toolbar :is(.toolbar-button, .parsha-title, .mobile-library-button,
+      .mobile-aliyah-play-toggle, .mobile-aliyah-picker-toggle) {
+      transition: none;
+    }
+    .app-toolbar[data-header-pointer] :is(.toolbar-button, .parsha-title,
+      .mobile-library-button, .mobile-aliyah-play-toggle, .mobile-aliyah-picker-toggle):not(:disabled):not([aria-disabled='true']):active {
+      transform: none;
+    }
+  }
+
+  :where(.aliyah-audio-button, .mobile-aliyah-play, .mobile-aliyah-play-toggle)[data-audio-tone='normal'] {
+    --audio-button-color: hsl(206, 100%, 49%);
+    opacity: 1;
+  }
+  [data-audio-tone='cue'] { --audio-button-color: var(--admin-cue-incomplete-color); }
+  [data-audio-tone='audio'] { --audio-button-color: var(--admin-missing-audio-color); }
+  [data-audio-tone='empty'] { --audio-button-color: var(--light-text-color); }
+
+  :is(.aliyah-audio-button, .mobile-aliyah-play-toggle)[data-audio-tone]:not([data-audio-tone='normal']),
+  .aliyah-audio-button[data-audio-tone='normal']:not(.is-active) {
+    color: var(--audio-button-color);
+    background: color-mix(in srgb, var(--audio-button-color) 14%, transparent);
+  }
+  .mobile-aliyah-play[data-audio-tone]:not([data-audio-tone='normal']) {
+    color: var(--paper-color);
+    background: var(--audio-button-color);
+  }
+  .mobile-aliyah-play[data-audio-tone='cue'] { color: var(--admin-cue-incomplete-ink); }
+  .mobile-aliyah-play[data-audio-tone='empty'] {
+    color: var(--audio-button-color);
+    background: color-mix(in srgb, var(--audio-button-color) 14%, transparent);
+  }
+  .mobile-aliyah-capsule[data-audio-tone]:not([data-audio-tone='normal']) {
+    color: var(--audio-button-color);
+    border-color: color-mix(in srgb, var(--audio-button-color) 45%, transparent);
+    background: color-mix(in srgb, var(--audio-button-color) 9%, transparent);
+    box-shadow: none;
+  }
+  .mobile-aliyah-capsule[data-audio-tone='empty']:not(.is-playing) {
+    color: var(--light-text-color);
+    background: var(--light-accent-color);
+  }
+  .mobile-aliyah-capsule[data-audio-tone='empty'] .mobile-aliyah-play-toggle {
+    color: inherit;
+    background: transparent;
+  }
+  .aliyah-audio-button.is-active[data-audio-tone] {
+    color: hsl(42, 82%, 42%);
+    background: color-mix(in srgb, hsl(48, 100%, 62%) 18%, transparent);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .aliyah-audio-button[data-audio-tone='normal']:not(.is-active):not([aria-disabled='true']):hover {
+      background: color-mix(in srgb, dodgerblue 20%, transparent);
+    }
+    .aliyah-audio-button.is-active[data-audio-tone]:hover {
+      background: color-mix(in srgb, hsl(48, 100%, 62%) 26%, transparent);
+    }
+  }
+  .mobile-aliyah-capsule.is-playing[data-audio-tone] {
+    color: #18191d;
+    border-color: var(--mobile-reader-gold);
+    background: var(--mobile-reader-gold);
+  }
+  .mobile-aliyah-capsule.is-playing .mobile-aliyah-play-toggle[data-audio-tone] {
+    color: inherit;
+    background: transparent;
+  }
+  html:not([data-reader-mode='admin-authoring']):not([data-recording-mode='true']) :is(.aliyah-audio-button, .mobile-aliyah-play, .mobile-aliyah-play-toggle)[data-audio-dimmed='true'] {
+    opacity: 0.42;
+    cursor: not-allowed;
+  }
+  html:not([data-reader-mode='admin-authoring']):not([data-recording-mode='true']) .app-toolbar .mobile-aliyah-play-toggle[data-audio-tone='empty'] {
+    opacity: 1;
+  }
+  [data-audio-tooltip][aria-disabled='true'] { cursor: default; }
+
+  .audio-button-tooltip {
+    position: fixed;
+    z-index: 10000;
+    max-width: min(17rem, calc(100vw - 16px));
+    padding: 0.5rem 0.7rem;
+    border-radius: 0.4rem;
+    background: oklch(from var(--text-color) l c h / 0.96);
+    color: var(--paper-color);
+    font: 0.8125rem/1.4 var(--hebrew-ui-font-family);
+    direction: ltr;
+    text-align: start;
+    overflow-wrap: anywhere;
   }
 }

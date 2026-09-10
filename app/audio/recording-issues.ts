@@ -34,6 +34,7 @@ export interface RecordingIssue {
   note?: string
   createdAt: number
   tokenizationVersion: string
+  removed?: boolean
 }
 
 export const recordingIssueKinds: RecordingIssueKind[] = [
@@ -78,7 +79,7 @@ export function createRecordingIssue(
 ): RecordingIssue {
   const issue = {
     ...input,
-    id: `issue:${input.audioId}:${input.tokenKey}:${input.createdAt}`,
+    id: `issue:${input.audioId}:${input.tokenKey}:${input.kind}:${input.createdAt}`,
   }
   if (!parseRecordingIssue(issue, input.audioId, input.tokenizationVersion)) {
     throw new TypeError('Cannot create an invalid recording issue')
@@ -90,8 +91,23 @@ export function recordingIssueReaderLabel(issue: Pick<RecordingIssue, 'kind'>) {
   return issueLabels[issue.kind]
 }
 
+export function recordingIssueReaderText(issue: Pick<RecordingIssue, 'kind' | 'note'>) {
+  return issue.note?.trim() || recordingIssueReaderLabel(issue)
+}
+
 export function getReaderVisibleIssues(issues: RecordingIssue[]) {
-  return issues.filter((issue) => issue.visibility === 'readerVisible')
+  return issues.filter((issue) => !issue.removed && issue.visibility === 'readerVisible')
+}
+
+export function getLatestReaderVisibleIssues(issues: RecordingIssue[]) {
+  const latestByToken = new Map<string, RecordingIssue>()
+  for (const issue of getReaderVisibleIssues(issues)) {
+    const previous = latestByToken.get(issue.tokenKey)
+    if (!previous || issue.createdAt >= previous.createdAt) {
+      latestByToken.set(issue.tokenKey, issue)
+    }
+  }
+  return [...latestByToken.values()]
 }
 
 export function parseRecordingIssue(
@@ -115,6 +131,7 @@ export function parseRecordingIssue(
     Number.isSafeInteger(candidate.createdAt) &&
     candidate.createdAt >= 0 &&
     (candidate.note === undefined || typeof candidate.note === 'string') &&
+    (candidate.removed === undefined || typeof candidate.removed === 'boolean') &&
     isOptionalNonNegativeTime(candidate.timeStart) &&
     isOptionalNonNegativeTime(candidate.timeEnd) &&
     (candidate.timeEnd === undefined || candidate.timeStart !== undefined) &&
@@ -223,7 +240,9 @@ export function mergePublishedAndLocalRecordingIssues(
     issuesByOverlayKey.set(recordingIssueOverlayKey(issue), issue)
   }
   for (const issue of localIssues) {
-    issuesByOverlayKey.set(recordingIssueOverlayKey(issue), issue)
+    // Keep local removals so a published issue cannot reappear after reload.
+    if (issue.removed) issuesByOverlayKey.delete(recordingIssueOverlayKey(issue))
+    else issuesByOverlayKey.set(recordingIssueOverlayKey(issue), issue)
   }
 
   return [...issuesByOverlayKey.values()].sort(

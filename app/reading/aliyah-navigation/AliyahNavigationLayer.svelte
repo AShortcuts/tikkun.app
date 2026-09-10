@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { audioButtonState } from '../audio-button-state.ts'
   import { flushSync, onMount } from 'svelte'
   import { SvelteSet } from 'svelte/reactivity'
   import UiIcon from '../../components/UiIcon.svelte'
@@ -14,6 +15,7 @@
     type AliyahRailVisibility,
   } from './aliyah-navigation.ts'
   import {
+    aliyahNavigationItemResourceKey,
     isSameAliyahNavigationTarget,
     type AliyahNavigationItem,
     type AliyahNavigationPlayback,
@@ -97,22 +99,16 @@
   }
 
   function requestKey(item: AliyahNavigationItem, requestRevision = revision) {
-    return `${requestRevision}:${item.key}:${item.audioKey ?? ''}:${item.recordingKey ?? ''}`
+    return `${requestRevision}:${authoringEnabled}:${aliyahNavigationItemResourceKey(item)}`
   }
 
   function isCurrentItem(
-    snapshot: AliyahNavigationSnapshot | null,
-    item: AliyahNavigationItem,
-    requestRevision: number
+    key: string,
+    compactOnly = false
   ) {
-    return (
-      revision === requestRevision &&
-      snapshot?.items.some(
-        (candidate) =>
-          candidate.key === item.key &&
-          candidate.audioKey === item.audioKey &&
-          candidate.recordingKey === item.recordingKey
-      )
+    const snapshots = compactOnly ? [compactSnapshot] : [desktopSnapshot, compactSnapshot]
+    return snapshots.some((snapshot) =>
+      snapshot?.items.some((candidate) => requestKey(candidate) === key)
     )
   }
 
@@ -132,7 +128,7 @@
           if (
             destroyed ||
             signal.aborted ||
-            !isCurrentItem(snapshot, item, requestRevision)
+            !isCurrentItem(key)
           ) {
             return
           }
@@ -143,9 +139,8 @@
         })
         .catch((error) => {
           pendingCueStatuses.delete(key)
-          if (destroyed || signal.aborted) return
+          if (destroyed || signal.aborted || !isCurrentItem(key)) return
           onCueStatusError(error, item)
-          if (!isCurrentItem(snapshot, item, requestRevision)) return
         })
     }
   }
@@ -167,7 +162,7 @@
           if (
             destroyed ||
             signal.aborted ||
-            !isCurrentItem(compactSnapshot, item, requestRevision)
+            !isCurrentItem(key, true)
           ) {
             return
           }
@@ -180,9 +175,8 @@
         })
         .catch((error) => {
           pendingDurations.delete(key)
-          if (destroyed || signal.aborted) return
+          if (destroyed || signal.aborted || !isCurrentItem(key, true)) return
           onDurationError(error, item)
-          if (!isCurrentItem(compactSnapshot, item, requestRevision)) return
           flushSync(() => {
             durationLabels = { ...durationLabels, [key]: 'Available' }
           })
@@ -272,7 +266,12 @@
       desktopSnapshot = null
       compactSnapshot = null
       authoringEnabled = false
+      revision += 1
+      cueStatuses = {}
+      durationLabels = {}
     })
+    pendingCueStatuses.clear()
+    pendingDurations.clear()
     hideWide()
   }
 
@@ -417,17 +416,31 @@
   }
 
   function itemCueNeedsWork(item: AliyahNavigationItem) {
+    if (item.audioState) return item.audioState.problem === 'incomplete-cues'
     const status = resolvedCueStatus(item)
     return Boolean(
       item.recordingKey && status && isAliyahCueStatusUnfinished(status)
     )
   }
 
+  function itemAppearance(item: AliyahNavigationItem) {
+    return audioButtonState({ state: item.audioState, available: Boolean(item.audioKey),
+      cueIncomplete: itemCueNeedsWork(item), adminMissing: authoringEnabled && !item.recordingKey,
+      playing: isPlaying(compactPlayback(), item.target) })
+  }
+
   function durationLabel(item: AliyahNavigationItem) {
+    if (item.audioState?.message && !authoringEnabled) {
+      if (!item.audioState.canPlay) {
+        if (item.audioState.problem === 'missing-audio') return 'Audio unavailable'
+        if (item.audioState.problem === 'timing-needed') return 'Timing cues needed'
+      }
+      return item.audioState.message
+    }
     if (authoringEnabled && !item.recordingKey) {
       return 'Record audio + cues'
     }
-    if (!item.audioKey) return 'No audio'
+    if (!item.audioKey) return 'Audio unavailable'
     return durationLabels[requestKey(item)] ?? 'Loading…'
   }
 
@@ -477,7 +490,7 @@
         playing: isPlaying(playback, item.target),
       })
     }
-    return `${isPlaying(playback, item.target) ? 'Pause' : 'Play'} ${item.label}`
+    return `${isPlaying(playback, item.target) ? 'Pause' : 'Play'} ${item.label}${item.audioState?.message ? ` — ${item.audioState.message}` : ''}`
   }
 
   function segmentLabel(
@@ -509,6 +522,8 @@
   }
 
   async function playCompactItem(target: AliyahNavigationTarget) {
+    const item = compactSnapshot?.items.find(item => isSameAliyahNavigationTarget(item.target, target))
+    if (!item || itemAppearance(item).actionDisabled) return
     setActive(target)
     closeCompact({ focusTarget: getReaderFocusTarget() })
     const action = ++playAction
@@ -795,15 +810,19 @@
               )}
             </span>
           </button>
-          {#if item.audioKey || authoringEnabled}
+          {#if item.target}
             <button
               class="mobile-aliyah-play"
               class:is-missing-audio={authoringEnabled && !item.recordingKey}
               class:is-cue-incomplete={itemCueNeedsWork(item)}
+              data-audio-problem={item.audioState?.problem ?? ''}
+              data-audio-tone={itemAppearance(item).tone}
+              data-audio-dimmed={itemAppearance(item).dimmed}
+              data-audio-tooltip={itemAppearance(item).tooltip}
               data-run-id={item.target.runId}
               data-aliyah-index={item.target.aliyahIndex}
               type="button"
-              title={compactPlayLabel(item, compactPlayback())}
+              aria-disabled={itemAppearance(item).actionDisabled}
               aria-label={compactPlayLabel(item, compactPlayback())}
               aria-pressed={isPlaying(compactPlayback(), item.target)}
               onclick={() => playCompactItem(item.target)}

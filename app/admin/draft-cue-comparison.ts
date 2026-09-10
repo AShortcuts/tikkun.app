@@ -8,6 +8,7 @@ function normalizedCue(cue: WordCue) {
     lineIndex: cue.lineIndex,
     fragmentIndex: cue.fragmentIndex,
     wordIndex: cue.wordIndex,
+    review: cue.review,
   }
 }
 

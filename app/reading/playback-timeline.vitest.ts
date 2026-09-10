@@ -211,6 +211,49 @@ test('formats finite, invalid, and hour-long playback durations', () => {
   expect(formatPlaybackDuration(Number.POSITIVE_INFINITY)).toBe('--:--')
 })
 
+test('passage playback clears highlights in untimed gaps and keeps the selected reading title', async () => {
+  const { audio, audioController, highlightController } = createFixture()
+  const viewport = createViewport()
+  destroy = createMount()(scope => {
+    createPlaybackTimeline(scope, createOptions(audioController, highlightController, viewport))
+  })
+  const session = createSession([{ ...cue(tokenKeys[0], 0), timeEnd: 1 }])
+  session.status = 'partial-passage'
+  session.readingLabel = 'Nitzavim-Vayelech'
+  const range = { start: { scroll: 'torah' as const, b: 5, c: 31, v: 1 }, end: { scroll: 'torah' as const, b: 5, c: 31, v: 6 } }
+  session.passage = { range, requestedRange: range, cueComplete: false }
+  await audioController.loadSession(session)
+  audioController.seek(0.5)
+  await flushPromises()
+  expect(highlightController.getActiveTokenKey()).toBe(tokenKeys[0])
+  audioController.seek(2)
+  await flushPromises()
+  expect(highlightController.getActiveTokenKey()).toBeNull()
+  expect(required('[data-target-id="floating-player-title-desktop"]').textContent).toContain('Nitzavim-Vayelech')
+  expect(required('[data-target-id="floating-player-title-mobile"]').textContent).toContain('available portion')
+  expect(audio.currentTime).toBe(2)
+})
+
+test('passage word progress uses the actual word position after missing cues', async () => {
+  const { audioController, highlightController } = createFixture()
+  destroy = createMount()(scope => {
+    createPlaybackTimeline(scope, createOptions(audioController, highlightController, createViewport()))
+  })
+  const range = { start: { scroll: 'torah' as const, b: 5, c: 31, v: 1 }, end: { scroll: 'torah' as const, b: 5, c: 31, v: 6 } }
+  const session = createActiveAudioSession({
+    target: { runId: 'run', index: 1 }, tokenKeys, status: 'passage',
+    passage: { range, requestedRange: range, cueComplete: false },
+    segments: [{ recording, tokenKeys, cues: [cue(tokenKeys[1], 3)], startTime: 0, endTime: null }],
+  })
+  await audioController.loadSession(session)
+  audioController.seek(0)
+  await flushPromises()
+  expect(required('[data-target-id="mobile-player-word-progress"]').textContent).toBe('Word 0 of 2')
+  audioController.seek(3)
+  await flushPromises()
+  expect(required('[data-target-id="mobile-player-word-progress"]').textContent).toBe('Word 2 of 2')
+})
+
 function createFixture() {
   fixture = document.createElement('section')
   fixture.innerHTML = `

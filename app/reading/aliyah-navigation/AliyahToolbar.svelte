@@ -1,6 +1,7 @@
 <script lang="ts">
   import { flushSync, onMount } from 'svelte'
   import UiIcon from '../../components/UiIcon.svelte'
+  import { audioButtonState } from '../audio-button-state.ts'
   import {
     aliyahCueAuthoringActionLabel,
     isAliyahCueStatusUnfinished,
@@ -43,6 +44,20 @@
   const compactAudioAvailable = $derived(
     toolbarState.compact.audioAvailable ?? false
   )
+  const currentAppearance = $derived(audioButtonState({
+    state: toolbarState.current.audioState,
+    available: toolbarState.current.audioAvailable,
+    cueIncomplete: currentCueIsIncomplete(),
+    adminMissing: toolbarState.current.authoringAvailable,
+    playing: toolbarState.current.playing,
+  }))
+  const compactAppearance = $derived(audioButtonState({
+    state: toolbarState.compact.audioState,
+    available: compactAudioAvailable,
+    adminMissing: toolbarState.compact.authoringMissing,
+    cueIncomplete: toolbarState.compact.cueIncomplete,
+    playing: toolbarState.compact.playbackState === 'playing',
+  }))
 
   function sync(nextState: AliyahToolbarState) {
     const targetChanged = !isSameAliyahNavigationTarget(
@@ -95,6 +110,7 @@
 
   function currentCueIsIncomplete() {
     const status = toolbarState.current.cueStatus
+    if (toolbarState.current.audioState) return toolbarState.current.audioState.problem === 'incomplete-cues'
     return Boolean(
       toolbarState.current.audioAvailable &&
         status &&
@@ -115,7 +131,7 @@
         playing: toolbarState.current.playing,
       })
     }
-    return `${toolbarState.current.playing ? 'Pause' : 'Play'} ${toolbarState.current.label}`
+    return `${toolbarState.current.playing ? 'Pause' : 'Play'} ${toolbarState.current.label}${toolbarState.current.audioState?.message ? ` — ${toolbarState.current.audioState.message}` : ''}`
   }
 
   function toggleCompact() {
@@ -124,7 +140,7 @@
 
   async function playCurrent() {
     if (
-      !toolbarState.current.target ||
+      currentAppearance.actionDisabled || !toolbarState.current.target ||
       (!toolbarState.current.audioAvailable &&
         !toolbarState.current.authoringAvailable)
     ) {
@@ -135,7 +151,7 @@
 
   async function playCompact() {
     const target = toolbarState.compact.target
-    if (!target || !compactAudioAvailable || compactActionState === 'loading') {
+    if (!target || compactAppearance.actionDisabled || compactActionState === 'loading') {
       return
     }
 
@@ -162,7 +178,7 @@
     }
     return `${
       toolbarState.compact.playbackState === 'playing' ? 'Pause' : 'Play'
-    } ${toolbarState.compact.label}`
+    } ${toolbarState.compact.label}${toolbarState.compact.audioState?.message ? ` — ${toolbarState.compact.audioState.message}` : ''}`
   }
 
   const toolbar: AliyahToolbar = {
@@ -184,7 +200,8 @@
   class:is-loaded={toolbarState.compact.playbackState === 'loaded'}
   class:is-playing={toolbarState.compact.playbackState === 'playing'}
   class:is-loading={compactActionState === 'loading'}
-  class:is-error={compactActionState === 'error'}
+  data-audio-tone={compactAppearance.tone}
+  data-audio-dimmed={compactAppearance.dimmed}
   class:is-unavailable={!compactAudioAvailable}
   data-target-id="mobile-aliyah-capsule"
   data-run-id={toolbarState.compact.target?.runId ?? ''}
@@ -195,11 +212,15 @@
 >
   <button
     class="mobile-aliyah-play-toggle"
+    class:is-cue-incomplete={toolbarState.compact.audioState?.problem === 'incomplete-cues'}
+    data-audio-problem={toolbarState.compact.audioState?.problem ?? ''}
+    data-audio-tone={compactAppearance.tone}
+    data-audio-dimmed={compactAppearance.dimmed}
+    data-audio-tooltip={compactActionState === 'loading' ? 'Preparing audio for this aliyah.' : compactAppearance.tooltip}
     data-target-id="mobile-aliyah-play-toggle"
     type="button"
-    title={compactPlayLabel()}
     aria-label={compactPlayLabel()}
-    disabled={!compactAudioAvailable || compactActionState === 'loading'}
+    aria-disabled={compactAppearance.actionDisabled || compactActionState === 'loading'}
     onclick={() => void playCompact()}
   >
     <span class="mobile-aliyah-play-icon" aria-hidden="true">
@@ -251,24 +272,21 @@
 
 <button
   class="aliyah-audio-button toolbar-current-aliyah-audio"
-  class:u-hidden={!toolbarState.current.audioAvailable &&
-    !toolbarState.current.authoringAvailable}
+  class:u-hidden={!toolbarState.current.target || !toolbarState.current.labelVisible}
   class:is-active={toolbarState.current.playing}
   class:is-missing-audio={toolbarState.current.authoringAvailable}
   class:is-cue-incomplete={currentCueIsIncomplete()}
+  data-audio-problem={toolbarState.current.audioState?.problem ?? ''}
+  data-audio-tone={currentAppearance.tone}
+  data-audio-dimmed={currentAppearance.dimmed}
+  data-audio-tooltip={currentAppearance.tooltip}
   data-target-id="toolbar-current-aliyah-audio"
   data-run-id={toolbarState.current.target?.runId ?? ''}
   data-aliyah-index={toolbarState.current.target
     ? `${toolbarState.current.target.aliyahIndex}`
     : ''}
   type="button"
-  disabled={!toolbarState.current.audioAvailable &&
-    !toolbarState.current.authoringAvailable}
-  title={toolbarState.current.authoringAvailable
-    ? `Select ${toolbarState.current.label} for audio and cue recording`
-    : toolbarState.current.audioAvailable
-      ? currentPlayLabel()
-      : 'Recording unavailable'}
+  aria-disabled={currentAppearance.actionDisabled}
   aria-label={toolbarState.current.authoringAvailable
     ? `Select ${toolbarState.current.label} for audio and cue recording`
     : toolbarState.current.audioAvailable

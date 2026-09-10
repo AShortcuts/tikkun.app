@@ -6,12 +6,11 @@ import { LeiningGenerator } from '../app/calendar-model/generator.ts'
 import type { LeiningAliyah } from '../app/calendar-model/model-types.ts'
 import type { LineType } from '../app/components/Page.ts'
 import type { RefWithScroll } from '../app/ref.ts'
-import { tokenizeReaderWords } from '../app/reader/word-tokenization.ts'
+import { canonicalLineWords } from '../app/reader/canonical-line-words.ts'
 import {
   collectExactTokenRange,
   type SequencedWord,
 } from '../app/reading/exact-token-range.ts'
-import textFilter from '../app/text-filter.ts'
 import { resolveParshaRun } from '../app/view-model/navigation/parsha-routes.ts'
 
 type TocLocation = { p: number; l: number }
@@ -54,18 +53,7 @@ function wordsForLine({
   lineIndex,
   line,
 }: LocatedLine): SequencedWord[] {
-  return line.text.flatMap((column, columnIndex) =>
-    column.flatMap((fragment, fragmentIndex) =>
-      tokenizeReaderWords(textFilter({ text: fragment, annotated: true })).map(
-        (word, wordIndex) => ({
-          tokenKey: `${pageNumber}:${lineIndex}:${
-            columnIndex * 100 + fragmentIndex
-          }:${wordIndex}`,
-          annotatedText: word.text,
-        })
-      )
-    )
-  )
+  return canonicalLineWords(pageNumber, lineIndex, line)
 }
 
 function verseOrdinal(line: LineType, ref: RefWithScroll) {

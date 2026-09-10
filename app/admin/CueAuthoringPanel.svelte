@@ -9,6 +9,7 @@
   } from './cue-authoring-panel.ts'
 
   let { action, connect }: CueAuthoringPanelComponentProps = $props()
+  let importInput: HTMLInputElement
 
   let snapshot = $state<CueAuthoringPanelSnapshot>({
     visible: false,
@@ -364,6 +365,17 @@
     </span>
   </div>
 
+  <div class="admin-panel-actions mod-secondary">
+    <button type="button" class="toolbar-button" data-target-id="admin-import"
+      disabled={!snapshot.canImport} onclick={() => importInput.click()}>Import cues</button>
+    <input bind:this={importInput} type="file" accept=".json,application/json" hidden
+      aria-label="Import cue JSON for the loaded recording"
+      onchange={() => {
+        const file = importInput.files?.[0]
+        if (file) action({ type: 'import', file })
+        importInput.value = ''
+      }} />
+  </div>
   <div class="admin-panel-draft" data-target-id="admin-draft-status">
     {snapshot.draftStatusText}
   </div>

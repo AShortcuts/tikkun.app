@@ -1,3 +1,4 @@
+import { passageRangeLabel } from './passage-audio.ts'
 import type { AudioRecording } from '../audio/types.ts'
 import { getCueProgress, getWordProgress } from '../audio/progress.ts'
 import type { MountScope } from '../lifecycle/mount.ts'
@@ -14,7 +15,7 @@ import {
   type FloatingPlayerAction,
   type FloatingPlayerPosition,
 } from './floating-player.ts'
-import { HighlightController } from './highlight-controller.ts'
+import { HighlightController, cueKey } from './highlight-controller.ts'
 
 const PLAYBACK_RATE_MIN = 0.5
 const PLAYBACK_RATE_MAX = 3
@@ -80,6 +81,18 @@ export function formatPlaybackDuration(seconds: number) {
     return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
   }
   return `${minutes}:${String(secs).padStart(2, '0')}`
+}
+
+function sessionWordProgress(session: ActiveAudioSession | null, cueIndex: number) {
+  const cue = session?.cues[cueIndex]
+  const wordIndex = session?.passage
+    ? cue ? session.tokenKeys.indexOf(cueKey(cue)) : -1
+    : cueIndex
+  return getWordProgress({
+    cueIndex: wordIndex,
+    cueCount: session?.passage && wordIndex < 0 ? 0 : session?.cues.length ?? 0,
+    tokenCount: session?.tokenKeys.length ?? 0,
+  })
 }
 
 export function createPlaybackTimeline(
@@ -162,11 +175,7 @@ export function createPlaybackTimeline(
       : -1
   ) => {
     const session = audioController.session
-    const wordProgress = getWordProgress({
-      cueIndex,
-      cueCount: session?.cues.length ?? 0,
-      tokenCount: session?.tokenKeys.length ?? 0,
-    })
+    const wordProgress = sessionWordProgress(session, cueIndex)
     const cueProgress = getCueProgress({
       cueIndex,
       cueCount: session?.cues.length ?? 0,
@@ -212,11 +221,7 @@ export function createPlaybackTimeline(
     }
 
     const cueIndex = currentCueIndex(session, displayTime())
-    const wordProgress = getWordProgress({
-      cueIndex,
-      cueCount: session.cues.length,
-      tokenCount: session.tokenKeys.length,
-    })
+    const wordProgress = sessionWordProgress(session, cueIndex)
     const statusLabel = audioController.error
       ? 'Recording unavailable'
       : {
@@ -226,13 +231,15 @@ export function createPlaybackTimeline(
           )}`,
           'partial-start': 'Starts at first available cue',
           'overlap-only': 'Partial: shared opening only',
+          passage: session.passage?.cueComplete ? '' : 'Audio available; word highlighting incomplete',
+          'partial-passage': `Available portion: ${session.passage ? passageRangeLabel(session.passage.range) : ''}${session.passage?.cueComplete ? '' : ' · Word highlighting incomplete'}`,
         }[session.status]
-    const readingLabel = session.recording.reading.name
+    const readingLabel = session.readingLabel ?? session.recording.reading.name
     const aliyahLabel = formatAliyahLabel(session.aliyahIndex)
 
     player.sync({
-      desktopTitle: `${readingLabel} · ${aliyahLabel}`,
-      mobileTitle: aliyahLabel,
+      desktopTitle: `${readingLabel} · ${aliyahLabel}${session.status === 'partial-passage' ? ' · available portion' : ''}`,
+      mobileTitle: `${aliyahLabel}${session.status === 'partial-passage' ? ' · available portion' : ''}`,
       subtitle: 'Audio',
       mobileReading: readingLabel,
       mode: session.cues.length ? 'Word cues' : 'No cues',
@@ -327,10 +334,10 @@ export function createPlaybackTimeline(
     }
 
     const session = audioController.session
-    const activeVideo = session
+    const activeVideo = session && !session.passage
       ? findVideoForRecording(session.recording.id)
       : null
-    const hasDownload = Boolean(session && session.status !== 'overlap-only')
+    const hasDownload = Boolean(session && session.status !== 'overlap-only' && (!session.passage || (session.segments.length === 1 && session.segments[0].startTime === 0 && session.segments[0].endTime === null)))
     const hasTimedCues = Boolean(session?.cues.length)
     const paused = audioController.audio.paused
 
@@ -369,6 +376,17 @@ export function createPlaybackTimeline(
     if (!session) return
     const scroll = syncOptions.scroll ?? options.getAutoScroll()
 
+    if (session.passage) {
+      const time = syncOptions.currentTime ?? audioController.currentTime
+      const index = highlightController.getCueIndex(session.cues, time)
+      const cue = session.cues[index]
+      const segment = session.segments.find(entry => time >= entry.logicalStart && time < entry.logicalEnd)
+      if (!cue || !segment || !segment.tokenKeys.includes(cueKey(cue)) ||
+        (cue.timeEnd !== undefined && time >= cue.timeEnd)) {
+        highlightController.clear()
+        return
+      }
+    }
     if (session.cues.length) {
       const cueIndex = highlightController.getCueIndex(
         session.cues,
@@ -439,7 +457,7 @@ export function createPlaybackTimeline(
       ? options.attemptReplayFromStart(() => restart(restartAudio))
       : null
 
-    if (session.cues.length) {
+    if (session.cues.length && (!session.passage || session.cues[0].timeStart === 0)) {
       cueNavigationIndex = 0
       await highlightController.activateCue(session.cues[0], {
         scroll: true,
@@ -755,6 +773,11 @@ export function createPlaybackTimeline(
       updateTimeline()
       if (options.isCueAuthoringRecording() || scrubbing) return
       const session = audioController.session
+      if (session?.passage) {
+        void syncHighlight({ currentTime })
+        updateCueProgress()
+        return
+      }
       if (!session?.cues.length) return
 
       const cueIndex = highlightController.getCueIndex(

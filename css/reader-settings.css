@@ -26,6 +26,57 @@
     backdrop-filter: blur(14px) saturate(115%);
   }
 
+  .settings-pane.is-positioned {
+    right: auto;
+  }
+
+  .settings-pane.is-dragging {
+    user-select: none;
+  }
+
+  .settings-drag-handle {
+    position: absolute;
+    top: 0.75rem;
+    left: 0.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.25rem;
+    padding: 0;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--light-text-color);
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .settings-drag-handle[hidden] {
+    display: none;
+  }
+
+  .settings-drag-handle .ui-icon {
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+
+  .settings-drag-handle:focus-visible {
+    outline: 2px solid var(--reader-focus-color);
+    outline-offset: -2px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .settings-drag-handle:hover {
+      background: var(--light-accent-color);
+      color: var(--text-color);
+    }
+  }
+
+  .settings-pane.is-dragging .settings-drag-handle {
+    cursor: grabbing;
+  }
+
   .settings-pane-header {
     min-height: 3.75rem;
     margin-left: 3.25rem;
@@ -928,6 +979,10 @@
   }
 
   @media screen and (max-width: 715px) {
+    .settings-pane.is-positioned {
+      width: calc(100vw - 1rem);
+    }
+
     .settings-pane {
       left: 0.5rem;
       right: 0.5rem;

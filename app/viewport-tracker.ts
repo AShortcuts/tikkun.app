@@ -86,9 +86,9 @@ export class ViewportTracker extends EventEmitter<ViewportTrackerEvents> {
     const firstLineY = clampToViewport(bounds.top + paddingTop)
     const centerLineY = clampToViewport(getReaderFocalPointClientY(this.book))
     const lastLineY = clampToViewport(bounds.bottom - 1)
-    if (this.lineTrackers.first.update(firstLineY)) updated = true
-    if (this.lineTrackers.center.update(centerLineY)) updated = true
-    if (this.lineTrackers.last.update(lastLineY)) updated = true
+    if (this.lineTrackers.first.update(firstLineY, force)) updated = true
+    if (this.lineTrackers.center.update(centerLineY, force)) updated = true
+    if (this.lineTrackers.last.update(lastLineY, force)) updated = true
 
     if (updated || force) {
       this.emit('viewport-updated', {
@@ -156,19 +156,23 @@ class LineViewportTracker {
       document.documentElement.clientWidth / 2,
       targetY
     )
-    this.walker.currentNode =
-      target?.closest('[data-line-index]') ?? target ?? this.root
+    const line = target?.closest('[data-line-index]')
+    // Hidden pages and gaps can hit a container outside the reader. A TreeWalker
+    // accepts that node but cannot reliably walk back into its own subtree.
+    this.walker.currentNode = line && this.root.contains(line) ? line : this.root
+    if (this.walker.currentNode === this.root) this.walker.nextNode()
   }
 
   /** Updates the current element.  Returns false if it did not change. */
-  update(targetY: number): boolean {
+  update(targetY: number, reset = false): boolean {
     const current = this.current
+    if (reset) this.resetWalker(targetY)
     this.maybeUpdate(targetY)
     return current !== this.current
   }
   private maybeUpdate(targetY: number) {
     if (this.walker.currentNode === this.root) this.resetWalker(targetY)
-    if (!this.walker.currentNode.isConnected) this.resetWalker(targetY)
+    if (!this.root.contains(this.walker.currentNode)) this.resetWalker(targetY)
 
     if (!(this.walker.currentNode instanceof Element))
       throw new Error('Not an element?')

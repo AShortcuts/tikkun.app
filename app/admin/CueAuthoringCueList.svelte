@@ -26,6 +26,8 @@
   let panelFrame = 0
 
   const hasSelection = $derived(selectedIndex >= 0)
+  const flaggedCount = $derived(items.filter(item => item.flags?.length).length)
+  const selectedFlags = $derived(items[selectedIndex]?.flags ?? [])
   const canMovePrevious = $derived(selectedIndex > 0)
   const canMoveNext = $derived(
     hasSelection && selectedIndex < items.length - 1
@@ -51,7 +53,8 @@
       const timeText = formatTimestamp(item.timeStart)
       const label =
         `Select saved timing for ${item.tokenLabel} at ${timeText}` +
-        (note ? `. ${note}` : '')
+        (note ? `. ${note}` : '') +
+        (item.flags?.length ? `. Flagged: ${item.flags.join(' ')}` : '')
       return {
         ...item,
         index,
@@ -259,6 +262,7 @@
           class:is-current={row.index === currentIndex}
           class:mod-warning={row.tone === 'warning'}
           class:mod-invalid={row.tone === 'invalid'}
+          class:is-flagged={Boolean(row.flags?.length)}
           data-admin-cue-index={row.index}
           title={row.label}
           aria-label={row.label}
@@ -268,6 +272,9 @@
           <span class="admin-cue-token">{row.tokenLabel}</span>
           <span class="admin-cue-time">{row.timeText}</span>
           <span class="admin-cue-delta">{row.deltaText}</span>
+          {#if row.flags?.length}
+            <span class="admin-cue-flag">Flagged</span>
+          {/if}
           {#if row.note}
             <span class="admin-cue-note">{row.note}</span>
           {/if}
@@ -275,6 +282,20 @@
       {/each}
     {/if}
   </div>
+  {#if flaggedCount}
+    <div class="admin-flag-review">
+      <div class="admin-panel-actions mod-secondary">
+        <button type="button" class="toolbar-button" data-target-id="admin-next-flag"
+          onclick={() => action({ type: 'next-flag' })}>Next flagged ({flaggedCount})</button>
+        <button type="button" class="toolbar-button" data-target-id="admin-review-flag"
+          disabled={!selectedFlags.length}
+          onclick={() => action({ type: 'review-flag' })}>Mark reviewed</button>
+      </div>
+      {#each selectedFlags as message, index (index)}
+        <p class="admin-flag-message">{message}</p>
+      {/each}
+    </div>
+  {/if}
 </div>
 
 <style>

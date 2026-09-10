@@ -92,6 +92,53 @@ test('keeps nested flyouts open while moving backward and closes outside', () =>
   expect(submenu.isConnected).toBe(false)
 })
 
+test.each(['same', 'another'] as const)(
+  'closes the aliyah flyout when hovering the %s parsha title',
+  (target) => {
+    const navigate = vi.fn()
+    const picker = mountPicker({ navigate })
+    const trigger = findDoublePortionTrigger(picker)
+    const ownLink = trigger.closest('.parsha-row')!.querySelector('a')!
+    const title = target === 'same'
+      ? ownLink
+      : [...picker.querySelectorAll<HTMLAnchorElement>('[data-parsha-id]')]
+        .find((link) => link !== ownLink)!
+
+    trigger.dispatchEvent(
+      new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' })
+    )
+    document.querySelector('.aliyah-selection-option.mod-group')!.dispatchEvent(
+      new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' })
+    )
+    expect(document.querySelectorAll('.aliyah-selection-popup')).toHaveLength(2)
+
+    title.dispatchEvent(
+      new PointerEvent('pointerover', {
+        bubbles: true,
+        pointerType: 'mouse',
+        relatedTarget: trigger,
+      })
+    )
+
+    expect(document.querySelector('.aliyah-selection-stack')).toBeNull()
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    expect(navigate).not.toHaveBeenCalled()
+    title.click()
+    expect(navigate).toHaveBeenCalledWith(title.getAttribute('href'))
+  }
+)
+
+test('keeps click-based aliyah selection open on non-hover screens', () => {
+  setHoverFlyoutSupport(false)
+  const picker = mountPicker()
+  const trigger = findDoublePortionTrigger(picker)
+  trigger.click()
+  trigger.closest('.parsha-row')!.querySelector('a')!.dispatchEvent(
+    new PointerEvent('pointerover', { bubbles: true, pointerType: 'touch' })
+  )
+  expect(document.querySelector('.aliyah-selection-popup')).not.toBeNull()
+})
+
 test('opens a nested aliyah flyout for a double portion', () => {
   const picker = mountPicker()
   const trigger = findDoublePortionTrigger(picker)

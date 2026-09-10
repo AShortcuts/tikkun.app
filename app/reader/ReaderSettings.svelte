@@ -76,6 +76,94 @@
   let pendingCustomThemeUpdates: Partial<ReaderPreferences> | null = null
   let compactViewportMedia: MediaQueryList | null = null
   let compactViewport = $state(false)
+  let paneElement: HTMLDivElement
+  let panePosition = $state<{ left: number; top: number } | null>(null)
+  let defaultPanePosition: { left: number; top: number } | null = null
+  let paneDrag = $state<{
+    pointerId: number
+    clientX: number
+    clientY: number
+    left: number
+    top: number
+  } | null>(null)
+
+  function movePane(left: number, top: number) {
+    const rect = paneElement.getBoundingClientRect()
+    const margin = 8
+    panePosition = {
+      left: Math.max(
+        margin,
+        Math.min(left, view.innerWidth - rect.width - margin)
+      ),
+      top: Math.max(
+        margin,
+        Math.min(top, view.innerHeight - rect.height - margin)
+      ),
+    }
+  }
+
+  function resetPanePosition() {
+    paneDrag = null
+    panePosition = null
+    defaultPanePosition = null
+  }
+
+  function onPaneDragStart(
+    event: PointerEvent & { currentTarget: HTMLButtonElement }
+  ) {
+    if (compactViewport || event.button !== 0) return
+    event.preventDefault()
+    event.currentTarget.focus({ preventScroll: true })
+    const rect = paneElement.getBoundingClientRect()
+    if (!panePosition) defaultPanePosition = { left: rect.left, top: rect.top }
+    paneDrag = {
+      pointerId: event.pointerId,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      left: rect.left,
+      top: rect.top,
+    }
+  }
+
+  function onPaneDragKey(event: KeyboardEvent) {
+    if (compactViewport) return
+    if (event.key === 'Home') {
+      event.preventDefault()
+      event.stopPropagation()
+      resetPanePosition()
+      return
+    }
+    let dx = 0
+    let dy = 0
+    switch (event.key) {
+      case 'ArrowLeft':
+        dx = -1
+        break
+      case 'ArrowRight':
+        dx = 1
+        break
+      case 'ArrowUp':
+        dy = -1
+        break
+      case 'ArrowDown':
+        dy = 1
+        break
+      default:
+        return
+    }
+    event.preventDefault()
+    event.stopPropagation()
+    const rect = paneElement.getBoundingClientRect()
+    if (!panePosition) defaultPanePosition = { left: rect.left, top: rect.top }
+    const distance = event.shiftKey ? 40 : 12
+    movePane(rect.left + dx * distance, rect.top + dy * distance)
+  }
+
+  function keepPaneInViewport() {
+    if (isOpen && !compactViewport && panePosition) {
+      movePane(panePosition.left, panePosition.top)
+    }
+  }
   type SettingsCategory = 'reading' | 'appearance' | 'playback' | 'more'
   let activeCategory = $state<SettingsCategory>('reading')
 
@@ -450,6 +538,7 @@
     flushSync(() => {
       isOpen = true
     })
+    keepPaneInViewport()
     void offlineTorah.refresh()
     void offlineRecording.refresh()
     toggle.setAttribute('aria-expanded', 'true')
@@ -462,6 +551,7 @@
 
   function close({ restoreFocus: shouldRestoreFocus = true } = {}) {
     if (!isOpen) return false
+    paneDrag = null
     commitCustomThemeUpdates()
     cancelScheduledFocus()
     flushSync(() => {
@@ -486,6 +576,7 @@
     compactViewport = compactViewportMedia.matches
     const handleCompactViewportChange = (event: MediaQueryListEvent) => {
       compactViewport = event.matches
+      paneDrag = null
     }
     if (typeof compactViewportMedia.addEventListener === 'function') {
       compactViewportMedia.addEventListener(
@@ -519,7 +610,43 @@
     connect(settings)
     ownerDocument.addEventListener('pointerdown', handleOutsidePointer)
 
+    const handlePaneDragMove = (event: PointerEvent) => {
+      if (!paneDrag || event.pointerId !== paneDrag.pointerId) return
+      movePane(
+        paneDrag.left + event.clientX - paneDrag.clientX,
+        paneDrag.top + event.clientY - paneDrag.clientY
+      )
+    }
+    const handlePaneDragFinish = (event: PointerEvent) => {
+      if (!paneDrag || event.pointerId !== paneDrag.pointerId) return
+      paneDrag = null
+      if (
+        panePosition &&
+        defaultPanePosition &&
+        Math.hypot(
+          panePosition.left - defaultPanePosition.left,
+          panePosition.top - defaultPanePosition.top
+        ) <= 56
+      ) resetPanePosition()
+    }
+    const cancelPaneDrag = () => {
+      paneDrag = null
+    }
+    view.addEventListener('pointermove', handlePaneDragMove)
+    view.addEventListener('pointerup', handlePaneDragFinish)
+    view.addEventListener('pointercancel', cancelPaneDrag)
+    view.addEventListener('blur', cancelPaneDrag)
+    view.addEventListener('resize', keepPaneInViewport)
+    const paneResizeObserver = new ResizeObserver(keepPaneInViewport)
+    paneResizeObserver.observe(paneElement)
+
     return () => {
+      paneResizeObserver.disconnect()
+      view.removeEventListener('pointermove', handlePaneDragMove)
+      view.removeEventListener('pointerup', handlePaneDragFinish)
+      view.removeEventListener('pointercancel', cancelPaneDrag)
+      view.removeEventListener('blur', cancelPaneDrag)
+      view.removeEventListener('resize', keepPaneInViewport)
       unsubscribeOffline()
       unsubscribeOfflineRecording()
       if (typeof compactViewportMedia?.removeEventListener === 'function') {
@@ -545,14 +672,36 @@
 </script>
 
 <div
+  bind:this={paneElement}
   class="settings-pane"
   class:u-hidden={!isOpen}
+  class:is-positioned={!compactViewport && panePosition !== null}
+  class:is-dragging={paneDrag !== null}
+  style:left={!compactViewport && panePosition
+    ? `${panePosition.left}px`
+    : undefined}
+  style:top={!compactViewport && panePosition
+    ? `${panePosition.top}px`
+    : undefined}
   data-target-id="settings-pane"
   id="reader-settings-pane"
   role="dialog"
   aria-labelledby="reader-settings-title"
   aria-hidden={!isOpen}
 >
+  <button
+    class="settings-drag-handle"
+    type="button"
+    data-target-id="settings-drag-handle"
+    aria-label="Move reader settings"
+    title="Drag to move reader settings. Double-click or press Home to reset. Arrow keys move; Shift moves farther."
+    hidden={compactViewport}
+    onpointerdown={onPaneDragStart}
+    onkeydown={onPaneDragKey}
+    ondblclick={resetPanePosition}
+  >
+    <UiIcon name="grip" />
+  </button>
   <header class="settings-pane-header">
     <div class="settings-pane-title">
       <h2 id="reader-settings-title">Reader Settings</h2>
@@ -1397,6 +1546,21 @@
         aria-label="Playback settings"
       >
         <h3 class="settings-panel-title">Playback</h3>
+        <section class="settings-section">
+          <h4 class="settings-section-title">Motion</h4>
+          <label class="settings-field mod-control-row">
+            <span class="settings-field-label">Reduced motion</span>
+            <select value={preferences.reducedMotion} onchange={(event) => {
+              const value = event.currentTarget.value
+              if (value === 'automatic' || value === 'on' || value === 'off') updatePreferences({ reducedMotion: value })
+            }}>
+              <option value="automatic">Use device setting</option>
+              <option value="on">On</option>
+              <option value="off">Off</option>
+            </select>
+          </label>
+          <p>Instant highlights without glow. Smooth scrolling and audio timing stay the same.</p>
+        </section>
         <section class="settings-section">
           <h4 class="settings-section-title">Audio</h4>
           <label class="settings-field mod-control-row">

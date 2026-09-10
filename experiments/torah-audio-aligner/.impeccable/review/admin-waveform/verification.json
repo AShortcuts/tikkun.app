@@ -1,0 +1,40 @@
+{
+  "recording": "Behalotecha Aliyah 1",
+  "baseline": {
+    "duration": 232.129887,
+    "buckets": 800,
+    "visibleBars": 160,
+    "bucketSeconds": 0.29016235875
+  },
+  "desktop": {
+    "viewport": [
+      1440,
+      1000
+    ],
+    "seekTime": 12,
+    "playhead": 0.5,
+    "follow": {
+      "time": 37.355673,
+      "start": 22,
+      "end": 46
+    }
+  },
+  "mobile": {
+    "canvas": {
+      "height": 137,
+      "width": 462
+    },
+    "cueMarkers": 13,
+    "duration": 232.129887,
+    "paused": true,
+    "playhead": 0.5338779166666671,
+    "status": "Waveform lane - 2:45-3:09",
+    "time": 177.81307,
+    "viewport": [
+      389,
+      721
+    ],
+    "windowEnd": 189,
+    "windowStart": 165
+  }
+}

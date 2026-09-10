@@ -1,7 +1,7 @@
 import type { ReaderPagePresentation } from '../reader-presentation.ts'
 import { verseStartWordIndex } from '../reading/aliyah-token-sequence.ts'
 import { applyAnnotationMode } from './annotation-rendering.ts'
-import { SEA_SHIRAH_UNITS, seaShirahLayout } from './sea-shirah-layout.ts'
+import { seaShirahGeometry, seaShirahLayout, type SeaShirahMeasurements } from './sea-shirah-layout.ts'
 
 const visibleWords = (root: ParentNode, selector: string) =>
   [...root.querySelectorAll<HTMLElement>(selector)].filter(
@@ -18,7 +18,7 @@ type ShirahWidths = {
   half: number
   gap: number
   trailingSpace: number
-  required: number
+  sea: SeaShirahMeasurements
   hasAliyahLabels: boolean
   measuredRows: WeakSet<HTMLElement>
   pageFirstSpanWidths: WeakMap<HTMLElement, number>
@@ -95,7 +95,7 @@ function sizeMatchShirah(
     half: 0,
     gap: 0,
     trailingSpace: 0,
-    required: 0,
+    sea: {},
     hasAliyahLabels: false,
     measuredRows: new WeakSet<HTMLElement>(),
     pageFirstSpanWidths: new WeakMap<HTMLElement, number>(),
@@ -117,7 +117,9 @@ function sizeMatchShirah(
       Number(row.dataset.pageNumber),
       Number(row.dataset.lineIndex),
     ),
-    fragments: [...row.querySelectorAll<HTMLElement>('.fragment')].map(
+    fragments: [...row.querySelectorAll<HTMLElement>(
+      kind === 'sea' ? '.reader-text-side:first-child .fragment' : '.fragment',
+    )].map(
       (fragment) => {
         const clone = fragment.cloneNode(true) as HTMLElement
         probe.append(clone)
@@ -125,8 +127,8 @@ function sizeMatchShirah(
       },
     ),
   }))
-  if (samples.length || (kind === 'haazinu' && !widths.gap)) book.append(probe)
-  if (kind === 'haazinu' && !widths.gap) {
+  if (samples.length || !widths.gap) book.append(probe)
+  if (!widths.gap) {
     widths.gap = gapSample.getBoundingClientRect().width
     // The original justification pseudo-element retained one trailing space.
     widths.trailingSpace = spaceSample.getBoundingClientRect().width
@@ -139,13 +141,11 @@ function sizeMatchShirah(
         (fragment) => fragment.getBoundingClientRect().width,
       )
       if (seaLayout) {
-        // Font measurement fits the whole template; it never moves its gaps.
-        seaLayout.tracks.forEach(([, span], index) => {
-          widths.required = Math.max(
-            widths.required,
-            ((measured[index] + 1) * SEA_SHIRAH_UNITS) / span,
-          )
+        const trackWidths = widths.sea[seaLayout.pattern] ?? []
+        measured.forEach((width, index) => {
+          trackWidths[index] = Math.max(trackWidths[index] ?? 0, width + 1)
         })
+        widths.sea[seaLayout.pattern] = trackWidths
       } else {
         widths.half = Math.max(widths.half, ...measured)
         widths.pageFirstSpanWidths.set(member, Math.max(
@@ -158,6 +158,19 @@ function sizeMatchShirah(
   probe.remove()
   unmeasuredRows.forEach((row) => widths.measuredRows.add(row))
   cache.set(key, widths)
+
+  const sea = kind === 'sea' ? seaShirahGeometry(widths.sea, widths.gap) : null
+  if (sea) {
+    const fontSize = Number.parseFloat(getComputedStyle(page).fontSize)
+    pages.forEach((member) => {
+      member.style.setProperty('--match-sea-outer', `${sea.outer / fontSize}em`)
+      member.style.setProperty('--match-sea-middle', `${sea.middle / fontSize}em`)
+      member.style.setProperty('--match-sea-half', `${sea.half / fontSize}em`)
+      member.style.setProperty('--match-sea-extended-left', `${sea.extendedLeft / fontSize}em`)
+      member.style.setProperty('--match-sea-penultimate-right', `${sea.penultimateRight / fontSize}em`)
+      member.style.setProperty('--match-sea-gap', `${widths.gap / fontSize}em`)
+    })
+  }
 
   if (kind === 'haazinu' && sides === 'one') {
     pages.forEach((member) => member.style.setProperty(
@@ -184,7 +197,7 @@ function sizeMatchShirah(
   const safeEdge = Number.parseFloat(
     getComputedStyle(document.documentElement).fontSize,
   )
-  const required = kind === 'sea' ? widths.required : 2 * widths.half + gap
+  const required = sea?.required ?? 2 * widths.half + gap
   widths.hasAliyahLabels ||= rows.some((row) =>
     row.querySelector('.line-gutter.mod-aliyot')?.textContent?.trim(),
   )
@@ -283,6 +296,7 @@ function sizeMatchShirah(
 
   pages.forEach((member, index) => {
     member.style.setProperty('--match-shirah-inline-size', `${width}px`)
+    member.style.setProperty('--match-shirah-text-scale', `${Math.min(1, width / desiredWidth)}em`)
     member.style.setProperty(
       '--match-shirah-inline-offset',
       `${right - contentRects[index].right}px`,

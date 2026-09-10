@@ -3,7 +3,7 @@ import type { RenderedLineInfo } from '../view-model/scroll-view-model.ts'
 import displayRange from '../display-range.ts'
 import hebrewNumeralFromInteger from '../hebrew-numeral.ts'
 import { createLastReadingHash } from '../reading/last-reading.ts'
-import { tokenizeReaderWords } from '../reader/word-tokenization.ts'
+import { isInvertedNun, tokenizeReaderWords } from '../reader/word-tokenization.ts'
 import { createSpecialLetterRenderer } from '../special-letters.ts'
 import textFilter from '../text-filter.ts'
 import { iconMarkup } from './icons.ts'
@@ -70,7 +70,7 @@ const renderWords = ({
     const endsPasuk = Boolean(annotatedWord?.text.includes('׃'))
     return `<span
         class="word ${activeWord?.isKri ? 'ktiv-kri' : ''}${endsPasuk ? ' mod-sof-pasuk' : ''}"
-        data-token-key="${tokenKey}"
+        ${isInvertedNun(annotatedWord?.text ?? '') ? '' : `data-token-key="${tokenKey}"`}
         data-page-number="${pageNumber}"
         data-line-index="${lineIndex}"
         data-fragment-index="${fragmentIndex}"
@@ -227,7 +227,6 @@ const renderTextFlow = ({
   lineIndex,
   presentation,
   surface,
-  seaLayout,
 }: {
   text: string[][]
   references: (
@@ -239,7 +238,6 @@ const renderTextFlow = ({
   lineIndex: number
   presentation: ReaderPagePresentation
   surface: ReaderTextSurface
-  seaLayout?: ReturnType<typeof seaShirahLayout>
 }) => {
   const fixedAnnotations =
     surface === 'tikkun' ? true : surface === 'torah' ? false : null
@@ -261,7 +259,6 @@ const renderTextFlow = ({
         <div class="column">
           ${column
             .map((fragment, fragmentIndex) => {
-              const track = seaLayout?.tracks[fragmentIndex]
               const annotatedText = textFilter({
                 text: fragment,
                 annotated: true,
@@ -272,7 +269,7 @@ const renderTextFlow = ({
                   : textFilter({ text: fragment, annotated: false })
 
               return `
-            <span class="fragment ${setumaClass(column)}"${track ? ` style="--match-shirah-track: ${track[0]} / span ${track[1]}"` : ''}>${renderWords(
+            <span class="fragment ${setumaClass(column)}">${renderWords(
               {
                 annotatedText,
                 unannotatedText,
@@ -409,9 +406,6 @@ const Line = ({
               lineIndex,
               presentation,
               surface: side,
-              seaLayout: matchShirahLayout?.kind === 'sea'
-                ? seaShirahLayout(pageNumber, lineIndex)
-                : null,
             }),
           )
           .join('')
@@ -423,10 +417,6 @@ const Line = ({
           lineIndex,
           presentation,
           surface,
-          seaLayout:
-            matchShirahLayout?.kind === 'sea'
-              ? seaShirahLayout(pageNumber, lineIndex)
-              : null,
         })
 
   if (presentation.layout === 'reading') {

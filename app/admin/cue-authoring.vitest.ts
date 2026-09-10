@@ -1,4 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest'
+import { flushSync } from 'svelte'
 import type { ParshaAudioRecording, WordCue } from '../audio/types.ts'
 import { createCueDraftPayload } from '../audio/cue-draft.ts'
 import { TOKENIZATION_VERSION } from '../audio/cue-schema.ts'
@@ -752,6 +753,64 @@ test('keeps a delayed rejected save downloadable on its original recording', asy
   })
 })
 
+test('Space toggles admin playback when not recording and advances one word when recording', async () => {
+  const { audioController, highlightController } = createFixture()
+  let paused = true
+  vi.spyOn(audioController.audio, 'paused', 'get').mockImplementation(() => paused)
+  const pause = vi.spyOn(audioController.audio, 'pause').mockImplementation(() => { paused = true })
+  const play = vi.fn(async () => { paused = false; return true })
+  let authoring!: CueAuthoring
+  destroy = createMount()((scope) => {
+    authoring = createCueAuthoring(scope, createOptions(audioController, highlightController, {
+      playNetworkRecording: play,
+    }))
+  })
+  sessionStorage.setItem('tikkun-admin-unlocked', '1')
+  sessionStorage.setItem('tikkun-admin-panel-open', '1')
+  authoring.restoreAccessState()
+  await audioController.loadSession(createActiveAudioSession(buildPlaybackPlan({
+    target: { runId: 'run', index: 1 }, tokenKeys,
+    current: { recording: recording('current', 1), cues: tokenKeys.map((key, index) => cue(key, index)) },
+  })!))
+  highlightController.setSequence(tokenKeys)
+  await authoring.bindSession()
+  await highlightController.activateTokenKey(tokenKeys[0], { scroll: false })
+  const originalCues = structuredClone(audioController.session!.cues)
+  fixture!.addEventListener('keydown', event => authoring.handleKeydown(event))
+  const record = required<HTMLButtonElement>('[data-target-id="admin-record"]')
+  const space = (target: HTMLElement, repeat = false) => {
+    const event = new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true, cancelable: true, repeat })
+    target.dispatchEvent(event)
+    return event
+  }
+  pause.mockClear()
+  expect(space(record).defaultPrevented).toBe(true)
+  expect(play).toHaveBeenCalledOnce()
+  expect(paused).toBe(false)
+  space(record, true)
+  expect(pause).not.toHaveBeenCalled()
+  space(record)
+  expect(pause).toHaveBeenCalledOnce()
+  expect(paused).toBe(true)
+  expect(authoring.isRecording()).toBe(false)
+  expect(audioController.session!.cues).toEqual(originalCues)
+  expect(highlightController.getActiveTokenKey()).toBe(tokenKeys[0])
+
+  const input = document.createElement('input')
+  fixture!.append(input)
+  expect(space(input).defaultPrevented).toBe(false)
+  expect(play).toHaveBeenCalledOnce()
+
+  record.click()
+  expect(authoring.isRecording()).toBe(true)
+  const playCount = play.mock.calls.length
+  const pauseCount = pause.mock.calls.length
+  expect(space(record).defaultPrevented).toBe(true)
+  await vi.waitFor(() => expect(highlightController.getActiveTokenKey()).toBe(tokenKeys[1]))
+  expect(play).toHaveBeenCalledTimes(playCount)
+  expect(pause).toHaveBeenCalledTimes(pauseCount)
+})
+
 test('steps back from the highlighted word only while timing existing cues', async () => {
   const timingTokenKeys = [
     '1:0:0:0',
@@ -1150,20 +1209,22 @@ test('keeps the Svelte issue dialog open when persistence fails and retries safe
   )
   expect(modal.getAttribute('aria-hidden')).toBe('false')
   const firstIssue = required<HTMLButtonElement>('[data-issue-kind]')
-  expect(document.activeElement).toBe(firstIssue)
+  expect(document.activeElement).toBe(modal)
 
   const storageFailure = vi
     .spyOn(Storage.prototype, 'setItem')
     .mockImplementation(() => {
       throw new DOMException('Storage unavailable', 'QuotaExceededError')
     })
-  firstIssue.click()
+  flushSync(() => firstIssue.click())
+  const saveIssue = required<HTMLButtonElement>('[data-target-id="recording-issue-save"]')
+  saveIssue.click()
 
   expect(modal.getAttribute('aria-hidden')).toBe('false')
   expect(onLocalRecordingIssuesChanged).not.toHaveBeenCalled()
 
   storageFailure.mockRestore()
-  firstIssue.click()
+  saveIssue.click()
   expect(modal.getAttribute('aria-hidden')).toBe('true')
   expect(onLocalRecordingIssuesChanged).toHaveBeenCalledOnce()
 })
@@ -1222,9 +1283,10 @@ test('persists only local recording issue overlays when published issues are vis
   highlightController.setSequence(tokenKeys)
   await cueAuthoring.bindSession()
   cueAuthoring.openIssue()
-  required<HTMLButtonElement>(
+  flushSync(() => required<HTMLButtonElement>(
     '[data-issue-kind="repeated-word"]'
-  ).click()
+  ).click())
+  required<HTMLButtonElement>('[data-target-id="recording-issue-save"]').click()
 
   expect(localIssues).toHaveLength(1)
   expect(localIssues[0]).not.toEqual(publishedIssue)
@@ -1300,11 +1362,13 @@ test('keeps a stale issue save open, adopts newer local state, and retries witho
   const issueButton = required<HTMLButtonElement>(
     '[data-issue-kind="repeated-word"]'
   )
-  issueButton.click()
+  flushSync(() => issueButton.click())
+  const saveIssue = required<HTMLButtonElement>('[data-target-id="recording-issue-save"]')
+  saveIssue.click()
   expect(modal.getAttribute('aria-hidden')).toBe('false')
   expect(localIssues).toEqual([newerTabIssue])
 
-  issueButton.click()
+  saveIssue.click()
   expect(modal.getAttribute('aria-hidden')).toBe('true')
   expect(localIssues).toHaveLength(2)
   expect(localIssues).toContainEqual(newerTabIssue)
@@ -1504,6 +1568,76 @@ function createCueAuthoringPlaybackAdapter(
 }
 
 const tokenKeys = ['1:0:0:0', '1:0:0:1']
+
+test('imports generated flags, navigates and adjusts them, then preserves their review state in exports and reloads', async () => {
+  const { audioController, highlightController } = createFixture()
+  const writeText = vi.fn().mockResolvedValue(undefined)
+  installClipboard(writeText)
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:flagged-cues-test')
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+  const notice = vi.fn()
+  let authoring!: CueAuthoring
+  const mountAuthoring = () => {
+    destroy = createMount()((scope) => {
+      authoring = createCueAuthoring(scope, createOptions(audioController, highlightController, {
+        showPersistenceNotice: notice,
+      }))
+    })
+  }
+  mountAuthoring()
+  await audioController.loadSession(createActiveAudioSession(buildPlaybackPlan({
+    target: { runId: 'run', index: 1 }, tokenKeys,
+    current: { recording: recording('current', 1), cues: [cue(tokenKeys[0], 0), cue(tokenKeys[1], 3.25)] },
+  })!))
+  highlightController.setSequence(tokenKeys)
+  await authoring.bindSession()
+  const imported = {
+    ...draftRecordingIdentity(recording('current', 1)), tokenCount: 2, cueCount: 2,
+    tokenizationVersion: TOKENIZATION_VERSION,
+    cues: tokenKeys.map((key, index) => ({ ...cue(key, index * 3.25), cueNumber: index + 1,
+      review: { source: 'torah-audio-aligner', status: 'pending', flags: [{
+        id: `test-flag:${index}`, kind: 'unclear_audio', status: 'pending', message: 'Check this onset.',
+      }] },
+    })),
+  }
+  const chooseFile = () => {
+    const input = required<HTMLInputElement>('[aria-label="Import cue JSON for the loaded recording"]')
+    const files = new DataTransfer()
+    files.items.add(new File([JSON.stringify(imported)], 'generated-cues.json', { type: 'application/json' }))
+    input.files = files.files
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  }
+  chooseFile()
+  await vi.waitFor(() => expect(confirm).toHaveBeenCalledTimes(1))
+  expect(document.querySelectorAll('.admin-cue-row.is-flagged')).toHaveLength(0)
+  confirm.mockReturnValue(true)
+  chooseFile()
+  await vi.waitFor(() => expect(document.querySelectorAll('.admin-cue-row.is-flagged')).toHaveLength(2))
+  await vi.waitFor(() => expect(notice).toHaveBeenCalledWith(expect.stringContaining('2 pending flags')))
+  expect(getComputedStyle(required('.admin-cue-row.is-flagged:not(.is-selected)')).backgroundColor).toBe('rgb(255, 240, 220)')
+  required<HTMLButtonElement>('[data-target-id="admin-next-flag"]').click()
+  await vi.waitFor(() => expect(required('[data-admin-cue-index="1"]').classList.contains('is-selected')).toBe(true))
+  required<HTMLButtonElement>('[data-admin-nudge="0.05"]').click()
+  await vi.waitFor(() => expect(audioController.session?.cues[1].timeStart).toBe(3.3))
+  expect(document.querySelectorAll('.admin-cue-row.is-flagged')).toHaveLength(2)
+  required<HTMLButtonElement>('[data-target-id="admin-export"]').click()
+  await vi.waitFor(() => expect(writeText).toHaveBeenCalledTimes(1))
+  expect(JSON.parse(writeText.mock.calls[0][0]).cues[1].review.flags[0].status).toBe('pending')
+  required<HTMLButtonElement>('[data-target-id="export-close"]').click()
+  required<HTMLButtonElement>('[data-target-id="admin-review-flag"]').click()
+  await vi.waitFor(() => expect(document.querySelectorAll('.admin-cue-row.is-flagged')).toHaveLength(1))
+  await vi.waitFor(() => expect(JSON.parse(localStorage.getItem('tikkun-admin-draft:current')!).cues[1].review.flags[0].status).toBe('reviewed'))
+  destroy!()
+  mountAuthoring()
+  await authoring.bindSession()
+  expect(document.querySelectorAll('.admin-cue-row.is-flagged')).toHaveLength(1)
+  required<HTMLButtonElement>('[data-target-id="admin-export"]').click()
+  await vi.waitFor(() => expect(writeText).toHaveBeenCalledTimes(2))
+  const reexport = JSON.parse(writeText.mock.calls[1][0])
+  expect(reexport.cues[0].review.flags[0].status).toBe('pending')
+  expect(reexport.cues[1].review.flags[0]).toMatchObject({ status: 'reviewed', message: 'Check this onset.' })
+})
 
 function createFixture(keys: readonly string[] = tokenKeys) {
   fixture = document.createElement('div')

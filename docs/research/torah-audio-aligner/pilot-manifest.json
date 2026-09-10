@@ -1,0 +1,162 @@
+{
+  "status": "proposed-not-run",
+  "isBenchmarkResult": false,
+  "preparedAt": "2026-09-09T01:38:45.646Z",
+  "gitHead": "7232cd63d99b8baabe139d1651dcfb077ca6f0d2",
+  "textPagesSha256": "c4a212e60db1e79e1b6a3ec7eb3e5650964105f4aef9339dcc4b8d7f61557877",
+  "textPageHashScheme": "SHA-256 over each numeric page filename, NUL, exact file bytes, NUL, sorted by numeric page.",
+  "initialSmokeTest": {
+    "audioId": "haazinu-1",
+    "narratorId": "yoni-davidov",
+    "mediaPath": "site/audio/yoni-davidov/haazinu/1.m4a",
+    "mediaIdentity": {
+      "algorithm": "sha256",
+      "digest": "7f2e53b7103350e6bec3092ae8fda2d462b036be6c803704fb02455040a0de06",
+      "byteLength": 2172064
+    },
+    "durationSeconds": 76.184671,
+    "legacyCuePath": "audio-cues/yoni-davidov/haazinu/1.json",
+    "legacyDisplayTokenCueCount": 57,
+    "legacyCuesUsage": "Scoring and annotation reference only; do not provide timestamps to the automatic aligner.",
+    "tokenizationVersion": "v2"
+  },
+  "inputs": [
+    {
+      "audioId": "beresheet-1",
+      "narratorId": "yoni-davidov",
+      "mediaPath": "site/audio/yoni-davidov/beresheet/1.m4a",
+      "mediaIdentity": {
+        "algorithm": "sha256",
+        "digest": "e7f1093857d6c095916e5e3d432b62f3c383722462b1f5fa852f4434f091651c",
+        "byteLength": 5329663
+      },
+      "durationSeconds": 641.344,
+      "legacyCuePath": "audio-cues/yoni-davidov/beresheet/1.json",
+      "legacyDisplayTokenCueCount": 400,
+      "legacyCuesUsage": "Scoring and annotation reference only; do not provide timestamps to the automatic aligner.",
+      "tokenizationVersion": "v2"
+    },
+    {
+      "audioId": "beresheet-2",
+      "narratorId": "yoni-davidov",
+      "mediaPath": "site/audio/yoni-davidov/beresheet/2.m4a",
+      "mediaIdentity": {
+        "algorithm": "sha256",
+        "digest": "fc23e60684bb4f870d671ae30ac0dc01edcd6c2129d91f843a87791e1e6c204c",
+        "byteLength": 6958697
+      },
+      "durationSeconds": 330.845669,
+      "legacyCuePath": "audio-cues/yoni-davidov/beresheet/2.json",
+      "legacyDisplayTokenCueCount": 188,
+      "legacyCuesUsage": "Scoring and annotation reference only; do not provide timestamps to the automatic aligner.",
+      "tokenizationVersion": "v2"
+    },
+    {
+      "audioId": "noach-6",
+      "narratorId": "yoni-davidov",
+      "mediaPath": "site/audio/yoni-davidov/noach/6.m4a",
+      "mediaIdentity": {
+        "algorithm": "sha256",
+        "digest": "c648a4aab10065a1de3a7a70139fd72e562a573c640c7c9c8873f1409e3fa1c5",
+        "byteLength": 13530151
+      },
+      "durationSeconds": 474.035374,
+      "legacyCuePath": "audio-cues/yoni-davidov/noach/6.json",
+      "legacyDisplayTokenCueCount": 347,
+      "legacyCuesUsage": "Scoring and annotation reference only; do not provide timestamps to the automatic aligner.",
+      "tokenizationVersion": "v2"
+    },
+    {
+      "audioId": "lech-lecha-6",
+      "narratorId": "yoni-davidov",
+      "mediaPath": "site/audio/yoni-davidov/lech-lecha/6.m4a",
+      "mediaIdentity": {
+        "algorithm": "sha256",
+        "digest": "420bf546c3d387f81054f9baf762b01a7b2ad90ca3b73f57d1e8af32cc2dbcb1",
+        "byteLength": 5001072
+      },
+      "durationSeconds": 614.957279,
+      "legacyCuePath": "audio-cues/yoni-davidov/lech-lecha/6.json",
+      "legacyDisplayTokenCueCount": 409,
+      "legacyCuesUsage": "Scoring and annotation reference only; do not provide timestamps to the automatic aligner.",
+      "tokenizationVersion": "v2"
+    },
+    {
+      "audioId": "haazinu-4",
+      "narratorId": "yoni-davidov",
+      "mediaPath": "site/audio/yoni-davidov/haazinu/4.m4a",
+      "mediaIdentity": {
+        "algorithm": "sha256",
+        "digest": "75f5d48b46fe8d301f4f8925c1bbe6ca8d8d389e87bfe8f299bc0767d7e9968f",
+        "byteLength": 1066705
+      },
+      "durationSeconds": 126.336,
+      "legacyCuePath": "audio-cues/yoni-davidov/haazinu/4.json",
+      "legacyDisplayTokenCueCount": 93,
+      "legacyCuesUsage": "Scoring and annotation reference only; do not provide timestamps to the automatic aligner.",
+      "tokenizationVersion": "v2"
+    },
+    {
+      "audioId": "yitro-2",
+      "narratorId": "yoni-davidov",
+      "mediaPath": "site/audio/yoni-davidov/yitro/2.m4a",
+      "mediaIdentity": {
+        "algorithm": "sha256",
+        "digest": "bebfbcb46070bc71a535312d5fa486480d4a77b0103f0c64285fa52d5b7a3fdb",
+        "byteLength": 1819534
+      },
+      "durationSeconds": 215.597279,
+      "legacyCuePath": "audio-cues/yoni-davidov/yitro/2.json",
+      "legacyDisplayTokenCueCount": 162,
+      "legacyCuesUsage": "Scoring and annotation reference only; do not provide timestamps to the automatic aligner.",
+      "tokenizationVersion": "v2"
+    }
+  ],
+  "totals": {
+    "recordings": 6,
+    "audioSeconds": 2403.115601,
+    "legacyDisplayTokenCues": 1599,
+    "mediaBytes": 33705822
+  },
+  "candidates": [
+    {
+      "checkpoint": "imvladikon/wav2vec2-xls-r-300m-lm-hebrew",
+      "revision": null,
+      "revisionStatus": "Must resolve and pin before execution",
+      "weightsFormat": "safetensors",
+      "acousticLogitsOnly": true,
+      "decoders": [
+        "WhisperX supplied-text alignment adapter",
+        "ctc-segmentation adapter"
+      ],
+      "purpose": "Compare decoding methods using one acoustic checkpoint before adding another encoder."
+    }
+  ],
+  "evaluation": {
+    "humanBoundaryTargets": 300,
+    "humanBoundaryTargetMaximum": 500,
+    "wordEnds": "Fresh annotation on a dense subset; legacy cues contain no ends.",
+    "firstStarts": "All legacy file starts were normalized to zero; annotate actual acoustic onsets.",
+    "maqafInteriorBoundaries": "Unlabeled; require separate lexical annotation.",
+    "split": "Create fixed calibration/evaluation splits by passage or session before tuning; all related crops and transformations stay together.",
+    "readerGeneralization": "Not measurable from this one-narrator pilot.",
+    "modelResults": null
+  },
+  "executionPreflight": {
+    "requiredBeforeModelExecution": true,
+    "automaticDownloads": false,
+    "checkpointWeightsListedGB": 1.26,
+    "estimatedFreshEnvironmentDownloadGB": [
+      2,
+      3
+    ],
+    "estimatedWorkerMemoryGiB": [
+      4,
+      8
+    ],
+    "initialCpuThreads": 4,
+    "proposedSmokeTimeoutSeconds": 600,
+    "fullPilotRuntime": "Estimate from the smoke test before proceeding.",
+    "sourceMediaPolicy": "Original files immutable; analysis derivatives retain source-time mappings."
+  }
+}

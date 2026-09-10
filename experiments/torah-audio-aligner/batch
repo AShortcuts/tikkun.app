@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+task_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+export PYTHONDONTWRITEBYTECODE=1
+if [ "$#" -eq 0 ] && [ -f "$task_dir/work/private-batch-cue-flags/queue.json" ]; then
+  set -- --port 8768 --review-dir private-batch-cue-flags
+fi
+exec "$task_dir/.venv/bin/python" -B "$task_dir/batch_server.py" "$@"

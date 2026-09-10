@@ -47,6 +47,32 @@ const pageLoaders: Record<string, PageLoader> | null = isNodeRuntime
       import: 'default',
     })
 
+export async function loadScrollPageLines(scroll: ScrollName, pageNumber: number): Promise<LineType[]> {
+    const pageLoader =
+      pageLoaders?.[
+        `../../text/pages/${scroll}/${pageNumber}.json`
+      ]
+
+    if (pageLoader) {
+      return pageLoader()
+    } else if (import.meta.env?.MODE) {
+      // Vite dynamic imports doesn't support the second parameter
+      const page = await import(
+        /* @vite-ignore */
+        `../../text/pages/${scroll}/${pageNumber}.json`
+      )
+      return page.default
+    } else {
+      const page = await import(
+        /* @vite-ignore */
+        `../../text/pages/${scroll}/${pageNumber}.json`,
+        // Node.js requires the second parameter.
+        { with: { type: 'json' } }
+      )
+      return page.default
+    }
+}
+
 /** Information to render a single page from a scroll. */
 export interface RenderedPageInfo {
   type: 'page'
@@ -380,29 +406,7 @@ export abstract class ScrollViewModel {
   }
 
   protected async loadPageLines(pageNumber: number): Promise<LineType[]> {
-    const pageLoader =
-      pageLoaders?.[
-        `../../text/pages/${this.relevantRuns[0].scroll}/${pageNumber}.json`
-      ]
-
-    if (pageLoader) {
-      return pageLoader()
-    } else if (import.meta.env?.MODE) {
-      // Vite dynamic imports doesn't support the second parameter
-      const page = await import(
-        /* @vite-ignore */
-        `../../text/pages/${this.relevantRuns[0].scroll}/${pageNumber}.json`
-      )
-      return page.default
-    } else {
-      const page = await import(
-        /* @vite-ignore */
-        `../../text/pages/${this.relevantRuns[0].scroll}/${pageNumber}.json`,
-        // Node.js requires the second parameter.
-        { with: { type: 'json' } }
-      )
-      return page.default
-    }
+    return loadScrollPageLines(this.relevantRuns[0].scroll, pageNumber)
   }
 
   private findContainingAliyot(

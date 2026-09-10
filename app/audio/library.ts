@@ -9,6 +9,7 @@ import {
 import { audioRecordings } from '../data/audio-catalog.ts'
 import type { AudioNarrator, AudioRecording, WordCue } from './types.ts'
 import { normalizeFirstCueStart } from './normalize-first-cue.ts'
+import { TOKENIZATION_VERSION } from './cue-schema.ts'
 import { filterRecordingIssues } from './recording-issues.ts'
 export {
   findAuthoringRecordingForRun,
@@ -39,6 +40,17 @@ export function retryCueDataResolutionForRecording(recording: AudioRecording) {
 export async function getCuesForRecording(recording: AudioRecording): Promise<WordCue[]> {
   const payload = await getCuePayloadForRecording(recording)
   return normalizeFirstCueStart(payload?.cues ?? [])
+}
+
+export async function getPassageCuesForRecording(recording: AudioRecording): Promise<WordCue[]> {
+  const payload = await getCuePayloadForRecording(recording)
+  if (!payload) return []
+  if (payload.tokenizationVersion !== TOKENIZATION_VERSION) {
+    console.warn(`Ignoring outdated passage timings for ${recording.id}`)
+    return []
+  }
+  // Excerpts need original media offsets, including a late first published cue.
+  return payload.cues
 }
 
 export async function getIssuesForRecording(

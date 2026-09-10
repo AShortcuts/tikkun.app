@@ -180,17 +180,22 @@ html[data-reader-side-mode='two'] .reader-corner-controls {
 
 .toolbar-button,
 .aliyah-link,
-.aliyah-audio-button,
 .annotations-toggle,
 .app-update-button,
 .app-update-dismiss,
 .settings-offline-button,
-.settings-segmented-option,
-.aliyah-audio-button.is-active {
+.settings-segmented-option {
   transition:
     background-color var(--reader-motion-color) var(--reader-ease-standard),
     border-color var(--reader-motion-color) var(--reader-ease-standard),
     color var(--reader-motion-color) var(--reader-ease-standard),
+    opacity var(--reader-motion-color) var(--reader-ease-standard),
+    transform var(--reader-motion-fast) var(--reader-ease-out);
+}
+
+.aliyah-audio-button {
+  /* Playback color changes with the icon, not after it. */
+  transition:
     opacity var(--reader-motion-color) var(--reader-ease-standard),
     transform var(--reader-motion-fast) var(--reader-ease-out);
 }

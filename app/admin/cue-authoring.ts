@@ -12,6 +12,8 @@ import {
 } from '../audio/library.ts'
 import type { CueDataResolution } from '../audio/cue-data.ts'
 import { normalizeFirstCueStart } from '../audio/normalize-first-cue.ts'
+import { pendingCueFlags, nextFlaggedCueIndex, markCueReviewed } from '../audio/cue-review.ts'
+import { parseCueImport } from './cue-import.ts'
 import { getWordProgress } from '../audio/progress.ts'
 import {
   createRecordingIssue,
@@ -219,6 +221,7 @@ export function createCueAuthoring(
   let microphoneReplacementAudioId: string | null = null
   let sessionBindingGeneration = 0
   let boundSession: ReaderPlaybackCueAuthoringSessionSnapshot | null = null
+  let pendingIssueAudioId: string | null = null
   let pendingIssueTokenKey: string | null = null
   let pendingIssueTimeStart: number | undefined
   let accessDialog: CueAuthoringAccessDialog | null = null
@@ -447,6 +450,7 @@ export function createCueAuthoring(
   }
 
   const clearSession = () => {
+    issueDialog?.close()
     sessionBindingGeneration += 1
     boundSession = null
     draftEditor.clear()
@@ -462,6 +466,7 @@ export function createCueAuthoring(
   }
 
   const bindSession = async () => {
+    issueDialog?.close()
     const generation = ++sessionBindingGeneration
     const session = playback.session()
     if (!session) {
@@ -723,6 +728,7 @@ export function createCueAuthoring(
           key: `${formatTokenKey(cue)}:${index}`,
           tokenLabel: getTokenLabel(index),
           timeStart: cue.timeStart,
+          flags: pendingCueFlags(cue).map(flag => flag.message),
         }))
       : []
     const selectedCueIndex = session ? getEditableCueIndex() : -1
@@ -1000,6 +1006,7 @@ export function createCueAuthoring(
       canReset:
         sessionReady && (hasCues || draft.recording || draft.tokenPointer >= 0),
       canExport: sessionReady && draft.exportReady,
+      canImport: sessionReady && !draft.recording && !microphoneBusy && !draft.saveProblem,
       exportChanged: hasLocalCueChanges(),
       resumeWord: canResumeDraft ? draft.cues.length + 1 : null,
     }
@@ -1194,6 +1201,7 @@ export function createCueAuthoring(
         lineIndex: cue.lineIndex,
         fragmentIndex: cue.fragmentIndex,
         wordIndex: cue.wordIndex,
+        ...(cue.review ? { review: cue.review } : {}),
       })
     )
     const payload: CueExportPayload = {
@@ -1433,6 +1441,19 @@ export function createCueAuthoring(
   const handleCueListAction = (action: CueAuthoringCueListAction) => {
     const selectedCueIndex = getEditableCueIndex()
     switch (action.type) {
+      case 'next-flag': {
+        const nextIndex = nextFlaggedCueIndex(draftSnapshot().cues, selectedCueIndex)
+        if (nextIndex >= 0) void selectToken(nextIndex, { focusRow: true })
+        break
+      }
+      case 'review-flag':
+        commitDraftEdit(() => {
+          const cues = draftSnapshot().cues
+          if (!cues[selectedCueIndex] || !pendingCueFlags(cues[selectedCueIndex]).length) return null
+          draftEditor.replaceCues(cues.map((cue, index) => index === selectedCueIndex ? markCueReviewed(cue) : cue))
+          return true
+        })
+        break
       case 'select':
         void selectToken(action.index)
         break
@@ -1466,42 +1487,19 @@ export function createCueAuthoring(
     recordingIssueReaderLabel({ kind }).replace(/\bhere$/, '').trim()
 
   const clearPendingIssue = () => {
+    pendingIssueAudioId = null
     pendingIssueTokenKey = null
     pendingIssueTimeStart = undefined
   }
 
   const closeIssueModal = () => issueDialog?.close()
 
-  const saveIssue = ({
-    kind,
-    note,
-    readerVisible,
-  }: CueAuthoringIssueInput) => {
+  const persistIssueChanges = (nextIssues: RecordingIssue[]) => {
     const session = getSession()
-    if (!session || !pendingIssueTokenKey) return false
-    const issue = createRecordingIssue({
-      audioId: session.recording.id,
-      tokenKey: pendingIssueTokenKey,
-      timeStart: pendingIssueTimeStart,
-      kind,
-      visibility: readerVisible ? 'readerVisible' : 'authoringOnly',
-      severity: kind === 'other' ? 'low' : 'medium',
-      note,
-      createdAt: Date.now(),
-      tokenizationVersion: TOKENIZATION_VERSION,
-    })
-    const nextIssues = [
-      ...options
-        .getLocalRecordingIssues()
-        .filter(
-          (candidate) =>
-            !(
-              candidate.tokenKey === issue.tokenKey &&
-              candidate.kind === issue.kind
-            )
-        ),
-      issue,
-    ]
+    if (!session || session.recording.id !== pendingIssueAudioId || !pendingIssueTokenKey) {
+      state.recordingIssueSaveError = 'The selected recording changed. Close this dialog and select the word again.'
+      return false
+    }
     let savedRevision: PersistedJsonRevision
     try {
       savedRevision = saveLocalRecordingIssues(
@@ -1534,7 +1532,44 @@ export function createCueAuthoring(
     waveform?.contentChanged()
     options.onLocalRecordingIssuesChanged(nextIssues, savedRevision)
     syncCueList()
+    syncPanel()
     return true
+  }
+
+  const selectedIssue = (issueId: string) => options.getMergedRecordingIssues().find(issue =>
+    issue.id === issueId && issue.audioId === pendingIssueAudioId && issue.tokenKey === pendingIssueTokenKey)
+
+  const saveIssue = ({ issueId, kind, note, readerVisible }: CueAuthoringIssueInput) => {
+    const session = getSession()
+    const previous = issueId ? selectedIssue(issueId) : undefined
+    if (!session || !pendingIssueTokenKey || session.recording.id !== pendingIssueAudioId || (issueId && !previous)) {
+      state.recordingIssueSaveError = 'This issue or recording changed. Close this dialog and select the word again.'
+      return false
+    }
+    const issue = createRecordingIssue({
+      audioId: session.recording.id, tokenKey: pendingIssueTokenKey,
+      timeStart: pendingIssueTimeStart, kind,
+      visibility: readerVisible ? 'readerVisible' : 'authoringOnly',
+      severity: kind === 'other' ? 'low' : 'medium', note,
+      createdAt: Date.now(), tokenizationVersion: TOKENIZATION_VERSION,
+    })
+    const nextIssues = options.getLocalRecordingIssues().filter(candidate =>
+      candidate.id !== previous?.id && !(candidate.tokenKey === issue.tokenKey && candidate.kind === issue.kind))
+    if (previous && previous.kind !== kind) nextIssues.push({ ...previous, removed: true })
+    return persistIssueChanges([...nextIssues, issue])
+  }
+
+  const removeIssue = (issueId: string) => {
+    const issue = selectedIssue(issueId)
+    if (!issue) {
+      state.recordingIssueSaveError = 'This issue changed. Close this dialog and select the word again.'
+      return false
+    }
+    return persistIssueChanges([
+      ...options.getLocalRecordingIssues().filter(candidate =>
+        !(candidate.tokenKey === issue.tokenKey && candidate.kind === issue.kind)),
+      { ...issue, removed: true },
+    ])
   }
 
   const openIssueModal = () => {
@@ -1542,15 +1577,25 @@ export function createCueAuthoring(
     if (!session) return
     const tokenKey = options.getActiveTokenKey()
     if (!tokenKey) return
+    if (!session.tokenKeys.includes(tokenKey)) {
+      options.showPersistenceNotice('Select a word in the loaded recording before marking an issue.')
+      return
+    }
     const cue = draftSnapshot().cues.find(
       (candidate) => formatTokenKey(candidate) === tokenKey
     )
+    pendingIssueAudioId = session.recording.id
     pendingIssueTokenKey = tokenKey
     pendingIssueTimeStart = cue?.timeStart ?? playback.snapshot().currentTime
     if (!issueDialog) {
       throw new Error('Cue Authoring Issue Dialog is not mounted')
     }
-    issueDialog.open()
+    state.recordingIssueSaveError = null
+    issueDialog.open({
+      issues: options.getMergedRecordingIssues().filter(issue =>
+        issue.audioId === session.recording.id && issue.tokenKey === tokenKey),
+      wordLabel: getTokenLabel(session.tokenKeys.indexOf(tokenKey)),
+    })
   }
 
   const setVisible = (visible: boolean) => {
@@ -1641,10 +1686,22 @@ export function createCueAuthoring(
       return true
     }
 
-    if (isEditableTarget(event.target)) return false
-    if (!state.unlocked || !getSession() || !draftSnapshot().recording) {
+    const panelButton = event.target instanceof HTMLElement &&
+      event.target.closest('[data-target-id="cue-authoring-panel-root"] button')
+    if (isEditableTarget(event.target) &&
+      !(event.code === 'Space' && isVisible() && panelButton)) return false
+    if (!state.unlocked || !getSession()) {
       return false
     }
+    if (event.code === 'Space' && isVisible() && !draftSnapshot().recording) {
+      event.preventDefault()
+      if (!event.repeat) {
+        if (playback.snapshot().paused) void playback.play()
+        else playback.pause()
+      }
+      return true
+    }
+    if (!draftSnapshot().recording) return false
     if (event.code === 'Space' || event.key === 'ArrowRight') {
       event.preventDefault()
       recordNextCue()
@@ -1768,6 +1825,38 @@ export function createCueAuthoring(
     syncPanel()
   }
 
+  const importCues = async (file: File) => {
+    const session = getSession()
+    const generation = sessionBindingGeneration
+    if (!session || !getPanelSnapshot().canImport) return
+    try {
+      if (file.size > 5 * 1024 * 1024) throw new Error('Choose one cue JSON file smaller than 5 MB. Unzip bulk downloads first.')
+      const value: unknown = JSON.parse(await file.text())
+      if (generation !== sessionBindingGeneration || getSession() !== session) {
+        throw new Error('The recording changed while opening the file. Select it again for the matching recording.')
+      }
+      const cues = parseCueImport(value, session.recording, draftSnapshot().tokenKeys)
+      if (!getPanelSnapshot().canImport) throw new Error('Stop recording and resolve any draft save problem before importing.')
+      if (draftSnapshot().cues.length && !view.confirm(
+        `Import ${cues.length} cues for ${session.recording.title} and replace its current local timings? Cancel to export your current draft first.`
+      )) return
+      playback.pause()
+      const committed = applyDraftMutation(() => {
+        draftEditor.replaceCues(cues)
+        draftEditor.select(0)
+        return true
+      })
+      if (!committed) return
+      const saved = await saveDraft()
+      options.onChange('playback')
+      syncPanel()
+      if (saved) options.showPersistenceNotice(`Imported ${cues.length} cues with ${cues.reduce((sum, cue) => sum + pendingCueFlags(cue).length, 0)} pending flags. Saved as a local draft.`)
+    } catch (error) {
+      console.error('Cue import failed', error)
+      options.showPersistenceNotice(error instanceof Error ? error.message : 'Cue import failed. Your current draft is retained.')
+    }
+  }
+
   const handlePanelAction = (action: CueAuthoringPanelAction) => {
     switch (action.type) {
       case 'close':
@@ -1806,6 +1895,9 @@ export function createCueAuthoring(
       case 'export':
         void exportCues()
         break
+      case 'import':
+        void importCues(action.file)
+        break
     }
   }
 
@@ -1839,6 +1931,8 @@ export function createCueAuthoring(
       label: issueKindLabel(kind),
     })),
     save: saveIssue,
+    remove: removeIssue,
+    getSaveError: () => state.recordingIssueSaveError,
     closed: clearPendingIssue,
   })
   scope.own(() => {

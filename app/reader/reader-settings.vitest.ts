@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { page } from 'vitest/browser'
 import type {
   AudioNarrator,
   ParshaAudioRecording,
@@ -97,6 +98,71 @@ test('replacement mounts keep one settings lifetime and preserve focus behavior'
   expect(pane.classList.contains('u-hidden')).toBe(true)
   narrator.dispatchEvent(new Event('change', { bubbles: true }))
   expect(second.updatePreferences).toHaveBeenCalledTimes(1)
+})
+
+test('moves settings without changing preferences, keeps them reachable, and restores the mobile layout', async () => {
+  await page.viewport(1280, 900)
+  const state = createState()
+  let settings: ReaderSettings | null = null
+  destroy = createMount()((scope) => {
+    settings = createReaderSettings(scope, createOptions(state))
+  })
+  settings!.open()
+  await nextAnimationFrame()
+  const pane = required<HTMLElement>('[data-target-id="settings-pane"]')
+  const handle = required<HTMLButtonElement>('[data-target-id="settings-drag-handle"]')
+  const original = pane.getBoundingClientRect()
+  const drag = (dx: number, dy: number) => {
+    handle.dispatchEvent(new PointerEvent('pointerdown', {
+      bubbles: true, pointerId: 1, button: 0, clientX: 100, clientY: 100,
+    }))
+    window.dispatchEvent(new PointerEvent('pointermove', {
+      pointerId: 1, clientX: 100 + dx, clientY: 100 + dy,
+    }))
+    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1 }))
+  }
+  drag(-200, 20)
+  await nextAnimationFrame()
+  expect(pane.getBoundingClientRect().left).toBeCloseTo(original.left - 200)
+  expect(pane.classList.contains('is-dragging')).toBe(false)
+  expect(document.activeElement).toBe(handle)
+  settings!.close()
+  settings!.open()
+  await nextAnimationFrame()
+  expect(pane.getBoundingClientRect().left).toBeCloseTo(original.left - 200)
+
+  handle.dispatchEvent(new KeyboardEvent('keydown', {
+    bubbles: true, key: 'ArrowLeft', shiftKey: true,
+  }))
+  await nextAnimationFrame()
+  expect(pane.getBoundingClientRect().left).toBeCloseTo(original.left - 240)
+  handle.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Home' }))
+  await nextAnimationFrame()
+  expect(pane.style.left).toBe('')
+  expect(pane.getBoundingClientRect().left).toBeCloseTo(original.left)
+
+  drag(-2000, 2000)
+  await nextAnimationFrame()
+  expect(pane.getBoundingClientRect().left).toBe(8)
+  expect(pane.getBoundingClientRect().bottom).toBeLessThanOrEqual(892)
+  await page.viewport(700, 700)
+  await nextAnimationFrame()
+  expect(pane.getBoundingClientRect().right).toBeLessThanOrEqual(700)
+  expect(pane.getBoundingClientRect().bottom).toBeLessThanOrEqual(700)
+  await page.viewport(390, 844)
+  await vi.waitFor(() => expect(handle.hidden).toBe(true))
+  expect(pane.style.left).toBe('')
+  expect(pane.classList.contains('is-positioned')).toBe(false)
+
+  await page.viewport(1280, 900)
+  await vi.waitFor(() => expect(handle.hidden).toBe(false))
+  handle.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+  await nextAnimationFrame()
+  expect(pane.style.left).toBe('')
+  drag(-10, 0)
+  await nextAnimationFrame()
+  expect(pane.style.left).toBe('')
+  expect(state.updatePreferences).not.toHaveBeenCalled()
 })
 
 test('switches four accessible icon-only settings categories', async () => {

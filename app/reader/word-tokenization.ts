@@ -2,6 +2,8 @@ const inlineWordJoiners = new Set(['׀'])
 
 const stripKriMarkers = (word: string) => word.replace(/[{}]/g, '')
 
+export const isInvertedNun = (text: string) => text.trim() === '\u05c6'
+
 export type ReaderWord = {
   text: string
   isKri: boolean

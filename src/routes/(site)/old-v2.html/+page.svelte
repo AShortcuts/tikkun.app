@@ -7,7 +7,7 @@
     getReadingAvailabilitySummary,
     getRequiredReading,
   } from '$lib/readings'
-  import '../../../css/home.css'
+  import '../../../../css/home.css'
 
   const featuredReading = getRequiredReading('beresheet')
   const featuredAvailability = getReadingAvailabilitySummary(featuredReading)

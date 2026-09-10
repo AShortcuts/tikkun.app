@@ -1,4 +1,4 @@
-import type { AudioRecording, WordCue } from '../audio/types.ts'
+import type { AudioRecording, RecordingRange, WordCue } from '../audio/types.ts'
 import type { AliyahIdentity } from './aliyah-identity.ts'
 
 export type PlaybackPlanStatus =
@@ -6,6 +6,8 @@ export type PlaybackPlanStatus =
   | 'previous-opening'
   | 'partial-start'
   | 'overlap-only'
+  | 'passage'
+  | 'partial-passage'
 
 export interface PlaybackSegment {
   recording: AudioRecording
@@ -20,6 +22,8 @@ export interface PlaybackPlan {
   tokenKeys: string[]
   segments: PlaybackSegment[]
   status: PlaybackPlanStatus
+  readingLabel?: string
+  passage?: { range: RecordingRange; requestedRange: RecordingRange; cueComplete: boolean }
 }
 
 type RecordingWithCues = {

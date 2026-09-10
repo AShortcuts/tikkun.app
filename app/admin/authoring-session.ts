@@ -38,6 +38,7 @@ export function getAuthoringSegment(
   if (
     !session ||
     session.status === 'overlap-only' ||
+    Boolean(session.passage) ||
     session.segments.length !== 1
   ) {
     return null

@@ -172,6 +172,7 @@ test('rejects missing and occupied mount roots', () => {
 
 test('settles an idle mobile player into one compact transport and restores it', async () => {
   vi.useFakeTimers()
+  const action = vi.fn()
   fixture = document.createElement('section')
   fixture.innerHTML = '<div data-target-id="floating-player-root"></div>'
   document.body.appendChild(fixture)
@@ -181,7 +182,7 @@ test('settles an idle mobile player into one compact transport and restores it',
     player = createFloatingPlayer(scope, {
       document,
       view: window,
-      action: vi.fn(),
+      action,
     })
   })
 
@@ -205,6 +206,16 @@ test('settles an idle mobile player into one compact transport and restores it',
   expect(root.classList.contains('is-minimized')).toBe(true)
   expect(root.getAttribute('aria-label')).toBe('Compact audio player')
   expect(document.documentElement.dataset.mobilePlayerMinimized).toBe('')
+
+  const playButton = required<HTMLButtonElement>('[data-target-id="floating-play"]')
+  for (const playing of [false, true]) {
+    playButton.click()
+    expect(action).toHaveBeenLastCalledWith({ type: 'toggle-playback' })
+    player!.sync({ playing })
+    expect(playButton.getAttribute('aria-label')).toBe(playing ? 'Pause' : 'Play')
+    expect(root.classList.contains('is-minimized')).toBe(true)
+    expect(document.documentElement.dataset.mobilePlayerMinimized).toBe('')
+  }
 
   required<HTMLButtonElement>(
     '[data-target-id="floating-minimized-summary"]'

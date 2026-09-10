@@ -6,6 +6,7 @@ export interface CueAuthoringCueListItem {
   key: string
   tokenLabel: string
   timeStart: number
+  flags?: readonly string[]
 }
 
 export type CueAuthoringCueListAction =
@@ -13,6 +14,8 @@ export type CueAuthoringCueListAction =
   | { type: 'move'; delta: -1 | 1 }
   | { type: 'play' }
   | { type: 'trim' }
+  | { type: 'next-flag' }
+  | { type: 'review-flag' }
   | {
       type: 'nudge'
       seconds: -0.25 | -0.05 | 0.05 | 0.25

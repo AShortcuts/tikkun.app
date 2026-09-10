@@ -3,6 +3,7 @@ import {
   parseDraftWordCues,
 } from '../audio/cue-validation.ts'
 import type { WordCue } from '../audio/types.ts'
+import { cloneCueReview } from '../audio/cue-review.ts'
 import {
   formatTokenKey,
   isValidTokenKey,
@@ -100,7 +101,7 @@ type MutableState = {
   saveProblem: CueDraftSaveProblem | null
 }
 
-const cloneCue = (cue: Readonly<WordCue>): WordCue => ({ ...cue })
+const cloneCue = cloneCueReview
 const cloneCues = (cues: readonly Readonly<WordCue>[]) => cues.map(cloneCue)
 const roundCueTime = (value: number) => Number(value.toFixed(3))
 
@@ -172,7 +173,14 @@ function resumePointer(cueCount: number, tokenCount: number) {
 }
 
 function freezeCues(cues: readonly Readonly<WordCue>[]) {
-  return Object.freeze(cues.map((cue) => Object.freeze(cloneCue(cue))))
+  return Object.freeze(cues.map((cue) => {
+    const copy = cloneCue(cue)
+    if (copy.review) {
+      copy.review = Object.freeze({ ...copy.review,
+        flags: Object.freeze(copy.review.flags.map(flag => Object.freeze(flag))) })
+    }
+    return Object.freeze(copy)
+  }))
 }
 
 function isExportReady(cues: readonly Readonly<WordCue>[]) {
@@ -406,6 +414,7 @@ export function createCueDraftEditor(): CueDraftEditor {
       const position = tokenKey ? parseTokenKey(tokenKey) : null
       if (!tokenKey || !position) return null
       const cue = {
+        ...(state.cues[index]?.review ? { review: cloneCue(state.cues[index]).review } : {}),
         timeStart: roundCueTime(timeStart),
         ...position,
       }

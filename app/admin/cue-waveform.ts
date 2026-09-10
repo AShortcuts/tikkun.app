@@ -9,9 +9,7 @@ import type { WordCue } from '../audio/types.ts'
 import type { MountScope } from '../lifecycle/mount.ts'
 import type { ReaderPlaybackCueAuthoringSessionSnapshot } from '../reading/reader-playback.ts'
 
-const WAVEFORM_SUMMARY_BUCKETS = 800
 const MAX_WAVEFORM_SUMMARY_CACHE_ENTRIES = 6
-const WAVEFORM_VISIBLE_BARS = 160
 const WAVEFORM_AUTO_WINDOW_SECONDS = 24
 const WAVEFORM_FULL_VIEW_MAX_SECONDS = 30
 const WAVEFORM_WINDOW_STEP_SECONDS = 1
@@ -115,47 +113,41 @@ export function cueWaveformTimeRatio(
   time: number,
   window: CueWaveformWindow
 ) {
-  if (time < window.start || time > window.end) return null
-  return (time - window.start) / Math.max(window.end - window.start, 1)
+  const duration = window.end - window.start
+  if (!Number.isFinite(time) || duration <= 0 || time < window.start || time > window.end) {
+    return null
+  }
+  return (time - window.start) / duration
 }
 
-export function getCueWaveformWindowBars(
+export function getCueWaveformWindowColumns(
   summary: WaveformSummary,
   window: CueWaveformWindow,
-  timelineDuration: number
+  pixelWidth: number
 ) {
-  if (
-    !summary.buckets.length ||
-    summary.duration <= 0 ||
-    timelineDuration <= 0
-  ) {
+  const span = window.end - window.start
+  if (!Number.isFinite(pixelWidth) || pixelWidth < 1 || !Number.isFinite(span) || span <= 0) {
     return []
   }
-  const count = Math.max(2, WAVEFORM_VISIBLE_BARS)
-  const windowDuration = Math.max(window.end - window.start, 0.001)
-  const peaks = Array.from({ length: count }, (_, index) => {
-    const ratio = index / (count - 1)
-    const timelineTime = window.start + ratio * windowDuration
-    const summaryTime = (timelineTime / timelineDuration) * summary.duration
-    const summaryRatio = summaryTime / summary.duration
-    const rawIndex = Math.max(
-      0,
-      Math.min(
-        summary.buckets.length - 1,
-        summaryRatio * (summary.buckets.length - 1)
-      )
+  const count = Math.floor(pixelWidth)
+  return Array.from({ length: count }, (_, pixel) => {
+    // Sample positions stay on the decoded audio clock, even when media
+    // metadata reports a different duration. Each column covers [start, end).
+    const start = Math.max(0, (window.start + pixel / count * span) * summary.sampleRate)
+    const end = Math.min(
+      summary.sampleCount,
+      (window.start + (pixel + 1) / count * span) * summary.sampleRate
     )
-    const lowerIndex = Math.floor(rawIndex)
-    const upperIndex = Math.min(summary.buckets.length - 1, lowerIndex + 1)
-    const mix = rawIndex - lowerIndex
-    const lowerPeak = summary.buckets[lowerIndex] ?? 0
-    const upperPeak = summary.buckets[upperIndex] ?? lowerPeak
-    return lowerPeak + (upperPeak - lowerPeak) * mix
-  })
-  return peaks.map((peak, index) => {
-    const previous = peaks[index - 1] ?? peak
-    const next = peaks[index + 1] ?? peak
-    return Number(((previous + peak * 2 + next) / 4).toFixed(3))
+    if (start >= end) return { min: 0, max: 0 }
+    const first = Math.floor(start / summary.stepSamples)
+    const last = Math.min(summary.min.length, Math.ceil(end / summary.stepSamples))
+    let min = Infinity
+    let max = -Infinity
+    for (let bin = first; bin < last; bin += 1) {
+      min = Math.min(min, summary.min[bin])
+      max = Math.max(max, summary.max[bin])
+    }
+    return { min, max }
   })
 }
 
@@ -177,11 +169,17 @@ export function createCueWaveform(
     '[data-target-id="admin-waveform-status"]'
   )
   const summaryCache = new Map<string, WaveformSummary>()
+  const canvas = document.createElement('canvas')
+  canvas.className = 'admin-waveform-canvas'
+  canvas.setAttribute('aria-hidden', 'true')
+  bars.appendChild(canvas)
+  const context = canvas.getContext('2d')
   const summaryLoaders = new Map<string, WaveformSummaryLoader>()
   const windowCache = new Map<string, CueWaveformWindow>()
   let visible = false
   let renderFrame = 0
   let contentRevision = 0
+  let lastDrawKey = ''
 
   const summaryKey = (session: ReaderPlaybackCueAuthoringSessionSnapshot) => {
     const mediaIdentity = session.recording.mediaIdentity
@@ -201,7 +199,6 @@ export function createCueWaveform(
       decodeWaveformSummary({
         audioId: session.recording.id,
         src: session.recording.playSrc,
-        bucketCount: WAVEFORM_SUMMARY_BUCKETS,
         signal,
       })
     )
@@ -243,8 +240,8 @@ export function createCueWaveform(
       const activeSession = options.getSnapshot().session
       if (
         visible &&
-        activeSession === session &&
-        summaryKey(session) === key
+        activeSession &&
+        summaryKey(activeSession) === key
       ) {
         render()
       }
@@ -278,16 +275,39 @@ export function createCueWaveform(
     return nextWindow
   }
 
-  const createBars = (peaks: number[]) =>
-    peaks.map((peak) => {
-      const bar = document.createElement('span')
-      bar.className = 'admin-waveform-bar'
-      bar.style.setProperty('--waveform-peak', `${peak}`)
-      return bar
-    })
+  const clearCanvas = () => {
+    context?.clearRect(0, 0, canvas.width, canvas.height)
+    lastDrawKey = ''
+  }
+
+  const drawSummary = (summary: WaveformSummary, window: CueWaveformWindow, key: string) => {
+    if (!context) return
+    const rect = bars.getBoundingClientRect()
+    const scale = view.devicePixelRatio || 1
+    const width = Math.round(rect.width * scale)
+    const height = Math.round(rect.height * scale)
+    const color = view.getComputedStyle(canvas).color
+    const drawKey = `${key}:${window.start}:${window.end}:${width}:${height}:${scale}:${color}`
+    if (drawKey === lastDrawKey) return
+    lastDrawKey = drawKey
+    canvas.width = width
+    canvas.height = height
+    if (!width || !height) return
+    const columns = getCueWaveformWindowColumns(summary, window, width)
+    const middle = height / 2
+    const amplitude = Math.max(0, middle - 2 * scale)
+    context.fillStyle = color
+    for (let pixel = 0; pixel < columns.length; pixel += 1) {
+      const column = columns[pixel]
+      const top = middle - Math.max(-1, Math.min(1, column.max)) * amplitude
+      const bottom = middle - Math.max(-1, Math.min(1, column.min)) * amplitude
+      context.fillRect(pixel, top, 1, Math.max(1, bottom - top))
+    }
+  }
 
   const clearWaveform = () => {
-    bars.replaceChildren()
+    bars.replaceChildren(canvas)
+    clearCanvas()
     delete bars.dataset.audioId
     delete bars.dataset.windowStart
     delete bars.dataset.windowEnd
@@ -340,30 +360,21 @@ export function createCueWaveform(
       bars.dataset.windowEnd !== lane.dataset.windowEnd
     const summaryChanged = bars.dataset.summaryKey !== (summary ? key : '')
 
-    if (summary && (windowChanged || summaryChanged)) {
-      const visiblePeaks = getCueWaveformWindowBars(
-        summary,
-        visibleWindow,
-        safeDuration
-      )
-      bars.replaceChildren(...createBars(visiblePeaks))
-      bars.dataset.audioId = summary.audioId
-      bars.dataset.windowStart = lane.dataset.windowStart
-      bars.dataset.windowEnd = lane.dataset.windowEnd
-      bars.dataset.summaryAudioId = summary.audioId
-      bars.dataset.summaryKey = key
-      delete bars.dataset.contentRevision
-    } else if (!summary && (windowChanged || summaryChanged)) {
-      bars.replaceChildren()
+    if (windowChanged || summaryChanged) {
+      bars.replaceChildren(canvas)
+      clearCanvas()
       bars.dataset.audioId = session.recording.id
       bars.dataset.windowStart = lane.dataset.windowStart
       bars.dataset.windowEnd = lane.dataset.windowEnd
-      bars.dataset.summaryAudioId = ''
-      bars.dataset.summaryKey = ''
+      bars.dataset.summaryAudioId = summary?.audioId ?? ''
+      bars.dataset.summaryKey = summary ? key : ''
       delete bars.dataset.contentRevision
     }
+    if (summary) drawSummary(summary, visibleWindow, key)
 
-    status.textContent = summary
+    status.textContent = !context
+      ? 'Waveform drawing is unavailable in this browser.'
+      : summary
       ? visibleWindow.zoomed
         ? `Waveform lane - ${options.formatDuration(
             visibleWindow.start
@@ -502,12 +513,27 @@ export function createCueWaveform(
   view.visualViewport?.addEventListener('resize', schedule, {
     signal: scope.signal,
   })
+  const resizeObserver = new ResizeObserver(schedule)
+  resizeObserver.observe(bars)
+  const themeObserver = new MutationObserver(schedule)
+  for (const element of [document.documentElement, document.body]) {
+    themeObserver.observe(element, {
+      attributes: true,
+      attributeFilter: ['class', 'style', 'data-theme'],
+    })
+  }
+  view.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', schedule, {
+    signal: scope.signal,
+  })
 
   scope.own(() => {
     visible = false
     if (renderFrame) view.cancelAnimationFrame(renderFrame)
     renderFrame = 0
     cancelObsoleteLoads(null)
+    resizeObserver.disconnect()
+    themeObserver.disconnect()
+    canvas.remove()
   })
 
   return {

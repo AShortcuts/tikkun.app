@@ -158,6 +158,13 @@ it automatically.
 Generated files are reviewed diffs, never hand-edited sources. The relevant
 generator test must compare checked-in output with authoritative input. Run the
 generator twice after a source change; the second run must be a no-op.
+When adding or replacing `audio-cues/**` while the development server is running,
+Vite automatically validates and refreshes homepage and coverage-page aliyah bubbles.
+Rapid edits are batched; unchanged coverage does not rewrite the catalog. Invalid
+cue files show a development error and leave the last valid catalog intact until
+corrected. Startup and builds also generate coverage; `npm run reading:manifest`
+remains available for a manual refresh without a running development server.
+Files in Downloads and local admin drafts do not change published cue coverage.
 `npm run verify:release` snapshots all four tracked generated manifests before
 verification and rejects any byte change afterward. It compares against the
 starting bytes, not global worktree cleanliness, so unrelated work in progress

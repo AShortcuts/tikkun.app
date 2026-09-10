@@ -16,7 +16,8 @@ import {
   type AudioController,
 } from './audio-controller.ts'
 import type { HighlightController } from './highlight-controller.ts'
-import { buildPlaybackPlan } from './playback-plan.ts'
+import { buildPlaybackPlan, type PlaybackPlan } from './playback-plan.ts'
+import { passagePlaybackPlan, type PassageAudioResolver, type PassageAudioResolution, type PassageAudioPortion, type PassageAudioState } from './passage-audio.ts'
 
 export interface RecordingSessionLibrary {
   findRecording(input: {
@@ -62,6 +63,8 @@ export interface RecordingSessionOptions {
   presentation: RecordingSessionPresentation
   getNarratorId(): string
   recordingMode: boolean
+  passages?: PassageAudioResolver
+  choosePassagePortion?(resolution: PassageAudioResolution, signal: AbortSignal, authorize: (portion: PassageAudioPortion) => void): Promise<PassageAudioPortion | null>
 }
 
 export interface RecordingTarget {
@@ -73,6 +76,7 @@ export interface RecordingAvailability {
   recording: AudioRecording | null
   overlapRecording: AudioRecording | null
   available: boolean
+  passage?: PassageAudioState
 }
 
 export interface RecordingSession {
@@ -200,10 +204,14 @@ export function createRecordingSession(
   ): RecordingAvailability => {
     const recording = currentRecording(run, aliyahIndex)
     const previous = overlapRecording(run, aliyahIndex)
+    const aliyah = run.aliyot.find(entry => entry.index === aliyahIndex)
+    const passage = !options.recordingMode && !authoring.isActive() && run.scroll === 'torah' && aliyah
+      ? options.passages?.peek(aliyah, options.getNarratorId()) : undefined
     return {
       recording,
       overlapRecording: previous,
-      available: Boolean(recording || previous),
+      available: passage ? Boolean(passage.recording) : Boolean(recording || previous),
+      passage,
     }
   }
 
@@ -225,6 +233,33 @@ export function createRecordingSession(
 
     const useAuthoringPlan = mode === 'authoring' || authoring.isActive()
 
+    let passagePlan: PlaybackPlan | null = null
+    if (options.passages && run.scroll === 'torah' && !useAuthoringPlan && !options.recordingMode && recordingOverride === undefined) {
+      const aliyah = run.aliyot.find(entry => entry.index === target.aliyahIndex)
+      if (!aliyah) return null
+      const resolution = await options.passages.resolve(aliyah, options.getNarratorId())
+      if (!isCurrent(lifetime)) return null
+      const complete = resolution.problem === null || resolution.problem === 'incomplete-cues'
+      if (!complete) audioController.pause()
+      const portion = complete ? resolution.portions[0] :
+        await options.choosePassagePortion?.(resolution, lifetime.signal, portion => {
+          const first = portion.segments[0]?.recording
+          if (first) audioController.authorizePlayback(first)
+        })
+      if (!portion || !isCurrent(lifetime)) return null
+      passagePlan = passagePlaybackPlan(resolution, portion,
+        { runId: target.runId, index: target.aliyahIndex },
+        run.leining.date.title.en.replace(/^Parshat\s+/i, ''))
+      if (passagePlan.segments.length > 1) {
+        const { loadRecordingDuration } = await import('./passage-audio-tools.ts')
+        passagePlan.segments = await Promise.all(passagePlan.segments.map(async segment => ({
+          ...segment,
+          endTime: segment.endTime ?? await loadRecordingDuration(segment.recording, lifetime.signal),
+        })))
+      }
+      if (!isCurrent(lifetime)) return null
+    }
+
     const recording =
       recordingOverride === undefined
         ? mode === 'authoring'
@@ -235,7 +270,7 @@ export function createRecordingSession(
             })
           : currentRecording(run, target.aliyahIndex)
         : recordingOverride
-    const current = recording
+    const current = recording && !passagePlan
       ? {
           recording,
           cues: cloneCues(await library.loadCues(recording)),
@@ -245,7 +280,7 @@ export function createRecordingSession(
 
     let previous: { recording: AudioRecording; cues: WordCue[] } | null = null
     let previousTokenKeys: string[] = []
-    if (!options.recordingMode && !useAuthoringPlan) {
+    if (!passagePlan && !options.recordingMode && !useAuthoringPlan) {
       const entry = previousEntry(run, target.aliyahIndex).previous
       if (entry?.aliyah.index) {
         const recording = currentRecording(entry.run, entry.aliyah.index)
@@ -265,7 +300,7 @@ export function createRecordingSession(
     }
     if (!isCurrent(lifetime)) return null
 
-    const plan = buildPlaybackPlan({
+    const plan = passagePlan ?? buildPlaybackPlan({
       target: { runId: target.runId, index: target.aliyahIndex },
       tokenKeys,
       current,
@@ -281,9 +316,9 @@ export function createRecordingSession(
 
     await audioController.loadSession(session)
     if (!isCurrent(lifetime)) return null
-    highlightController.setSequence(tokenKeys)
+    highlightController.setSequence(session.tokenKeys)
     const startCue = session.cues[0]
-    if (startCue) {
+    if (startCue && (!passagePlan || startCue.timeStart === 0)) {
       audioController.seek(startCue.timeStart)
       await presentation.setCueIndex(0)
       if (!isCurrent(lifetime)) return null
@@ -355,6 +390,12 @@ export function createRecordingSession(
       currentSegment.recording.id !== session.recording.id
     ) {
       return
+    }
+
+    if (session.passage) {
+      const run = display.resolveRun(session.runId)
+      if (session.segments.length !== 1 || currentSegment.startTime !== 0 || currentSegment.endTime !== null ||
+        !run || currentRecording(run, session.aliyahIndex)?.id !== session.recording.id) return
     }
 
     const transition = authoringTransition.begin(

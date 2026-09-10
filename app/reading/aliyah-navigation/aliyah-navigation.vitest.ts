@@ -86,7 +86,10 @@ test('renders both navigation presentations behind one typed interface', async (
   expect(required('[data-target-id="aliyah-rail"]').tagName).toBe('NAV')
   expect(requiredAll('.mobile-aliyah-segment')).toHaveLength(2)
   expect(requiredAll('.mobile-aliyah-card')).toHaveLength(2)
-  expect(requiredAll('.mobile-aliyah-play')).toHaveLength(1)
+  expect(requiredAll('.mobile-aliyah-play')).toHaveLength(2)
+  const unavailable = required<HTMLButtonElement>('.mobile-aliyah-play[data-aliyah-index="2"]')
+  expect(unavailable.getAttribute('aria-disabled')).toBe('true')
+  expect(unavailable.dataset.audioTone).toBe('empty')
   expect(
     required<HTMLElement>('.aliyah-rail-button').dataset.cueStatus
   ).toBe('published')
@@ -241,7 +244,7 @@ test('marks only unavailable compact audio as neutral and keeps its picker usabl
   const play = required<HTMLButtonElement>('[data-target-id="mobile-aliyah-play-toggle"]')
   const picker = required<HTMLButtonElement>('[data-target-id="mobile-aliyah-picker-toggle"]')
   expect(capsule.classList).toContain('is-unavailable')
-  expect(play.disabled).toBe(true)
+  expect(play.getAttribute('aria-disabled')).toBe('true')
   expect(play.getAttribute('aria-label')).toBe('Recording unavailable for שני')
   play.click()
   expect(playCurrent).not.toHaveBeenCalled()
@@ -252,23 +255,86 @@ test('marks only unavailable compact audio as neutral and keeps its picker usabl
 
   syncAvailability(true)
   expect(capsule.classList).not.toContain('is-unavailable')
-  expect(play.disabled).toBe(false)
+  expect(play.getAttribute('aria-disabled')).toBe('false')
   play.click()
   await flushPromises()
   expect(playCurrent).toHaveBeenCalledOnce()
-  expect(play.disabled).toBe(true)
+  expect(play.getAttribute('aria-disabled')).toBe('true')
   expect(capsule.classList).toContain('is-loading')
   expect(capsule.classList).not.toContain('is-unavailable')
 
   pendingPlay.resolve()
   await flushPromises()
-  expect(play.disabled).toBe(false)
+  expect(play.getAttribute('aria-disabled')).toBe('false')
   syncAvailability(false)
   expect(capsule.classList).toContain('is-unavailable')
-  expect(play.disabled).toBe(true)
+  expect(play.getAttribute('aria-disabled')).toBe('true')
 })
 
-test('exposes missing-audio recording targets only while authoring is active', async () => {
+test('keeps mobile aliyah text beside Play and lets long statuses wrap', async () => {
+  const preferencesKey = 'tikkun.reader-preferences'
+  const previousPreferences = localStorage.getItem(preferencesKey)
+  const frame = document.createElement('iframe')
+  frame.title = 'Mobile aliyah picker layout'
+  frame.style.cssText = 'width:390px;height:844px;border:0'
+  localStorage.setItem(preferencesKey, JSON.stringify({ themeMode: 'dark' }))
+  frame.src = '/reader/#/torah/parsha/nitzavim-vayelech/5-29-9'
+  fixture?.appendChild(frame)
+
+  try {
+    await vi.waitFor(() => {
+      expect(frame.contentDocument?.querySelector('[data-reader-boot-state="ready"]')).not.toBeNull()
+      expect(frame.contentDocument?.querySelectorAll('.mobile-aliyah-card')).toHaveLength(8)
+    }, { timeout: 15_000 })
+    const doc = frame.contentDocument!
+    const view = frame.contentWindow!
+    const get = (selector: string) => {
+      const element = doc.querySelector<HTMLElement>(selector)
+      if (!element) throw new Error(`Missing picker element: ${selector}`)
+      return element
+    }
+    await doc.fonts.ready
+    const picker = get('[data-target-id="mobile-aliyah-picker-toggle"]')
+    picker.click()
+    await vi.waitFor(() => {
+      expect(get('.mobile-aliyah-picker').getAttribute('aria-hidden')).toBe('false')
+      expect(get('.mobile-aliyah-card.is-unavailable .mobile-aliyah-play').getAttribute('aria-disabled')).toBe('true')
+    })
+    for (const width of [320, 390, 550]) {
+      frame.style.width = `${width}px`
+      await new Promise<void>((resolve) => view.requestAnimationFrame(() => resolve()))
+      // Exercise long status copy independently of the fixture's recording coverage.
+      const longStatus = get('.mobile-aliyah-card[data-aliyah-index="5"] .mobile-aliyah-card-status')
+      longStatus.textContent = 'Full audio available. Some word highlighting is missing.'
+      get('.mobile-aliyah-card[data-aliyah-index="5"]').classList.remove('is-unavailable')
+      for (const card of doc.querySelectorAll<HTMLElement>('.mobile-aliyah-card')) {
+        const main = card.querySelector<HTMLElement>('.mobile-aliyah-card-main')!
+        const play = card.querySelector<HTMLElement>('.mobile-aliyah-play')!
+        const mainBox = main.getBoundingClientRect()
+        const playBox = play.getBoundingClientRect()
+        expect(playBox.left, `Play stays right at ${width}px`).toBeGreaterThan(mainBox.right)
+        expect(playBox.top).toBeGreaterThanOrEqual(mainBox.top - 1)
+        expect(playBox.bottom).toBeLessThanOrEqual(mainBox.bottom + 1)
+        for (const text of main.querySelectorAll<HTMLElement>('span')) {
+          expect(view.getComputedStyle(text).whiteSpace).toBe('normal')
+          expect(text.scrollWidth).toBeLessThanOrEqual(text.clientWidth + 1)
+          expect(text.scrollHeight).toBeLessThanOrEqual(text.clientHeight + 1)
+        }
+      }
+      const sheet = get('.mobile-aliyah-sheet')
+      expect(longStatus.clientHeight).toBeGreaterThan(parseFloat(view.getComputedStyle(longStatus).lineHeight))
+      expect(sheet.scrollWidth).toBeLessThanOrEqual(sheet.clientWidth)
+      expect(view.getComputedStyle(picker).opacity).toBe('1')
+      expect(view.getComputedStyle(picker).color).toBe(view.getComputedStyle(sheet).color)
+    }
+  } finally {
+    frame.remove()
+    if (previousPreferences === null) localStorage.removeItem(preferencesKey)
+    else localStorage.setItem(preferencesKey, previousPreferences)
+  }
+}, 20_000)
+
+test('keeps missing-audio targets selectable while authoring is active', async () => {
   const playCompact = vi.fn(async () => idlePlayback)
   const playCurrent = vi.fn(async () => {})
   const navigation = mountNavigation({
@@ -313,6 +379,8 @@ test('exposes missing-audio recording targets only while authoring is active', a
   )
   expect(toolbarPlay.disabled).toBe(false)
   expect(toolbarPlay.classList).toContain('is-missing-audio')
+  expect(toolbarPlay.dataset.audioTone).toBe('empty')
+  expect(toolbarPlay.dataset.audioDimmed).toBe('true')
   toolbarPlay.click()
   missingPlay.click()
   await flushPromises()
@@ -551,6 +619,66 @@ test('ignores stale cue status and duration requests after invalidation', async 
   expect(
     required<HTMLElement>('.mobile-aliyah-card-status').dataset.durationLabel
   ).toBe('2:05')
+})
+
+test('refreshes a cue dot when audio coverage finishes without saving cues', async () => {
+  const loadCueStatus = vi.fn<AliyahNavigationOptions['loadCueStatus']>(
+    async (item) => item.audioState?.problem === null ? 'published' : 'none'
+  )
+  const navigation = mountNavigation({ loadCueStatus })
+  const checking: AliyahNavigationSnapshot = {
+    ...snapshot,
+    items: [{ ...snapshot.items[0], audioState: {
+      problem: 'checking', message: 'Checking audio coverage', recording: null,
+    } }],
+  }
+  navigation.syncContent({ desktop: checking, compact: checking, authoringEnabled: false })
+  await flushPromises()
+  expect(required<HTMLElement>('.aliyah-rail-button').dataset.cueStatus).toBe('none')
+
+  const ready: AliyahNavigationSnapshot = {
+    ...checking,
+    items: [{ ...checking.items[0], audioState: {
+      problem: null, message: '', recording: null, canPlay: true,
+    } }],
+  }
+  navigation.syncContent({ desktop: ready, compact: ready, authoringEnabled: false })
+  await flushPromises()
+  expect(required<HTMLElement>('.aliyah-rail-button').dataset.cueStatus).toBe('published')
+  expect(loadCueStatus).toHaveBeenCalledTimes(2)
+})
+
+test('refreshes cue status when entering authoring without a save', async () => {
+  let authoring = false
+  const navigation = mountNavigation({
+    loadCueStatus: async () => authoring ? 'local-draft' : 'published',
+  })
+  const single = { ...snapshot, items: [snapshot.items[0]] }
+  navigation.syncContent({ desktop: single, compact: single, authoringEnabled: false })
+  await flushPromises()
+  authoring = true
+  navigation.syncContent({ desktop: single, compact: single, authoringEnabled: true })
+  await flushPromises()
+  expect(required<HTMLElement>('.aliyah-rail-button').dataset.cueStatus).toBe('local-draft')
+})
+
+test('rejects late cue results after the current recording has changed', async () => {
+  const previous = deferred<'local-draft'>()
+  const onCueStatusChange = vi.fn()
+  const navigation = mountNavigation({
+    loadCueStatus: async (item) => item.recordingKey === 'audio-1' ? previous.promise : 'published',
+    onCueStatusChange,
+  })
+  const first = { ...snapshot, items: [snapshot.items[0]] }
+  navigation.syncContent({ desktop: first, compact: first, authoringEnabled: false })
+  const replacement = { ...first, items: [{ ...first.items[0], audioKey: 'audio-new', recordingKey: 'audio-new' }] }
+  navigation.syncContent({ desktop: replacement, compact: replacement, authoringEnabled: false })
+  await flushPromises()
+  previous.resolve('local-draft')
+  await flushPromises()
+  expect(required<HTMLElement>('.aliyah-rail-button').dataset.cueStatus).toBe('published')
+  expect(onCueStatusChange).toHaveBeenCalledTimes(1)
+  expect(onCueStatusChange).toHaveBeenCalledWith(replacement.items[0], 'published')
 })
 
 test('replacement mounts cleanly without duplicating actions', async () => {

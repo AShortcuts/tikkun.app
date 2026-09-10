@@ -37,7 +37,7 @@ const annotatedWordsIn = (node: ParentNode) => {
     ? canonicalWords
     : [...node.querySelectorAll<HTMLElement>('.fragment .word')]
   return words.filter(
-    (word) => word.dataset.annotationsOnPresent !== 'false'
+    (word) => word.dataset.annotationsOnPresent !== 'false' && Boolean(word.dataset.tokenKey)
   )
 }
 

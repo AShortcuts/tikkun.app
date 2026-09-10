@@ -1,6 +1,8 @@
 import { expect, test } from 'vitest'
 import Line from './components/Line.ts'
 import type { LineType } from './components/Page.ts'
+import { tokenizeReaderWords } from './reader/word-tokenization.ts'
+import textFilter from './text-filter.ts'
 import {
   createSpecialLetterRenderer,
   normalizeHebrewWord,
@@ -15,7 +17,7 @@ const torahPages = import.meta.glob<LineType[]>(
   }
 )
 
-test('loads the seven small-letter targets from the extensible catalog', () => {
+test('loads seven small letters and both inverted nuns from the catalog', () => {
   expect(specialLetterCatalog.schemaVersion).toBe(1)
   expect(specialLetterCatalog.tradition).toBe(
     'contemporary-ashkenazi-sephardi'
@@ -34,6 +36,8 @@ test('loads the seven small-letter targets from the extensible catalog', () => {
     { ref: '1:27:46', word: 'קצתי', letter: 'ק', position: 1, form: 'small' },
     { ref: '3:1:1', word: 'ויקרא', letter: 'א', position: 5, form: 'small' },
     { ref: '3:6:2', word: 'מוקדה', letter: 'מ', position: 1, form: 'small' },
+    { ref: '4:10:35', word: '׆', letter: '׆', position: 1, form: 'inverted' },
+    { ref: '4:10:36', word: '׆', letter: '׆', position: 1, form: 'inverted' },
     { ref: '4:25:11', word: 'פינחס', letter: 'י', position: 2, form: 'small' },
     { ref: '5:32:18', word: 'תשי', letter: 'י', position: 3, form: 'small' },
   ])
@@ -55,7 +59,7 @@ test('each catalog entry resolves to exactly one word in its canonical verse', (
         : line.verses
       const words = line.text
         .flat()
-        .flatMap((fragment) => fragment.trim().split(/\s+/))
+        .flatMap((fragment) => tokenizeReaderWords(textFilter({ text: fragment, annotated: true })).map(word => word.text))
         .map(normalizeHebrewWord)
 
       for (const entry of specialLetterCatalog.entries) {
@@ -107,7 +111,7 @@ test('the line renderer keeps one live marker and one stored alternate', () => {
       const lineFocalRef = focalRef ?? verses[0]
       const containsTargetWord = line.text
         .flat()
-        .flatMap((fragment) => fragment.trim().split(/\s+/))
+        .flatMap((fragment) => tokenizeReaderWords(textFilter({ text: fragment, annotated: true })).map(word => word.text))
         .map(normalizeHebrewWord)
         .some((word) => targetWords.has(word))
 

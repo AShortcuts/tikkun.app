@@ -313,6 +313,18 @@
   width: 100%;
 }
 
+html[data-reader-reduced-motion='on'] .word {
+  transition: none;
+  --reader-highlight-glow: 0px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-reader-reduced-motion='off']) .word {
+    transition: none;
+    --reader-highlight-glow: 0px;
+  }
+}
+
 .word {
   display: inline;
   position: relative;
@@ -545,23 +557,61 @@ html[data-reader-side-order='torah-right']
     tr[data-shirah-kind='sea']
     .column {
     display: grid;
-    grid-template-columns: repeat(8, minmax(0, 1fr));
+    grid-template-columns: var(--match-sea-half) minmax(0, 1fr) var(--match-sea-half);
     gap: 0;
     width: 100%;
   }
 
   .tikkun-book[data-reader-layout='match']
-    tr[data-shirah-kind='sea']
-    .fragment {
-    grid-column: var(--match-shirah-track);
-    grid-row: 1;
+    tr[data-shirah-kind='sea'][data-shirah-pattern='opening'] .column {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tikkun-book[data-reader-layout='match']
+    tr[data-shirah-kind='sea'][data-shirah-pattern='fragments-3'] .column {
+    grid-template-columns:
+      var(--match-sea-outer) minmax(0, 1fr) var(--match-sea-middle)
+      minmax(0, 1fr) var(--match-sea-outer);
+  }
+
+  .tikkun-book[data-reader-layout='match']
+    tr[data-shirah-kind='sea'][data-shirah-pattern='extended-left'] .column {
+    grid-template-columns: var(--match-sea-half) minmax(0, 1fr) var(--match-sea-extended-left);
+  }
+
+  .tikkun-book[data-reader-layout='match']
+    tr[data-shirah-kind='sea'][data-shirah-pattern='penultimate'] .column {
+    grid-template-columns: var(--match-sea-penultimate-right) minmax(0, 1fr) var(--match-sea-half);
+  }
+
+  .tikkun-book[data-reader-layout='match']
+    tr[data-shirah-kind='sea'][data-shirah-pattern='closing'] .column {
+    grid-template-columns: var(--match-sea-outer) var(--match-sea-gap) minmax(0, 1fr);
   }
 
   .tikkun-book[data-reader-layout='match']
     tr[data-shirah-kind='sea']
     .fragment {
+    /* Keep placement with the templates, not in separately updated markup. */
+    grid-column: 1;
+    grid-row: 1;
     width: 100%;
     min-width: 0;
+  }
+
+  .tikkun-book[data-reader-layout='match']
+    tr[data-shirah-kind='sea'] .fragment:nth-child(2) {
+    grid-column: 3;
+  }
+
+  .tikkun-book[data-reader-layout='match']
+    tr[data-shirah-kind='sea'] .fragment:nth-child(3) {
+    grid-column: 5;
+  }
+
+  .tikkun-book[data-reader-layout='match']
+    tr[data-shirah-kind='sea'][data-shirah-pattern='opening'] .fragment {
+    grid-column: 1 / -1;
   }
 
   .tikkun-book[data-reader-layout='match']
@@ -1093,6 +1143,50 @@ html[data-reader-side-order='torah-right']
   color: var(--light-text-color);
   background: var(--light-accent-color);
   cursor: not-allowed;
+}
+
+.passage-audio-dialog {
+  margin: auto;
+  max-width: min(30rem, calc(100vw - 2rem));
+  box-sizing: border-box;
+  border: 1px solid currentColor;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  background: var(--paper-color);
+  color: var(--text-color);
+  font: inherit;
+  direction: ltr;
+}
+
+.passage-audio-dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+.passage-audio-dialog h2 {
+  margin: 0 0 1rem;
+  font-size: 1.25rem;
+}
+
+.passage-audio-dialog p {
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.passage-audio-dialog > div {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.passage-audio-dialog button {
+  min-height: 44px;
+  padding: 0.65rem 1rem;
+  border: 1px solid currentColor;
+  border-radius: 0.5rem;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
 }
 
 html[data-reader-mode='admin-authoring'] .aliyah-audio-button.is-missing-audio {

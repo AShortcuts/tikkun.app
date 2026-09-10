@@ -141,6 +141,19 @@ test('refresh reports the current viewport even when the focal line is unchanged
   expect(lastReportedRunIds.center).toBe('2025-03-01:shacharis,main')
 })
 
+test('finds the focal line immediately when a hidden initial display is revealed', async () => {
+  await resize(5)
+  root.style.visibility = 'hidden'
+  await renderRun('2025-03-01:shacharis,main')
+
+  root.style.visibility = ''
+  tracker!.refresh()
+
+  expect(lastReportedRange.center).toBe(
+    ': וְיִקְחוּ־לִ֖י תְּרוּמָ֑ה מֵאֵ֤ת כׇּל־אִישׁ֙ אֲשֶׁ֣ר יִדְּבֶ֣נּוּ לִבּ֔וֹ'
+  )
+})
+
 test('destroy cancels pending updates and stops future tracking', async () => {
   await resize(5)
   await renderRun('2025-03-01:shacharis,main')

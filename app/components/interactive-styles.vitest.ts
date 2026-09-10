@@ -4,6 +4,7 @@ import '../../css/master.css'
 import '../../css/page.css'
 import '../../css/reader-enhancements.css'
 import '../../css/cue-authoring.css'
+import { iconMarkup } from './icons.ts'
 
 let fixture: HTMLElement
 
@@ -28,6 +29,44 @@ beforeEach(async () => {
 })
 
 afterEach(() => fixture.remove())
+
+test.each([389, 1280])('switches playback colors with the icon on the first frame at %ipx', async (width) => {
+  await page.viewport(width, 900)
+  fixture.insertAdjacentHTML('beforeend', `
+    <header class="app-toolbar">
+      <div class="mobile-aliyah-capsule" data-audio-tone="normal">
+        <button class="mobile-aliyah-play-toggle" data-audio-tone="normal">Play</button>
+      </div>
+    </header>
+  `)
+  const inline = required<HTMLButtonElement>('[aria-label="Inactive aliyah audio"]')
+  inline.dataset.audioTone = 'normal'
+  const floating = required('[data-target-id="floating-play"]')
+  const player = required('.floating-player')
+  player.classList.remove('is-playing')
+  const capsule = required('.mobile-aliyah-capsule')
+  const compact = required<HTMLButtonElement>('.mobile-aliyah-play-toggle')
+  const controls = width <= 550 ? [compact, floating] : [inline, floating]
+  const colors = () => controls.map(element => ({
+    color: getComputedStyle(element).color,
+    background: getComputedStyle(element).backgroundColor,
+  }))
+  await transitionSettled()
+
+  for (const playing of [true, false]) {
+    // Commit the previous appearance so a delayed CSS transition cannot hide.
+    colors()
+    inline.classList.toggle('is-active', playing)
+    player.classList.toggle('is-playing', playing)
+    capsule.classList.toggle('is-playing', playing)
+    for (const control of controls) control.innerHTML = iconMarkup(playing ? 'pause' : 'play')
+    const immediate = colors()
+    const capsuleBackground = getComputedStyle(capsule).backgroundColor
+    await transitionSettled()
+    expect(immediate, playing ? 'Play to pause' : 'Pause to play').toEqual(colors())
+    if (width <= 550) expect(capsuleBackground).toBe(getComputedStyle(capsule).backgroundColor)
+  }
+})
 
 test('keeps active aliyah hover yellow while inactive playback hover stays blue', async () => {
   const inactive = required<HTMLButtonElement>(

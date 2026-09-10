@@ -377,6 +377,12 @@
     outline-offset: 2px;
   }
 
+  [data-target-id='floating-play'] {
+    transition:
+      opacity var(--reader-motion-color) var(--reader-ease-standard),
+      transform var(--reader-motion-fast) var(--reader-ease-out);
+  }
+
   .floating-player-button {
     border: none;
     border-radius: 999px;

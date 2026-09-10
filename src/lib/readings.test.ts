@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import {
   availableReadings,
   coverageSummary,
@@ -7,6 +7,33 @@ import {
   getRequiredReading,
   readingCoverage,
 } from './readings.ts'
+
+vi.mock('../../generated/public-reading-manifest.ts', async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import('../../generated/public-reading-manifest.ts')
+  >()
+  // Keep status scenarios stable as real recordings receive new cue files.
+  // The generator tests separately verify the manifest against those files.
+  const ready = new Set([
+    'beresheet', 'noach', 'lech-lecha', 'toldot', 'vayetzei', 'haazinu',
+  ])
+  return {
+    ...actual,
+    publicAliyotByParsha: Object.fromEntries(
+      Object.entries(actual.publicAliyotByParsha).map(([slug, aliyot]) => [
+        slug,
+        aliyot.map((aliyah) => ({
+          ...aliyah,
+          cueStatus: ready.has(slug) ||
+            (slug === 'yitro' && aliyah.number <= 2) ||
+            (slug === 'behalotecha' && aliyah.number === 1)
+            ? 'cued'
+            : 'missing',
+        })),
+      ])
+    ),
+  }
+})
 
 test('builds public coverage from generated recordings and cue data', () => {
   expect(readingCoverage).toHaveLength(56)
@@ -40,6 +67,10 @@ test('projects published cue states and canonical aliyah links without cue paylo
   })
   expect(behalotecha.aliyot[0]).toMatchObject({
     audioId: 'behalotecha-1',
+    cueStatus: 'cued',
+  })
+  expect(behalotecha.aliyot[1]).toMatchObject({
+    audioId: 'behalotecha-2',
     cueStatus: 'missing',
   })
   expect(beresheet.aliyot.every((aliyah) =>
@@ -66,7 +97,7 @@ test('uses manual rows only for active work while generated cues decide readines
   expect(getRequiredReading('beresheet').statusLabel).toBe('Word sync ready')
   expect(getRequiredReading('vayetzei').statusLabel).toBe('Word sync ready')
   expect(getRequiredReading('nasso').statusLabel).toBe('Recording review')
-  expect(getRequiredReading('behalotecha').statusLabel).toBe('Audio available')
+  expect(getRequiredReading('behalotecha').statusLabel).toBe('Sync in progress')
   expect(getRequiredReading('vayelech').statusLabel).toBe('Audio available')
   expect(readingCoverage.map((reading) => reading.statusLabel)).not.toContain(
     'Needs review'
@@ -82,7 +113,7 @@ test('derives featured-reading copy from generated availability and cue truth', 
     getReadingAvailabilitySummary(getRequiredReading('behalotecha'))
   ).toEqual({
     aliyahLabel: 'All seven aliyot available',
-    statusLabel: 'Audio available',
+    statusLabel: 'Sync in progress',
   })
 })
 

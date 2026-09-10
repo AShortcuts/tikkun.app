@@ -14,6 +14,7 @@ export type CueAuthoringPanelAction =
   | { type: 'reset' }
   | { type: 'resume' }
   | { type: 'export' }
+  | { type: 'import'; file: File }
 
 export type CueAuthoringCaptureTone =
   | 'normal'
@@ -63,6 +64,7 @@ export interface CueAuthoringPanelSnapshot {
   canMarkIssue: boolean
   canReset: boolean
   canExport: boolean
+  canImport?: boolean
   exportChanged: boolean
   resumeWord: number | null
 }

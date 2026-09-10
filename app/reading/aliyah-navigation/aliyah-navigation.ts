@@ -1,3 +1,4 @@
+import type { PassageAudioState } from '../passage-audio.ts'
 import { flushSync, mount, unmount } from 'svelte'
 import type { MountScope } from '../../lifecycle/mount.ts'
 import AliyahNavigationLayerView from './AliyahNavigationLayer.svelte'
@@ -27,7 +28,10 @@ export type MobileAliyahCapsule = Readonly<{
   target: AliyahNavigationTarget | null
   label: string
   playbackState: MobileAliyahCapsuleState
+  audioState?: PassageAudioState
   audioAvailable?: boolean
+  authoringMissing?: boolean
+  cueIncomplete?: boolean
 }>
 
 export type AliyahToolbarState = Readonly<{
@@ -35,6 +39,7 @@ export type AliyahToolbarState = Readonly<{
     labelVisible: boolean
     label: string
     target: AliyahNavigationTarget | null
+    audioState?: PassageAudioState
     audioAvailable: boolean
     authoringAvailable: boolean
     authoringEnabled: boolean

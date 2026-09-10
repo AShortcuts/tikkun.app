@@ -2,11 +2,13 @@ import { afterEach, expect, test, vi } from 'vitest'
 import {
   createRecordingIssue,
   filterRecordingIssues,
+  getLatestReaderVisibleIssues,
   getReaderVisibleIssues,
   loadLocalRecordingIssues,
   mergePublishedAndLocalRecordingIssues,
   parseRecordingIssues,
   recordingIssueReaderLabel,
+  recordingIssueReaderText,
   RecordingIssueConflictError,
   RecordingIssueStorageError,
   saveLocalRecordingIssues,
@@ -44,10 +46,39 @@ test('creates a reader-visible recording issue anchored to a token', () => {
   })
 
   expect(issue).toMatchObject({
-    id: 'issue:beresheet-1:1:0:0:1:1',
+    id: 'issue:beresheet-1:1:0:0:1:mistaken-pronunciation:1',
     visibility: 'readerVisible',
   })
   expect(recordingIssueReaderLabel(issue)).toBe('Pronunciation differs here')
+})
+
+test('uses the latest visible issue per word and prefers its note in reader text', () => {
+  const older = createRecordingIssue({
+    audioId: 'beresheet-1', tokenKey: '1:0:0:1', kind: 'mistaken-pronunciation',
+    visibility: 'readerVisible', severity: 'medium', createdAt: 1, tokenizationVersion: 'v2',
+  })
+  const latest = createRecordingIssue({ ...older, kind: 'repeated-word', note: '  The word is repeated twice.  ', createdAt: 2 })
+  const privateIssue = createRecordingIssue({ ...older, kind: 'hesitation', visibility: 'authoringOnly', createdAt: 3 })
+  const removed = createRecordingIssue({ ...older, kind: 'other', removed: true, createdAt: 4 })
+  const otherWord = createRecordingIssue({ ...older, tokenKey: '1:0:0:2', kind: 'skipped-word' })
+
+  expect(getLatestReaderVisibleIssues([latest, older, privateIssue, removed, otherWord])).toEqual([latest, otherWord])
+  expect(recordingIssueReaderText(latest)).toBe('The word is repeated twice.')
+  expect(recordingIssueReaderText({ ...latest, note: ' ' })).toBe('Recording repeats here')
+  expect(recordingIssueReaderText(otherWord)).toBe('Recording skips here')
+})
+
+test('keeps a published issue removed after saving and reloading the local overlay', () => {
+  const storage = createStorage()
+  const published = createRecordingIssue({
+    audioId: 'beresheet-1', tokenKey: '1:0:0:1', kind: 'mistaken-pronunciation',
+    visibility: 'readerVisible', severity: 'medium', createdAt: 1, tokenizationVersion: 'v2',
+  })
+  const removed = { ...published, removed: true }
+  saveLocalRecordingIssues(storage, 'beresheet-1', 'v2', [removed], loadLocalRecordingIssues(storage, 'beresheet-1', 'v2').revision)
+  const reloaded = loadLocalRecordingIssues(storage, 'beresheet-1', 'v2').issues
+  expect(mergePublishedAndLocalRecordingIssues([published], reloaded)).toEqual([])
+  expect(getReaderVisibleIssues(reloaded)).toEqual([])
 })
 
 test('filters reader-visible issues from authoring and alignment hints', () => {

@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+task_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+export PYTHONDONTWRITEBYTECODE=1
+if [ ! -x "$task_dir/.venv/bin/python" ]; then
+  echo "Private model environment is missing. Follow README.md setup before starting." >&2
+  exit 1
+fi
+exec "$task_dir/.venv/bin/python" -B "$task_dir/beta_server.py" "$@"

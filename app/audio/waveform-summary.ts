@@ -1,49 +1,61 @@
 export interface WaveformSummary {
   audioId: string
   duration: number
-  buckets: number[]
+  sampleRate: number
+  sampleCount: number
+  stepSamples: number
+  min: Float32Array
+  max: Float32Array
 }
 
 export function createWaveformSummary({
   audioId,
-  duration,
+  sampleRate,
   channelData,
-  bucketCount,
 }: {
   audioId: string
-  duration: number
+  sampleRate: number
   channelData: readonly Float32Array[]
-  bucketCount: number
 }): WaveformSummary {
-  const safeBucketCount = Math.max(0, Math.floor(bucketCount))
-  if (!safeBucketCount) return { audioId, duration, buckets: [] }
+  if (!Number.isFinite(sampleRate) || sampleRate <= 0) {
+    throw new RangeError('Waveform sample rate must be positive and finite')
+  }
   const sampleCount = channelData.reduce(
     (longest, channel) => Math.max(longest, channel.length),
     0
   )
-  if (!sampleCount || duration <= 0) {
-    return { audioId, duration, buckets: Array.from({ length: safeBucketCount }, () => 0) }
-  }
-
-  const bucketSize = sampleCount / safeBucketCount
-  const buckets = Array.from({ length: safeBucketCount }, (_, index) => {
-    const start = Math.floor(index * bucketSize)
-    const end = Math.max(start + 1, Math.floor((index + 1) * bucketSize))
-    let sumOfSquares = 0
-    let includedSampleCount = 0
+  const stepSamples = Math.max(1, Math.round(sampleRate * 0.01))
+  const binCount = Math.ceil(sampleCount / stepSamples)
+  const min = new Float32Array(binCount)
+  const max = new Float32Array(binCount)
+  for (let index = 0; index < binCount; index += 1) {
+    const start = index * stepSamples
+    const end = Math.min(start + stepSamples, sampleCount)
+    let low = Infinity
+    let high = -Infinity
+    // Keep transients from every channel, including opposite-phase stereo.
     for (const channel of channelData) {
       const channelEnd = Math.min(end, channel.length)
       for (let sampleIndex = start; sampleIndex < channelEnd; sampleIndex += 1) {
-        const sample = channel[sampleIndex] ?? 0
-        sumOfSquares += sample * sample
-        includedSampleCount += 1
+        const sample = channel[sampleIndex]
+        if (!Number.isFinite(sample)) {
+          throw new Error('Waveform audio contains a non-finite sample')
+        }
+        low = Math.min(low, sample)
+        high = Math.max(high, sample)
       }
     }
-    const volume = includedSampleCount
-      ? Math.sqrt(sumOfSquares / includedSampleCount)
-      : 0
-    return Number(volume.toFixed(3))
-  })
+    min[index] = low
+    max[index] = high
+  }
 
-  return { audioId, duration, buckets }
+  return {
+    audioId,
+    duration: sampleCount / sampleRate,
+    sampleRate,
+    sampleCount,
+    stepSamples,
+    min,
+    max,
+  }
 }

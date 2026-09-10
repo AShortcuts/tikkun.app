@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+task_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+mkdir -p "$task_dir/work"
+export UV_CACHE_DIR="$task_dir/work/uv-cache"
+export PYTHONDONTWRITEBYTECODE=1
+task_python=$(command -v python3)
+if [ -x "$task_dir/.venv/bin/python" ]; then
+  task_python="$task_dir/.venv/bin/python"
+fi
+exec uv --quiet run --offline --no-project --python "$task_python" python -B "$task_dir/aligner.py" "$@"

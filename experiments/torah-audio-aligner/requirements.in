@@ -1,0 +1,6 @@
+# Acoustic environment; resolve for CPython 3.13 on macOS ARM64.
+# Installation and model inference require the separately agreed resource budget.
+numpy==2.5.3
+torch==2.14.0
+transformers==5.16.1
+safetensors==0.8.0

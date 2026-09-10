@@ -8,6 +8,7 @@ import {
 import type { ReaderPreferences } from './reader-preferences.ts'
 
 const preferences: ReaderPreferences = {
+  reducedMotion: 'automatic',
   narratorId: 'custom-narrator',
   playbackRate: 1.35,
   highlightFill: '#123456',

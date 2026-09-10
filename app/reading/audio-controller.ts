@@ -20,6 +20,8 @@ export interface ActiveAudioSession {
   tokenKeys: string[]
   segments: ActivePlaybackSegment[]
   status: PlaybackPlanStatus
+  readingLabel?: string
+  passage?: PlaybackPlan['passage']
 }
 
 type AudioControllerEvents = {
@@ -276,8 +278,8 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
     // Safari on iOS only unlocks media loading when load() or play() runs
     // synchronously from the user's gesture. Call this before any await.
     if (sourceChanged) {
-      this.cancelPendingActivation?.()
-      this.audio.pause()
+      if (this.activeSession) this.clearSession()
+      else { this.cancelPendingActivation?.(); this.audio.pause() }
       this.audio.src = recording.playSrc
     }
     this.activationError = null
@@ -378,11 +380,11 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
       this.emit('frame-updated', { currentTime: this.currentTime })
       return
     }
-    this.activateSegment(segmentIndex, clampedTime, false)
+    this.activateSegment(segmentIndex, clampedTime, !this.audio.paused)
   }
 
   replayFromStart() {
-    const startTime = this.activeSession?.cues[0]?.timeStart ?? 0
+    const startTime = this.activeSession?.passage ? 0 : this.activeSession?.cues[0]?.timeStart ?? 0
     this.seek(startTime)
     return this.play()
   }
@@ -599,6 +601,7 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
   ) {
     if (generation !== this.activationGeneration || !this.activeSession) return
     this.activationError = error
+    this.audio.pause()
     this.activationNeedsReload = needsReload
     this.emit('playback-error', {
       error,
@@ -656,6 +659,8 @@ export function createActiveAudioSession(plan: PlaybackPlan): ActiveAudioSession
     tokenKeys: plan.tokenKeys,
     segments,
     status: plan.status,
+    readingLabel: plan.readingLabel,
+    passage: plan.passage,
   }
 }
 

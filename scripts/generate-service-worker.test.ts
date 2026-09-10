@@ -9,7 +9,7 @@ import {
   MAX_SHELL_PRECACHE_RAW_BYTES,
   MAX_SHELL_PRECACHE_URLS,
   normalizeBasePath,
-  prototypeRouteNodeSources,
+  deferredRouteNodeSources,
   renderServiceWorkerSource,
   shellAssetReferencesFromHtml,
   shouldPrecache,
@@ -234,10 +234,11 @@ test('resolves nested shell dependencies within a deployment base path', () => {
   ).toEqual(['_app/site.css'])
 })
 
-test('finds prototype page and layout nodes in the generated route table', () => {
+test('finds prototype and backup nodes while keeping the homepage in the shell', () => {
   expect(
-    [...prototypeRouteNodeSources(`
+    [...deferredRouteNodeSources(`
       "/": [5],
+      "/(site)/old-v2.html": [7,[3]],
       "/prototypes": [10],
       "/prototypes/scroll-story": [16,[4]],
     `)].sort()
@@ -245,6 +246,7 @@ test('finds prototype page and layout nodes in the generated route table', () =>
     '.svelte-kit/generated/client-optimized/nodes/10.js',
     '.svelte-kit/generated/client-optimized/nodes/16.js',
     '.svelte-kit/generated/client-optimized/nodes/4.js',
+    '.svelte-kit/generated/client-optimized/nodes/7.js',
   ])
 })
 
@@ -287,9 +289,20 @@ test('precache keeps the app shell small and excludes deferred content', () => {
   expect(shouldPrecache('_headers', excludedFiles)).toBe(false)
   expect(shouldPrecache('_redirects', excludedFiles)).toBe(false)
   expect(shouldPrecache('prototypes/index.html', excludedFiles)).toBe(false)
+  expect(shouldPrecache('old-v2.html', excludedFiles)).toBe(false)
+  expect(shouldPrecache('assets/images/home-reader-demo.jpg', excludedFiles)).toBe(false)
   expect(
     shouldPrecache('assets/images/prototypes/reader.png', excludedFiles)
   ).toBe(false)
+})
+
+test('passage playback tools load on demand without excluding shared reader code', () => {
+  const { excludedFiles } = classifyManifestFiles({
+    'app/index.ts': { file: 'reader.js', isEntry: true },
+    'app/reading/passage-audio-tools.ts': { file: 'passage-tools.js', isDynamicEntry: true, imports: ['app/index.ts'] },
+  })
+  expect(shouldPrecache('passage-tools.js', excludedFiles)).toBe(false)
+  expect(shouldPrecache('reader.js', excludedFiles)).toBe(true)
 })
 
 test('accepts shell precache metrics at both release limits', () => {

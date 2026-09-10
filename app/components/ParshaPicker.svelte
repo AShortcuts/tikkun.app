@@ -321,10 +321,12 @@
         0,
         viewport.height - POPUP_VIEWPORT_MARGIN * 2
       )}px`
+      const rowRect = menu.trigger.closest('.parsha-row')?.getBoundingClientRect()
       const { left, top, side } = calculateFlyoutPopupPosition({
-        anchorRect: triggerRect,
+        anchorRect: rowRect ?? triggerRect,
         popupRect: popup.getBoundingClientRect(),
         viewport,
+        preferredSide: 'left',
       })
       popup.dataset.flyoutSide = side
       popup.style.left = `${left}px`
@@ -1075,6 +1077,11 @@
                       class="parsha"
                       href={entry.href}
                       data-parsha-id={entry.id}
+                      onpointerover={(event) => {
+                        if (hoverFlyout && event.pointerType === 'mouse') {
+                          closeAliyahMenu()
+                        }
+                      }}
                       onclick={(event) => navigateLink(event, entry.href)}
                     >
                       {entry.label}

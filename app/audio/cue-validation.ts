@@ -1,6 +1,7 @@
 import {
   compareTokenPositions,
 } from '../reader/token-position.ts'
+import { parseCueReview } from './cue-review.ts'
 import {
   parseRecordingIssues,
   type RecordingIssue,
@@ -84,6 +85,8 @@ export function audioMediaIdentitiesEqual(
 
 export function parseWordCue(value: unknown): WordCue | null {
   if (!isRecord(value)) return null
+  const review = value.review === undefined ? undefined : parseCueReview(value.review)
+  if (review === null) return null
   if (
     !isFiniteNumber(value.timeStart) ||
     value.timeStart < 0 ||
@@ -114,6 +117,7 @@ export function parseWordCue(value: unknown): WordCue | null {
     lineIndex: value.lineIndex,
     fragmentIndex: value.fragmentIndex,
     wordIndex: value.wordIndex,
+    ...(review === undefined ? {} : { review }),
   }
 }
 
@@ -281,7 +285,7 @@ export function inspectCueExportPayload(value: unknown): CuePayloadInspection {
     )
     addIssue(
       invalidCueIndex >= 0 ? `cues[${invalidCueIndex}]` : 'cues',
-      'Every cue must contain a valid timestamp and token position.'
+      'Every cue must contain a valid timestamp, token position, and review metadata when present.'
     )
   } else {
     const invalidNumberIndex = draftCues.findIndex(

@@ -27,6 +27,8 @@ const excludedPathPrefixes = [
   '.vite/',
   'prototypes/',
   'assets/images/prototypes/',
+  'old-v2.html',
+  'assets/images/home-reader-demo.jpg',
 ]
 const excludedExtensions = new Set([
   '.aac',
@@ -47,14 +49,19 @@ const deferredSourcePatterns = [
   /^app\/admin\/cue-authoring\.ts$/,
   /^app\/components\/CueAnalyticsPage\.ts$/,
   /^app\/video\/recording-harness\.ts$/,
+  /^app\/reading\/passage-audio-tools\.ts$/,
   /^src\/routes\/prototypes\//,
+  /^src\/routes\/\(site\)\/old-v2\.html\//,
 ]
 const verificationFilePattern = /^google[A-Za-z0-9_-]+\.html$/
 const nonCriticalFontPattern = /(?:^|\/)Lora-Regular(?:\.[A-Za-z0-9_-]+)?\.ttf$/
 const hostControlFiles = new Set(['_headers', '_redirects'])
 
-export const MAX_SHELL_PRECACHE_URLS = 64
-export const MAX_SHELL_PRECACHE_RAW_BYTES = 1_600_000
+// Passage coverage adds one shared reader chunk; audio-only tools stay deferred.
+// Promoting the scroll story adds two shell files; backups stay deferred.
+export const MAX_SHELL_PRECACHE_URLS = 67
+// Movable reader settings add about 3.2 KB of script and styles before compression.
+export const MAX_SHELL_PRECACHE_RAW_BYTES = 1_610_000
 
 function normalizePath(filePath) {
   return filePath.split(path.sep).join('/')
@@ -136,11 +143,13 @@ function filesForManifestEntries(manifest, sourcePaths) {
   return files
 }
 
-export function prototypeRouteNodeSources(clientAppSource) {
+export function deferredRouteNodeSources(clientAppSource) {
   const nodeIds = new Set()
-  const routePattern = /^\s*"\/prototypes[^"]*":\s*\[(\d+)(?:,\[([^\]]*)\])?\],?$/gm
+  const routePattern = /^\s*"(?:\/prototypes[^"]*|\/(?:\(site\)\/)?old-v2\.html)":\s*\[(\d+)(?:,\[([^\]]*)\])?\],?$/gm
   for (const match of clientAppSource.matchAll(routePattern)) {
     nodeIds.add(Number(match[1]))
+    // The backup shares its layout with active public pages.
+    if (match[0].includes('old-v2.html')) continue
     for (const layoutId of match[2]?.split(',') ?? []) {
       if (/^\d+$/.test(layoutId.trim())) nodeIds.add(Number(layoutId))
     }
@@ -1856,7 +1865,7 @@ export async function generateServiceWorker(
   ])
   const { excludedFiles, torahPageFiles } = classifyManifestFiles(
     manifest,
-    prototypeRouteNodeSources(clientAppSource)
+    deferredRouteNodeSources(clientAppSource)
   )
   if (!torahPageFiles.length) {
     throw new Error('SvelteKit client manifest did not contain Torah page chunks')

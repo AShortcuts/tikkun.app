@@ -21,6 +21,17 @@ const testSettings: UserSettings = {
 
 const generator = new LeiningGenerator(testSettings)
 
+test('keeps the parsha flyout on the chevron side, with an edge fallback', () => {
+  const position = (left: number) => calculateFlyoutPopupPosition({
+    anchorRect: { left, right: left + 148, top: 200, bottom: 244 },
+    popupRect: { width: 156, height: 300 },
+    viewport: { width: 1280, height: 800 },
+    preferredSide: 'left',
+  })
+  expect(position(950)).toMatchObject({ side: 'left', left: 790 })
+  expect(position(20)).toMatchObject({ side: 'right', left: 172 })
+})
+
 test('builds aliyah choices for a regular parsha', () => {
   const beresheet = findParsha('Bereshit')
 

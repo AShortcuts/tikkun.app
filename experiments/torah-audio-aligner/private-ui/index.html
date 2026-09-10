@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Torah Audio Aligner · Private beta</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="identity"><h1>Torah Audio Aligner</h1><span class="beta-label">Private beta</span></div>
+    <div class="save-tools"><span id="save-status" role="status">Loading recordings…</span><button id="undo" class="quiet" disabled>Undo</button><button id="redo" class="quiet" disabled>Redo</button><button id="save" disabled>Save</button></div>
+  </header>
+  <div id="error" role="alert" hidden><span id="error-text"></span><button id="download-unsaved">Download edits</button><button id="dismiss-error" class="quiet">Dismiss</button></div>
+  <section class="recording-bar" aria-label="Recording">
+    <div class="recording-choice"><label for="recording">Recording</label><select id="recording" disabled><option>Loading real recordings…</option></select><span id="recording-meta"></span></div>
+    <button id="align" disabled>Align again</button>
+    <button id="review-toggle" aria-expanded="false" aria-controls="review-panel">Review &amp; export</button>
+    <button id="quick-download-cues" class="primary" disabled>Download Tikkun cues</button>
+  </section>
+  <p id="download-notice" class="download-notice" role="status" hidden></p>
+  <div id="job" role="status" hidden><span id="job-text"></span><button id="open-result" hidden>Open new result</button></div>
+  <main id="workspace" aria-busy="true">
+    <section class="reading" aria-label="Torah passage">
+      <div class="reading-heading"><div><h2 id="passage-title">Loading passage</h2><p id="passage-hint">Select a word to replay it. Review the onset against the audio.</p></div><span id="review-count"></span></div>
+      <div id="passage" tabindex="-1"><p class="loading-copy">Opening the local alignment…</p></div>
+      <div class="reading-legend"><span><i class="selected-dot"></i>Selected</span><span><i class="reviewed-dot"></i>Timing reviewed</span><span id="flag-count"></span></div>
+    </section>
+    <aside class="inspector" aria-label="Selected word">
+      <div class="word-nav"><button id="previous" aria-label="Previous word" disabled>Previous</button><span id="word-position"></span><button id="next" aria-label="Next word" disabled>Next</button></div>
+      <div class="selected-heading"><h2 id="selected-word" lang="he" dir="rtl">—</h2><span id="selected-verse"></span></div>
+      <div class="timing-control"><label for="start">Word onset <span>seconds</span></label><div class="nudge"><button id="earlier" aria-label="Move onset 20 milliseconds earlier" disabled>−20 ms</button><input id="start" type="number" min="0" step="0.02" inputmode="decimal" disabled><button id="later" aria-label="Move onset 20 milliseconds later" disabled>+20 ms</button></div><button id="use-playhead" class="text-button" disabled>Set onset at playhead</button></div>
+      <p id="model-onset" class="secondary"></p>
+      <button id="accept" class="primary" disabled>Mark timing reviewed &amp; next</button>
+      <button id="unreview" class="text-button" hidden>Mark this word unreviewed</button>
+      <div id="word-evidence" class="word-evidence"></div>
+      <details id="word-details"><summary>Word details &amp; corrections</summary><div class="detail-body">
+        <label for="note">Review note</label><textarea id="note" rows="2" maxlength="2000" placeholder="What did you hear?"></textarea>
+        <label for="end">Reviewed end <span>optional, seconds</span></label><input id="end" type="number" min="0" step="0.02" inputmode="decimal" placeholder="Leave unset to keep chanting intact">
+        <label class="check"><input id="end-accepted" type="checkbox">I checked this end against the audio</label>
+        <p class="secondary">Raw model ends can miss sustained chanting. Playback continues to the next word unless you review an end.</p>
+        <label for="insert-token">Add a performed word</label><select id="insert-token"></select><button id="insert">Insert selected word at playhead</button>
+        <button id="remove" class="text-button danger">Remove this occurrence</button>
+      </div></details>
+    </aside>
+    <aside id="review-panel" class="review-panel" hidden aria-label="Recording review and export">
+      <div class="review-heading-sticky">
+        <div class="panel-heading"><h2>Review &amp; export</h2><button id="review-close" class="quiet" aria-label="Close review panel">Close</button></div>
+        <div class="review-transport"><button id="review-play" class="primary" disabled>Play audio</button><output id="review-time">0:00 / 0:00</output></div>
+        <div id="review-error" role="alert" hidden><p id="review-error-text"></p><div><button id="review-download-unsaved">Download edits</button><button id="review-dismiss-error" class="quiet">Dismiss</button></div></div>
+      </div>
+      <section id="cue-export" class="cue-export" aria-label="Tikkun cue download" tabindex="-1">
+        <h3>Tikkun cues</h3>
+        <p id="export-gate" class="secondary"></p>
+        <button id="download-cues" class="primary" disabled>Download Tikkun cues</button>
+        <p id="review-download-notice" class="secondary" role="status" hidden></p>
+      </section>
+      <p class="secondary">Saved only on this Mac. Downloads are private drafts.</p>
+      <label for="reviewer">Your name</label><input id="reviewer" type="text" maxlength="120" autocomplete="name" placeholder="Reviewer name">
+      <label class="check"><input id="linear" type="checkbox">I listened to the complete recording and verified every word occurs once, in order.</label>
+      <button id="accept-all">Mark all word timings reviewed</button>
+      <h3>Reading flags</h3><p class="secondary">These are model hypotheses. Listen before recording your decision.</p><div id="events"></div>
+      <details id="tail-details"><summary id="tail-summary">Possible sustained tails</summary><p class="secondary">Voiced gaps may belong to either word. These guide end review; they are not reading mistakes.</p><div id="tails"></div></details>
+      <details><summary>Preview settings</summary><div class="detail-body"><label for="lead">Highlight lead <span>milliseconds</span></label><input id="lead" type="number" min="0" max="1000" step="20"><p class="secondary">228 ms matches the approximate convention in your existing cues. It changes preview and cue starts; your corrected onsets stay intact.</p><label for="preroll">Word replay pre-roll <span>milliseconds</span></label><input id="preroll" type="number" min="0" max="1000" step="20"></div></details>
+      <details id="history-details"><summary>Saved revisions</summary><div class="detail-body"><label for="history">Restore an earlier private edit</label><select id="history"><option>No saved revisions</option></select><button id="restore" disabled>Restore as a new revision</button></div></details>
+      <details><summary>Other export options</summary><div class="detail-body"><label class="check"><input id="include-ends" type="checkbox">Include separately reviewed end times</label><button id="download-review">Download review package</button><p class="secondary">Includes original evidence, corrections, and unresolved flags.</p></div></details>
+      <details><summary>About this beta</summary><p id="beta-about" class="secondary">Uses the existing local model and registered Tikkun recordings. Re-alignment runs one recording at a time, with four CPU threads and a three-minute acoustic limit. No upload or live following yet. Timing review does not verify pronunciation or taamim correctness. Nothing here publishes to Tikkun.</p></details>
+    </aside>
+  </main>
+  <footer class="audio-desk" aria-label="Audio playback and timing">
+    <div class="timeline-heading"><span id="timeline-caption">Waveform · original audio timeline</span><div><label for="zoom">Window</label><select id="zoom" aria-label="Waveform window"><option value="4">4 seconds</option><option value="8" selected>8 seconds</option><option value="16">16 seconds</option><option value="0">Full recording</option></select><label class="check compact"><input id="follow" type="checkbox" checked>Follow</label></div></div>
+    <canvas id="waveform" height="112" tabindex="0" role="img" aria-label="Audio waveform. Click to seek; Shift-click to set selected word onset. Left and right arrow keys seek 20 milliseconds."></canvas>
+    <label for="seek" class="sr-only">Recording position</label><input id="seek" type="range" min="0" max="1" step="0.01" value="0" disabled>
+    <div class="transport"><div class="play-tools"><button id="play" class="primary play" disabled><svg aria-hidden="true" viewBox="0 0 24 24"><path id="play-icon" d="M8 5l11 7-11 7z"/></svg><span id="play-label">Play</span></button><button id="back" aria-label="Back five seconds" disabled>−5 s</button><button id="replay" disabled>Replay word</button><label class="check compact"><input id="loop" type="checkbox">Loop word</label></div><div class="play-info"><output id="time">0:00 / 0:00</output><label for="speed" class="sr-only">Playback speed</label><select id="speed" aria-label="Playback speed"><option value="0.6">0.6×</option><option value="0.8">0.8×</option><option value="1" selected>1×</option><option value="1.2">1.2×</option></select></div></div>
+    <audio id="audio" preload="metadata"></audio>
+  </footer>
+</body>
+</html>

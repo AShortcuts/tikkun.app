@@ -46,7 +46,10 @@ export class WaveformSummaryLoader {
       })
       .catch((error: unknown): null => {
         if (controller.signal.aborted) {
-          if (this.entries.get(key)?.status === 'loading') this.entries.delete(key)
+          const current = this.entries.get(key)
+          if (current?.status === 'loading' && current.controller === controller) {
+            this.entries.delete(key)
+          }
           return null
         }
         const failure = error instanceof Error
@@ -80,12 +83,10 @@ export class WaveformSummaryLoader {
 export async function decodeWaveformSummary({
   audioId,
   src,
-  bucketCount,
   signal,
 }: {
   audioId: string
   src: string
-  bucketCount: number
   signal: AbortSignal
 }) {
   const response = await fetch(src, { signal })
@@ -101,12 +102,11 @@ export async function decodeWaveformSummary({
     if (signal.aborted) throw new DOMException('Waveform load cancelled', 'AbortError')
     return createWaveformSummary({
       audioId,
-      duration: decoded.duration,
+      sampleRate: decoded.sampleRate,
       channelData: Array.from(
         { length: decoded.numberOfChannels },
         (_, channelIndex) => decoded.getChannelData(channelIndex)
       ),
-      bucketCount,
     })
   } finally {
     if (audioContext.state !== 'closed') await audioContext.close()

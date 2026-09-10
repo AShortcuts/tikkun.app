@@ -1,5 +1,5 @@
 import { flushSync, mount, unmount } from 'svelte'
-import type { RecordingIssueKind } from '../audio/recording-issues.ts'
+import type { RecordingIssue, RecordingIssueKind } from '../audio/recording-issues.ts'
 import type { MountScope } from '../lifecycle/mount.ts'
 import CueAuthoringIssueDialogView from './CueAuthoringIssueDialog.svelte'
 
@@ -9,13 +9,14 @@ export interface CueAuthoringIssueKindOption {
 }
 
 export interface CueAuthoringIssueInput {
+  issueId?: string
   kind: RecordingIssueKind
   note?: string
   readerVisible: boolean
 }
 
 export interface CueAuthoringIssueDialog {
-  open(): void
+  open(options?: { issues?: readonly RecordingIssue[]; wordLabel?: string }): void
   close(): void
   isOpen(): boolean
 }
@@ -24,6 +25,8 @@ export interface CueAuthoringIssueDialogOptions {
   document: Document
   issueKinds: readonly CueAuthoringIssueKindOption[]
   save(input: CueAuthoringIssueInput): boolean
+  remove(issueId: string): boolean
+  getSaveError?(): string | null
   closed(): void
 }
 
@@ -52,6 +55,8 @@ export function createCueAuthoringIssueDialog(
     props: {
       issueKinds: options.issueKinds,
       save: options.save,
+      remove: options.remove,
+      getSaveError: options.getSaveError,
       closed: options.closed,
       connect: (connectedDialog: CueAuthoringIssueDialog) => {
         dialog = connectedDialog

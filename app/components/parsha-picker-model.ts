@@ -286,18 +286,22 @@ export function calculateFlyoutPopupPosition({
   verticalAnchorRect = anchorRect,
   popupRect,
   viewport,
+  preferredSide = 'right',
 }: {
   anchorRect: AnchorRect
   verticalAnchorRect?: AnchorRect
   popupRect: PopupRect
   viewport: ViewportRect
+  preferredSide?: 'left' | 'right'
 }) {
   const margin = POPUP_VIEWPORT_MARGIN
   const gap = 4
   const fitsRight =
     anchorRect.right + gap + popupRect.width <= viewport.width - margin
   const fitsLeft = anchorRect.left - gap - popupRect.width >= margin
-  const side = fitsRight || !fitsLeft ? 'right' : 'left'
+  const side = preferredSide === 'left'
+    ? (fitsLeft || !fitsRight ? 'left' : 'right')
+    : (fitsRight || !fitsLeft ? 'right' : 'left')
   const preferredLeft =
     side === 'right'
       ? anchorRect.right + gap

@@ -4,7 +4,7 @@ import specialLettersJson from '../text/special-letters.json' with {
 import type { Ref } from './ref.ts'
 
 export type SpecialLetterForm = {
-  type: 'small'
+  type: 'small' | 'inverted'
 }
 
 export type SpecialLetterEntry = {
@@ -42,7 +42,7 @@ const isHebrewLetter = (value: unknown): value is string =>
   typeof value === 'string' && /^[א-ת]$/u.test(value)
 
 export const normalizeHebrewWord = (text: string) =>
-  text.match(/[א-ת]/gu)?.join('') ?? ''
+  text.match(/[א-ת\u05c6]/gu)?.join('') ?? ''
 
 const parseEntry = (value: unknown, index: number): SpecialLetterEntry => {
   const label = `Special-letter entry ${index + 1}`
@@ -70,14 +70,19 @@ const parseEntry = (value: unknown, index: number): SpecialLetterEntry => {
   }
   if (
     !isRecord(letter) ||
-    !isHebrewLetter(letter.text) ||
+    !(isHebrewLetter(letter.text) || letter.text === '\u05c6') ||
     !isPositiveInteger(letter.position) ||
     Array.from(word.text)[letter.position - 1] !== letter.text
   ) {
     throw new Error(`${label} has an invalid letter target`)
   }
-  if (!isRecord(form) || form.type !== 'small') {
+  if (!isRecord(form) || (form.type !== 'small' && form.type !== 'inverted')) {
     throw new Error(`${label} has an unsupported form`)
+  }
+  if (form.type === 'inverted'
+    ? word.text !== '\u05c6' || letter.text !== '\u05c6'
+    : !isHebrewLetter(letter.text)) {
+    throw new Error(`${label} has an invalid target for its form`)
   }
 
   return {
@@ -95,7 +100,7 @@ const parseEntry = (value: unknown, index: number): SpecialLetterEntry => {
       text: letter.text,
       position: letter.position,
     },
-    form: { type: 'small' },
+    form: { type: form.type },
   }
 }
 
@@ -178,7 +183,7 @@ const renderTargetedWord = (
 
   return (text.match(/.\p{Mark}*/gu) ?? [])
     .map((grapheme) => {
-      const letter = grapheme.match(/[א-ת]/u)?.[0]
+      const letter = grapheme.match(/[א-ת\u05c6]/u)?.[0]
       if (!letter) return grapheme
 
       letterPosition += 1

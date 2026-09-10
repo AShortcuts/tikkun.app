@@ -171,6 +171,14 @@
   min-width: 0;
 }
 
+@media screen and (min-width: 716px) {
+  .parsha-books.mod-emphasize-first-in-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10.75rem, 1fr));
+    row-gap: 1.5rem;
+  }
+}
+
 @media screen and (max-width: 715px) {
   .parsha-books {
     display: block;
@@ -207,9 +215,16 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) 2.75rem;
   align-items: stretch;
-  width: calc(100% - 1.5rem);
+  width: min(9.25rem, calc(100% - 1.5rem));
+  min-height: 2.75rem;
+  margin-bottom: 0.5rem;
   margin-inline: auto;
   border-radius: var(--button-border-radius);
+  background-color: transparent;
+}
+
+.parsha-row:has(:focus-visible) {
+  background-color: var(--light-accent-color);
 }
 
 .parsha {
@@ -228,16 +243,27 @@
 }
 
 .parsha-row .parsha {
+  min-width: 0;
   width: 100%;
   margin: 0;
+  padding: 0.65rem 0.625rem;
+  overflow-wrap: anywhere;
+  align-content: center;
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
 }
 
 .parsha-aliyah-toggle {
+  position: relative;
   display: grid;
   place-items: center;
   min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0;
   border: 0;
   border-radius: var(--button-border-radius);
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
   background: transparent;
   color: var(--light-text-color);
   cursor: pointer;
@@ -247,12 +273,32 @@
     transform var(--reader-motion-fast) var(--reader-ease-out);
 }
 
-.parsha-aliyah-toggle .ui-icon {
-  width: 1.15rem;
-  height: 1.15rem;
+.parsha-aliyah-toggle::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0;
+  top: 50%;
+  width: 1px;
+  height: 1.25rem;
+  transform: translateY(-50%);
+  background-color: color-mix(in srgb, var(--text-color) 22%, transparent);
+  opacity: 0;
+  pointer-events: none;
 }
 
-.parsha-books.mod-emphasize-first-in-group li:first-child .parsha {
+.parsha-aliyah-toggle .ui-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  stroke-width: 1.5;
+}
+
+.parsha-row .parsha:focus-visible,
+.parsha-aliyah-toggle:focus-visible {
+  outline: 2px solid var(--reader-focus-color);
+  outline-offset: 2px;
+}
+
+.parsha-books.mod-emphasize-first-in-group .parsha-list > li:first-child > .parsha {
   font-weight: bolder;
 }
 
@@ -263,6 +309,14 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
+  .parsha-row:hover {
+    background-color: var(--light-accent-color);
+  }
+
+  .parsha-row:hover .parsha-aliyah-toggle::before {
+    opacity: 1;
+  }
+
   .parsha:hover,
   .parsha-aliyah-toggle:hover {
     background-color: var(--medium-accent-color);

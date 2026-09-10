@@ -287,35 +287,35 @@ export const publicAliyotByParsha: Readonly<
     {
       "number": 3,
       "audioId": "yitro-3",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 43,
       "readerHash": "#/torah/parsha/yitro/2-18-24"
     },
     {
       "number": 4,
       "audioId": "yitro-4",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 73,
       "readerHash": "#/torah/parsha/yitro/2-19-1"
     },
     {
       "number": 5,
       "audioId": "yitro-5",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 176,
       "readerHash": "#/torah/parsha/yitro/2-19-7"
     },
     {
       "number": 6,
       "audioId": "yitro-6",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 221,
       "readerHash": "#/torah/parsha/yitro/2-19-20"
     },
     {
       "number": 7,
       "audioId": "yitro-7",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 104,
       "readerHash": "#/torah/parsha/yitro/2-20-15"
     }
@@ -324,21 +324,21 @@ export const publicAliyotByParsha: Readonly<
     {
       "number": 1,
       "audioId": "nasso-1",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 197,
       "readerHash": "#/torah/parsha/nasso/4-4-21"
     },
     {
       "number": 2,
       "audioId": "nasso-2",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 124,
       "readerHash": "#/torah/parsha/nasso/4-4-38"
     },
     {
       "number": 3,
       "audioId": "nasso-3",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 110,
       "readerHash": "#/torah/parsha/nasso/4-5-1"
     },
@@ -352,21 +352,21 @@ export const publicAliyotByParsha: Readonly<
     {
       "number": 5,
       "audioId": "nasso-5",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 431,
       "readerHash": "#/torah/parsha/nasso/4-7-1"
     },
     {
       "number": 6,
       "audioId": "nasso-6",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 293,
       "readerHash": "#/torah/parsha/nasso/4-7-42"
     },
     {
       "number": 7,
       "audioId": "nasso-7",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 228,
       "readerHash": "#/torah/parsha/nasso/4-7-72"
     }
@@ -375,49 +375,49 @@ export const publicAliyotByParsha: Readonly<
     {
       "number": 1,
       "audioId": "behalotecha-1",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 144,
       "readerHash": "#/torah/parsha/behalotecha/4-8-1"
     },
     {
       "number": 2,
       "audioId": "behalotecha-2",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 166,
       "readerHash": "#/torah/parsha/behalotecha/4-8-15"
     },
     {
       "number": 3,
       "audioId": "behalotecha-3",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 183,
       "readerHash": "#/torah/parsha/behalotecha/4-9-1"
     },
     {
       "number": 4,
       "audioId": "behalotecha-4",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 220,
       "readerHash": "#/torah/parsha/behalotecha/4-9-15"
     },
     {
       "number": 5,
       "audioId": "behalotecha-5",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 206,
       "readerHash": "#/torah/parsha/behalotecha/4-10-11"
     },
     {
       "number": 6,
       "audioId": "behalotecha-6",
-      "cueStatus": "missing",
-      "expectedTokenCount": 431,
+      "cueStatus": "cued",
+      "expectedTokenCount": 429,
       "readerHash": "#/torah/parsha/behalotecha/4-10-35"
     },
     {
       "number": 7,
       "audioId": "behalotecha-7",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 252,
       "readerHash": "#/torah/parsha/behalotecha/4-11-30"
     }
@@ -426,49 +426,49 @@ export const publicAliyotByParsha: Readonly<
     {
       "number": 1,
       "audioId": "vayelech-1",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 42,
       "readerHash": "#/torah/parsha/vayelech/5-31-1"
     },
     {
       "number": 2,
       "audioId": "vayelech-2",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 38,
       "readerHash": "#/torah/parsha/vayelech/5-31-4"
     },
     {
       "number": 3,
       "audioId": "vayelech-3",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 54,
       "readerHash": "#/torah/parsha/vayelech/5-31-7"
     },
     {
       "number": 4,
       "audioId": "vayelech-4",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 66,
       "readerHash": "#/torah/parsha/vayelech/5-31-10"
     },
     {
       "number": 5,
       "audioId": "vayelech-5",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 111,
       "readerHash": "#/torah/parsha/vayelech/5-31-14"
     },
     {
       "number": 6,
       "audioId": "vayelech-6",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 82,
       "readerHash": "#/torah/parsha/vayelech/5-31-20"
     },
     {
       "number": 7,
       "audioId": "vayelech-7",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 88,
       "readerHash": "#/torah/parsha/vayelech/5-31-25"
     }

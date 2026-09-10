@@ -38,7 +38,8 @@
   }
 
   function refresh() {
-    searchBar?.refresh()
+    // Opening already refreshes the index. Hidden search must not block reader actions.
+    if (openState) searchBar?.refresh()
   }
 
   function open() {

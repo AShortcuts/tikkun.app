@@ -224,7 +224,7 @@ export function createReaderDisplaySession({
   const releaseViewportListener = viewportTracker.on(
     'viewport-updated',
     (range) => {
-      if (!activeDisplay) return
+      if (!activeDisplay || root.style.visibility === 'hidden') return
       latestViewportRange = range
       presentation.invalidate('viewport-title', 'reader-position')
     },

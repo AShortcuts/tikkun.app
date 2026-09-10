@@ -35,6 +35,7 @@
   })
   let annotationsEnabled = $state(readInitialAnnotationsEnabled())
   let titleButton: HTMLButtonElement
+  let headerPointer = $state(false)
 
   const mobileTitleQuery = '(max-width: 550px)'
   const mobileTitleFontProperty = '--mobile-parsha-title-font-size'
@@ -154,7 +155,12 @@
   })
 </script>
 
-<header class="app-toolbar" data-reader-shell-owner="true">
+<svelte:document
+  onpointerdown={() => { headerPointer = true }}
+  onkeydown={() => { headerPointer = false }}
+/>
+
+<header class="app-toolbar" data-header-pointer={headerPointer || undefined} data-reader-shell-owner="true">
   <div class="toolbar-content u-page-wrap">
     <div class="toolbar-wrapper mod-left">
       <div class="toolbar-item">

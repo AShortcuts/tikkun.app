@@ -68,7 +68,7 @@ test('creates presentation items and a stable signature behind one model interfa
   })
 
   expect(snapshot.signature).toBe(
-    `narrator-a:${run.id}:1:recording-1:recording-1|${run.id}:2::`
+    `narrator-a:${run.id}:1:recording-1:recording-1:recording:::|${run.id}:2:::recording:::`
   )
   expect(snapshot.items).toEqual([
     {

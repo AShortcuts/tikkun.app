@@ -11,8 +11,19 @@ afterEach(() => {
 })
 
 test('loads the real Home route and keeps navigation operable', async () => {
+  const route = await loadRoute('/', '#scroll-hero-title', 'Tikkun Reader — Torah reading practice in sync')
+  errorCapture = captureRouteErrors(route.view, 'Home')
+  expect(required(route.document, '#scroll-hero-title').textContent).toContain('Read along.')
+  expect(Array.from(route.document.querySelectorAll<HTMLAnchorElement>('.scroll-nav-link'), link => new URL(link.href).pathname))
+    .toEqual(['/readings/', '/tidbits/', '/about/'])
+  expect(new URL(required<HTMLAnchorElement>(route.document, '.scroll-brand').href).pathname).toBe('/')
+  expect(required<HTMLIFrameElement>(route.document, '.scroll-hero iframe').getAttribute('src')).toContain('/reader/')
+  await assertRouteHealthy(route.document, errorCapture)
+})
+
+test('preserves the old homepage and its navigation at old-v2.html', async () => {
   const route = await loadRoute(
-    '/',
+    '/old-v2.html',
     '#home-title',
     'Tikkun Korim — Torah reading practice in sync'
   )

@@ -1,0 +1,27 @@
+<nav class="batch-navigation" aria-label="Aligner workspace">
+  <button id="show-batch" class="quiet" aria-pressed="false">Back to batch</button>
+  <button id="show-reader" class="quiet" aria-pressed="true">Review recording</button>
+  <span id="batch-summary" role="status">Opening queue…</span>
+</nav>
+<section id="batch-panel" hidden aria-label="Batch alignment and review">
+  <div class="batch-heading"><div><h2>Align your next recordings</h2><p class="secondary">Choose local Tikkun recordings or add your own audio. Existing results are reused unless you request a new run.</p></div></div>
+  <div class="batch-columns">
+    <section class="batch-library" aria-label="Add recordings">
+      <div class="library-filters"><label for="library-parsha">Parsha</label><select id="library-parsha" disabled><option>Loading…</option></select><label for="library-search">Search recordings</label><input id="library-search" type="search" placeholder="Name or aliyah"></div>
+      <div class="library-selection"><button id="select-visible">Select visible</button><button id="select-new">Select unaligned</button><button id="clear-selection" class="quiet">Clear</button></div>
+      <div id="library-list" class="library-list"><p>Opening local recordings…</p></div>
+      <div class="add-actions"><span id="selection-count">0 selected</span><button id="add-selected" class="primary" disabled>Add to queue</button></div>
+      <details><summary>Run fresh alignments</summary><label class="check"><input id="force-alignment" type="checkbox">Create new results for this selection, retaining earlier reviews.</label></details>
+      <details id="upload-details"><summary>Use your own audio</summary><div class="detail-body"><p class="secondary">MP3 or M4A, up to 100 MB and 15 minutes each. Map every file to its complete aliyah. Audio stays on this Mac.</p><label for="upload-files">Audio files</label><input id="upload-files" type="file" accept=".m4a,.mp3,audio/mp4,audio/mpeg" multiple><div id="upload-mappings"></div><button id="upload-add" disabled>Upload &amp; add to queue</button><p id="upload-status" class="secondary" role="status"></p></div></details>
+    </section>
+    <section class="batch-queue" aria-label="Saved batch queue">
+      <div class="queue-heading"><h3>Your queue</h3><button id="review-next" disabled>Review next</button></div>
+      <p id="queue-status" class="secondary" role="status"></p>
+      <div class="queue-controls"><button id="queue-start" class="primary" disabled>Start queue</button><button id="queue-pause" disabled>Pause after current</button><button id="queue-cancel" class="quiet" disabled>Cancel waiting</button></div>
+      <details><summary>Run limits</summary><div class="detail-body"><label for="run-minutes">Start new recordings for <span>minutes</span></label><input id="run-minutes" type="number" min="1" max="60" value="10"><p class="secondary">One recording at a time, four CPU threads. Each active recording finishes before a pause or time limit takes effect. Restarted queues wait for you to resume.</p><p id="queue-budget" class="secondary"></p></div></details>
+      <div class="library-selection"><button id="select-downloads">Select completed</button><button id="clear-downloads" class="quiet">Clear downloads</button></div>
+      <div id="queue-list" class="queue-list"><p class="secondary">No queued recordings. Select an aliyah to begin.</p></div>
+      <div class="zip-actions"><button id="download-batch" disabled>Download cues (.zip)</button><p id="zip-help" class="secondary">Flags stay in each cue file until reviewed.</p><p id="batch-download-status" class="secondary" role="status"></p></div>
+    </section>
+  </div>
+</section>

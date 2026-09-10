@@ -238,7 +238,12 @@
   }
 
   function send(nextAction: FloatingPlayerAction) {
-    if (nextAction.type !== 'layout') notePlayerActivity()
+    if (
+      nextAction.type !== 'layout' &&
+      !(minimized && nextAction.type === 'toggle-playback')
+    ) {
+      notePlayerActivity()
+    }
     action(nextAction)
   }
 
@@ -653,7 +658,7 @@
       class="floating-player-button"
       data-target-id="floating-play"
       type="button"
-      title={playLabel}
+      data-audio-tooltip={snapshot.status || `${playLabel} this aliyah`}
       aria-label={playLabel}
       disabled={!snapshot.visible}
       onclick={() => send({ type: 'toggle-playback' })}

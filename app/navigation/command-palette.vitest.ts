@@ -147,6 +147,50 @@ test('keeps one action index across keystrokes and rebuilds it on refresh', () =
   destroy()
 })
 
+test('does not rebuild hidden search on bookmark changes and shows fresh actions on open', () => {
+  let label = 'First bookmark'
+  const getActions = vi.fn(() => [
+    createNavigationAction({
+      id: 'bookmark.current',
+      group: 'resume',
+      label,
+      emptyPriority: 10,
+      run: vi.fn(),
+    }),
+  ])
+  let palette!: ReturnType<typeof createCommandPalette>
+  const destroy = createMount()((scope) => {
+    palette = createCommandPalette(scope, {
+      document,
+      getActions,
+      restoreFocus: vi.fn(),
+      isBookmarkAction: () => true,
+      formatBadge: (value) => value,
+    })
+  })
+
+  try {
+    palette.refresh()
+    expect(getActions).not.toHaveBeenCalled()
+    palette.open()
+    expect(getActions).toHaveBeenCalledOnce()
+    expect(fixture.textContent).toContain('First bookmark')
+
+    palette.close()
+    label = 'New bookmark'
+    palette.refresh()
+    palette.refresh()
+    expect(getActions).toHaveBeenCalledOnce()
+
+    palette.open()
+    expect(getActions).toHaveBeenCalledTimes(2)
+    expect(fixture.textContent).toContain('New bookmark')
+    expect(fixture.textContent).not.toContain('First bookmark')
+  } finally {
+    destroy()
+  }
+})
+
 test('uses explicit empty priorities and keyboard selection', () => {
   const runFirst = vi.fn()
   const runSecond = vi.fn()

@@ -341,8 +341,18 @@ async function writeFileAtomically(filePath, contents) {
 
 async function main() {
   const { contents, aliyahCount } = await generatePublicReadingManifestSource()
+  let existing
+  try {
+    existing = await readFile(targetFile, 'utf8')
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error
+  }
+  if (existing === contents) {
+    console.log(`Cue coverage unchanged for ${aliyahCount} aliyot`)
+    return
+  }
   await writeFileAtomically(targetFile, contents)
-  console.log(`Generated ${aliyahCount} public aliyah links with cue coverage`)
+  console.log(`Updated cue coverage for ${aliyahCount} aliyot`)
 }
 
 const isDirectExecution = process.argv.some(

@@ -17,6 +17,21 @@ export interface AudioNarrator {
   notes?: string
 }
 
+export interface CueReviewFlag {
+  id: string
+  kind: string
+  message: string
+  status: 'pending' | 'reviewed'
+  sourceTime?: number
+  note?: string
+}
+
+export interface CueReview {
+  source: 'torah-audio-aligner'
+  status: 'pending' | 'reviewed'
+  flags: readonly CueReviewFlag[]
+}
+
 export interface WordCue {
   cueNumber?: number
   timeStart: number
@@ -25,6 +40,7 @@ export interface WordCue {
   lineIndex: number
   fragmentIndex: number
   wordIndex: number
+  review?: CueReview
 }
 
 export type ParshaReadingIdentity = {

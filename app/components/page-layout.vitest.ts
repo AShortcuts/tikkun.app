@@ -428,7 +428,6 @@ test('clones One Side Match text, punctuation, special letters, and shirah track
     renderedPage(37, vayishlachPageJson),
   ]
   const snapshot = (flow: HTMLElement) => requiredAll<HTMLElement>('.fragment', flow).map((fragment) => ({
-    track: fragment.style.getPropertyValue('--match-shirah-track'),
     words: requiredAll<HTMLElement>('.word', fragment).map((word) => ({
       key: word.dataset.tokenKey,
       markup: word.innerHTML,
@@ -791,46 +790,7 @@ test.each([551, 768, 1024, 1280, 1600])(
       })
     const initial = geometry()
     // Check the empty spaces themselves, not only consistency between rows.
-    const expectedSeaTracks = [
-      { line: 5, tracks: [[0, 8]] },
-      {
-        line: 6,
-        tracks: [
-          [0, 1],
-          [2, 4],
-          [7, 1],
-        ],
-      },
-      {
-        line: 7,
-        tracks: [
-          [0, 3],
-          [5, 3],
-        ],
-      },
-      {
-        line: 11,
-        tracks: [
-          [0, 3],
-          [4, 4],
-        ],
-      },
-      {
-        line: 33,
-        tracks: [
-          [0, 4],
-          [5, 3],
-        ],
-      },
-      {
-        line: 34,
-        tracks: [
-          [0, 1],
-          [2, 6],
-        ],
-      },
-    ]
-    for (const { line, tracks } of expectedSeaTracks) {
+    for (const line of [5, 6, 7, 11, 33, 34]) {
       const row = required<HTMLElement>(
         `tr[data-page-number="78"][data-line-index="${line}"]`,
       )
@@ -839,16 +799,21 @@ test.each([551, 768, 1024, 1280, 1600])(
         book.getBoundingClientRect().left + 16 - 1,
       )
       const fragments = requiredAll<HTMLElement>('.fragment', row)
-      expect(fragments).toHaveLength(tracks.length)
-      fragments.forEach((fragment, index) => {
-        const [offset, span] = tracks[index]
-        const rect = fragment.getBoundingClientRect()
-        expect(rect.right).toBeCloseTo(
-          content.right - (content.width * offset) / 8,
-          0,
-        )
-        expect(rect.width).toBeCloseTo((content.width * span) / 8, 0)
-      })
+      expect(fragments).toHaveLength(line === 5 ? 1 : line === 6 ? 3 : 2)
+      expect(fragments[0].getBoundingClientRect().right).toBeCloseTo(content.right, 0)
+      expect(fragments.at(-1)!.getBoundingClientRect().left).toBeCloseTo(content.left, 0)
+      const flow = required<HTMLElement>('.reader-text-flow', row)
+      const probe = document.createElement('span')
+      probe.style.cssText = `position:absolute;white-space:nowrap;font:${getComputedStyle(flow).font}`
+      probe.textContent = 'אשר אשר אשר'
+      book.append(probe)
+      const minimumGap = probe.getBoundingClientRect().width
+      probe.remove()
+      for (let index = 1; index < fragments.length; index++) {
+        const actualGap = fragments[index - 1].getBoundingClientRect().left -
+          fragments[index].getBoundingClientRect().right
+        expect(actualGap, `protected blank in Sea row ${line}`).toBeGreaterThanOrEqual(minimumGap - 1)
+      }
     }
     for (const pattern of ['columns-2', 'fragments-2', 'fragments-3']) {
       const repeated = initial.filter((row) => row.pattern === pattern)
@@ -923,6 +888,48 @@ test.each([551, 768, 1024, 1280, 1600])(
           )
         })
       })
+  },
+)
+
+test.each(['one', 'two'] as const)(
+  'keeps Sea fragment placement with its CSS templates in %s Side Match',
+  async (sides) => {
+    await page.viewport(1280, 900)
+    document.documentElement.dataset.readerSideOrder = 'tikkun-right'
+    const presentation = { layout: 'match' as const, sides }
+    install(`<div class="tikkun-book" data-reader-layout="match"
+      data-reader-sides="${sides}" dir="rtl" style="width: 1140px">
+      <section class="tikkun-page">${Page(renderedPage(78, beshalachPageJson), {
+        presentation,
+      })}</section>
+    </div>`)
+    await document.fonts.ready
+    const member = required<HTMLElement>('.tikkun-page')
+    applyReaderPageLayout(member, presentation)
+    expect(member.querySelector('[style*="--match-shirah-track"]')).toBeNull()
+
+    for (const row of requiredAll<HTMLElement>('tr[data-shirah-kind="sea"]')) {
+      for (const column of requiredAll<HTMLElement>('.column', row)) {
+        const fragments = requiredAll<HTMLElement>('.fragment', column)
+        const initial = fragments.map((fragment) => fragment.getBoundingClientRect())
+        // Already-mounted markup must not override an updated CSS template.
+        fragments.forEach((fragment, index) => {
+          fragment.style.setProperty('--match-shirah-track', `${index + 1} / span 8`)
+        })
+        fragments.forEach((fragment, index) => {
+          const rect = fragment.getBoundingClientRect()
+          expect(rect.width).toBeCloseTo(initial[index].width, 1)
+          expect(rect.left).toBeCloseTo(initial[index].left, 1)
+          const wordTops = requiredAll<HTMLElement>('.word:not([hidden])', fragment)
+            .map((word) => word.getBoundingClientRect().top)
+          expect(Math.max(...wordTops) - Math.min(...wordTops)).toBeLessThan(1)
+        })
+        if (row.dataset.shirahPattern === 'opening') {
+          expect(fragments[0].getBoundingClientRect().width)
+            .toBeCloseTo(column.getBoundingClientRect().width, 1)
+        }
+      }
+    }
   },
 )
 

@@ -7,6 +7,8 @@ import utils from './utils.ts'
 import { applyAnnotationMode } from './annotation-rendering.ts'
 import Line from './Line.ts'
 import { collectStartingLineTokenKeys } from '../reading/aliyah-token-sequence.ts'
+import { canonicalLineWords } from '../reader/canonical-line-words.ts'
+import { HighlightController } from '../reading/highlight-controller.ts'
 
 const { htmlToElement } = utils
 
@@ -123,6 +125,34 @@ test('folds a standalone paseq into the previous word token', () => {
   expect(words[0].textContent).toBe('וְכֹ֣ל ׀')
   expect(words[1].dataset.tokenKey).toBe('12:4:0:1')
   expect(words[1].textContent).toBe('רוֹמֵ֣שׂ')
+})
+
+test('keeps inverted nuns visible but skips them without shifting audio word IDs', async () => {
+  const text = [['(׆)#וַיְהִ֛י בִּנְסֹ֥עַ הָאָרֹ֖ן׃#(׆)']]
+  const node = htmlToElement(Line({
+    pageNumber: 165, lineIndex: 26, text,
+    verses: [{ b: 4, c: 10, v: 35 }],
+    isPetucha: false, labels: [], aliyot: [], aliyahStarts: [],
+  }))
+  const book = document.createElement('main')
+  book.append(node)
+  if (!(node instanceof HTMLElement)) throw new Error('Expected an HTML reader line')
+  const words = [...node.querySelectorAll<HTMLElement>('.word')]
+  const markers = words.filter(word => word.textContent === '׆')
+  expect(markers).toHaveLength(2)
+  expect(markers.every(word => !word.hasAttribute('data-token-key'))).toBe(true)
+  const tokenKeys = collectStartingLineTokenKeys({ book, startLine: node })
+  expect(tokenKeys).toEqual(['165:26:0:1', '165:26:0:2', '165:26:0:3'])
+  expect(canonicalLineWords(165, 26, { text, verses: [], aliyot: [], isPetucha: false })
+    .map(word => word.tokenKey)).toEqual(tokenKeys)
+  const highlight = new HighlightController(book)
+  highlight.setSequence(tokenKeys)
+  await highlight.step(1, { scroll: false })
+  expect(node.querySelector('.is-active-word')?.textContent).toBe('וַיְהִ֛י')
+  await highlight.activateTokenKey('165:26:0:0', { scroll: false })
+  expect(node.querySelector('.is-active-word')).toBeNull()
+  applyAnnotationMode(book, false)
+  expect(markers.every(word => !word.hidden && word.textContent === '׆')).toBe(true)
 })
 
 test('keeps a small letter inside one stable word token in both display modes', () => {
