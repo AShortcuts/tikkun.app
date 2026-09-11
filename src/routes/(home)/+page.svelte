@@ -222,7 +222,6 @@
   )
   let storyMotionStyle = $derived(
     [
-      `--story-progress: ${(storyProgress.current * 100).toFixed(3)}%`,
       `--story-paper-opacity: ${storyMotion.paper.toFixed(4)}`,
       `--story-ambient-opacity: ${storyMotion.ambientOpacity.toFixed(4)}`,
       `--story-hero-opacity: ${storyMotion.heroOpacity.toFixed(4)}`,
@@ -871,7 +870,7 @@
             <small>Now practicing</small>
             <strong>{featuredReading.parshaName}, aliyah 1</strong>
           </span>
-          <a href={featuredAliyahUrl} data-sveltekit-reload>Open reader</a>
+          <a href={featuredAliyahUrl}>Open reader</a>
         </div>
         <p class="scroll-torah-line" dir="rtl" lang="he">
           {#each torahWords as word, index (word)}
@@ -892,7 +891,7 @@
             <small>Your recent place</small>
             <strong>Continue {featuredReading.parshaName}, aliyah 1?</strong>
           </span>
-          <a href={featuredAliyahUrl} data-sveltekit-reload>Continue</a>
+          <a href={featuredAliyahUrl}>Continue</a>
         </div>
         <p>The reader keeps a recent place for up to 48 hours.</p>
       </div>
@@ -928,7 +927,7 @@
           Choose the reading, press play, and follow every word where it appears in the Torah.
         </p>
         <div class="scroll-hero-actions">
-          <a class="scroll-primary-action" href={readerUrl} data-sveltekit-reload>
+          <a class="scroll-primary-action" href={readerUrl}>
             Start practicing
           </a>
           <a class="scroll-text-action" href="#how-it-works">See how it works</a>
@@ -944,7 +943,6 @@
                   <span>Live Beresheet reader</span>
                   <a
                     href={readerUrl}
-                    data-sveltekit-reload
                     aria-label="Open Beresheet in the full reader"
                   >
                     Open full reader
@@ -1006,8 +1004,6 @@
             </div>
             <p class="scroll-theme-status" aria-live="polite">{selectedThemeLabel} theme selected</p>
           </section>
-
-          <div class="scroll-film-progress" aria-hidden="true"><span></span></div>
 
           <div
             class="scroll-stage-practice"

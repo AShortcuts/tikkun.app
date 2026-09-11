@@ -1,17 +1,24 @@
-import { afterEach, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { page } from 'vitest/browser'
 
 const frames: HTMLIFrameElement[] = []
+beforeEach(async () => { await page.viewport(1440, 1000) })
 
 afterEach(() => {
   for (const frame of frames.splice(0)) frame.remove()
 })
 
-test('renders public and prototype routes in visibly separate worlds', async () => {
-  const publicDocument = await loadRoute(
-    `/?prototype-isolation=${Date.now()}`,
+test('keeps the legacy home separate while the promoted story and prototype share the approved design', async () => {
+  const legacyDocument = await loadRoute(
+    `/old-v2.html?prototype-isolation=${Date.now()}`,
     '.home-page'
   )
-  expect(publicDocument.querySelector('.prototype-scroll-story')).toBeNull()
+  expect(legacyDocument.querySelector('.prototype-scroll-story')).toBeNull()
+  const publicDocument = await loadRoute(
+    `/?prototype-isolation=${Date.now()}`,
+    '.prototype-scroll-story'
+  )
+  expect(required(publicDocument, '#scroll-hero-title').textContent).toContain('Read along.')
   expect(
     publicDocument.querySelector('a[href$="/prototypes/scroll-story/"]')
   ).toBeNull()
@@ -45,17 +52,43 @@ test('renders public and prototype routes in visibly separate worlds', async () 
   ).not.toBeNull()
 })
 
+test.each(['/', '/prototypes/scroll-story/'])('keeps the reader pinned during the scroll journey at %s', async (path) => {
+  const document = await loadRoute(path, '.scroll-reader-stage')
+  const view = document.defaultView!
+  const stage = required(document, '.scroll-reader-stage')
+  const motion = required(document, '.scroll-reader-motion')
+  const startTransform = view.getComputedStyle(motion).transform
+
+  view.scrollTo({ top: 1200, behavior: 'instant' })
+
+  await vi.waitFor(() => {
+    expect(view.scrollY).toBe(1200)
+    expect(stage.getBoundingClientRect().top).toBeCloseTo(
+      Number.parseFloat(view.getComputedStyle(stage).top), 0
+    )
+    expect(view.getComputedStyle(motion).transform).not.toBe(startTransform)
+  })
+})
+
 async function loadRoute(path: string, readySelector: string) {
   const frame = document.createElement('iframe')
   frame.title = `Prototype isolation: ${path}`
   frame.style.width = '1280px'
   frame.style.height = '900px'
+  frame.style.position = 'fixed'
+  frame.style.inset = '0'
   frame.src = path
   frames.push(frame)
   document.body.appendChild(frame)
 
   await vi.waitFor(
-    () => expect(frame.contentDocument?.querySelector(readySelector)).not.toBeNull(),
+    () => {
+      expect(frame.contentDocument?.querySelector(readySelector)).toBeTruthy()
+      expect(frame.contentDocument?.documentElement.dataset.appHydrated).toBe('true')
+      for (const embedded of frame.contentDocument!.querySelectorAll<HTMLIFrameElement>('iframe')) {
+        expect(embedded.contentDocument?.querySelector('[data-reader-boot-state="ready"]')).toBeTruthy()
+      }
+    },
     { timeout: 15_000, interval: 50 }
   )
   if (!frame.contentDocument) throw new Error(`No document for ${path}`)

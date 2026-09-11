@@ -157,14 +157,14 @@ test('updates shell presentation without replacing stable reader targets', () =>
   expect(annotations.querySelector('input')).toBeNull()
   expect(annotations.getAttribute('aria-pressed')).toBe('true')
   expect(annotations.getAttribute('aria-label')).toBe(
-    'Hide vowels and cantillation marks'
+    'Hide nekudot and cantillation marks'
   )
   annotations.click()
   flushSync()
   expect(annotationChanges).toBe(1)
   expect(annotations.getAttribute('aria-pressed')).toBe('false')
   expect(annotations.getAttribute('aria-label')).toBe(
-    'Show vowels and cantillation marks'
+    'Show nekudot and cantillation marks'
   )
   expect(book.classList.contains('mod-annotations-off')).toBe(true)
 

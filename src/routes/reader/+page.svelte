@@ -8,4 +8,4 @@
   <meta name="description" content="Practice Torah reading in the Tikkun Korim reader." />
 </svelte:head>
 
-<ReaderApp aboutHref={resolve('/about/')} />
+<ReaderApp aboutHref={resolve('/')} />

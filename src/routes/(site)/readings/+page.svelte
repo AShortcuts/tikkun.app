@@ -152,7 +152,6 @@
               <a
                 class="coverage-open"
                 href={resolve(`/reader/#/torah/parsha/${reading.parshaSlug}`)}
-                data-sveltekit-reload
               >Open</a>
             {/if}
           </article>

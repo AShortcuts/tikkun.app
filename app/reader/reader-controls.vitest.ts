@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { page } from '@vitest/browser/context'
 import { createMount } from '../lifecycle/mount.ts'
 import {
   createReaderControls,
@@ -72,7 +73,7 @@ test('synchronizes wide and compact controls through one action interface', () =
   expect(
     required('[data-target-id="toolbar-overflow-annotations-label"]')
       .textContent
-  ).toContain('Hide Vowels')
+  ).toContain('Hide Nekudot')
   const annotationsAction = required<HTMLButtonElement>(
     '[data-toolbar-overflow-action="annotations"]'
   )
@@ -132,7 +133,7 @@ test('synchronizes wide and compact controls through one action interface', () =
   expect(
     required('[data-target-id="toolbar-overflow-annotations-label"]')
       .textContent
-  ).toContain('Show Vowels')
+  ).toContain('Show Nekudot')
   expect(annotationsAction.getAttribute('aria-pressed')).toBe('false')
 })
 
@@ -186,6 +187,77 @@ test('owns menu focus, outside dismissal, and replacement cleanup', () => {
   expect(
     fixture.querySelector('[data-target-id="toolbar-overflow-toggle"]')
   ).toBeNull()
+})
+
+test.each(['light', 'dark', 'custom'])('centers the transparent nekudot icon in both states: %s', async (theme) => {
+  const previousTheme = document.documentElement.getAttribute('data-reader-theme')
+  await page.viewport(390, 844)
+  document.documentElement.setAttribute('data-reader-theme', theme)
+  const state: ReaderControlsState = {
+    bookmarkAvailable: true,
+    bookmarked: false,
+    annotationsEnabled: true,
+    aliyahNavigationAvailable: true,
+  }
+  let controls!: ReaderControls
+  destroy = createMount()((scope) => {
+    controls = createReaderControls(scope, createOptions(state, createActions()))
+  })
+  required<HTMLButtonElement>('[data-target-id="toolbar-overflow-toggle"]').click()
+  await document.fonts.ready
+  const icon = required<HTMLElement>('.annotations-toggle-icon')
+  const originalBounds = icon.getBoundingClientRect()
+  try {
+    for (const enabled of [true, false]) {
+      state.annotationsEnabled = enabled
+      controls.sync()
+      const bounds = icon.getBoundingClientRect()
+      const glyphs = Array.from(icon.children, glyph => glyph.getBoundingClientRect())
+      expect(getComputedStyle(icon).backgroundColor).toBe('rgba(0, 0, 0, 0)')
+      expect(bounds.width).toBe(originalBounds.width)
+      expect(bounds.height).toBe(originalBounds.height)
+      expect(Math.abs((glyphs[0].left + glyphs[1].right) / 2 - (bounds.left + bounds.width / 2))).toBeLessThan(1)
+      for (const glyph of glyphs) {
+        expect(Math.abs(glyph.top + glyph.height / 2 - (bounds.top + bounds.height / 2))).toBeLessThan(1)
+      }
+    }
+  } finally {
+    if (previousTheme === null) document.documentElement.removeAttribute('data-reader-theme')
+    else document.documentElement.setAttribute('data-reader-theme', previousTheme)
+    await page.viewport(1280, 844)
+  }
+})
+
+test('shares through the existing menu, prevents duplicate sheets and honors availability', async () => {
+  const state: ReaderControlsState = { bookmarkAvailable: true, bookmarked: false, annotationsEnabled: true, aliyahNavigationAvailable: true, shareAvailable: false }
+  let finish!: () => void
+  const shareReading = vi.fn(() => new Promise<void>(resolve => { finish = resolve }))
+  destroy = createMount()((scope) => {
+    createReaderControls(scope, { ...createOptions(state, createActions()), shareReading })
+  })
+  const toggle = required<HTMLButtonElement>('[data-target-id="toolbar-overflow-toggle"]')
+  const share = required<HTMLButtonElement>('[data-toolbar-overflow-action="share"]')
+  toggle.click()
+  expect(share.disabled).toBe(true)
+  state.shareAvailable = true
+  toggle.click(); toggle.click()
+  expect(share.disabled).toBe(false)
+  share.click()
+  expect(shareReading).toHaveBeenCalledWith(toggle)
+  expect(toggle.getAttribute('aria-expanded')).toBe('false')
+  toggle.click()
+  expect(share.disabled).toBe(true)
+  share.click()
+  expect(shareReading).toHaveBeenCalledOnce()
+  finish()
+  await vi.waitFor(() => expect(share.disabled).toBe(false))
+  await page.viewport(1280, 844)
+  const desktopShare = required<HTMLButtonElement>('[data-target-id="share-current-reading"]')
+  desktopShare.click()
+  expect(shareReading).toHaveBeenLastCalledWith(desktopShare)
+  finish()
+  await vi.waitFor(() => expect(desktopShare.disabled).toBe(false))
+  expect(document.activeElement).toBe(desktopShare)
 })
 
 function createActions() {

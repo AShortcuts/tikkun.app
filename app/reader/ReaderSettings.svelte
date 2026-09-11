@@ -34,6 +34,7 @@
     animateThemeChanges,
     offlineTorah,
     offlineRecording,
+    openMedia,
     toggle,
     connect,
   }: ReaderSettingsComponentProps = $props()
@@ -219,7 +220,10 @@
           : 'Low contrast may be difficult to read. Current colors remain allowed.'
   )
 
+  const deviceDownloads = $derived(offlineRecordingSnapshot.storageLocation === 'device')
+  const downloadLocationText = $derived(deviceDownloads ? 'on this device' : 'in this browser')
   const offlineStatusText = $derived.by(() => {
+    if (deviceDownloads) return 'Core Torah pages are included in this app.'
     const { phase, downloaded, total, errorMessage } = offlineSnapshot
     if (phase === 'checking') return 'Checking offline availability…'
     if (phase === 'unavailable') {
@@ -267,7 +271,7 @@
         return 'Checking saved offline recordings…'
       }
       if (offlineRecordingSnapshot.inventoryPhase === 'unavailable') {
-        return 'Offline recording downloads are not available in this browser.'
+        return `Offline recording downloads are not available ${downloadLocationText}.`
       }
       if (offlineRecordingSnapshot.inventoryPhase === 'removing') {
         return 'Removing saved offline recordings…'
@@ -281,14 +285,14 @@
       if (offlineRecordingSnapshot.storedCount > 0) {
         const copies =
           offlineRecordingSnapshot.storedCount === 1 ? 'copy uses' : 'copies use'
-        return `${offlineRecordingSnapshot.storedCount} offline recording ${copies} ${formatByteCount(offlineRecordingSnapshot.storedBytes)} in this browser. Start an aliyah to manage one recording.`
+        return `${offlineRecordingSnapshot.storedCount} offline recording ${copies} ${formatByteCount(offlineRecordingSnapshot.storedBytes)} ${downloadLocationText}. Start an aliyah to manage one recording.`
       }
       return 'Start an aliyah to choose a recording.'
     }
     if (phase === 'unavailable') {
       return (
         errorMessage ??
-        'Offline recording downloads are not available in this browser.'
+        `Offline recording downloads are not available ${downloadLocationText}.`
       )
     }
     if (phase === 'checking') {
@@ -298,9 +302,10 @@
       return `Saving ${recordingTitle ?? 'the current recording'} for offline playback.`
     }
     if (phase === 'complete') {
-      return `${recordingTitle ?? 'This recording'} is available offline in this browser.`
+      return `${recordingTitle ?? 'This recording'} is available offline ${downloadLocationText}.`
     }
     if (phase === 'removing') {
+      if (offlineRecordingSnapshot.removalPending) return 'Removal pending until playback releases this recording.'
       return `Removing ${recordingTitle ?? 'the recording'}…`
     }
     if (phase === 'error') {
@@ -317,7 +322,9 @@
     offlineRecordingSnapshot.phase === 'downloading'
         ? 'Downloading recording…'
         : offlineRecordingSnapshot.phase === 'removing'
-          ? 'Removing recording…'
+          ? offlineRecordingSnapshot.removalPending ? 'Removal pending' : 'Removing recording…'
+          : offlineRecordingSnapshot.requiresDependencyRepair
+            ? 'Repair offline download'
           : offlineRecordingSnapshot.exactStored
             ? 'Remove offline recording'
           : offlineRecordingSnapshot.phase === 'error'
@@ -328,12 +335,12 @@
   const otherOfflineRecordingStatusText = $derived.by(() => {
     const { otherCount, otherBytes } = offlineRecordingSnapshot
     const copies = otherCount === 1 ? 'copy' : 'copies'
-    return `${otherCount} other offline recording ${copies} use ${formatByteCount(otherBytes)} in this browser.`
+    return `${otherCount} other offline recording ${copies} use ${formatByteCount(otherBytes)} ${downloadLocationText}.`
   })
 
   function toggleOfflineRecording() {
     const expectedRecordingId = offlineRecordingSnapshot.recordingId
-    if (offlineRecordingSnapshot.exactStored) {
+    if (offlineRecordingSnapshot.exactStored && !offlineRecordingSnapshot.requiresDependencyRepair) {
       const successMessage = `${offlineRecordingSnapshot.recordingTitle ?? 'The recording'} was removed from offline storage.`
       void announceOfflineRecordingRemoval(
         offlineRecording.remove(expectedRecordingId),
@@ -371,6 +378,8 @@
     offlineRecordingAnnouncement =
       result.status === 'completed'
         ? successMessage
+        : result.status === 'pending'
+          ? 'Recordings still in use will be removed when playback releases them.'
         : (result.errorMessage ?? 'The offline recording removal paused.')
   }
 
@@ -395,6 +404,7 @@
       return `${title} is available offline.`
     }
     if (phase === 'removing' || nextSnapshot.inventoryPhase === 'removing') {
+      if (nextSnapshot.removalPending) return 'Removal pending until playback releases this recording.'
       return 'Removing offline recordings…'
     }
     if (phase === 'error') {
@@ -920,12 +930,14 @@
 
         <section class="settings-section">
       <h4 class="settings-section-title">Offline</h4>
+      {#if openMedia}
+        <button class="settings-offline-button" type="button" onclick={() => { close({ restoreFocus: false }); openMedia?.() }}>Media &amp; Storage</button>
+      {/if}
       <div class="settings-field settings-offline-field">
         <span class="settings-field-copy">
           <span class="settings-field-label">Torah pages</span>
           <span class="settings-field-helper"
-            >Saves every Torah page in this browser. Recordings are downloaded
-            separately below.</span
+            >{deviceDownloads ? 'Available offline without an additional download.' : 'Saves every Torah page in this browser. Recordings are downloaded separately below.'}</span
           >
         </span>
         {#if offlineSnapshot.total > 0}
@@ -942,7 +954,7 @@
           data-target-id="settings-offline-status"
           aria-live="polite">{offlineStatusText}</span
         >
-        <button
+        {#if !deviceDownloads}<button
           class="settings-offline-button"
           type="button"
           data-target-id="settings-offline-download"
@@ -952,7 +964,7 @@
             offlineSnapshot.phase === 'complete' ||
             offlineSnapshot.phase === 'unavailable'}
           onclick={() => void offlineTorah.download()}
-        >{offlineButtonLabel}</button>
+        >{offlineButtonLabel}</button>{/if}
       </div>
       <div class="settings-field settings-offline-field">
         <span class="settings-field-copy">

@@ -27,6 +27,7 @@
     "./scripts/**/*.ts",
     "./src/**/*",
     "./vite.config.ts",
+    "./capacitor.config.ts",
     "./vitest.config.ts"
   ]
 }

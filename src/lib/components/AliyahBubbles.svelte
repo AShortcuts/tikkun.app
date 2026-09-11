@@ -71,7 +71,6 @@
         class={`home-aliyah-bubble home-aliyah-bubble-link mod-${item.cueStatus}`}
         class:is-available={item.cueStatus !== 'empty'}
         href={resolve(`/reader/${item.readerHash}`)}
-        data-sveltekit-reload
         data-cue-status={item.cueStatus}
         data-local-cue-status={localStatus ?? undefined}
         aria-label={label}

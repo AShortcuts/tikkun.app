@@ -5,8 +5,14 @@ cypress/screenshots
 .playwright-cli/
 .vitest-attachments/
 .DS_Store
+.asc/
 download
 dist
+dist-native/
+.native-site/
+.svelte-kit-native/
+native-bundle-report.json
+tsconfig.native.json
 .tsimp
 koofr-video-links.local.json
 video-render-metadata.local.json

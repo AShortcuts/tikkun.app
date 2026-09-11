@@ -75,6 +75,7 @@ export interface ReaderDisplaySession {
   resetViewport(): void
   refreshViewport(): void
   setPagePresentation(presentation: ReaderPagePresentation, beforeLayout?: () => void): boolean
+  updateAnnotations(mutation: () => void): void
   progressSnapshot(): ReaderProgressAnchorSnapshot
   progressAnchorForElement(element: HTMLElement): ReaderProgressAnchor | null
   invalidateProgressAnchors(reason: ReaderProgressAnchorInvalidation): void
@@ -653,6 +654,13 @@ export function createReaderDisplaySession({
       viewportTracker?.refresh()
       presentation.invalidateAfterLayout('reader-position')
       return true
+    },
+    updateAnnotations(mutation) {
+      if (activeDisplay) activeDisplay.updateAnnotations(mutation)
+      else mutation()
+      progressAnchors.invalidate('annotations')
+      viewportTracker?.refresh()
+      presentation.invalidateAfterLayout('reader-position')
     },
     progressSnapshot: () => progressAnchors.snapshot(),
     progressAnchorForElement: (element) =>

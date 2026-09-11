@@ -4,10 +4,10 @@
 @import '../node_modules/normalize.css/normalize.css' layer(reset);
 
 @import './app-layout.css' layer(shell);
+@import './reader-system-colors.css' layer(tokens);
 @import './reader-search.css' layer(feature);
 @import './tooltip.css' layer(feature);
 @import './page.css' layer(reader);
-@import './parsha-picker.css' layer(feature);
 @import './toggle.css' layer(feature);
 @import './toolbar.css' layer(shell);
 @import './reader-enhancements.css' layer(feature);

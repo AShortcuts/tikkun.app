@@ -80,7 +80,7 @@ Durable trade-offs live in [`docs/adr/`](adr/): static delivery, Reader hash rou
 - Reader Shell renders stable empty targets for nested Svelte and imperative features but never manages their contents. It updates classes, text, progress styles, and annotation state without conditionally replacing the `tikkun-book` reader root or optional-page outlet.
 - Add Svelte feature by feature. Prefer a pure model plus a small mount adapter when the feature has meaningful domain preparation, as Parsha Picker does. Do not introduce a global store simply to connect old and new UI.
 - SvelteKit is the delivery and public-routing layer. Reader components keep browser APIs inside their mounted lifetime, and Reader domain models remain safe to import during prerendering.
-- A future Capacitor entry should compose Platform Capability adapters at the application boundary. Use native-platform or plugin-availability checks only to choose implementations such as native filesystem versus web download.
+- The Capacitor entry composes Platform Capability adapters at the application boundary. `app/platform/native.ts` selects native capability and disables web service-worker access. Native file storage/playback and web worker downloads now use separate adapters without changing domain rules.
 - Reader Viewport remains responsible for compact versus wide layout in browsers, PWAs, and Capacitor WebViews. Platform Capability must never become a responsive breakpoint.
 
 ## Build and Delivery
@@ -95,21 +95,256 @@ Durable trade-offs live in [`docs/adr/`](adr/): static delivery, Reader hash rou
 
 ## PWA Strategy
 
-The app is treated as a PWA-capable static site rather than a native shell.
+The website remains a PWA-capable static site. A separate Capacitor build packages
+the same Reader for iOS; the native app does not depend on the web service worker.
 
 - `site/manifest.webmanifest` defines install metadata, display mode, colors, and relative install URLs.
 - `src/app.html` includes Apple mobile web app metadata and icon links.
-- `scripts/generate-service-worker.mjs` creates a versioned cache after each build.
+- `scripts/generate-service-worker.mjs` creates a versioned cache after each build and compiles the worker with esbuild minification. Protocol property names are preserved.
 - The generated service worker precaches the app shell, page chunks, and first-use core reader chunks, then uses cache-first behavior for requested same-origin assets.
 - Navigation requests use network-first behavior with an exact cached clean-route match, then the cached Home page as a final fallback.
 - Cue Data, prototype routes/assets, Optional Feature bundles, the recording-only harness, and large media files are intentionally excluded from the initial precache so installation does not download content the reader has not requested.
+- Informational About, public Settings/diagnostics, and Tidbits pages and their exclusive route bundles are also deferred, along with the decorative public-site background. Their online routes remain available. Reading Index keeps its shared public layout; Reader Settings is a separate core offline feature.
 - Reader Settings offers an explicit per-recording Offline Download. The recording cache incrementally verifies the published SHA-256 digest and size before commit, reports progress, exposes the selected copy and other saved recordings for explicit cleanup, and serves cached `Range`/`If-Range` playback without opportunistically storing ordinary media requests.
 - Before the first production release, the generated worker and cache protocol support only the current build contract; there is no previous-worker compatibility layer.
 - Reader Settings, the search overlay, and Reading Index are deferred from initial JavaScript execution but remain precached because they are core reader controls that must work offline.
+- Picker styles load with the lazy ParshaPicker entry in the existing `feature` cascade layer. That stylesheet remains precached, separating feature ownership without changing the offline UI.
 - Unified Reader search can read saved Cue Authoring access without importing Cue Authoring. The authoring implementation loads only when an unlocked user runs that action or invokes its dedicated shortcut.
 - Recording media should become available offline only through explicit user-requested offline downloads, not silent playback caching.
 
-If native app packaging is ever added, prefer treating Capacitor or another native wrapper as a packaging layer around the existing web build, not as a rewrite of the app architecture.
+### Download Library
+
+- `app/offline/download-library.ts` owns verified inventory, a two-transfer queue,
+  progress, retry, cancellation, and selective cleanup. The root layout creates
+  `app/offline/download-owner.ts` in Svelte context; each app root is isolated.
+  Backends and catalog are initialized lazily through `recording-library.ts` on
+  first Reader entry. Transfers and refresh listeners survive Reader unmount,
+  About/Reading Index navigation, and return. Actual root teardown aborts work
+  without erasing persisted retry intent. Full reload/OS suspension is not covered
+  by this in-memory lifetime guarantee.
+- Reader uses SvelteKit navigation and releases its imperative component mounts
+  in `onNavigate`, before route DOM replacement. Waiting until parent teardown
+  erased the next route. Public Reader links no longer force reloads. Public
+  global CSS is scoped away from Reader, retaining themes across navigation.
+- `app/offline/recording-storage.ts` isolates the worker protocol. Catalog URLs
+  are resolved before comparing them with absolute worker inventory URLs. Asset
+  identity is URL, digest, and byte length; aliases share one physical download.
+- `app/offline/selected-download.ts` adapts existing Settings controls to this
+  owner. Settings teardown unsubscribes without cancelling the library. Inventory
+  retains obsolete saved versions so cleanup is not limited to the current catalog.
+- `app/offline/download-intent.ts` persists explicit intent under Web Locks.
+  Unfinished/stopped work is offered for manual retry, never automatically resumed.
+  Stopping one tab does not erase another tab's intent for the same recording.
+- Web queue claims cover waiting items before intent persistence, not just active
+  worker requests. `queue-protection.ts` holds shared registration-scope and
+  physical-URL locks until completion/failure/cancellation settles. The worker
+  takes exclusive matching claims before selected or bulk cleanup, so another
+  tab's waiting queue cannot recreate a successfully removed file. Conflicts
+  report where to cancel before retrying; unrelated selected cleanup remains
+  available. Local removal cancels its own queue first. Failed batch acquisition,
+  failed persistence and owner destruction release claims; immediate retry waits
+  for the prior release. Playback and queue claims reuse `shared-locks.ts` but
+  retain separate lock names and lifetimes. This requires participating page and
+  worker builds; installed-PWA update acceptance remains separate. These claims
+  prevent conflicting mutations; they are not disk-quota reservations.
+- Worker cancellation removes one request's subscription. The underlying transfer
+  aborts only after its last subscriber cancels. Completed verified assets remain.
+- `scripts/recording-mutation-locks.mjs` coordinates explicit audio saves and
+  removals across participating worker versions in one deployment namespace.
+  Saves hold a shared library lock and an exclusive physical-URL lock through
+  transfer/cache commit. A duplicate save rechecks verified cache after acquiring
+  the lock instead of fetching the same body twice. Cancellation releases waiting
+  requests. Targeted removal acquires the URL lock without waiting; clear-all and
+  remove-others require the exclusive library lock through all deletion settlement.
+  Conflicts fail visibly without entering deletion; unrelated targeted cleanup
+  remains available. Without worker Web Locks, explicit removal fails closed and
+  keeps files, while the existing bounded download fallback remains available.
+- `scripts/offline-transfer-queue.mjs` bounds explicit web transfers to two through
+  streamed verification and cache commit. Audio, dependency/manifest transfers,
+  and the separate Torah download share this scheduler; ordinary playback and
+  navigation requests do not. Two origin-scoped Web Locks use a stable deployment
+  namespace, coordinating tabs and overlapping worker versions. Without worker
+  Web Locks, the fallback is two per worker, not a cross-version guarantee.
+  Waiting cancellation never starts its task; active cancellation holds its slot
+  until transfer cleanup finishes. Lock acquisition errors remain errors.
+- Deletion protects all media sources in the current playback plan, including
+  later segments. Settings announces pending removal; release occurs on session
+  replacement or route reset after native clear acknowledges success.
+  `app/offline/playback-retention.ts` retains old sources across asynchronous
+  clear, rejects failed release and prevents stale acknowledgments from releasing
+  a newer session's files. On Reader teardown, the retained sources are frozen
+  until native clear succeeds; failures retain protection.
+  Preferences, drafts, and local recordings are outside
+  this download inventory and cleanup scope.
+- Web playback also holds shared physical-URL Web Locks for every published
+  segment before installing a session. Pausing retains protection; clearing media
+  and preloads releases it. Cancelled or failed acquisition releases partial locks.
+  Worker removal takes exclusive playback locks without waiting and reports an
+  in-use error for another tab. Saving while playing remains allowed. Worker bulk
+  endpoints acquire the whole deletion set before deleting; Media selections are
+  processed individually, so unrelated selected files can still be removed.
+  Protection requires participating page/worker builds and Web Locks. Missing
+  page locks does not disable playback; missing worker locks refuses removal.
+- Inventory bytes describe audio storage separately from package `readiness`.
+  Native dependency checks validate published cue identity and tokenization before
+  transferring audio; absent/empty timings are explicitly audio-only, while failed
+  published modules remain errors. Existing audio survives a dependency failure
+  and dependency-only retries do not transfer it again. Settings offers repair
+  through its existing control when audio exists but supporting content is missing.
+- Web dependency checks use an exact-build manifest generated from the emitted
+  module graph. The manifest itself is downloaded and SHA-256 checked on explicit
+  preparation, not during installation. It describes shared core text (all current
+  text pages), the lazy playback-tools bundle required for combined recordings,
+  and only the selected recordings' published cues plus static imports.
+  Each file is size/hash verified before cache commit; stale builds are rejected.
+  Core files reuse shell/Torah caches; cues and the manifest use an owned persistent
+  dependency cache. Serving uses the same cache priority as verification.
+- Dependency cancellation is subscriber-scoped, preserving shared transfers and
+  completed files. Cache checks and semantic cue compatibility both precede a
+  complete package state. Tests cover worker restart without network, but full
+  downloaded Beresheet packages now pass cold offline playback, highlighting,
+  seeking, selective removal and re-download in Chromium and WebKit. Release
+  budgets pass. Worker-update, combined-recording and physical-device acceptance
+  remain open; see the dated checkpoints in the native development guide.
+  Reference-aware obsolete dependency cleanup and large-library scan performance
+  still need acceptance; no automatic dependency eviction is implemented.
+- Before persisting a new batch, the queue checks platform download capacity.
+  Native storage checks unique missing audio plus active reservations with a
+  32 MiB reserve; bundled text/cues need no extra allocation. Native transfers
+  recheck capacity before each write.
+- Web package preflight lives beside dependency preparation because audio and
+  supporting modules share browser quota. The worker checks the combined batch
+  against verified caches, includes active transfers from its other clients,
+  deduplicates physical audio/shared modules, and allows temporary-write overhead
+  plus a 32 MiB reserve. A missing signed dependency manifest may be fetched for
+  inspection, but preflight does not cache or remove asset bodies. Missing or
+  failed quota estimates remain unknown, not zero. Low-space errors retain smaller
+  selections and never silently evict saved content.
+- Checks remain advisory. `app/offline/capacity-reservations.ts` serializes web
+  batch admission with a Web Lock and persisted missing-asset reservations. Physical
+  URLs deduplicate; full staging bytes and a 32 MiB reserve are retained until the
+  batch settles. Held owner locks distinguish live batches from dead-tab records.
+  Failed admission, completion, cancellation and teardown release reservations.
+  The shared transfer cap and application-wide navigation lifetime are implemented.
+  Queue claims protect pending work from conflicting removal before worker submission.
+  Old nonparticipating clients still require update acceptance. Cross-tab playback conflicts require
+  manual removal retry after the other reading closes; they are not persisted
+  deferred-removal requests.
+
+### Native Packaging
+
+- iOS media-service reset recovery rebuilds the AVPlayer and its Now Playing
+  session/remote command bindings. It preserves the loaded plan, logical position,
+  rate and duration, cancels obsolete item callbacks and interruption-resume intent,
+  and stays paused with a retryable error until explicit Play. Failed/loading seeks
+  report their pending logical position instead of an obsolete physical position.
+  This lives in `ios/TikkunPlayback/` and `TikkunPlaybackPlugin.swift`; web playback
+  and download ownership are unchanged.
+
+- Reader sharing uses `app/reader/share-reading.ts` to validate reading hashes
+  and create public `https://tikkunreader.com/reader/` links, never local Capacitor
+  URLs. Reader Runtime selects the focal reading/verse and lazily loads
+  `@capacitor/share` in native builds. Web uses Web Share synchronously with user
+  activation, then clipboard only when sharing is unavailable. Cancellation is
+  silent; genuine failures are announced. Mobile uses the Reader menu; desktop
+  uses a toolbar link icon. Both prevent duplicate sheets and restore focus.
+  This is not an exact-word share contract.
+- Existing aliyah permalink buttons keep their copy/checkmark interaction.
+  `app/reader/aliyah-permalink.ts` reuses the public reading URL validator for
+  native copies through lazy-loaded `@capacitor/clipboard`; browser copies remain
+  deployment-relative. Pending writes cannot duplicate, failures clear stale
+  success and announce a retry notice, and detached controls never receive late
+  success feedback. Existing Reading-mode and phone gutter visibility stays
+  unchanged; Share Reading remains the phone entry point.
+- `app/platform/native-reading-links.ts` owns the app-lifetime incoming URL
+  listener and startup gate. It accepts only HTTPS reading URLs on
+  `tikkunreader.com`, strips unrelated queries and rejects other origins/routes.
+  Reader startup waits for the native launch URL on hashless Reader entry; an
+  explicit reading or public-page reload never replays a stale launch URL.
+  Newer events beat launch lookup and pending navigation is serialized/latest-wins.
+  The root layout uses SvelteKit navigation from public pages, retaining the
+  download owner; Reader-to-Reader links use the existing hash route owner.
+  Capacitor plugin proxies are wrapped inside loader results, never returned as
+  bare thenables. iOS scene callbacks feed the official App plugin.
+- Capacitor 8.5.1 and an iOS SwiftPM project package `dist-native/`, with
+  `/reader/` as the launch path. This is bundled web code, not a remote website
+  wrapper. The user-confirmed bundle ID is `com.adamn.tikkunreader`. Xcode's
+  existing team `5D862AQ8GV` is preserved pending release ownership confirmation.
+- Native builds bootstrap root/web framework types only when absent, then derive
+  `tsconfig.native.json` from the shared compiler settings and type-check against
+  `.svelte-kit-native`. Existing web output is not rewritten by this bootstrap.
+  `npm run verify:native-clean` exercises a fresh temporary source copy without
+  downloaded media or preexisting generated types, reusing installed dependencies.
+  Associated Domains and `site/.well-known/apple-app-site-association` describe
+  only `/reader` and `/reader/`; deployment and signed-device handoff remain gates.
+- `scripts/build-native.mjs` stages filtered static assets in `.native-site/`
+  and uses `.svelte-kit-native/` so native builds do not replace the web output.
+  Core text, fonts, and compiled cue modules are bundled; bulk audio is excluded.
+- Native builds verify every source text page and published cue against the
+  emitted module graph, including merged chunks and transitive imports/assets.
+  `native-bundle-report.json` records their source digests and bundled files.
+  This build proof plus runtime cue compatibility checks covers installed content;
+  it is not a physical-device offline-launch acceptance result.
+- Native media URLs use `https://tikkunreader.com`, preserving digest version
+  queries. Web URLs remain deployment-relative. The native host can be overridden
+  at build time, but must be an HTTPS origin without credentials or a path.
+- The iOS host routes clean paths to their prerendered `index.html` and confines
+  the Reader to safe areas. Hashless native launch resumes the eligible recent
+  reading or opens Reading Index; explicit reading hashes take precedence.
+- Shared per-asset worker inventory and the web queue/Settings adapter are
+  implemented. The native adapter uses `ios/TikkunMedia/` through the local
+  `TikkunMediaPlugin`. The lazily mounted `MediaPanel.svelte` now exposes Media
+  and Storage as sibling tabs from Reader controls, navigation search, and Settings.
+- Media derives all 54 parshiot and their actual aliyot from the canonical route
+  catalog/calendar. Editorial work rows supply display names, never availability.
+  Narrator-scoped catalog identities map to shared physical download keys; aliya
+  coverage counts logical entries while storage bytes count each physical file once.
+  Search, downloaded filtering, disclosure, per-aliyah download/cancel, the single
+  transforming parsha control, and confirmed narrator-library batches share the
+  app-owned queue. Closing the panel or navigating away from Reader does not
+  destroy or cancel that queue.
+- Storage shows measured categories and separate capacity/headroom. Native uses
+  the metrics bridge; web reads only the current app-base cache namespace, measures
+  decoded core/dependency bodies, and uses verified audio inventory. Unverified
+  inventory cannot produce a zero-byte success state. Browser origin usage and
+  quota are separately labelled estimates, not device free space. Personal data
+  and unclassified overhead are explicitly excluded from measured cache totals.
+  Selection, reading/narrator filters, size sorting, confirmed removal and pending
+  playback deletion are implemented. Required shared dependencies are retained;
+  reference-aware optional-dependency cleanup remains future work.
+- Native downloads use cancellable `URLSession` download tasks. A MediaStore
+  actor verifies SHA-256/length in bounded chunks, then atomically moves a directory
+  containing the media and its identity into Application Support/TikkunMedia.
+  Downloaded assets are excluded from backup; JS receives metadata and file URLs,
+  never base64 audio. Inventory verifies actual files and discards corrupt owned
+  copies without touching personal data. Queue intent uses atomic native JSON.
+- Native playback resolves each published segment to a verified local copy when
+  present, keeping the original catalog identity. Missing copies stream; file
+  verification failures are surfaced rather than silently treated as absence.
+- Native metrics measure logical app-bundle, audio, staging, and metadata bytes;
+  capacity uses Apple's available-for-important-usage API. Unknown capacity stays
+  unavailable and does not block downloading. Low known capacity prevents a new
+  transfer with a visible error. These are not exact iOS Settings totals: WebKit
+  personal storage and OS-managed temporary overhead remain unmeasured.
+- Native builds select `NativeAudioController` for published recordings. The
+  `TikkunPlayback` Swift package owns AVPlayer segment progression and physical
+  seeks; the Capacitor bridge returns logical time and ordered session snapshots.
+  Browser builds retain HTML audio. Microphone/blob authoring sessions retain
+  the HTML implementation even inside native builds.
+- Native background playback and foreground highlight resynchronization passed
+  a simulator check. System-media integration and interruption handlers are
+  implemented, but lock-screen controls did not appear during simulator testing.
+  Physical-device verification and full listening acceptance remain open.
+
+- Home Screen widgets and Shortcuts share the `ios/TikkunSystem/` package.
+  The existing TypeScript calendar is bundled for JavaScriptCore, so native
+  schedule results use the same rules without a WebView or network request.
+  App Group storage shares calendar preferences and the current practice route;
+  validated custom-scheme links return widget taps to the Reader. See
+  [iOS system integration](ios-system-integration.md) for behavior and limits.
+
+See [Native development](native-development.md) for build commands and evidence,
+and [the implementation plan](capacitor-media-plan.md) for the remaining sequence.
 
 ## Data Model
 
@@ -175,7 +410,10 @@ Audio support is data-driven and controller-based.
 - `scripts/generate-audio-manifest.mjs` copies supported source audio into `site/audio/` and regenerates `generated/audio-manifest.ts`.
 - `app/audio/library.ts` exposes narrators, recordings, cue lookup, cue progress, and recording matching.
 - Cue payloads live in `audio-cues/` and are loaded lazily through the glob in `app/audio/cue-data.ts`.
-- `AudioController` wraps one `HTMLAudioElement`, tracks the active session, and emits typed playback/session events.
+- `PlaybackController` is the shared typed playback contract. `AudioController`
+  wraps one `HTMLAudioElement`; `NativeAudioController` adapts the iOS player and
+  forwards the same playback/session events. Reader consumers no longer reach
+  directly into the HTML element for paused, ended, speed, or metadata state.
 - `HighlightController` maps cue timing to token keys, indexes rendered token elements, activates the current word, and optionally scrolls it into view.
 - Reader Playback constructs these Implementations once and owns their cross-wiring, route reset, and teardown behind one Interface.
 - Recording Session chooses recordings, loads Cue Data and page tokens, builds playback plans, and installs active sessions. Reader Playback supplies its page-display and presentation Adapters.
@@ -302,5 +540,8 @@ Avoid these patterns:
 
 ## Open Questions
 
-- Whether a native wrapper such as Capacitor is worth adding later for app-store distribution or more reliable native media storage.
+- Android transfer/storage implementation and native device acceptance remain
+  open in [the Capacitor plan](capacitor-media-plan.md). iOS uses the local
+  URLSession/MediaStore bridge because the official File Transfer API does not
+  currently expose cancellation.
 - Whether admin cue editing should eventually move into a separate route/tool or remain embedded behind the current unlock flow.

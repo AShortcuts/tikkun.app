@@ -215,3 +215,41 @@ test('destroy rejects a request before worker acquisition completes', async () =
 
   await expect(request).rejects.toThrow('cancelled')
 })
+
+test('does not dispatch an already cancelled request', async () => {
+  const postMessage = vi.fn()
+  const client = createOfflineWorkerRequestClient({ serviceWorker: serviceWorkerFor({ postMessage }) })
+  const controller = new AbortController()
+  controller.abort()
+  await expect(client.request({ type: 'DOWNLOAD_RECORDING' }, () => true, {
+    signal: controller.signal,
+  })).rejects.toMatchObject({ name: 'AbortError' })
+  expect(postMessage).not.toHaveBeenCalled()
+  client.destroy()
+})
+
+test('sends cancellation over the existing port and waits for worker acknowledgement', async () => {
+  const messages: unknown[] = []
+  let acknowledge: (() => void) | undefined
+  const postMessage = vi.fn((_message: unknown, transfer: Transferable[]) => {
+    const port = transfer[0] as MessagePort
+    port.onmessage = (event) => {
+      messages.push(event.data)
+      acknowledge = () => { port.postMessage({ cancelled: true }); port.close() }
+    }
+    port.start()
+  })
+  const client = createOfflineWorkerRequestClient({ serviceWorker: serviceWorkerFor({ postMessage }) })
+  const controller = new AbortController()
+  let settled = false
+  const request = client.request({ type: 'DOWNLOAD_RECORDING' }, () => true, {
+    signal: controller.signal, cancelMessage: { type: 'CANCEL_RECORDING_DOWNLOAD' },
+  }).then((result) => { settled = true; return result })
+  await vi.waitFor(() => expect(postMessage).toHaveBeenCalledOnce())
+  controller.abort()
+  await vi.waitFor(() => expect(messages).toEqual([{ type: 'CANCEL_RECORDING_DOWNLOAD' }]))
+  expect(settled).toBe(false)
+  acknowledge!()
+  await expect(request).resolves.toBe('complete')
+  client.destroy()
+})

@@ -558,6 +558,60 @@ test('rejects malformed segment boundaries before media activation', () => {
   )
 })
 
+test('holds all playback sources until media and preloads are cleared, not merely paused', async () => {
+  const preloads: FakeAudioElement[] = []
+  stubMediaGlobals(preloads)
+  const audio = new FakeAudioElement(20)
+  const release = vi.fn(() => {
+    expect(audio.src).toBe('')
+    expect(preloads.every((preload) => preload.src === '')).toBe(true)
+  })
+  const protectPlayback = vi.fn(async () => release)
+  const controller = new AudioController(audio as unknown as HTMLAudioElement, { protectPlayback })
+  await controller.loadSession(createActiveAudioSession(compositePlan()))
+  expect(protectPlayback).toHaveBeenCalledWith(['/previous.mp3', '/final.mp3'], expect.any(AbortSignal))
+  controller.pause()
+  expect(release).not.toHaveBeenCalled()
+  controller.clearSession()
+  controller.destroy()
+  expect(release).toHaveBeenCalledOnce()
+})
+
+test('clearing or replacing a pending playback lease cannot activate a stale session', async () => {
+  stubMediaGlobals()
+  const audio = new FakeAudioElement(20), release = vi.fn(), nextRelease = vi.fn()
+  let finish!: (release: () => void) => void
+  const protectPlayback = vi.fn().mockImplementationOnce(() => new Promise<() => void>((resolve) => { finish = resolve }))
+    .mockResolvedValueOnce(nextRelease)
+  const controller = new AudioController(audio as unknown as HTMLAudioElement, { protectPlayback })
+  const first = controller.loadSession(createActiveAudioSession(compositePlan()))
+  const cancelled = expect(first).rejects.toMatchObject({ name: 'AbortError' })
+  const second = createActiveAudioSession(plan(20))
+  await controller.loadSession(second)
+  finish(release)
+  await cancelled
+  expect(release).toHaveBeenCalledOnce()
+  expect(controller.session).toBe(second)
+  controller.destroy()
+  expect(nextRelease).toHaveBeenCalledOnce()
+})
+
+test('destroy cancels pending lease acquisition before audio activation', async () => {
+  stubMediaGlobals()
+  const audio = new FakeAudioElement(20)
+  const controller = new AudioController(audio as unknown as HTMLAudioElement, {
+    protectPlayback: (_sources, signal) => new Promise((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+    }),
+  })
+  const loading = controller.loadSession(createActiveAudioSession(plan(20)))
+  const cancelled = expect(loading).rejects.toMatchObject({ name: 'AbortError' })
+  controller.destroy()
+  await cancelled
+  expect(audio.src).toBe('')
+  expect(controller.session).toBeNull()
+})
+
 test('releases media listeners, playback work, and preloads when destroyed', async () => {
   const preloads: FakeAudioElement[] = []
   stubMediaGlobals(preloads)

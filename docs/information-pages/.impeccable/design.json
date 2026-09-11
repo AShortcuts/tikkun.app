@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-11T04:29:03Z",
+  "title": "Design System: Tikkun Reader Privacy and Support",
+  "extensions": {
+    "colorMeta": {
+      "link": { "role": "primary", "displayName": "Inherited soft blue links" },
+      "action": { "role": "primary", "displayName": "Scoped support action" },
+      "background": { "role": "neutral", "displayName": "Inherited near-black background" },
+      "panel": { "role": "neutral", "displayName": "Inherited translucent panel" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Page title", "purpose": "Lora title in the introduction column." },
+      "body": { "displayName": "Reading text", "purpose": "Introduction and information-panel content." },
+      "title": { "displayName": "Section heading", "purpose": "Compact headings within the information panel." },
+      "label": { "displayName": "Local navigation", "purpose": "Support and Privacy policy links." }
+    },
+    "shadows": [],
+    "motion": [
+      { "name": "inherited-action-transition", "value": "border-color 150ms ease, background-color 150ms ease, color 150ms ease, transform 150ms ease", "purpose": "Existing public-site action state transition." },
+      { "name": "inherited-action-hover", "value": "translateY(-1px)", "purpose": "Existing action hover lift; no page entrance animation." }
+    ],
+    "breakpoints": [
+      { "name": "information-stack", "value": "48rem" },
+      { "name": "inherited-full-width-action", "value": "620px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Support action",
+      "kind": "button",
+      "refersTo": "support-action",
+      "description": "Existing mailto action with scoped contrast correction and inherited shape, focus, and motion.",
+      "html": "<a class=\"ds-support-action\" href=\"mailto:support@oceanoftorah.com?subject=Tikkun%20Reader%20support\">Email support</a>",
+      "css": ".ds-support-action { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; border-radius: 0.85rem; padding: 0.7rem 1rem; margin-top: 0.5rem; background: #2164c7; color: #fff; font-family: var(--hebrew-ui-font-family, 'Noto Sans Hebrew', sans-serif); font-size: 1rem; font-weight: 700; line-height: 1.75; text-decoration: none; transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease, transform 150ms ease; } .ds-support-action:hover { background: #286cce; color: #fff; transform: translateY(-1px); } .ds-support-action:focus-visible { outline: 3px solid rgba(90, 157, 255, 0.9); outline-offset: 4px; } @media (max-width: 620px) { .ds-support-action { width: 100%; } }"
+    },
+    {
+      "name": "Information navigation",
+      "kind": "nav",
+      "description": "Actual two-link local navigation; current page receives an underline.",
+      "html": "<nav class=\"ds-information-nav\" aria-label=\"Help and privacy\"><a href=\"/support/\" aria-current=\"page\">Support</a><a href=\"/privacy/\">Privacy policy</a></nav>",
+      "css": ".ds-information-nav { display: flex; flex-wrap: wrap; gap: 0.35rem 1.35rem; font-family: var(--hebrew-ui-font-family, 'Noto Sans Hebrew', sans-serif); font-size: 0.875rem; } .ds-information-nav a { display: inline-flex; align-items: center; min-height: 2.75rem; color: var(--site-muted, rgba(235, 240, 247, 0.66)); text-decoration: none; } .ds-information-nav a[aria-current='page'] { color: var(--site-text, #f5f7fa); text-decoration: underline; text-underline-offset: 0.45em; text-decoration-color: var(--site-accent-soft, #79aaff); } .ds-information-nav a:hover { color: var(--site-text, #f5f7fa); } .ds-information-nav a:focus-visible { outline: 3px solid rgba(90, 157, 255, 0.9); outline-offset: 4px; }"
+    },
+    {
+      "name": "Information panel",
+      "kind": "card",
+      "refersTo": "information-panel",
+      "description": "Static reading container with a real excerpt from Support; no card hover behavior.",
+      "html": "<div class=\"ds-information-panel\"><section><h2>A few details help</h2><ul><li>What you were trying to do, and what happened instead.</li><li>The reading and aliyah, or a link to the passage, if relevant.</li><li>Your device and browser or app version. A screenshot can help, too.</li></ul></section></div>",
+      "css": ".ds-information-panel { min-width: 0; border: 1px solid var(--site-line-strong, rgba(255, 255, 255, 0.18)); border-radius: 1rem; padding: clamp(1.5rem, 3.5vw, 3rem); background: var(--site-surface, rgba(15, 19, 25, 0.84)); color: var(--site-muted, rgba(235, 240, 247, 0.66)); font-family: var(--hebrew-ui-font-family, 'Noto Sans Hebrew', sans-serif); font-size: 1rem; line-height: 1.75; overflow-wrap: anywhere; } .ds-information-panel h2 { margin: 0 0 0.75rem; color: var(--site-text, #f5f7fa); font-size: 1.125rem; font-weight: 650; line-height: 1.4; } .ds-information-panel ul { margin: 0; padding-left: 1.25rem; } .ds-information-panel li + li { margin-top: 0.55rem; } .ds-information-panel li::marker { color: var(--site-accent-soft, #79aaff); }"
+    }
+  ],
+  "narrative": {
+    "overview": "This reference applies only to `/privacy/` and `/support/`. It records the built extension of Tikkun's public site: the existing dark shell, ambient background, Lora titles, Noto Sans Hebrew reading text, blue links, and quiet borders. It neither replaces nor defines the global visual system.",
+    "dos": [
+      "Do preserve the incumbent shell and the scoped two-column-to-stack composition.",
+      "Do retain the corrected support-action colors and white label in both default and hover states.",
+      "Do use actual project content, working route links, and the shared support contact source."
+    ],
+    "donts": [
+      "Don't turn these page-specific measurements into global site rules.",
+      "Don't add decorative motion, generated raster assets, or invented UI primitives to this extension.",
+      "Don't treat visual or automated verification as approval of privacy claims: hosting configuration and support-mail retention require owner review before publication."
+    ]
+  }
+}

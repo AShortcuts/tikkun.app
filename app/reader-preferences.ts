@@ -369,6 +369,7 @@ export function applyReaderPreferences(preferences: ReaderPreferences) {
       ? 'dark'
       : 'light'
     : ''
+  root.dataset.readerCustomScheme = root.style.colorScheme
   setReaderFocalPointMode(preferences.focalPointMode)
 
   root.style.setProperty('--reader-highlight-fill', preferences.highlightFill)

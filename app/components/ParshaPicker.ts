@@ -1,4 +1,5 @@
 import { flushSync, mount, unmount } from 'svelte'
+import '../../css/parsha-picker-entry.css'
 import type { CalendarSettings } from '../calendar-settings.ts'
 import type { LeiningGenerator } from '../calendar-model/generator.ts'
 import type { NavigationAction } from '../navigation/actions.ts'

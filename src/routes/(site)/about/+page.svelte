@@ -26,14 +26,13 @@
         Tikkun Korim keeps Torah text, aliyah boundaries, audio, and word highlighting in one browser-based reader.
       </p>
       <div class="site-action-row">
-        <a class="site-primary-action" href={resolve('/reader/#/next')} data-sveltekit-reload>
+        <a class="site-primary-action" href={resolve('/reader/#/next')}>
           Open reader
         </a>
         <a class="site-secondary-action" href={resolve('/readings/')}>See available readings</a>
         <a
           class="site-secondary-action"
           href={resolve('/reader/#/about/playback-analytics')}
-          data-sveltekit-reload
         >Cue analytics</a>
       </div>
     </div>
@@ -42,7 +41,7 @@
   <section class="about-facts" aria-label="Project facts">
     <article>
       <h2>Recordings</h2>
-      <p>Current aliyah recordings are by Yoni Davidov.</p>
+      <p>Current aliyah recordings are by Yoni Davidov, used with permission.</p>
     </article>
     <article>
       <h2>Word timing</h2>
@@ -51,9 +50,10 @@
     <article>
       <h2>Open source</h2>
       <p>
-        The project is published under the MIT License.
+        The project's own code is published under the MIT License; dependencies retain their own licenses.
         <a href="https://github.com/AShortcuts/tikkun.app" rel="noreferrer">View the source.</a>
       </p>
+      <p>Calendar calculations use <a href="https://www.hebcal.com/home/developer-apis" rel="noreferrer">Hebcal</a>.</p>
     </article>
   </section>
 
@@ -67,6 +67,7 @@
       </p>
     </div>
     <SupportDiagnosticsActions variant="site" />
+    <a class="site-inline-action" href={resolve('/support/')}>Contact support</a>
   </section>
 
   <section class="site-section about-taskboard" aria-labelledby="taskboard-title">

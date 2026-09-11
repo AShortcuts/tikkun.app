@@ -189,6 +189,9 @@ test('loads and applies a custom page and text color', () => {
   )
   expect(styleProperties.get('--reader-custom-text-color')).toBe('#f4f1e8')
   expect(document.documentElement.style.colorScheme).toBe('dark')
+  expect(document.documentElement.dataset.readerCustomScheme).toBe('dark')
+  applyReaderPreferences({ ...preferences, themeMode: 'light' })
+  expect(document.documentElement.dataset.readerCustomScheme).toBe('')
 })
 
 test('keeps custom contrast advisory and recommends the clearer text color', () => {

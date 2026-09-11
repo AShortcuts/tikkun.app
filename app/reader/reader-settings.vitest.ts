@@ -1,10 +1,15 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { page } from 'vitest/browser'
+import '../../css/master.css'
 import type {
   AudioNarrator,
   ParshaAudioRecording,
 } from '../audio/types.ts'
 import { createMount } from '../lifecycle/mount.ts'
+import { createDownloadLibrary } from '../offline/download-library.ts'
+import { descriptorForRecording } from '../offline/recording-download.ts'
+import { resolveRecordingAsset, type RecordingStorage } from '../offline/recording-storage.ts'
+import type { StoredRecording } from '../offline/recording-inventory.ts'
 import { hexToOklch, oklchToHex } from './oklch-color.ts'
 import {
   defaultReaderPreferences,
@@ -492,6 +497,111 @@ test('keeps OKLCH slider intent through gray, gamut fitting, commits and externa
   settings!.sync()
   setRange('Text lightness', '50')
   expect(state.preferences.customTextColor).toBe(oklchToHex({ ...hexToOklch('#ff8800'), lightness: 0.5 }))
+})
+
+test.each([390, 1280])('shared downloads survive closing Settings and announce deferred deletion at %ipx', async (width) => {
+  await page.viewport(width, 900)
+  const asset = resolveRecordingAsset(descriptorForRecording(activeRecording)!, document.baseURI)
+  let stored: StoredRecording[] = []
+  let finish: (() => void) | undefined
+  let inUse = true
+  const backend: RecordingStorage = {
+    supported: true,
+    inventory: async () => stored,
+    download: () => new Promise((resolve) => { finish = () => { stored = [asset]; resolve(asset) } }),
+    remove: vi.fn(async () => { stored = [] }),
+    destroy: vi.fn(),
+  }
+  const library = createDownloadLibrary({
+    assets: [asset], backend, inUse: () => inUse,
+    intent: { read: async () => [], update: async () => {} },
+  })
+  let settings: ReaderSettings | null = null
+  destroy = createMount()((scope) => {
+    scope.own(() => library.destroy())
+    settings = createReaderSettings(scope, {
+      ...createOptions(createState()), downloadLibrary: library, getCurrentRecording: () => activeRecording,
+    })
+  })
+  settings!.open()
+  const button = required<HTMLButtonElement>('[data-target-id="settings-offline-recording-download"]')
+  await vi.waitFor(() => expect(button.disabled).toBe(false))
+  button.click()
+  await vi.waitFor(() => expect(button.textContent).toBe('Downloading recording…'))
+  settings!.close()
+  expect(backend.destroy).not.toHaveBeenCalled()
+  finish!()
+  await vi.waitFor(() => expect(library.snapshot().inventory).toHaveLength(1))
+  settings!.open()
+  await vi.waitFor(() => {
+    expect(library.snapshot().phase).toBe('ready')
+    expect(button.textContent).toBe('Remove offline recording')
+    expect(button.disabled).toBe(false)
+  })
+  button.click()
+  await vi.waitFor(() => expect(library.snapshot().entries[0]).toMatchObject({ phase: 'removal-pending', error: null }))
+  await vi.waitFor(() => expect(button.textContent).toBe('Removal pending'))
+  expect(button.disabled).toBe(true)
+  expect(backend.remove).not.toHaveBeenCalled()
+  expect(required('[data-target-id="settings-offline-recording-status"]').textContent).toContain('playback releases')
+  expect(required('[data-target-id="settings-offline-recording-announcement"]').textContent).not.toContain('was removed')
+  inUse = false
+  await library.releasePlayback()
+  await vi.waitFor(() => expect(button.textContent).toBe('Download current recording'))
+  expect(backend.remove).toHaveBeenCalledOnce()
+})
+
+test('native Settings distinguishes bundled Torah and device downloads from browser cache', async () => {
+  const asset = resolveRecordingAsset(descriptorForRecording(activeRecording)!, document.baseURI)
+  const library = createDownloadLibrary({
+    assets: [asset],
+    backend: { supported: true, location: 'device', inventory: async () => [asset],
+      download: async () => asset, remove: async () => {}, destroy() {} },
+    intent: { read: async () => [], update: async () => {} },
+  })
+  let settings: ReaderSettings | null = null
+  destroy = createMount()((scope) => {
+    scope.own(() => library.destroy())
+    settings = createReaderSettings(scope, { ...createOptions(createState()), downloadLibrary: library,
+      getCurrentRecording: () => activeRecording })
+  })
+  settings!.open()
+  required<HTMLButtonElement>('[data-settings-category="more"]').click()
+  await vi.waitFor(() => expect(required('[data-target-id="settings-offline-recording-status"]').textContent).toContain('on this device'))
+  expect(required('[data-target-id="settings-offline-status"]').textContent).toBe('Core Torah pages are included in this app.')
+  expect(fixture.querySelector('[data-target-id="settings-offline-download"]')).toBeNull()
+})
+
+test.each([390, 1280])('repairs missing offline content without deleting or re-downloading saved audio at %ipx', async (width) => {
+  await page.viewport(width, 900)
+  const asset = resolveRecordingAsset(descriptorForRecording(activeRecording)!, document.baseURI)
+  const download = vi.fn(async () => asset)
+  const remove = vi.fn(async () => {})
+  let ready = false
+  const library = createDownloadLibrary({
+    assets: [asset],
+    backend: { supported: true, inventory: async () => [asset], download, remove, destroy() {} },
+    dependencies: { check: async () => ready ? 'ready' : 'missing', prepare: async () => { ready = true; return 'ready' } },
+    intent: { read: async () => [], update: async () => {} },
+  })
+  let settings: ReaderSettings | null = null
+  destroy = createMount()((scope) => {
+    scope.own(() => library.destroy())
+    settings = createReaderSettings(scope, { ...createOptions(createState()), downloadLibrary: library, getCurrentRecording: () => activeRecording })
+  })
+  settings!.open()
+  required<HTMLButtonElement>('[data-settings-category="more"]').click()
+  const button = required<HTMLButtonElement>('[data-target-id="settings-offline-recording-download"]')
+  await vi.waitFor(() => expect(button.textContent).toBe('Repair offline download'))
+  expect(button.disabled).toBe(false)
+  expect(required('[data-target-id="settings-offline-recording-status"]').textContent).toContain('timings are missing')
+  expect(button.scrollWidth).toBeLessThanOrEqual(button.clientWidth)
+  await page.screenshot({ path: `../../.vitest-attachments/offline-repair-${width}.png` })
+  button.click()
+  await vi.waitFor(() => expect(button.textContent).toBe('Remove offline recording'))
+  expect(download).not.toHaveBeenCalled()
+  expect(remove).not.toHaveBeenCalled()
+  expect(library.snapshot().inventory).toHaveLength(1)
 })
 
 test('downloads and removes only the active recording after explicit requests', async () => {

@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest'
 import { commands, page } from 'vitest/browser'
 import type { ThemeMode } from '../reader-preferences.ts'
+import { getFirstGraphemeRect } from '../reading/aliyah-start-marker.ts'
 
 interface AccessibilityMediaOptions {
   forcedColors?: 'active' | 'none' | null
@@ -62,6 +63,168 @@ afterEach(async () => {
     originalLocalStorage = null
   }
 })
+
+test.each(['match', 'reading'] as const)('anchors mobile aliyah overlays to their first letter in %s after scrolling and resizing', async (readerTextLayout) => {
+  await page.viewport(1280, 1000)
+  originalLocalStorage = snapshotStorage(localStorage)
+  localStorage.clear()
+  localStorage.setItem('tikkun.reader-preferences', JSON.stringify({
+    readerTextLayout,
+    readerSideMode: 'one',
+  }))
+  frame = document.createElement('iframe')
+  frame.title = `Mobile ${readerTextLayout} aliyah overlay`
+  frame.style.cssText = 'display:block;width:390px;height:844px;border:0'
+  frame.src = `/reader/?aliyah-overlay=${Date.now()}#/torah/parsha/beshalach/2-14-26`
+  document.body.append(frame)
+  await vi.waitFor(() => {
+    expect(frame?.contentDocument?.querySelector('[data-reader-boot-state="ready"]')).not.toBeNull()
+    expect(frame?.contentDocument?.querySelector('.aliyah-start-marker')).not.toBeNull()
+  }, { timeout: 15_000, interval: 50 })
+
+  const doc = requiredFrameDocument(frame)
+  const view = requiredFrameWindow(frame)
+  const book = required<HTMLElement>(doc, '[data-target-id="tikkun-book"]')
+  expect(book.dataset.readerLayout).toBe(readerTextLayout)
+  expect(book.dataset.readerSides).toBe('one')
+  errorCapture = captureFrameErrors(view)
+  await doc.fonts.ready
+  const assertAnchors = () => {
+    const markers = [...book.querySelectorAll<HTMLButtonElement>('.aliyah-start-marker')]
+    expect(markers.length).toBeGreaterThan(0)
+    for (const marker of markers) {
+      const word = required<HTMLElement>(
+        marker.parentElement!,
+        `.word[data-token-key="${marker.dataset.tokenKey}"]:not([hidden])`
+      )
+      const letter = getFirstGraphemeRect(word)
+      expect(letter).not.toBeNull()
+      if (!letter) continue
+      const rect = marker.getBoundingClientRect()
+      const transform = new DOMMatrixReadOnly(view.getComputedStyle(marker).transform)
+      expect(rect.width).toBe(44)
+      expect(rect.height).toBe(44)
+      const context = `${readerTextLayout} ${view.innerWidth}px ${marker.dataset.tokenKey}`
+      expect(
+        Math.abs(rect.left + rect.width / 2 - letter.left - letter.width / 2),
+        `${context} horizontal anchor`
+      ).toBeLessThan(1)
+      expect(
+        Math.abs(rect.top - transform.m42 - letter.top),
+        `${context} vertical anchor`
+      ).toBeLessThan(1)
+    }
+  }
+  for (const width of [390, 320, 550, 390]) {
+    await setFrameWidth(frame, width)
+    await vi.waitFor(assertAnchors, { timeout: 3_000, interval: 50 })
+    for (const distance of [-120, 240]) {
+      book.scrollTop += distance
+      await settle(view)
+      await vi.waitFor(assertAnchors, { timeout: 3_000, interval: 50 })
+    }
+  }
+  book.scrollTop = 0
+  await vi.waitFor(() => {
+    expect(book.querySelector('[data-page-number="76"]')).not.toBeNull()
+  }, { timeout: 8_000, interval: 50 })
+  await vi.waitFor(assertAnchors, { timeout: 3_000, interval: 50 })
+  expect(errorCapture.errors).toEqual([])
+}, 25_000)
+
+test.each([
+  { layout: 'reading', width: 390 },
+  { layout: 'reading', width: 1000 },
+  { layout: 'match', width: 390 },
+  { layout: 'match', width: 1000 },
+])('keeps verse numbers and the focal word through nekud toggles: $layout at $width', async ({ layout, width }) => {
+  await page.viewport(1440, 1000)
+  originalLocalStorage = snapshotStorage(localStorage)
+  localStorage.clear()
+  localStorage.setItem('tikkun.reader-preferences', JSON.stringify({
+    readerTextLayout: layout,
+    readerSideMode: 'one',
+  }))
+  frame = document.createElement('iframe')
+  frame.title = 'Reader nekud position regression'
+  frame.style.cssText = `position:fixed;inset:0;width:${width}px;height:844px;border:0`
+  frame.src = `/reader/?nekud-position=${Date.now()}#/torah/parsha/vezos-haberacha`
+  document.body.append(frame)
+  await vi.waitFor(() => {
+    expect(frame?.contentDocument?.querySelector('[data-reader-boot-state="ready"]')).not.toBeNull()
+  }, { timeout: 15_000, interval: 50 })
+  const doc = requiredFrameDocument(frame)
+  const view = requiredFrameWindow(frame)
+  const book = required<HTMLElement>(doc, '[data-target-id="tikkun-book"]')
+  const toggle = required<HTMLButtonElement>(doc, '[data-test-id="annotations-toggle"]')
+  errorCapture = captureFrameErrors(view)
+  await doc.fonts.ready
+  await settle(view)
+  book.scrollTop += 160
+  await settle(view)
+  const centerY = () => book.getBoundingClientRect().top + book.clientHeight / 2
+  const offset = (word: HTMLElement) => {
+    const rect = word.getBoundingClientRect()
+    return (rect.top + rect.bottom) / 2 - centerY()
+  }
+  const word = [...book.querySelectorAll<HTMLElement>('[data-reader-canonical="true"] .word:not([hidden])')]
+    .filter((candidate) => candidate.getClientRects().length > 0)
+    .sort((a, b) => Math.abs(offset(a)) - Math.abs(offset(b)))[0]
+  expect(word).toBeDefined()
+  const before = offset(word)
+  const labels = [...book.querySelectorAll<HTMLElement>('.location-indicator.mod-verses')]
+    .filter((label) => label.textContent?.trim())
+  expect(labels.length).toBeGreaterThan(0)
+  for (const enabled of [false, true, false, true]) {
+    toggle.click()
+    await settle(view)
+    expect(toggle.getAttribute('aria-pressed')).toBe(String(enabled))
+    expect(word.isConnected).toBe(true)
+    expect(word.hidden).toBe(false)
+    expect(Math.abs(offset(word) - before), `${layout} ${width}px ${word.dataset.tokenKey}`).toBeLessThan(2)
+    for (const label of labels) {
+      expect(view.getComputedStyle(label).display).not.toBe('none')
+      expect(label.getBoundingClientRect().width).toBeGreaterThan(0)
+    }
+  }
+  if (width === 390) {
+    const bookRect = book.getBoundingClientRect()
+    const x = bookRect.left + 12
+    const y = bookRect.top + book.clientHeight / 2
+    const gap = doc.elementFromPoint(x, y)!
+    expect(book.contains(gap)).toBe(true)
+    expect(gap.closest('.reader-text-side')).toBeNull()
+    expect(gap.closest('.word')).toBeNull()
+    const main = required<HTMLElement>(doc, '[data-target-id="reader-shell"]')
+    const mainRect = main.getBoundingClientRect()
+    const reader = page.frameLocator(page.elementLocator(frame)).getByRole('main', { name: 'Torah reader' })
+    for (const enabled of [false, true]) {
+      await reader.click({ position: { x: x - mainRect.left, y: y - mainRect.top } })
+      await settle(view)
+      expect(toggle.getAttribute('aria-pressed'), 'tap in the blank reading margin').toBe(String(enabled))
+      expect(Math.abs(offset(word) - before)).toBeLessThan(2)
+    }
+
+    const pointer = (type: string, clientY = y) => gap.dispatchEvent(new PointerEvent(type, {
+      bubbles: true, pointerId: 7, pointerType: 'touch', clientX: x, clientY,
+    }))
+    pointer('pointerdown')
+    pointer('pointermove', y + 30)
+    pointer('pointerup', y + 30)
+    gap.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await settle(view)
+    expect(toggle.getAttribute('aria-pressed'), 'dragging through a gap must not toggle').toBe('true')
+
+    gap.setAttribute('data-reader-no-form-toggle', 'true')
+    pointer('pointerdown')
+    pointer('pointerup')
+    gap.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await settle(view)
+    gap.removeAttribute('data-reader-no-form-toggle')
+    expect(toggle.getAttribute('aria-pressed'), 'excluded surfaces must not toggle').toBe('true')
+  }
+  expect(errorCapture.errors).toEqual([])
+}, 25_000)
 
 test('keeps the real Reader reachable across responsive widths, themes, and accessibility modes', async () => {
   await page.viewport(1440, 1000)
@@ -507,6 +670,11 @@ function assertReaderLayout(document: Document, view: Window, context: string) {
       title.scrollWidth,
       `${context} Reader title width ${title.scrollWidth}px exceeds its ${title.clientWidth}px capsule`
     ).toBeLessThanOrEqual(title.clientWidth + 1)
+    const titleRange = document.createRange()
+    titleRange.selectNodeContents(title)
+    const textRect = titleRange.getBoundingClientRect()
+    expect(textRect.left, `${context} title text left edge`).toBeGreaterThanOrEqual(titleRect.left - 1)
+    expect(textRect.right, `${context} title text right edge`).toBeLessThanOrEqual(titleRect.right + 1)
   }
 
   const visibleToolbarButtons = Array.from(

@@ -1,3 +1,4 @@
+import { getWebServiceWorker, isNativeApp } from '../platform/native.ts'
 import { loadPassageTokens } from '../audio/passage-tokens.ts'
 import { audioButtonState } from '../reading/audio-button-state.ts'
 import { createRecordingRangeResolver } from '../audio/recording-ranges.ts'
@@ -6,6 +7,7 @@ import { HDate } from '@hebcal/hdate'
 import utils from '../components/utils.ts'
 import { ScrollViewModel } from '../view-model/scroll-view-model.ts'
 import { LeiningGenerator } from '../calendar-model/generator.ts'
+import { publishNativePractice } from '../platform/native-practice.ts'
 import {
   CalendarSettingsStorageError,
   loadCalendarSettingsState,
@@ -14,7 +16,6 @@ import {
   type CalendarSettings,
 } from '../calendar-settings.ts'
 import { applyAnnotationMode } from '../components/annotation-rendering.ts'
-import { applyReaderPageLayout } from '../components/reader-page-layout.ts'
 import { alignSmallSpecialLettersWhenFontsReady } from '../special-letter-layout.ts'
 import type { ViewportRange } from '../viewport-tracker.ts'
 import {
@@ -41,6 +42,8 @@ import {
   generatePageUrl,
 } from '../view-model/navigation/url-parser.ts'
 import { isSemanticallyRoutableReaderHash } from '../view-model/navigation/routable-reader-hash.ts'
+import { isReaderHash } from '../view-model/navigation/reader-hash.ts'
+import { shareReadingLink } from './share-reading.ts'
 import {
   generateParshaUrl,
   getParshaSearchTermsForSlug,
@@ -118,6 +121,10 @@ import {
   formatPlaybackDuration as formatDuration,
 } from '../reading/playback-timeline.ts'
 import { LatestAction } from '../reading/latest-action.ts'
+import { createRecordingLibrary } from '../offline/recording-library.ts'
+import { createDownloadOwner, type DownloadOwner } from '../offline/download-owner.ts'
+import { createPlaybackRetention } from '../offline/playback-retention.ts'
+import { DOWNLOAD_INTENT_KEY } from '../offline/download-intent.ts'
 import {
   createReaderPlayback,
   type ReaderPlayback,
@@ -241,6 +248,8 @@ export interface ReaderRuntimeOptions {
   sessionStorage: Storage | null
   recordingMode: RecordingModeConfig
   aboutHref: string
+  downloadOwner?: DownloadOwner
+  openAbout?: () => Promise<void>
 }
 
 export function startReaderRuntime({
@@ -250,6 +259,8 @@ export function startReaderRuntime({
   sessionStorage: browserSessionStorage,
   recordingMode,
   aboutHref,
+  downloadOwner,
+  openAbout,
 }: ReaderRuntimeOptions): ReaderRuntime {
   const window = view
   const location = view.location
@@ -331,6 +342,7 @@ export function startReaderRuntime({
   let readerPlaybackGlobal: ReaderPlayback | null = null
   let readerSettingsGlobal: LazyReaderSettings | null = null
   let readerControlsGlobal: ReaderControls | null = null
+  let openMediaGlobal: ((returnFocus?: HTMLElement) => void) | null = null
   let readerShellGlobal: ReaderShell | null = null
   let readerRouteGlobal: ReaderRoute | null = null
   let lastReadingPromptGlobal: LastReadingPrompt | null = null
@@ -572,20 +584,15 @@ export function startReaderRuntime({
   }
 
   const setAnnotationsEnabled = (enabled: boolean) => {
-    annotationsEnabled = enabled
-    getReaderShell().setAnnotationsEnabled(enabled)
     const book = getBook()
-    applyAnnotationMode(book, enabled)
-    if (
-      book.dataset.readerLayout === 'match' &&
-      book.dataset.readerSides === 'one'
-    ) {
-      book.querySelectorAll<HTMLElement>('.tikkun-page').forEach((page) => {
-        applyReaderPageLayout(page, { layout: 'match', sides: 'one' })
-      })
-    }
     const displaySession = readerDisplaySessionGlobal
-    displaySession?.invalidateProgressAnchors('annotations')
+    const update = () => {
+      annotationsEnabled = enabled
+      getReaderShell().setAnnotationsEnabled(enabled)
+      applyAnnotationMode(book, enabled)
+    }
+    if (displaySession) displaySession.updateAnnotations(update)
+    else update()
     const activeDisplay = displaySession?.capture()
     if (activeDisplay) {
       scheduleSpecialLetterAlignment(book, activeDisplay.signal)
@@ -1018,6 +1025,7 @@ export function startReaderRuntime({
       bookmarked: isBookmarked,
       annotationsEnabled,
       aliyahNavigationAvailable: isAliyahRailRouteAvailable(),
+      shareAvailable: isReaderHash(currentShareHash()),
     }
   }
 
@@ -1034,6 +1042,12 @@ export function startReaderRuntime({
     return currentReaderHash && currentReaderHash !== '#/next'
       ? currentReaderHash
       : location.hash
+  }
+
+  function currentShareHash() {
+    const tokenKey = getReaderFocalTokenKey()
+    return tokenKey ? getBookmarkHashForTokenKey(tokenKey)
+      : readerRouteGlobal?.snapshot().currentReaderHash ?? ''
   }
 
   function checkpointFromBookmark(bookmark: ReaderBookmark): Checkpoint {
@@ -1298,6 +1312,15 @@ export function startReaderRuntime({
         keywords: ['timing'],
         emptyPriority: 40,
         run: () => readerRouteGlobal?.navigate(generateCueAnalyticsUrl()),
+      }),
+      createNavigationAction({
+        id: 'tools.media',
+        group: 'tools',
+        label: 'Media & Storage',
+        aliases: ['Downloads', 'Offline audio'],
+        keywords: ['download', 'storage', 'recordings'],
+        emptyPriority: 38,
+        run: () => openMediaGlobal?.(),
       }),
       createNavigationAction({
         id: 'tools.settings',
@@ -1651,11 +1674,16 @@ export function startReaderRuntime({
       },
       { signal: scope.signal }
     )
-    void document.fonts.ready.then(() => {
+    const refreshFontLayout = () => {
       if (scope.signal.aborted) return
       readerDisplaySessionGlobal?.invalidateProgressAnchors('text-layout')
       scheduleAliyahStartMarkerLayout(book)
       if (readerDisplaySessionGlobal) invalidateReaderPositionAfterLayout()
+    }
+    void document.fonts.ready.then(refreshFontLayout)
+    // The initial ready promise can resolve before reader text starts loading its font.
+    document.fonts.addEventListener('loadingdone', refreshFontLayout, {
+      signal: scope.signal,
     })
     document.addEventListener(
       'pointerdown',
@@ -2340,15 +2368,24 @@ export function startReaderRuntime({
             .find((rect) => rect !== null)
           if (!graphemeRect) return
 
-          const position = getAliyahStartMarkerPosition(
-            content.getBoundingClientRect(),
-            graphemeRect
-          )
           const marker = createAliyahStartMarker({ label, tokenKey })
           marker.dataset.aliyahStartLabel = label
+          content.append(marker)
+          // Reading's inline wrappers are not positioning containers. Measure
+          // in the actual containing block's content coordinates, including scroll.
+          const container = marker.offsetParent instanceof HTMLElement
+            ? marker.offsetParent
+            : content
+          const containerRect = container.getBoundingClientRect()
+          const position = getAliyahStartMarkerPosition(
+            {
+              left: containerRect.left + container.clientLeft - container.scrollLeft,
+              top: containerRect.top + container.clientTop - container.scrollTop,
+            },
+            graphemeRect
+          )
           marker.style.setProperty('--aliyah-start-anchor-x', `${position.x}px`)
           marker.style.setProperty('--aliyah-start-anchor-y', `${position.y}px`)
-          content.append(marker)
         })
       })
   }
@@ -3192,6 +3229,8 @@ export function startReaderRuntime({
 
   let ready!: Promise<void>
   const destroy = mountReaderRuntime((scope) => {
+  const downloads = downloadOwner ?? createDownloadOwner()
+  if (!downloadOwner) scope.own(() => downloads.destroy())
   void import('../reading/passage-audio-tools.ts').then(({ mountAudioButtonTooltip }) => {
     if (!scope.signal.aborted) mountAudioButtonTooltip(scope, document)
   }).catch(error => console.error('Could not load audio tooltips', error))
@@ -3321,6 +3360,9 @@ export function startReaderRuntime({
     }
   })
   let passageDialog: ReturnType<typeof import('../reading/passage-audio-dialog.ts').createPassageAudioDialog> | null = null
+  let releaseDownloadPlayback: (() => void) | undefined = undefined
+  // Mount resources release in reverse order: wait until playback has torn down.
+  scope.own(() => releaseDownloadPlayback?.())
   const readerPlayback = createReaderPlayback(scope, {
     document,
     view: window,
@@ -3388,8 +3430,51 @@ export function startReaderRuntime({
     },
   })
   readerPlaybackGlobal = readerPlayback
+  const baseUrl = document.baseURI
+  const downloadLibrary = downloads.getLibrary((inUse) => createRecordingLibrary({
+    baseUrl, navigator, storage: browserLocalStorage, inUse,
+  }), { view: window, document, intentKey: DOWNLOAD_INTENT_KEY })
+  const playbackRetention = createPlaybackRetention({
+    currentSources: () => readerPlayback.snapshot().session?.mediaSources ?? [],
+    whenReleased: () => readerPlayback.whenAudioReleased(),
+    onReleased: () => downloadLibrary.releasePlayback(),
+  })
+  let releasingSources: readonly string[] | undefined
+  const releaseProtection = downloads.protectPlayback((asset) =>
+    (releasingSources ?? playbackRetention.sources()).some((source) =>
+      new URL(source, baseUrl).href === asset.url
+    )
+  )
+  scope.signal.addEventListener('abort', () => {
+    releasingSources = playbackRetention.freeze()
+  }, { once: true })
+  releaseDownloadPlayback = () => {
+    void readerPlayback.whenAudioReleased().then(releaseProtection)
+      .catch((error: unknown) => console.error('Could not release recording download protection', error))
+  }
+  let mediaPanel: ReturnType<typeof import('./media-panel.ts').createMediaPanel> | undefined
+  let mediaLoad: Promise<void> | undefined
+  const openMedia = (returnFocus?: HTMLElement) => {
+    readerSettingsGlobal?.close({ restoreFocus: false })
+    if (mediaPanel) { mediaPanel.open({ returnFocus, narratorId: readerPreferences.narratorId }); return }
+    if (mediaLoad) return
+    mediaLoad = import('./media-panel.ts').then(({ createMediaPanel }) => {
+      if (scope.signal.aborted) return
+      mediaPanel = createMediaPanel(scope, { document, generator: createCalendarGenerator(), library: downloadLibrary,
+        recordings: listRecordings(), narrators: listNarrators(), narratorId: readerPreferences.narratorId })
+      mediaPanel.open({ returnFocus, narratorId: readerPreferences.narratorId })
+    }).catch((error: unknown) => {
+      console.error('Could not open Media', error)
+      if (!scope.signal.aborted) showPersistenceNotice('Media could not be opened. Try again.')
+    }).finally(() => { mediaLoad = undefined })
+  }
+  openMediaGlobal = openMedia
+  scope.own(() => { if (openMediaGlobal === openMedia) openMediaGlobal = null })
   scope.own(
     readerPlayback.subscribe((change, snapshot) => {
+      if (change.type === 'session-loaded' || change.type === 'route-reset') {
+        void playbackRetention.sync().catch((error: unknown) => console.error('Could not remove released recordings', error))
+      }
       if (change.type === 'reader-chrome') {
         if (snapshot.playing) {
           offlineRecordingPromptGlobal?.clearPlaybackFailure()
@@ -3573,6 +3658,22 @@ export function startReaderRuntime({
     openSettings: (returnFocus) => {
       readerSettingsGlobal?.open({ returnFocus })
     },
+    openMedia,
+    shareReading: async () => {
+      try {
+        const result = await shareReadingLink(currentShareHash(), {
+          navigator,
+          nativeShare: import.meta.env.TIKKUN_NATIVE_MEDIA_ORIGIN && isNativeApp() ? async (data) => {
+            const { Share } = await import('@capacitor/share')
+            return Share.share(data)
+          } : undefined,
+        })
+        if (!scope.signal.aborted && result === 'copied') showReaderNotice('Reading link copied.')
+      } catch (error) {
+        console.error('Could not share reading', error)
+        if (!scope.signal.aborted) showReaderNotice('Reading could not be shared. Try again.', { assertive: true })
+      }
+    },
   })
   readerControlsGlobal = readerControls
   scope.own(() => {
@@ -3608,11 +3709,11 @@ export function startReaderRuntime({
       restoreFocus: focusOverlayReturnTarget,
       animateThemeChanges: !recordingMode.enabled,
       serviceWorker:
-        'serviceWorker' in window.navigator
-          ? window.navigator.serviceWorker
-          : null,
+        getWebServiceWorker(window.navigator),
       getCurrentRecording: () =>
         readerPlayback.snapshot().session?.activeRecording ?? null,
+      downloadLibrary,
+      openMedia: () => openMedia(document.querySelector<HTMLElement>('[data-target-id="settings-toggle"]') ?? undefined),
       onLoadError: (error) => {
         console.error('Failed to load Reader Settings', error)
         showPersistenceNotice(
@@ -3715,7 +3816,11 @@ export function startReaderRuntime({
       applyAnnotationMode(pageRoot, annotationsEnabled)
       scheduleSpecialLetterAlignment(pageRoot, scope.signal)
       readerDisplaySession.pageRendered(pageRoot, () => {
-        applyAliyahStartWordMarkers(book, pageRoot)
+        // Reading flows across pages, so prepending one also moves existing anchors.
+        applyAliyahStartWordMarkers(
+          book,
+          book.dataset.readerLayout === 'reading' ? book : pageRoot
+        )
         applyRecordingModePageLabels(pageRoot)
         applyReaderVisibleIssueMarkers(pageRoot)
       })
@@ -3765,7 +3870,7 @@ export function startReaderRuntime({
       if (
         !isCompactReaderViewport() ||
         !(target instanceof Element) ||
-        !target.closest('.reader-text-side') ||
+        !book.contains(target) ||
         target.closest(readerFormTapBlockedSelector)
       ) {
         readerFormTap = null
@@ -3828,7 +3933,7 @@ export function startReaderRuntime({
     const target = event.target
     if (
       !(target instanceof Element) ||
-      !target.closest('.reader-text-side') ||
+      !book.contains(target) ||
       target.closest(readerFormTapBlockedSelector)
     ) {
       return false
@@ -3850,7 +3955,17 @@ export function startReaderRuntime({
       return
     }
 
-    if (await handleAliyahPermalinkClick(event)) return
+    if (await handleAliyahPermalinkClick(event, {
+      nativeWriteText: import.meta.env.TIKKUN_NATIVE_MEDIA_ORIGIN && isNativeApp()
+        ? async (value) => {
+          const { Clipboard } = await import('@capacitor/clipboard')
+          await Clipboard.write({ string: value })
+        }
+        : undefined,
+      onError: () => {
+        if (!scope.signal.aborted) showReaderNotice('Reading link could not be copied. Try again.', { assertive: true })
+      },
+    })) return
 
     const word = target.closest<HTMLElement>('.word')
     const playback = readerPlayback.snapshot()
@@ -4045,7 +4160,13 @@ export function startReaderRuntime({
         closeCueAuthoring()
         lastReadingPromptGlobal?.hide()
       },
-      openAbout: () => view.location.assign(aboutHref),
+      openAbout: () => {
+        if (!openAbout) { view.location.assign(aboutHref); return }
+        void openAbout().catch((error: unknown) => {
+          console.error('Could not open About', error)
+          if (!scope.signal.aborted) showReaderNotice('About could not be opened. Try again.', { assertive: true })
+        })
+      },
       readerRouteChanged: (nextReaderHash) => {
         readerUrlSyncArmed = false
         readerUrlPreviousFocalPosition = null
@@ -4062,6 +4183,11 @@ export function startReaderRuntime({
       readerReady: () => {
         const lifetime = readerDisplaySession.capture()
         refreshReaderChrome()
+        // Before layout settles, the focal anchor can still belong to the previous aliyah.
+        const practiceRoute = readerRouteGlobal?.snapshot()
+        if (!recordingMode.enabled && practiceRoute?.view === 'reader' && isReaderHash(practiceRoute.currentReaderHash)) {
+          publishNativePractice({ reading: { hash: practiceRoute.currentReaderHash, parshaName: practiceRoute.title } })
+        }
         if (readerPlaybackGlobal === readerPlayback) {
           void readerPlayback
             .syncHighlight({ scroll: false })
@@ -4112,7 +4238,10 @@ export function startReaderRuntime({
   scope.own(() => {
     if (readerRouteGlobal === readerRoute) readerRouteGlobal = null
   })
-  ready = readerRoute.start()
+  const nativeLaunch = isNativeApp() && !recordingMode.enabled
+  ready = readerRoute.start(nativeLaunch
+    ? { resumeHash: launchLastReading?.hash ?? null }
+    : undefined)
 
   scope.own(() => {
     if (readerNoticeTimer !== null) {
@@ -4133,7 +4262,7 @@ export function startReaderRuntime({
     lastReadingPromptGlobal?.hide()
   })
 
-  if (launchLastReading) lastReadingPromptGlobal?.show(launchLastReading)
+  if (launchLastReading && !nativeLaunch) lastReadingPromptGlobal?.show(launchLastReading)
   })
 
   return { ready, destroy }

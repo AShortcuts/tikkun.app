@@ -56,7 +56,7 @@ export interface ReaderRouteSnapshot {
 }
 
 export interface ReaderRoute {
-  start(): Promise<void>
+  start(launch?: { resumeHash: string | null }): Promise<void>
   navigate(
     hash: string,
     options?: {
@@ -539,7 +539,7 @@ export function createReaderRoute(
     pickerOpen: Boolean(picker) || pickerLoading,
   })
 
-  const start = () => {
+  const start = (launch?: { resumeHash: string | null }) => {
     if (started) throw new Error('Reader Route is already started')
     started = true
     const ready = new Promise<void>((resolve, reject) => {
@@ -556,13 +556,20 @@ export function createReaderRoute(
       { signal: scope.signal }
     )
 
+    const useLaunch = !view.location.hash && launch !== undefined
+    const resumeHash = useLaunch ? launch.resumeHash : null
+    const resumeRoute = resumeHash ? parseHash(resumeHash) : null
+    const resumedReading = resumeHash && resumeRoute?.view === 'reader'
+      ? { ...resumeRoute, canonicalHash: resumeRoute.canonicalHash ?? hashPath(resumeHash) }
+      : null
     const initialRoute =
-      parseCurrentRoute() ?? {
+      resumedReading ?? parseCurrentRoute() ?? {
         view: 'reader' as const,
         canonicalHash: DEFAULT_READER_HASH,
         model: ScrollViewModel.forDate(options.createGenerator(), new Date()),
       }
     renderRoute(initialRoute)
+    if (useLaunch && !resumedReading) openPicker(null, { focusSearch: false })
     return ready
   }
 

@@ -37,6 +37,7 @@ function installFixture() {
 }
 
 function setHash(hash = '') {
+  if (window.location.hash === hash) return
   window.history.replaceState(
     null,
     '',
@@ -99,10 +100,12 @@ function mountRoute({
   host = createHost(),
   calendarSettings = { israel: false },
   loadParshaPicker = async () => ({ default: createParshaPicker }),
+  launch,
 }: {
   host?: ReaderRouteHost
   calendarSettings?: CalendarSettings
   loadParshaPicker?: () => Promise<ParshaPickerModule>
+  launch?: { resumeHash: string | null }
 } = {}) {
   const { shell, state } = createShell()
   const mount = createMount()
@@ -122,7 +125,7 @@ function mountRoute({
     })
   })
   mountedRoutes.push(destroy)
-  const ready = route.start()
+  const ready = route.start(launch)
   return { host, route, state, ready }
 }
 
@@ -155,6 +158,34 @@ test('canonicalizes hashless startup before completing the first reader render',
 
   expect(host.readerReady).toHaveBeenCalledOnce()
   expect(host.pickerChanged).not.toHaveBeenCalled()
+})
+
+test.each([
+  '#/torah/parsha/beshalach/2-15-1',
+  '#/r/2-15-1',
+  '#/torah/page/242',
+])('resumes a supplied reading on native hashless startup: %s', async (hash) => {
+  const { ready, route, host } = mountRoute({ launch: { resumeHash: hash } })
+  await ready
+  expect(route.snapshot().currentReaderHash).toBe(hash)
+  expect(window.location.hash).toBe(hash)
+  expect(host.preparePicker).not.toHaveBeenCalled()
+})
+
+test.each([null, '#/not-a-reading'])('opens Reading Index when native resume is unavailable: %s', async (resumeHash) => {
+  const { ready, route, host } = mountRoute({ launch: { resumeHash } })
+  await ready
+  expect(host.preparePicker).toHaveBeenCalledOnce()
+  expect(route.snapshot().pickerOpen).toBe(true)
+})
+
+test('native resume never replaces an explicit reading link', async () => {
+  const hash = '#/torah/parsha/beshalach/2-15-1'
+  setHash(hash)
+  const { ready, route, host } = mountRoute({ launch: { resumeHash: '#/torah/page/242' } })
+  await ready
+  expect(route.snapshot().currentReaderHash).toBe(hash)
+  expect(host.preparePicker).not.toHaveBeenCalled()
 })
 
 test('sets the requested title before rendering and waits for positioning at startup', async () => {

@@ -115,8 +115,10 @@ test('computes a centered wide reader and balanced Torah line', async () => {
       getComputedStyle(required('.reader-text-flow')).columnGap,
     ),
   ).toBeLessThan(32)
-  expect(getComputedStyle(required('.special-letter.mod-small')).fontSize).toBe(
-    '8px',
+  const smallLetter = required('.special-letter.mod-small')
+  // Respect the engine's minimum font size, while keeping the letter smaller.
+  expect(Number.parseFloat(getComputedStyle(smallLetter).fontSize)).toBeLessThan(
+    Number.parseFloat(getComputedStyle(smallLetter.parentElement!).fontSize),
   )
 
   const hebrewUiFont = getComputedStyle(
@@ -350,10 +352,6 @@ test.each([
       sides: 'one',
     })
 
-    const measuredOffset = Number.parseFloat(
-      pageElement.style.getPropertyValue('--match-shirah-inline-offset'),
-    )
-    const offset = Number.isFinite(measuredOffset) ? measuredOffset : 0
     const shirahRect = shirahContent.getBoundingClientRect()
     const regularRect = regularContent.getBoundingClientRect()
     const safeEdge = Number.parseFloat(
@@ -362,7 +360,8 @@ test.each([
 
     expect(shirahRect.width).toBeGreaterThanOrEqual(regularRect.width)
     expect(shirahRect.left).toBeGreaterThanOrEqual(bookRect.left + safeEdge - 1)
-    expect(shirahRect.right).toBeCloseTo(regularRect.right + offset, 1)
+    expect(shirahRect.left).toBeCloseTo(regularRect.left, 1)
+    expect(shirahRect.right).toBeCloseTo(regularRect.right, 1)
     expect(getComputedStyle(shirahLine).fontSize).toBe(
       getComputedStyle(regularLine).fontSize,
     )
@@ -392,6 +391,49 @@ test.each([
     }
   },
 )
+
+test.each([390, 550, 551, 768, 1280, 1600].flatMap((width) =>
+  (width < 551 ? ['two'] as const : ['one', 'two'] as const).map((sides) => ({ width, sides })),
+))('centers ordinary Match text within each song side with one verse gutter at $width px / $sides', async ({ width, sides }) => {
+  await page.viewport(width, 900)
+  document.documentElement.dataset.readerSideOrder = 'tikkun-right'
+  const presentation = { layout: 'match', sides } as const
+  const fixtures = [
+    renderedPage(78, beshalachPageJson),
+    renderedPage(242, haazinuPageJson),
+    renderedPage(243, haazinuSecondPageJson),
+  ]
+  install(`<div class="tikkun-book" data-target-id="tikkun-book"
+    data-reader-layout="match" data-reader-sides="${sides}" dir="rtl" style="width:100vw">
+    ${fixtures.map((fixture) => `<section class="tikkun-page">${Page(fixture, { presentation })}</section>`).join('')}
+  </div>`)
+  await document.fonts.load('28.8px ShlomosemiStam', 'אשר')
+  await document.fonts.ready
+  const pages = requiredAll<HTMLElement>('.tikkun-page')
+  const center = (element: HTMLElement) => {
+    const rect = element.getBoundingClientRect()
+    return rect.left + rect.width / 2
+  }
+  for (const order of ['tikkun-right', 'torah-right']) {
+    document.documentElement.dataset.readerSideOrder = order
+    pages.forEach((member) => applyReaderPageLayout(member, presentation))
+    for (const member of pages) {
+      const song = required('tr[data-shirah-kind]', member)
+      const songGutter = required('.line-gutter.mod-verses', song).getBoundingClientRect()
+      for (const row of requiredAll<HTMLElement>('tr', member)) {
+        const label = `${row.dataset.pageNumber}:${row.dataset.lineIndex}:${order}`
+        expect(required('.line-gutter.mod-verses', row).getBoundingClientRect().left, `${label} shared verse gutter`)
+          .toBeCloseTo(songGutter.left, 1)
+        for (const side of requiredAll<HTMLElement>('.reader-text-side', row)) {
+          const surface = side.classList.contains('mod-tikkun') ? 'tikkun'
+            : side.classList.contains('mod-torah') ? 'torah' : 'single'
+          expect(center(required('.reader-text-flow', side)), `${label} centered ${surface} block`)
+            .toBeCloseTo(center(required(`.reader-text-side.mod-${surface} .reader-text-flow`, song)), 1)
+        }
+      }
+    }
+  }
+})
 
 test('uses the same Haazinu and Sea boundary rows in both Match modes', () => {
   const fixtures = [
@@ -476,6 +518,10 @@ test.each([551, 768, 1280])('fits identical Sea tracks in Two Sided Match at %ip
         }
       }
     }
+  }
+  const bookRect = book.getBoundingClientRect()
+  for (const label of requiredAll<HTMLElement>('.location-indicator.mod-verses', book)) {
+    expect(label.getBoundingClientRect().right, `verse range ${label.textContent} (${label.closest('tr')?.dataset.shirahKind ?? 'ordinary'})`).toBeLessThanOrEqual(bookRect.right + 1)
   }
   expect(book.scrollWidth).toBeLessThanOrEqual(book.clientWidth + 1)
 })
@@ -583,13 +629,23 @@ test.each([390, 551, 768, 1024, 1280, 1600, 1920])(
         `tr[data-page-number="${row.dataset.pageNumber}"][data-line-index="${row.dataset.lineIndex}"]`,
         deployed,
       )
-      const content = required('.line-content', row)
+      const content = required('.reader-text-flow', row)
       const original = required('.line-content', reference)
       const label = `${row.dataset.pageNumber}:${row.dataset.lineIndex}`
-      expect(content.getBoundingClientRect().width, `${label} width`).toBeCloseTo(original.getBoundingClientRect().width, 1)
-      expect(content.getBoundingClientRect().left, `${label} placement`).toBeCloseTo(original.getBoundingClientRect().left, 1)
+      const fitted = content.closest('.mod-match-fitted')
+      if (fitted) {
+        // A legacy row that wraps may borrow margins, but not change its line height.
+        expect(content.getBoundingClientRect().width, `${label} fit`).toBeGreaterThanOrEqual(original.getBoundingClientRect().width)
+        expect(getComputedStyle(content).lineHeight, `${label} line height`).toBe(getComputedStyle(original).lineHeight)
+        expect(row.getBoundingClientRect().height, `${label} row spacing`).toBeLessThanOrEqual(reference.getBoundingClientRect().height + 1)
+      } else {
+        expect(content.getBoundingClientRect().width, `${label} width`).toBeCloseTo(original.getBoundingClientRect().width, 1)
+        if (viewportWidth <= 550) {
+          expect(content.getBoundingClientRect().left, `${label} placement`).toBeCloseTo(original.getBoundingClientRect().left, 1)
+        }
+        expect(row.getBoundingClientRect().height, `${label} row spacing`).toBeCloseTo(reference.getBoundingClientRect().height, 1)
+      }
       expect(getComputedStyle(content).font, `${label} font`).toBe(getComputedStyle(original).font)
-      expect(row.getBoundingClientRect().height, `${label} row spacing`).toBeCloseTo(reference.getBoundingClientRect().height, 1)
     }
   },
 )
@@ -785,6 +841,7 @@ test.each([551, 768, 1024, 1280, 1600])(
         )
         return {
           pattern: row.dataset.shirahPattern,
+          location: `${row.dataset.pageNumber}:${row.dataset.lineIndex}`,
           rects: tracks.map((track) => track.getBoundingClientRect()),
         }
       })
@@ -819,8 +876,8 @@ test.each([551, 768, 1024, 1280, 1600])(
       const repeated = initial.filter((row) => row.pattern === pattern)
       for (const row of repeated) {
         row.rects.forEach((rect, i) => {
-          expect(rect.left).toBeCloseTo(repeated[0].rects[i].left, 0)
-          expect(rect.right).toBeCloseTo(repeated[0].rects[i].right, 0)
+          expect(rect.left, `${row.location} repeated track ${i} left`).toBeCloseTo(repeated[0].rects[i].left, 0)
+          expect(rect.right, `${row.location} repeated track ${i} right`).toBeCloseTo(repeated[0].rects[i].right, 0)
         })
         expect(row.rects[0].width).toBeCloseTo(row.rects.at(-1)!.width, 0)
       }
@@ -862,8 +919,8 @@ test.each([551, 768, 1024, 1280, 1600])(
     verifySpacing()
     geometry().forEach((row, index) =>
       row.rects.forEach((rect, i) => {
-        expect(rect.left).toBeCloseTo(initial[index].rects[i].left, 0)
-        expect(rect.right).toBeCloseTo(initial[index].rects[i].right, 0)
+        expect(rect.left, `${row.location} track ${i} left after annotations`).toBeCloseTo(initial[index].rects[i].left, 0)
+        expect(rect.right, `${row.location} track ${i} right after annotations`).toBeCloseTo(initial[index].rects[i].right, 0)
       }),
     )
     applyAnnotationMode(book, true)
@@ -878,7 +935,7 @@ test.each([551, 768, 1024, 1280, 1600])(
       .filter((row) => row.pattern === 'columns-2')
       .forEach((row, index) => {
         row.rects.forEach((rect, i) => {
-          expect(rect.left).toBeCloseTo(
+          expect(rect.left, `${row.location} after eviction`).toBeCloseTo(
             lastHaazinuTracks[index].rects[i].left,
             0,
           )

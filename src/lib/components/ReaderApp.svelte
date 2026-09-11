@@ -1,16 +1,22 @@
 <script lang="ts">
   import { resolve } from '$app/paths'
-  import { onMount } from 'svelte'
+  import { goto, onNavigate } from '$app/navigation'
+  import { getContext, onMount } from 'svelte'
+  import { DOWNLOAD_OWNER_CONTEXT, type DownloadOwner } from '../../../app/offline/download-owner.ts'
+  import { NATIVE_READING_LINKS_CONTEXT, type NativeReadingLinks } from '../../../app/platform/native-reading-links.ts'
+  import type { ReaderAppOptions } from '../../../app/index.ts'
   import '../../../css/master.css'
 
   type ReaderAppModule = {
-    startApp(): { readonly ready: Promise<void> }
+    startApp(options?: ReaderAppOptions): { readonly ready: Promise<void> }
     stopApp(): void
   }
 
   type ReaderBootState = 'loading' | 'ready' | 'failed'
 
   const loadDefaultReaderApp = () => import('../../../app/index.ts')
+  const downloadOwner = getContext<DownloadOwner | undefined>(DOWNLOAD_OWNER_CONTEXT)
+  const nativeLinks = getContext<NativeReadingLinks | null>(NATIVE_READING_LINKS_CONTEXT)
 
   let {
     aboutHref,
@@ -29,6 +35,14 @@
   let stopApp: (() => void) | null = null
   let reloadOnRetry = false
 
+  onNavigate(({ from, to }) => {
+    if (from?.route.id === to?.route.id) return
+    // Imperative Reader roots must unmount before SvelteKit replaces their DOM.
+    bootRevision += 1
+    stopApp?.()
+    stopApp = null
+  })
+
   function retryReader() {
     // Failed dynamic text imports can remain cached for this document's lifetime.
     if (reloadOnRetry) reloadPage()
@@ -42,10 +56,14 @@
 
     let app: ReaderAppModule | null = null
     try {
+      await nativeLinks?.ready
+      if (disposed || revision !== bootRevision) return
       app = await loadApp()
       if (disposed || revision !== bootRevision) return
 
-      const reader = app.startApp()
+      // aboutHref is already base-path resolved by the owning route.
+      // eslint-disable-next-line svelte/no-navigation-without-resolve
+      const reader = app.startApp({ downloadOwner, openAbout: () => goto(aboutHref) })
       if (disposed || revision !== bootRevision) {
         app.stopApp()
         return

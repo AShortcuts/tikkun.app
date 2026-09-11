@@ -1,4 +1,5 @@
-@import '../node_modules/normalize.css/normalize.css';
+@layer reset, tokens, shell, reader, feature, responsive, overrides;
+@import '../node_modules/normalize.css/normalize.css' layer(reset);
 
 @font-face {
   font-family: 'ShlomosemiStam';
@@ -21,7 +22,8 @@
   font-weight: 100 900;
 }
 
-:root {
+/* Route styles remain loaded during client navigation; keep public globals local. */
+:root:not(:has([data-target-id='app-root'])) {
   --hebrew-ui-font-family: 'Noto Sans Hebrew', sans-serif;
   --site-accent: #3984ff;
   --site-accent-soft: #79aaff;
@@ -41,23 +43,29 @@
   box-sizing: border-box;
 }
 
-html {
+html:not(:has([data-target-id='app-root'])) {
+  height: auto;
   min-width: 20rem;
   min-height: 100%;
+  overflow: auto;
   background: #06080b;
   color-scheme: dark;
   scroll-behavior: smooth;
 }
 
-body {
+body:not(:has([data-target-id='app-root'])) {
+  height: auto;
   min-height: 100%;
   margin: 0;
-  overflow-x: hidden;
+  /* Clip horizontal artwork without becoming the sticky story's scroll container. */
+  overflow-x: clip;
+  overflow-y: visible;
   background: #06080b;
+  font-family: 'Lora', Georgia, serif;
 }
 
-button,
-a {
+body:not(:has([data-target-id='app-root'])) button,
+body:not(:has([data-target-id='app-root'])) a {
   font-family: inherit;
 }
 
@@ -955,7 +963,7 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html {
+  html:not(:has([data-target-id='app-root'])) {
     scroll-behavior: auto;
   }
 }

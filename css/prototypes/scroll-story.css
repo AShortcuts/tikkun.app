@@ -463,8 +463,7 @@
   display: none;
 }
 
-.prototype-scroll-story .scroll-stage-practice,
-.prototype-scroll-story .scroll-film-progress {
+.prototype-scroll-story .scroll-stage-practice {
   display: none;
 }
 
@@ -1762,7 +1761,6 @@
     --journey-reader-width: min(80vw, 72rem);
     --journey-stage-top: 6.25rem;
     --journey-stage-margin: 1.25rem;
-    --story-progress: 0%;
     --story-paper-opacity: 0;
     --story-ambient-opacity: 0.42;
     --story-hero-opacity: 1;
@@ -2115,27 +2113,6 @@
 
   .prototype-scroll-story .scroll-stage-practice .scroll-practice-scene {
     animation-duration: 420ms;
-  }
-
-  .prototype-scroll-story .scroll-film-progress {
-    position: absolute;
-    z-index: 7;
-    top: 27svh;
-    left: max(0.85rem, calc((100vw - 92rem) / 2 - 1.25rem));
-    display: block;
-    width: 1px;
-    height: 44svh;
-    overflow: hidden;
-    background: rgba(169, 190, 222, 0.18);
-    opacity: 0.58;
-  }
-
-  .prototype-scroll-story .scroll-film-progress span {
-    display: block;
-    width: 100%;
-    height: var(--story-progress);
-    background: linear-gradient(to bottom, #d7e7ff, #5b9cff);
-    box-shadow: 0 0 0.75rem rgba(91, 156, 255, 0.85);
   }
 
   @media (min-width: 64rem) {

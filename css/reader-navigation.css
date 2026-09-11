@@ -10,12 +10,12 @@
       inset 0 1px 0 color-mix(in srgb, var(--text-color) 8%, transparent),
       0 2px 3px #00000010;
     --header-bookmark-color: color-mix(in srgb, #d84f5b 76%, var(--text-color));
-    --header-audio-ink: light-dark(#006bc7, #62b3ff);
     --header-audio-surface: color-mix(in srgb, var(--paper-color) 84%, #0a84ff);
     border-bottom: 1px solid transparent;
     flex-shrink: 0;
     box-shadow: 0 0 8px -4px black;
-    padding: 10px 0;
+    padding: calc(10px + env(safe-area-inset-top, 0px))
+      env(safe-area-inset-right, 0px) 10px env(safe-area-inset-left, 0px);
     position: sticky;
     top: 0;
     background: color-mix(in srgb, var(--paper-color) 94%, transparent);
@@ -348,7 +348,7 @@
   .toolbar-overflow-icon.mod-annotations {
     align-items: center;
     justify-content: center;
-    width: 1.8rem;
+    width: 0.95rem;
     height: 1.8rem;
     overflow: visible;
     font-family: 'ShlomosemiStam';
@@ -556,6 +556,9 @@
     display: none;
   }
   @media screen and (max-width: 550px) {
+    .toolbar-button.toolbar-share-current {
+      display: none;
+    }
     body {
       --mobile-aliyah-playing-text: #111;
     }
@@ -563,7 +566,8 @@
       --mobile-aliyah-playing-text: #fff;
     }
     .app-toolbar {
-      padding: max(12px, env(safe-area-inset-top, 0px)) 0 12px;
+      padding: calc(12px + env(safe-area-inset-top, 0px))
+        env(safe-area-inset-right, 0px) 12px env(safe-area-inset-left, 0px);
       border-bottom: none;
       background: color-mix(in srgb, var(--paper-color) 96%, transparent);
       box-shadow: none;

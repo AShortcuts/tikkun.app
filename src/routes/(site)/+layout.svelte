@@ -10,16 +10,18 @@
   let mobileMenuOpen = $state(false)
 
   function closeMobileMenu() {
+    mobileMenu.open = false
     mobileMenuOpen = false
   }
 
   function handleDocumentPointerDown(event: PointerEvent) {
-    if (!mobileMenuOpen || !(event.target instanceof Node)) return
+    if (!mobileMenu.open || !(event.target instanceof Node)) return
     if (!mobileMenu.contains(event.target)) closeMobileMenu()
   }
 
   function handleDocumentKeydown(event: KeyboardEvent) {
-    if (event.key !== 'Escape' || !mobileMenuOpen) return
+    // Native details toggles precede Svelte's asynchronous open binding.
+    if (event.key !== 'Escape' || !mobileMenu.open) return
     closeMobileMenu()
     mobileMenu.querySelector<HTMLElement>('summary')?.focus({ preventScroll: true })
   }
@@ -93,10 +95,10 @@
             aria-current={page.url.pathname.startsWith(resolve('/about/')) ? 'page' : undefined}
             onclick={closeMobileMenu}
           >About</a>
-          <a href={resolve('/reader/#/next')} data-sveltekit-reload>Open reader</a>
+          <a href={resolve('/reader/#/next')}>Open reader</a>
         </nav>
       </details>
-      <a class="home-open-reader" href={resolve('/reader/#/next')} data-sveltekit-reload>
+      <a class="home-open-reader" href={resolve('/reader/#/next')}>
         Open reader
       </a>
     </nav>
@@ -107,6 +109,8 @@
   <footer class="home-footer">
     <p>Recordings by Yoni Davidov. Reader and timing tools by Tikkun Korim.</p>
     <nav class="site-footer-nav" aria-label="Footer navigation">
+      <a href={resolve('/support/')}>Support</a>
+      <a href={resolve('/privacy/')}>Privacy policy</a>
       <a href={resolve('/readings/')}>Readings & coverage</a>
       <a href={resolve('/tidbits/')}>Tidbits</a>
       <a href={resolve('/about/')}>About</a>

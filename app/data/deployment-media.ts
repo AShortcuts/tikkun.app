@@ -16,7 +16,8 @@ export function resolveDeploymentMediaUrl(src: string, basePath: string) {
 
 export function resolveRecordingMediaUrls(
   recording: AudioRecording,
-  basePath: string
+  basePath: string,
+  mediaOrigin = ''
 ): AudioRecording {
   const playSrc = resolveDeploymentMediaUrl(recording.playSrc, basePath)
   const versionedPlaySrc = recording.mediaIdentity
@@ -24,9 +25,16 @@ export function resolveRecordingMediaUrls(
     : playSrc
   return {
     ...recording,
-    playSrc: versionedPlaySrc,
-    downloadSrc: resolveDeploymentMediaUrl(recording.downloadSrc, basePath),
+    playSrc: resolveNativeMediaUrl(versionedPlaySrc, mediaOrigin),
+    downloadSrc: resolveNativeMediaUrl(
+      resolveDeploymentMediaUrl(recording.downloadSrc, basePath), mediaOrigin
+    ),
   }
+}
+
+function resolveNativeMediaUrl(src: string, mediaOrigin: string) {
+  if (!mediaOrigin || !src.startsWith('/') || src.startsWith('//')) return src
+  return new URL(src, mediaOrigin).href
 }
 
 export function appendRecordingMediaVersion(src: string, digest: string) {

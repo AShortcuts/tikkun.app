@@ -1,6 +1,9 @@
 import adapter from '@sveltejs/adapter-static'
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte'
 import process from 'node:process'
+import { nativeBuildConfig } from './scripts/native-build-config.mjs'
+
+const native = nativeBuildConfig()
 
 const configuredBasePath = process.env.TIKKUN_BASE_PATH ?? ''
 const basePath =
@@ -15,13 +18,14 @@ if (basePath && !basePath.startsWith('/')) {
 export default {
   preprocess: vitePreprocess(),
   kit: {
+    outDir: native.enabled ? '.svelte-kit-native' : '.svelte-kit',
     adapter: adapter({
-      pages: 'dist',
-      assets: 'dist',
+      pages: native.enabled ? 'dist-native' : 'dist',
+      assets: native.enabled ? 'dist-native' : 'dist',
       strict: true,
     }),
     files: {
-      assets: 'site',
+      assets: native.enabled ? '.native-site' : 'site',
       appTemplate: process.env.VITEST ? 'src/app.test.html' : 'src/app.html',
     },
     paths: {

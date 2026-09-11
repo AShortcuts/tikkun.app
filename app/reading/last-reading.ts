@@ -1,4 +1,5 @@
 import type { LeiningRun } from '../calendar-model/model-types.ts'
+import { publishNativePractice } from '../platform/native-practice.ts'
 import type { RefWithScroll } from '../ref.ts'
 import { semanticParshaUrlForLeining } from '../view-model/navigation/parsha-routes.ts'
 import { isReaderHash } from '../view-model/navigation/reader-hash.ts'
@@ -74,6 +75,7 @@ export function saveLastReading(
     const current = store.read()
     if (current.status === 'unavailable') throw current.error
     requirePersistedJsonMutation(store.write(payload, current.revision))
+    publishNativePractice({ reading: payload })
   } catch (error) {
     throw new LastReadingStorageError(error)
   }

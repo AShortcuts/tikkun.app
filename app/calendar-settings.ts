@@ -1,4 +1,5 @@
 import type { UserSettings } from './calendar-model/user-settings.ts'
+import { publishNativePractice } from './platform/native-practice.ts'
 import {
   createPersistedJsonStore,
   getBrowserStorage,
@@ -95,7 +96,9 @@ export function saveCalendarSettings(
       if (current.status === 'unavailable') throw current.error
       revision = current.revision
     }
-    return requirePersistedJsonMutation(store.write(settings, revision))
+    const saved = requirePersistedJsonMutation(store.write(settings, revision))
+    publishNativePractice({ israel: settings.israel })
+    return saved
   } catch (error) {
     if (error instanceof CalendarSettingsStorageError) throw error
     throw new CalendarSettingsStorageError(error)

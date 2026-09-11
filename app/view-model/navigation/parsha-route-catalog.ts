@@ -180,6 +180,11 @@ export const routeSpecByCanonicalSlug = new Map(
   parshaRouteSpecs.map((spec) => [spec.canonicalSlug, spec])
 )
 
+export const singleParshaRouteSpecs = [
+  ...weeklyParshaRoutes,
+  ...parshaRouteSpecs.filter((spec) => spec.kind === 'vezos-haberacha'),
+]
+
 const aliasToCanonicalSlug = new Map<string, string>()
 
 for (const spec of parshaRouteSpecs) {

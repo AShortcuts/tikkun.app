@@ -1,4 +1,5 @@
 import { EventEmitter } from '../event-emitter.ts'
+import type { ProtectPlayback } from '../offline/playback-protection.ts'
 import type { AudioRecording, WordCue } from '../audio/types.ts'
 import type { PlaybackSessionAliyahIndex } from './playback-session.ts'
 import type {
@@ -24,13 +25,14 @@ export interface ActiveAudioSession {
   passage?: PlaybackPlan['passage']
 }
 
-type AudioControllerEvents = {
+export type AudioControllerEvents = {
   'session-loaded': ActiveAudioSession
   'segment-updated': { index: number; segment: ActivePlaybackSegment }
   'playback-updated': { playing: boolean }
   'frame-updated': { currentTime: number }
   'time-updated': { currentTime: number }
   'duration-updated': { duration: number }
+  'metadata-updated': undefined
   'playback-error': { error: Error; recording: AudioRecording }
 }
 
@@ -44,7 +46,10 @@ const PLAYBACK_ACTIVATION_CANCELLED = Symbol('playback-activation-cancelled')
 
 export interface AudioControllerOptions {
   signal?: AbortSignal
+  protectPlayback?: ProtectPlayback
 }
+
+export type PlaybackController = Omit<Pick<AudioController, keyof AudioController>, 'audio'>
 
 export class AudioController extends EventEmitter<AudioControllerEvents> {
   private activeSession: ActiveAudioSession | null = null
@@ -65,6 +70,9 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
   private readonly mediaDurationsBySource = new Map<string, number>()
   private readonly lifetimeController = new AbortController()
   private destroyed = false
+  private readonly protectPlayback?: ProtectPlayback
+  private pendingProtection: AbortController | null = null
+  private releaseProtection: (() => void) | null = null
 
   private readonly pumpPlaybackFrame = () => {
     if (this.audio.paused || this.audio.ended) {
@@ -92,9 +100,10 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
 
   constructor(
     readonly audio: HTMLAudioElement,
-    { signal }: AudioControllerOptions = {}
+    { signal, protectPlayback }: AudioControllerOptions = {}
   ) {
     super()
+    this.protectPlayback = protectPlayback
     const listenerOptions = { signal: this.lifetimeController.signal }
     audio.addEventListener('play', () => {
       this.startPlaybackFrameLoop()
@@ -137,6 +146,9 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
       }
       this.reportPlaybackError(error, this.activationGeneration, true)
     }, listenerOptions)
+    for (const event of ['loadedmetadata', 'durationchange', 'emptied']) {
+      audio.addEventListener(event, () => this.emit('metadata-updated', undefined), listenerOptions)
+    }
 
     signal?.addEventListener('abort', () => this.destroy(), { once: true })
     if (signal?.aborted) this.destroy()
@@ -164,6 +176,11 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
   get session() {
     return this.activeSession
   }
+
+  get paused() { return this.audio.paused }
+  get ended() { return this.audio.ended }
+  get playbackRate() { return this.audio.playbackRate }
+  set playbackRate(rate: number) { this.audio.playbackRate = rate }
 
   get error() {
     return this.activationError
@@ -197,9 +214,34 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
   }
 
   async loadSession(session: ActiveAudioSession) {
+    if (this.destroyed) throw new Error('Playback controller was destroyed')
+    this.pendingProtection?.abort()
+    const pending = new AbortController()
+    this.pendingProtection = pending
+    let release: (() => void) | null = null
+    try {
+      if (this.protectPlayback) release = await this.protectPlayback(
+        session.segments.filter(({ recording }) => recording.status !== 'missing')
+          .map(({ recording }) => recording.playSrc), pending.signal)
+      pending.signal.throwIfAborted()
+    } catch (error) {
+      release?.()
+      throw error
+    } finally {
+      if (this.pendingProtection === pending) this.pendingProtection = null
+    }
+    const previous = this.releaseProtection
+    this.releaseProtection = release
     this.activeSession = session
     this.activeSegmentIndex = 0
-    this.activateSegment(0, session.segments[0]?.logicalStart ?? 0, false)
+    try {
+      this.activateSegment(0, session.segments[0]?.logicalStart ?? 0, false)
+    } catch (error) {
+      this.clearSession()
+      throw error
+    } finally {
+      previous?.()
+    }
     this.emit('session-loaded', session)
     return session
   }
@@ -250,6 +292,8 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
   }
 
   clearSession() {
+    this.pendingProtection?.abort()
+    this.pendingProtection = null
     this.audio.pause()
     this.cancelPendingActivation?.()
     this.activationGeneration += 1
@@ -264,6 +308,8 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
     this.activationNeedsReload = false
     this.audio.removeAttribute('src')
     this.audio.load()
+    this.releaseProtection?.()
+    this.releaseProtection = null
     this.emit('playback-updated', { playing: false })
   }
 

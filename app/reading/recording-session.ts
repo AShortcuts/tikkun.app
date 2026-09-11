@@ -13,7 +13,7 @@ import type { PlaybackAliyahIndex } from './aliyah-dom-target.ts'
 import {
   createActiveAudioSession,
   type ActiveAudioSession,
-  type AudioController,
+  type PlaybackController,
 } from './audio-controller.ts'
 import type { HighlightController } from './highlight-controller.ts'
 import { buildPlaybackPlan, type PlaybackPlan } from './playback-plan.ts'
@@ -55,7 +55,7 @@ export interface RecordingSessionPresentation {
 }
 
 export interface RecordingSessionOptions {
-  audioController: AudioController
+  audioController: PlaybackController
   highlightController: HighlightController
   library: RecordingSessionLibrary
   display: RecordingSessionDisplay

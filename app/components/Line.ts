@@ -194,7 +194,7 @@ type MatchShirahLayout = {
     | 'closing'
 }
 
-const getMatchShirahLayout = (
+export const getMatchShirahLayout = (
   text: string[][],
   reference: RenderedLineInfo['focalRef'],
   pageNumber: number,
@@ -219,7 +219,7 @@ const getMatchShirahLayout = (
   return null
 }
 
-const renderTextFlow = ({
+export const renderTextFlow = ({
   text,
   references,
   annotationsEnabled,

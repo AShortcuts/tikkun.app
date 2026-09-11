@@ -170,6 +170,11 @@ export class CueDataResolver {
 
 const cueDataResolver = new CueDataResolver(cuePayloadLoaders)
 
+export function publishedCueSourceForRecording(recording: AudioRecording): string | null {
+  const path = cuePayloadPathForRecording(recording)
+  return path && Object.hasOwn(cuePayloadLoaders, path) ? path.slice('../../'.length) : null
+}
+
 export function cuePayloadPathForRecording({
   narratorId,
   reading,

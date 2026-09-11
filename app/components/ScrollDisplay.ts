@@ -23,7 +23,7 @@ import {
   isReaderTextLayout,
   type ReaderPagePresentation,
 } from '../reader-presentation.ts'
-import { applyReaderPageLayout } from './reader-page-layout.ts'
+import { applyReaderPageLayout, readerPageFont } from './reader-page-layout.ts'
 
 const { htmlToElement, purgeNode } = utils
 
@@ -129,7 +129,7 @@ export class ScrollDisplay {
     this.scrolled = this.rendered.then(async (line) => {
       // Wait for parsha picker to close (from `this.rendered`)
       // so that we become measurable.
-      await waitForDocumentFonts()
+      await waitForDocumentFonts(this.root)
       await new Promise(requestAnimationFrame)
       this.refreshMountedPageLayouts()
       this.scrollTo({ element: line })
@@ -155,13 +155,7 @@ export class ScrollDisplay {
       return false
     }
 
-    const priorAnchor = this.presentationAnchor
-    const priorWord = priorAnchor && findPreservedWord(this.root, priorAnchor)
-    // Several words can share the center after reflow. Keep the same logical
-    // word on a return switch unless the reader has moved away from it.
-    const anchor = priorWord && Math.abs(
-      getViewportOffset(this.root, priorWord, priorAnchor.alignment) - priorAnchor.viewportOffset,
-    ) < 1 ? priorAnchor : getScrollPreservationAnchor(this.root)
+    const anchor = this.getPresentationAnchor()
     const rerendered: { page: RenderedPageInfo; node: HTMLElement }[] = []
     this.mutatePreservingViewport(null, () => {
       beforeLayout?.()
@@ -194,6 +188,25 @@ export class ScrollDisplay {
       this.schedulePageLayoutRefresh()
     }
     return true
+  }
+
+  updateAnnotations(mutation: () => void) {
+    const anchor = this.getPresentationAnchor()
+    this.mutatePreservingViewport(null, () => {
+      mutation()
+      this.refreshMountedPageLayouts()
+    }, anchor)
+    this.presentationAnchor = anchor
+  }
+
+  private getPresentationAnchor() {
+    const priorAnchor = this.presentationAnchor
+    const priorWord = priorAnchor && findPreservedWord(this.root, priorAnchor)
+    // Several words can share the center after reflow. Reuse the logical word
+    // across return toggles unless the reader has scrolled away from it.
+    return priorWord && Math.abs(
+      getViewportOffset(this.root, priorWord, priorAnchor.alignment) - priorAnchor.viewportOffset,
+    ) < 1 ? priorAnchor : getScrollPreservationAnchor(this.root)
   }
 
   usesPresentation(presentation: ReaderPagePresentation) {
@@ -1050,9 +1063,13 @@ function getViewportOffset(
   return elementPosition - getReaderFocalPointClientY(root)
 }
 
-async function waitForDocumentFonts() {
+async function waitForDocumentFonts(root: HTMLElement) {
   const fonts = document.fonts
-  if (!fonts || fonts.status === 'loaded') return
+  if (!fonts) return
+  // A cold document can report "loaded" before layout requests the Torah face.
+  // Request that actual face before measuring or centering the first page.
+  const page = root.querySelector<HTMLElement>('.tikkun-page')
+  if (page) await fonts.load(readerPageFont(page), 'אשר')
   await fonts.ready
 }
 

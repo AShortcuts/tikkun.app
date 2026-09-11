@@ -13,6 +13,8 @@ import {
   type OfflineTorahDownloadController,
 } from '../offline/torah-download.ts'
 import ReaderSettingsPane from './ReaderSettings.svelte'
+import type { DownloadLibrary } from '../offline/download-library.ts'
+import { createSelectedRecordingDownload } from '../offline/selected-download.ts'
 
 export interface ReaderSettingsOptions {
   document: Document
@@ -25,6 +27,8 @@ export interface ReaderSettingsOptions {
   animateThemeChanges: boolean
   serviceWorker: ServiceWorkerContainer | null
   getCurrentRecording(): OfflineDownloadRecording | null
+  downloadLibrary?: DownloadLibrary
+  openMedia?(): void
 }
 
 export interface ReaderSettings {
@@ -69,7 +73,11 @@ export function createReaderSettings(
   const offlineTorah = createOfflineTorahDownloadController({
     serviceWorker: options.serviceWorker,
   })
-  const offlineRecording = createOfflineRecordingDownloadController({
+  const offlineRecording = options.downloadLibrary ? createSelectedRecordingDownload({
+    library: options.downloadLibrary,
+    getRecording: options.getCurrentRecording,
+    baseUrl: options.document.baseURI,
+  }) : createOfflineRecordingDownloadController({
     serviceWorker: options.serviceWorker,
     getRecording: options.getCurrentRecording,
   })

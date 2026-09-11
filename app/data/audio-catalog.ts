@@ -6,4 +6,6 @@ import { resolveRecordingMediaUrls } from './deployment-media.ts'
 export const audioRecordings = [
   ...parshaAudioRecordings,
   ...rangeAudioRecordings,
-].map((recording) => resolveRecordingMediaUrls(recording, base))
+].map((recording) => resolveRecordingMediaUrls(
+  recording, base, import.meta.env.TIKKUN_NATIVE_MEDIA_ORIGIN ?? ''
+))

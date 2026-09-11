@@ -526,6 +526,35 @@ html[data-reader-side-order='torah-right']
   font-size: var(--match-text-scale, 1em);
 }
 
+@media (min-width: 551px) {
+  .tikkun-book[data-reader-layout='match']
+    tr:not([data-shirah-kind]) .reader-text-flow {
+    font-size: var(--match-text-scale, 1em);
+  }
+}
+
+.tikkun-book[data-reader-layout='match'] .mod-match-fitted
+  tr:not([data-shirah-kind]) > .line {
+  contain: inline-size;
+}
+
+.tikkun-book[data-reader-layout='match'] .mod-match-fitted
+  tr:not([data-shirah-kind]) .line-content {
+  width: var(--match-ordinary-inline-size);
+  justify-self: end;
+  transform: translateX(var(--match-ordinary-inline-offset));
+}
+
+.tikkun-book[data-reader-layout='match'] .mod-match-fitted
+  tr:not([data-shirah-kind]) .line-gutter {
+  transform: translateX(var(--match-ordinary-inline-offset));
+}
+
+.tikkun-book[data-reader-layout='match']
+  .line-gutter.mod-aliyot:has(.location-indicator.mod-aliyot:empty) {
+  display: none;
+}
+
 @media screen and (min-width: 551px) {
   .tikkun-book[data-reader-layout='match']
     tr[data-shirah-kind='sea']
@@ -597,6 +626,7 @@ html[data-reader-side-order='torah-right']
     grid-row: 1;
     width: 100%;
     min-width: 0;
+    text-align: right;
   }
 
   .tikkun-book[data-reader-layout='match']
@@ -612,6 +642,7 @@ html[data-reader-side-order='torah-right']
   .tikkun-book[data-reader-layout='match']
     tr[data-shirah-kind='sea'][data-shirah-pattern='opening'] .fragment {
     grid-column: 1 / -1;
+    text-align: justify;
   }
 
   .tikkun-book[data-reader-layout='match']
@@ -621,12 +652,14 @@ html[data-reader-side-order='torah-right']
   }
 
   .tikkun-book[data-reader-layout='match']
-    tr[data-shirah-pattern='fragments-3']
-    .fragment:last-child,
-  .tikkun-book[data-reader-layout='match']
-    tr[data-shirah-pattern='closing']
+    tr[data-shirah-kind='sea']:not([data-shirah-pattern='opening'])
     .fragment:last-child {
     text-align: left;
+  }
+
+  .tikkun-book[data-reader-layout='match']
+    tr[data-shirah-pattern='fragments-3'] .fragment:nth-child(2) {
+    text-align: center;
   }
 }
 
@@ -685,6 +718,30 @@ html[data-reader-side-order='torah-right']
   font-size: var(--match-shirah-text-scale, 1em);
 }
 
+.tikkun-book[data-reader-layout='match'] .mod-match-song-frame tr > .line {
+  contain: inline-size;
+}
+
+.tikkun-book[data-reader-layout='match'] .tikkun-page.mod-match-song-frame tr .line-content {
+  width: var(--match-page-inline-size);
+  justify-self: end;
+  transform: translateX(var(--match-page-inline-offset));
+}
+
+.tikkun-book[data-reader-layout='match'] .tikkun-page.mod-match-song-frame tr .line-gutter {
+  transform: translateX(var(--match-page-gutter-inline-offset, var(--match-page-inline-offset)));
+}
+
+.tikkun-book[data-reader-layout='match'] .mod-match-song-frame .reader-text-flow {
+  width: var(--match-page-ordinary-flow-size);
+  margin-inline: auto;
+}
+
+.tikkun-book[data-reader-layout='match'] .mod-match-song-frame
+  tr[data-shirah-kind] .reader-text-flow {
+  width: var(--match-page-shirah-flow-size);
+}
+
 .match-shirah-measure {
   position: absolute;
   visibility: hidden;
@@ -706,8 +763,7 @@ html[data-reader-side-order='torah-right']
   content: none;
 }
 
-.tikkun-book[data-reader-layout='match'][data-reader-sides='two']
-  .match-shirah-measure .reader-text-flow {
+.match-shirah-measure .reader-text-flow {
   width: max-content;
   font-size: 1em;
 }
@@ -945,9 +1001,8 @@ html[data-reader-side-order='torah-right']
 
 @media screen and (max-width: 550px) {
   .tikkun-book[data-target-id='tikkun-book'][data-reader-layout='match'][data-reader-sides='two'] {
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    touch-action: pan-x pan-y pinch-zoom;
+    overflow-x: hidden;
+    touch-action: pan-y pinch-zoom;
   }
 
   .tikkun-book[data-target-id='tikkun-book'][data-reader-layout='match'][data-reader-sides='two']
@@ -985,7 +1040,7 @@ html[data-reader-side-order='torah-right']
   user-drag: none;
 }
 
-.tikkun-book.mod-annotations-off .location-indicator {
+.tikkun-book.mod-annotations-off .location-indicator:not(.mod-verses) {
   display: none;
 }
 

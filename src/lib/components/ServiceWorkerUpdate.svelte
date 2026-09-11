@@ -1,6 +1,7 @@
 <script lang="ts">
   import { base } from '$app/paths'
   import { onMount } from 'svelte'
+  import { isNativeApp } from '../../../app/platform/native.ts'
 
   let visible = $state(false)
   let waitingWorker: ServiceWorker | null = null
@@ -37,6 +38,7 @@
   }
 
   onMount(() => {
+    if (isNativeApp()) return
     if (!('serviceWorker' in navigator)) return
 
     const listeners = new AbortController()

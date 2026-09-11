@@ -1,0 +1,39 @@
+/* Explicit tokens keep lazy-loaded panels independent of CSS color-function lowering. */
+:root {
+  --media-background: #f2f2f7;
+  --media-surface: #fff;
+  --media-label: #1c1c1e;
+  --media-secondary: #626268;
+  --media-fill: #e6e6eb;
+  --media-rule: #d8d8de;
+  --media-tint: #0066cc;
+  --media-danger: #c52b23;
+  --header-audio-ink: #006bc7;
+}
+
+html[data-reader-theme='dark'],
+html[data-reader-theme='custom'][data-reader-custom-scheme='dark'] {
+  --media-background: #000;
+  --media-surface: #1c1c1e;
+  --media-label: #f5f5f7;
+  --media-secondary: #aaaab2;
+  --media-fill: #2c2c2e;
+  --media-rule: #38383a;
+  --media-tint: #70b7ff;
+  --media-danger: #ff827b;
+  --header-audio-ink: #62b3ff;
+}
+
+@media (prefers-color-scheme: dark) {
+  html[data-reader-theme='automatic'] {
+    --media-background: #000;
+    --media-surface: #1c1c1e;
+    --media-label: #f5f5f7;
+    --media-secondary: #aaaab2;
+    --media-fill: #2c2c2e;
+    --media-rule: #38383a;
+    --media-tint: #70b7ff;
+    --media-danger: #ff827b;
+    --header-audio-ink: #62b3ff;
+  }
+}

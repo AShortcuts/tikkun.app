@@ -10,6 +10,8 @@ These routes are prerendered as static HTML during `npm run build`.
 /tidbits/
 /tidbits/{slug}/
 /about/
+/privacy/
+/support/
 /reader/
 ```
 

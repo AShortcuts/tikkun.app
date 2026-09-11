@@ -6,6 +6,7 @@ import {
   assertShellPrecacheBudget,
   cacheNamespaceForBasePath,
   classifyManifestFiles,
+  compileServiceWorkerSource,
   MAX_SHELL_PRECACHE_RAW_BYTES,
   MAX_SHELL_PRECACHE_URLS,
   normalizeBasePath,
@@ -16,6 +17,59 @@ import {
   toDeploymentUrl,
   torahPageFilesFromManifest,
 } from './generate-service-worker.mjs'
+
+// These VM fixtures exercise one worker's protocol/cache behavior. Cross-owner
+// contention is covered with actual browser locks in recording-mutation-locks.vitest.ts.
+const uncontendedWorkerLocks = {
+  async request<T>(_name: string, options: { signal?: AbortSignal }, task: (lock: object) => T) {
+    options.signal?.throwIfAborted()
+    return task({})
+  },
+}
+
+test('compiled worker preserves installation and versioned download messages', async () => {
+  type WorkerEvent = {
+    waitUntil: (work: Promise<unknown>) => void
+    data?: { type: string; version: string }
+    ports?: { postMessage: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> }[]
+  }
+  const handlers = new Map<string, (event: WorkerEvent) => void>()
+  const addAll = vi.fn(async () => undefined)
+  const postMessage = vi.fn()
+  const close = vi.fn()
+  const options = {
+    basePath: '/preview', buildHash: 'compiled-test',
+    shellUrls: ['/preview/', '/preview/reader/'], torahPageUrls: [],
+    dependencyManifest: {
+      version: 'current', asset: { url: '', byteLength: 0, digest: '' },
+    },
+  }
+  const source = await compileServiceWorkerSource(options)
+  expect(source.length).toBeLessThan(renderServiceWorkerSource(options).length)
+  vm.runInNewContext(source, {
+    URL, AbortController,
+    caches: { open: vi.fn(async () => ({ addAll })) },
+    self: {
+      location: { origin: 'https://tikkun.test' },
+      addEventListener: (type: string, handler: (event: WorkerEvent) => void) => handlers.set(type, handler),
+    },
+  })
+  expect([...handlers.keys()]).toEqual(['install', 'activate', 'message', 'fetch'])
+  const pending: Promise<unknown>[] = []
+  const waitUntil = (work: Promise<unknown>) => { pending.push(work) }
+  handlers.get('install')!({ waitUntil })
+  handlers.get('message')!({
+    waitUntil, data: { type: 'PREFLIGHT_RECORDING_DOWNLOADS', version: 'stale' },
+    ports: [{ postMessage, close }],
+  })
+  await Promise.all(pending)
+  expect(addAll).toHaveBeenCalledWith(options.shellUrls)
+  expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+    type: 'RECORDING_PREFLIGHT', version: 'current', state: 'error',
+    errorMessage: expect.stringContaining('another app build'),
+  }))
+  expect(close).toHaveBeenCalledOnce()
+})
 
 type FakeResponse = {
   ok: boolean
@@ -43,7 +97,7 @@ function loadNetworkFirst({
   })
   const cache = { match: cacheMatch, put: vi.fn() }
   const context = {
-    URL,
+    URL, AbortController,
     fetch: vi.fn(async () => {
       if (fetchError) throw fetchError
       return fetchResponse
@@ -54,6 +108,8 @@ function loadNetworkFirst({
       delete: vi.fn(),
     },
     self: {
+      navigator: { locks: uncontendedWorkerLocks },
+      registration: { scope: 'https://tikkun.test/' },
       addEventListener: vi.fn(),
       location: { origin: 'https://tikkun.test' },
       clients: { claim: vi.fn() },
@@ -239,14 +295,22 @@ test('finds prototype and backup nodes while keeping the homepage in the shell',
     [...deferredRouteNodeSources(`
       "/": [5],
       "/(site)/old-v2.html": [7,[3]],
+      "/(site)/about": [8,[3]],
+      "/(site)/settings": [9,[3]],
+      "/(site)/tidbits": [11,[3]],
+      "/(site)/tidbits/[slug]": [12,[3]],
       "/prototypes": [10],
       "/prototypes/scroll-story": [16,[4]],
     `)].sort()
   ).toEqual([
     '.svelte-kit/generated/client-optimized/nodes/10.js',
+    '.svelte-kit/generated/client-optimized/nodes/11.js',
+    '.svelte-kit/generated/client-optimized/nodes/12.js',
     '.svelte-kit/generated/client-optimized/nodes/16.js',
     '.svelte-kit/generated/client-optimized/nodes/4.js',
     '.svelte-kit/generated/client-optimized/nodes/7.js',
+    '.svelte-kit/generated/client-optimized/nodes/8.js',
+    '.svelte-kit/generated/client-optimized/nodes/9.js',
   ])
 })
 
@@ -290,6 +354,16 @@ test('precache keeps the app shell small and excludes deferred content', () => {
   expect(shouldPrecache('_redirects', excludedFiles)).toBe(false)
   expect(shouldPrecache('prototypes/index.html', excludedFiles)).toBe(false)
   expect(shouldPrecache('old-v2.html', excludedFiles)).toBe(false)
+  expect(shouldPrecache('about/index.html', excludedFiles)).toBe(false)
+  expect(shouldPrecache('settings/index.html', excludedFiles)).toBe(false)
+  expect(shouldPrecache('tidbits/index.html', excludedFiles)).toBe(false)
+  expect(shouldPrecache('tidbits/example/index.html', excludedFiles)).toBe(false)
+  expect(shouldPrecache('assets/images/home-ambient.jpg', excludedFiles)).toBe(false)
+  expect(shouldPrecache('assets/images/github.svg', excludedFiles)).toBe(false)
+  expect(shouldPrecache('assets/images/disc-filled-rounded-square.svg', excludedFiles)).toBe(false)
+  expect(shouldPrecache('assets/images/disc-filled-inner-circle.svg', excludedFiles)).toBe(false)
+  expect(shouldPrecache('readings/index.html', excludedFiles)).toBe(true)
+  expect(shouldPrecache('reader/index.html', excludedFiles)).toBe(true)
   expect(shouldPrecache('assets/images/home-reader-demo.jpg', excludedFiles)).toBe(false)
   expect(
     shouldPrecache('assets/images/prototypes/reader.png', excludedFiles)
@@ -449,7 +523,7 @@ test('streams explicit recording downloads and serves exact cached byte ranges',
     })
   )
   const context = {
-    URL,
+    URL, AbortController,
     Headers,
     Request,
     Response,
@@ -461,6 +535,8 @@ test('streams explicit recording downloads and serves exact cached byte ranges',
       delete: vi.fn(),
     },
     self: {
+      navigator: { locks: uncontendedWorkerLocks },
+      registration: { scope: 'https://tikkun.test/' },
       addEventListener: vi.fn(),
       location: { origin: 'https://tikkun.test' },
       clients: { claim: vi.fn() },
@@ -681,7 +757,7 @@ test('settles every destructive recording-cache task before releasing a failed r
     },
   }
   const context = {
-    URL,
+    URL, AbortController,
     Headers,
     Request,
     Response,
@@ -693,6 +769,8 @@ test('settles every destructive recording-cache task before releasing a failed r
       delete: vi.fn(),
     },
     self: {
+      navigator: { locks: uncontendedWorkerLocks },
+      registration: { scope: 'https://tikkun.test/' },
       addEventListener: vi.fn(),
       location: { origin: 'https://tikkun.test' },
       clients: { claim: vi.fn() },
@@ -816,7 +894,7 @@ test('rejects truncated or same-size wrong recording content without caching it'
     keys: vi.fn(async () => [...stored.keys()].map((url) => new Request(url))),
   }
   const context = {
-    URL,
+    URL, AbortController,
     Headers,
     Request,
     Response,
@@ -835,6 +913,8 @@ test('rejects truncated or same-size wrong recording content without caching it'
       delete: vi.fn(),
     },
     self: {
+      navigator: { locks: uncontendedWorkerLocks },
+      registration: { scope: 'https://tikkun.test/' },
       addEventListener: vi.fn(),
       location: { origin: 'https://tikkun.test' },
       clients: { claim: vi.fn() },
@@ -941,7 +1021,7 @@ test('rejects and removes corrupt completed recording cache entries before statu
     })
   )
   const context = {
-    URL,
+    URL, AbortController,
     Headers,
     Request,
     Response,
@@ -953,6 +1033,8 @@ test('rejects and removes corrupt completed recording cache entries before statu
       delete: vi.fn(),
     },
     self: {
+      navigator: { locks: uncontendedWorkerLocks },
+      registration: { scope: 'https://tikkun.test/' },
       addEventListener: vi.fn(),
       location: { origin: 'https://tikkun.test' },
       clients: { claim: vi.fn() },
@@ -1019,7 +1101,7 @@ test('rejects and removes corrupt completed recording cache entries before statu
   expect(fetch).toHaveBeenCalledTimes(1)
 })
 
-test('serializes recording operations by audio identity and gives every client a terminal status', async () => {
+test.each(['none', 'first', 'both'] as const)('serializes recording operations and settles every client when cancellation is %s', async (cancel) => {
   const bytes = Uint8Array.from([4, 8, 15, 16])
   const digest = createHash('sha256').update(bytes).digest('hex')
   const recording = {
@@ -1060,7 +1142,10 @@ test('serializes recording operations by audio identity and gives every client a
   const bodyGate = new Promise<void>((resolve) => {
     releaseBody = resolve
   })
-  const fetch = vi.fn(async () =>
+  let transferSignal: AbortSignal | undefined
+  const fetch = vi.fn(async (_url: string, options: RequestInit) => {
+    transferSignal = options.signal ?? undefined
+    return (
     new Response(
       new ReadableStream({
         async pull(controller) {
@@ -1071,9 +1156,10 @@ test('serializes recording operations by audio identity and gives every client a
       }),
       { headers: { 'Content-Length': String(bytes.byteLength) } }
     )
-  )
+    )
+  })
   const context = {
-    URL,
+    URL, AbortController,
     Headers,
     Request,
     Response,
@@ -1085,6 +1171,8 @@ test('serializes recording operations by audio identity and gives every client a
       delete: vi.fn(),
     },
     self: {
+      navigator: { locks: uncontendedWorkerLocks },
+      registration: { scope: 'https://tikkun.test/' },
       addEventListener: vi.fn(),
       location: { origin: 'https://tikkun.test' },
       clients: { claim: vi.fn() },
@@ -1100,9 +1188,15 @@ test('serializes recording operations by audio identity and gives every client a
     context
   )
   type Status = { state: string; errorMessage?: string }
+  type Port = {
+    onmessage: ((message: { data: { type: string } }) => void) | null
+    postMessage(message: Status): void
+    start(): void
+    close(): void
+  }
   type WorkerEvent = {
     data: { type: string; recording: typeof recording }
-    ports: never[]
+    ports: Port[]
     source: { postMessage(message: Status): void }
   }
   const worker = (
@@ -1116,13 +1210,19 @@ test('serializes recording operations by audio identity and gives every client a
   ).recordingWorkerForTest
   const eventFor = (type: string, descriptor = recording) => {
     const messages: Status[] = []
+    const port: Port = {
+      onmessage: null,
+      postMessage: (message) => { messages.push(message) },
+      start: vi.fn(), close: vi.fn(),
+    }
     return {
       event: {
         data: { type, recording: descriptor },
-        ports: [],
+        ports: [port],
         source: { postMessage: (message: Status) => messages.push(message) },
       },
       messages,
+      cancel: () => port.onmessage?.({ data: { type: 'CANCEL_RECORDING_DOWNLOAD' } }),
     }
   }
 
@@ -1155,11 +1255,27 @@ test('serializes recording operations by audio identity and gives every client a
   expect(differentVersion.messages.at(-1)).toMatchObject({ state: 'error' })
   expect(conflictingRemoval.messages.at(-1)).toMatchObject({ state: 'error' })
 
+  if (cancel !== 'none') {
+    first.cancel()
+    await firstDownload
+    expect(first.messages.at(-1)).toMatchObject({ state: 'error' })
+    expect(transferSignal?.aborted).toBe(false)
+  }
+  if (cancel === 'both') {
+    second.cancel()
+    await secondDownload
+    expect(transferSignal?.aborted).toBe(true)
+  }
   releaseBody()
   await Promise.all([firstDownload, secondDownload])
   expect(fetch).toHaveBeenCalledTimes(1)
-  expect(first.messages.at(-1)).toMatchObject({ state: 'complete' })
-  expect(second.messages.at(-1)).toMatchObject({ state: 'complete' })
+  expect(first.messages.at(-1)).toMatchObject({ state: cancel === 'none' ? 'complete' : 'error' })
+  expect(second.messages.at(-1)).toMatchObject({ state: cancel === 'both' ? 'error' : 'complete' })
+
+  if (cancel === 'both') {
+    await vi.waitFor(() => expect(stored.size).toBe(0))
+    return
+  }
 
   const removal = eventFor('REMOVE_RECORDING_DOWNLOAD')
   await worker.handleRecordingRemoval(removal.event)
@@ -1215,7 +1331,7 @@ test('reports descriptor-free recording inventory and shares one live clear-all 
     },
   }
   const context = {
-    URL,
+    URL, AbortController,
     Headers,
     Request,
     Response,
@@ -1227,6 +1343,8 @@ test('reports descriptor-free recording inventory and shares one live clear-all 
       delete: vi.fn(),
     },
     self: {
+      navigator: { locks: uncontendedWorkerLocks },
+      registration: { scope: 'https://tikkun.test/' },
       addEventListener: vi.fn(),
       location: { origin: 'https://tikkun.test' },
       clients: { claim: vi.fn() },
@@ -1348,7 +1466,7 @@ test('namespaces cache cleanup to one deployment base path', async () => {
   const otherCache = `tikkun-shell-${otherNamespace}-current`
   const deleted: string[] = []
   const context = {
-    URL,
+    URL, AbortController,
     fetch: vi.fn(),
     caches: {
       keys: vi.fn(async () => [currentCache, obsoleteCache, otherCache]),
@@ -1358,6 +1476,8 @@ test('namespaces cache cleanup to one deployment base path', async () => {
       }),
     },
     self: {
+      navigator: { locks: uncontendedWorkerLocks },
+      registration: { scope: 'https://tikkun.test/' },
       addEventListener: vi.fn(),
       location: { origin: 'https://tikkun.test' },
       clients: { claim: vi.fn() },

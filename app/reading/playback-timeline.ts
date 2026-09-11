@@ -8,7 +8,7 @@ import type { ReaderViewport } from '../adaptive/reader-viewport.ts'
 import { formatAliyahLabel } from './aliyah-navigation/model.ts'
 import {
   type ActiveAudioSession,
-  AudioController,
+  type PlaybackController,
 } from './audio-controller.ts'
 import {
   createFloatingPlayer,
@@ -41,7 +41,7 @@ export type PlaybackCommand =
 export interface PlaybackTimelineOptions {
   document: Document
   view: Window
-  audioController: AudioController
+  audioController: PlaybackController
   highlightController: HighlightController
   viewport: ReaderViewport
   getAutoScroll(): boolean
@@ -272,7 +272,7 @@ export function createPlaybackTimeline(
   const syncPlaybackRateControl = () => {
     const rate = clampPlaybackRate(options.getPlaybackRate())
     player.sync({ playbackRate: rate })
-    audioController.audio.playbackRate = rate
+    audioController.playbackRate = rate
   }
 
   const setPlaybackRate = (requestedRate: number, snap = false) => {
@@ -280,7 +280,7 @@ export function createPlaybackTimeline(
       ? snapPlaybackRate(requestedRate)
       : clampPlaybackRate(requestedRate)
     options.onPlaybackRateChange(rate)
-    audioController.audio.playbackRate = rate
+    audioController.playbackRate = rate
     syncPlaybackRateControl()
   }
 
@@ -339,7 +339,7 @@ export function createPlaybackTimeline(
       : null
     const hasDownload = Boolean(session && session.status !== 'overlap-only' && (!session.passage || (session.segments.length === 1 && session.segments[0].startTime === 0 && session.segments[0].endTime === null)))
     const hasTimedCues = Boolean(session?.cues.length)
-    const paused = audioController.audio.paused
+    const paused = audioController.paused
 
     if (!session) setExpanded(false, { restoreFocus: false })
     cornerControls?.classList.toggle('mod-raised', Boolean(session))
@@ -439,7 +439,7 @@ export function createPlaybackTimeline(
   }
 
   const toggle = async (retry?: () => Promise<void>) => {
-    if (!audioController.audio.paused) {
+    if (!audioController.paused) {
       audioController.pause()
       refresh()
       return
@@ -797,17 +797,7 @@ export function createPlaybackTimeline(
     })
   )
 
-  for (const eventName of [
-    'loadedmetadata',
-    'durationchange',
-    'emptied',
-  ] as const) {
-    audioController.audio.addEventListener(
-      eventName,
-      () => refresh('progress'),
-      { signal: scope.signal }
-    )
-  }
+  scope.own(audioController.on('metadata-updated', () => refresh('progress')))
   scope.own(() => {
     if (focusFrame) view.cancelAnimationFrame(focusFrame)
     focusFrame = 0

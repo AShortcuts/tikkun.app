@@ -2,7 +2,8 @@ export interface OfflineWorkerRequestClient {
   readonly supported: boolean
   request(
     message: Readonly<Record<string, unknown>>,
-    onMessage: (value: unknown) => boolean
+    onMessage: (value: unknown) => boolean,
+    options?: { signal?: AbortSignal; cancelMessage?: Readonly<Record<string, unknown>> }
   ): Promise<'complete' | 'unavailable'>
   destroy(): void
 }
@@ -46,11 +47,12 @@ export function createOfflineWorkerRequestClient({
 
   return {
     supported: Boolean(serviceWorker),
-    async request(message, onMessage) {
+    async request(message, onMessage, { signal, cancelMessage } = {}) {
       if (!serviceWorker || destroyed) return 'unavailable'
 
       return new Promise<'complete' | 'unavailable'>((resolve, reject) => {
         let settled = false
+        let sent = false
         let responseTimer = 0
         const request: ActiveRequest = {
           port: null,
@@ -59,6 +61,7 @@ export function createOfflineWorkerRequestClient({
             if (settled) return
             settled = true
             clearTimeout(responseTimer)
+            signal?.removeEventListener('abort', abort)
             activeRequests.delete(request)
             request.port?.close()
             request.port = null
@@ -76,8 +79,17 @@ export function createOfflineWorkerRequestClient({
         }
         const armResponseTimer = () =>
           armTimer(responseTimeoutMs, WORKER_NOT_READY_MESSAGE)
+        const abort = () => {
+          if (settled) return
+          if (sent && cancelMessage && request.port) {
+            request.port.postMessage(cancelMessage)
+            armResponseTimer()
+          } else fail(new DOMException('The offline request was cancelled.', 'AbortError'))
+        }
         armTimer(acquisitionTimeoutMs, WORKER_NOT_READY_MESSAGE)
         activeRequests.add(request)
+        signal?.addEventListener('abort', abort, { once: true })
+        if (signal?.aborted) { abort(); return }
 
         void getActiveWorker()
           .then((worker) => {
@@ -114,6 +126,7 @@ export function createOfflineWorkerRequestClient({
             }
             port.start()
             try {
+              sent = true
               worker.postMessage(message, [channel.port2])
             } catch (error) {
               fail(

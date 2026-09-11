@@ -1,4 +1,8 @@
 import type { AudioRecording, WordCue } from '../audio/types.ts'
+import { isNativeApp } from '../platform/native.ts'
+import { NativeAudioController } from './native-audio-controller.ts'
+import { resolveNativeRecording } from '../offline/native-recording-storage.ts'
+import { createPlaybackProtection } from '../offline/playback-protection.ts'
 import type { LeiningRun } from '../calendar-model/model-types.ts'
 import type { ScrollDisplay } from '../components/ScrollDisplay.ts'
 import type { MountScope } from '../lifecycle/mount.ts'
@@ -67,6 +71,7 @@ export interface ReaderPlaybackOptions {
 export interface ReaderPlaybackSessionSnapshot {
   readonly recording: ReaderPlaybackRecordingSnapshot
   readonly activeRecording: ReaderPlaybackRecordingSnapshot
+  readonly mediaSources: readonly string[]
   readonly runId: string
   readonly aliyahIndex: ActiveAudioSession['aliyahIndex']
   readonly status: ActiveAudioSession['status']
@@ -184,6 +189,7 @@ export interface ReaderPlaybackRecordingHarnessAdapter {
 
 export interface ReaderPlayback {
   snapshot(): ReaderPlaybackSnapshot
+  whenAudioReleased(): Promise<void>
   subscribe(
     listener: (
       change: ReaderPlaybackChange,
@@ -248,11 +254,14 @@ export function createReaderPlayback(
   scope: MountScope,
   options: ReaderPlaybackOptions
 ): ReaderPlayback {
-  const audioController = new AudioController(options.audioElement, {
-    signal: scope.signal,
-  })
+  const audioController = import.meta.env.TIKKUN_NATIVE_MEDIA_ORIGIN && isNativeApp()
+    ? new NativeAudioController(options.audioElement, undefined, resolveNativeRecording)
+    : new AudioController(options.audioElement, {
+      signal: scope.signal,
+      protectPlayback: createPlaybackProtection(options.view.navigator.locks ?? null, options.document.baseURI),
+    })
   scope.own(() => audioController.destroy())
-  audioController.audio.playbackRate = options.initialPlaybackRate
+  audioController.playbackRate = options.initialPlaybackRate
 
   const highlightController = new HighlightController(options.book)
   scope.own(() => highlightController.clear())
@@ -351,6 +360,7 @@ export function createReaderPlayback(
     cachedSessionSnapshot = Object.freeze({
       recording: recordingSnapshot(session.recording),
       activeRecording: recordingSnapshot(activeRecording),
+      mediaSources: Object.freeze([...new Set(session.segments.map((segment) => segment.recording.playSrc))]),
       runId: session.runId,
       aliyahIndex: session.aliyahIndex,
       status: session.status,
@@ -412,8 +422,8 @@ export function createReaderPlayback(
       currentTime,
       displayTime: timeline?.displayTime ?? currentTime,
       duration: audioController.duration,
-      paused: audioController.audio.paused,
-      ended: audioController.audio.ended,
+      paused: audioController.paused,
+      ended: audioController.ended,
       error: audioController.error,
     })
   }
@@ -472,12 +482,12 @@ export function createReaderPlayback(
       currentTime: audioController.currentTime,
       displayTime: timeline?.displayTime ?? audioController.currentTime,
       duration: audioController.duration,
-      paused: audioController.audio.paused,
-      ended: audioController.audio.ended,
+      paused: audioController.paused,
+      ended: audioController.ended,
       playing: Boolean(
         session &&
-          !audioController.audio.paused &&
-          !audioController.audio.ended
+          !audioController.paused &&
+          !audioController.ended
       ),
       error: audioController.error,
       tokenCacheSize: recordingSession?.tokenCacheSize() ?? 0,
@@ -733,6 +743,8 @@ export function createReaderPlayback(
 
   return {
     snapshot,
+    whenAudioReleased: () => audioController instanceof NativeAudioController
+      ? audioController.whenCleared() : Promise.resolve(),
     subscribe(listener) {
       listeners.add(listener)
       return () => listeners.delete(listener)

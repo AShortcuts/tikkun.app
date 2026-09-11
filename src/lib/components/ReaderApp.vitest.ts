@@ -1,6 +1,7 @@
 import { mount, unmount } from 'svelte'
 import { afterEach, expect, test, vi } from 'vitest'
 import ReaderApp from './ReaderApp.svelte'
+import { NATIVE_READING_LINKS_CONTEXT } from '../../../app/platform/native-reading-links.ts'
 
 let component: ReturnType<typeof mount> | null = null
 let target: HTMLElement | null = null
@@ -11,6 +12,30 @@ afterEach(async () => {
   target?.remove()
   target = null
   vi.restoreAllMocks()
+})
+
+test('waits for native launch resolution before importing or starting Reader', async () => {
+  const linksReady = deferred()
+  const startApp = vi.fn(() => ({ ready: Promise.resolve() }))
+  const loadApp = vi.fn(async () => ({ startApp, stopApp: vi.fn() }))
+  mountReader(loadApp, undefined, linksReady.promise)
+  await eventually(() => required('[data-target-id="reader-boot-state"]'))
+  expect(loadApp).not.toHaveBeenCalled()
+  linksReady.resolve()
+  await eventually(() => startApp.mock.calls.length ? target : null)
+  expect(loadApp).toHaveBeenCalledOnce()
+})
+
+test('unmounting during native launch resolution does not start a stale Reader', async () => {
+  const linksReady = deferred()
+  const loadApp = vi.fn(async () => ({ startApp: () => ({ ready: Promise.resolve() }), stopApp: vi.fn() }))
+  mountReader(loadApp, undefined, linksReady.promise)
+  await eventually(() => required('[data-target-id="reader-boot-state"]'))
+  await unmount(component!)
+  component = null
+  linksReady.resolve()
+  await Promise.resolve()
+  expect(loadApp).not.toHaveBeenCalled()
 })
 
 test('shows recovery links and retries a rejected Reader import', async () => {
@@ -164,11 +189,12 @@ function deferred() {
 function mountReader(loadApp: () => Promise<{
   startApp(): { readonly ready: Promise<void> }
   stopApp(): void
-}>, reloadPage?: () => void) {
+}>, reloadPage?: () => void, linksReady?: Promise<void>) {
   target = document.createElement('div')
   document.body.appendChild(target)
   component = mount(ReaderApp, {
     target,
+    context: linksReady ? new Map([[NATIVE_READING_LINKS_CONTEXT, { ready: linksReady }]]) : undefined,
     props: {
       aboutHref: '/about/',
       loadApp,

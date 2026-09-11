@@ -47,7 +47,6 @@
       <a
         class="scroll-open-reader"
         href={resolve('/reader/#/next')}
-        data-sveltekit-reload
       >Open reader</a>
     </nav>
   </header>
@@ -62,6 +61,8 @@
       <p>A Torah-reading companion by Ocean of Torah</p>
     </div>
     <nav aria-label="Footer navigation">
+      <a href={resolve('/support/')}>Support</a>
+      <a href={resolve('/privacy/')}>Privacy policy</a>
       <a href={resolve('/readings/')}>Readings & coverage</a>
       <a href={resolve('/tidbits/')}>Tidbits</a>
       <a href={resolve('/about/')}>About</a>

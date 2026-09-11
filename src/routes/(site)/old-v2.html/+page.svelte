@@ -35,7 +35,6 @@
         <a
           class="home-primary-action"
           href={resolve(`/reader/#/torah/parsha/${featuredReading.parshaSlug}`)}
-          data-sveltekit-reload
         >
           Start practicing
         </a>
@@ -45,7 +44,6 @@
     <a
       class="home-reader-demo"
       href={resolve(`/reader/#/torah/parsha/${featuredReading.parshaSlug}`)}
-      data-sveltekit-reload
       aria-label={`Open ${featuredReading.parshaName} in the reader`}
     >
       <span class="home-reader-window">

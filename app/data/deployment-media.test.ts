@@ -80,3 +80,15 @@ test('rejects an invalid deployment base path', () => {
     'must be empty or start with "/"'
   )
 })
+
+test('native catalog uses the remote origin while preserving media identity and local cue paths', () => {
+  const mediaIdentity = { algorithm: 'sha256' as const, digest: 'a'.repeat(64), byteLength: 123 }
+  const resolved = resolveRecordingMediaUrls(
+    { ...recording, mediaIdentity, cueSrc: '/cues/beresheet.json' }, '', 'https://audio.example.org'
+  )
+  expect(resolved.playSrc).toBe(`https://audio.example.org${recording.playSrc}?tikkun-media=${mediaIdentity.digest}`)
+  expect(resolved.downloadSrc).toBe(`https://audio.example.org${recording.downloadSrc}`)
+  expect(resolved.cueSrc).toBe('/cues/beresheet.json')
+  expect(resolveRecordingMediaUrls({ ...recording, playSrc: 'https://other.example.org/audio.m4a' }, '', 'https://audio.example.org').playSrc)
+    .toBe('https://other.example.org/audio.m4a')
+})

@@ -76,7 +76,10 @@
       Number.parseFloat(style.paddingInlineStart) +
       Number.parseFloat(style.paddingInlineEnd)
     const availableWidth = titleButton.clientWidth - inlinePadding
-    const contentWidth = titleButton.scrollWidth - inlinePadding
+    // scrollWidth can undercount centered RTL text overflowing both edges.
+    const titleRange = titleButton.ownerDocument.createRange()
+    titleRange.selectNodeContents(titleButton)
+    const contentWidth = titleRange.getBoundingClientRect().width
     if (availableWidth <= 0 || contentWidth <= availableWidth + 0.5) return
 
     const baseFontSize = Number.parseFloat(style.fontSize)
@@ -178,8 +181,8 @@
           class="mobile-library-button"
           data-target-id="mobile-library"
           type="button"
-          title="About"
-          aria-label="Open About page"
+          title="Home"
+          aria-label="Open main page"
           onclick={onAboutClick}
         >
           <span class="mobile-library-icon" data-target-id="mobile-library-icon">
@@ -381,15 +384,15 @@
     data-tooltip='Tip: Hold "Shift" to toggle quickly'
     data-tooltip-position="top-left"
     type="button"
-    title={annotationsEnabled ? 'Hide vowels' : 'Show vowels'}
+    title={annotationsEnabled ? 'Hide nekudot' : 'Show nekudot'}
     aria-label={annotationsEnabled
-      ? 'Hide vowels and cantillation marks'
-      : 'Show vowels and cantillation marks'}
+      ? 'Hide nekudot and cantillation marks'
+      : 'Show nekudot and cantillation marks'}
     aria-pressed={annotationsEnabled}
     onclick={() => onAnnotationsChange(!annotationsEnabled)}
   >
     <span class="toggle" aria-hidden="true">
-      <span class="shadowed-circle">
+      <span class="annotations-toggle-icon">
         <span class="toggle-state mod-off">א</span>
         <span class="toggle-state mod-on">אֶ֨</span>
       </span>

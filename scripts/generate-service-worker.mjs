@@ -1,8 +1,14 @@
 import { createHash } from 'node:crypto'
+import { Buffer } from 'node:buffer'
 import { readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { transform } from 'esbuild'
+import { recordingDependencyManifest } from './recording-dependency-manifest.mjs'
+import { renderRecordingDependenciesWorker } from './recording-dependencies-worker.mjs'
+import { renderOfflineTransferQueue } from './offline-transfer-queue.mjs'
+import { renderRecordingMutationLocks } from './recording-mutation-locks.mjs'
 
 const repoRoot = path.resolve(fileURLToPath(new URL('..', import.meta.url)))
 const distRoot = path.join(repoRoot, 'dist')
@@ -28,7 +34,15 @@ const excludedPathPrefixes = [
   'prototypes/',
   'assets/images/prototypes/',
   'old-v2.html',
+  'about/',
+  'settings/',
+  'tidbits/',
+  'assets/images/home-ambient.jpg',
   'assets/images/home-reader-demo.jpg',
+  // Legacy standalone artwork has no references in the current app or manifest.
+  'assets/images/github.svg',
+  'assets/images/disc-filled-rounded-square.svg',
+  'assets/images/disc-filled-inner-circle.svg',
 ]
 const excludedExtensions = new Set([
   '.aac',
@@ -145,11 +159,11 @@ function filesForManifestEntries(manifest, sourcePaths) {
 
 export function deferredRouteNodeSources(clientAppSource) {
   const nodeIds = new Set()
-  const routePattern = /^\s*"(?:\/prototypes[^"]*|\/(?:\(site\)\/)?old-v2\.html)":\s*\[(\d+)(?:,\[([^\]]*)\])?\],?$/gm
+  const routePattern = /^\s*"(?:\/prototypes[^"]*|\/(?:\(site\)\/)?(?:old-v2\.html|about|settings|tidbits(?:\/[^"]*)?))":\s*\[(\d+)(?:,\[([^\]]*)\])?\],?$/gm
   for (const match of clientAppSource.matchAll(routePattern)) {
     nodeIds.add(Number(match[1]))
-    // The backup shares its layout with active public pages.
-    if (match[0].includes('old-v2.html')) continue
+    // Informational pages share the public layout with the offline Reading Index.
+    if (!match[0].includes('/prototypes')) continue
     for (const layoutId of match[2]?.split(',') ?? []) {
       if (/^\d+$/.test(layoutId.trim())) nodeIds.add(Number(layoutId))
     }
@@ -214,6 +228,7 @@ export function isPageChunk(relativePath, manifest = null) {
 
 export function shouldPrecache(relativePath, excludedFiles = new Set()) {
   const normalized = normalizePath(relativePath)
+  if (/^_app\/immutable\/assets\/recording-dependencies\.[a-f0-9]+\.json$/.test(normalized)) return false
   if (normalized === 'service-worker.js') return false
   if (hostControlFiles.has(normalized)) return false
   if (excludedFiles.has(normalized)) return false
@@ -324,6 +339,14 @@ export function assertShellPrecacheBudget({ urlCount, rawBytes }) {
   }
 }
 
+export async function compileServiceWorkerSource(options) {
+  const { code } = await transform(renderServiceWorkerSource(options), {
+    loader: 'js', target: 'es2022', format: 'iife', minify: true,
+    legalComments: 'eof', sourcefile: 'service-worker.js',
+  })
+  return code
+}
+
 export function torahPageFilesFromManifest(manifest) {
   return classifyManifestFiles(manifest).torahPageFiles
 }
@@ -345,6 +368,7 @@ export function renderServiceWorkerSource({
   buildHash,
   shellUrls,
   torahPageUrls,
+  dependencyManifest = { version: '', asset: { url: '', byteLength: 0, digest: '' } },
 }) {
   const cacheNamespace = cacheNamespaceForBasePath(basePath)
   return `const BASE_PATH = '${normalizeBasePath(basePath)}'
@@ -388,6 +412,7 @@ const SHA256_ROUND_CONSTANTS = new Uint32Array([
 let activeTorahDownload = null
 const activeRecordingOperations = new Map()
 const verifiedRecordingCacheEntries = new Map()
+${renderRecordingMutationLocks(cacheNamespace)}
 let recordingOperationGeneration = 0
 let activeOtherRecordingRemoval = null
 let activeAllRecordingRemoval = null
@@ -410,6 +435,10 @@ self.addEventListener('activate', (event) => {
 })
 
 self.addEventListener('message', (event) => {
+  if (['GET_RECORDING_DEPENDENCIES', 'PREPARE_RECORDING_DEPENDENCIES', 'PREFLIGHT_RECORDING_DOWNLOADS'].includes(event.data?.type)) {
+    event.waitUntil(handleRecordingDependencies(event))
+    return
+  }
   if (event.data?.type === 'SKIP_WAITING') {
     event.waitUntil(self.skipWaiting())
     return
@@ -432,6 +461,11 @@ self.addEventListener('message', (event) => {
 
   if (event.data?.type === 'GET_RECORDING_DOWNLOAD_INVENTORY') {
     event.waitUntil(reportRecordingDownloadInventory(event))
+    return
+  }
+
+  if (event.data?.type === 'GET_RECORDING_LIBRARY') {
+    event.waitUntil(reportRecordingLibrary(event))
     return
   }
 
@@ -798,6 +832,43 @@ async function readRecordingInventoryCacheStatus() {
   return recordingInventoryStatus('idle', await inspectRecordingInventory())
 }
 
+async function readVerifiedRecordingLibrary() {
+  const cache = await caches.open(RECORDING_CACHE_NAME)
+  const recordings = []
+  // Stream one file at a time so opening Media cannot hash the whole library concurrently.
+  for (const request of await cache.keys()) {
+    const cached = await cache.match(request)
+    const metadata = cached ? recordingCacheMetadata(cached) : null
+    if (!metadata || !recordingCacheUrlMatchesMetadata(request.url, metadata)) {
+      await deleteRecordingCacheEntry(cache, request)
+      continue
+    }
+    if (await ensureRecordingCacheEntryValid(cache, request, cached, metadata)) {
+      recordings.push({ ...metadata, url: request.url })
+    }
+  }
+  return recordings.sort((left, right) => left.url.localeCompare(right.url))
+}
+
+async function reportRecordingLibrary(event) {
+  const reporter = createMessageReporter(event)
+  try {
+    reporter.post({
+      type: 'RECORDING_LIBRARY',
+      state: 'ready',
+      recordings: await readVerifiedRecordingLibrary(),
+    })
+  } catch (error) {
+    reporter.post({
+      type: 'RECORDING_LIBRARY',
+      state: 'error',
+      errorMessage: error instanceof Error ? error.message : 'Could not inspect saved recordings.',
+    })
+  } finally {
+    reporter.close()
+  }
+}
+
 async function readLiveRecordingInventoryStatus() {
   const operation = activeAllRecordingRemoval
   if (operation?.settled) return operation.terminalStatus
@@ -881,6 +952,22 @@ async function handleRecordingDownload(event) {
   const reporter = createMessageReporter(event)
   let descriptor = null
   let operation = null
+  let cancelled = false
+  let resolveCancellation
+  const cancellation = new Promise((resolve) => { resolveCancellation = resolve })
+  const port = event.ports?.[0]
+  if (port) {
+    port.onmessage = (message) => {
+      if (message.data?.type !== 'CANCEL_RECORDING_DOWNLOAD') return
+      cancelled = true
+      if (operation) {
+        operation.reporters.delete(reporter)
+        if (!operation.settled && operation.reporters.size === 0) operation.abortController.abort()
+      }
+      resolveCancellation(null)
+    }
+    port.start?.()
+  }
   try {
     descriptor = parseRecordingDescriptor(event.data?.recording)
     if (activeOtherRecordingRemoval || activeAllRecordingRemoval) {
@@ -895,6 +982,7 @@ async function handleRecordingDownload(event) {
       return
     }
     const currentStatus = await readRecordingDownloadStatus(descriptor)
+    if (cancelled) throw new Error('The recording download was cancelled.')
     if (currentStatus.complete) {
       reporter.post(currentStatus)
       return
@@ -937,7 +1025,9 @@ async function handleRecordingDownload(event) {
         operation.cacheFacts
       )
     )
-    reporter.post(await operation.promise)
+    const result = await Promise.race([operation.promise, cancellation])
+    if (!result) throw new Error('The recording download was cancelled.')
+    reporter.post(result)
   } catch (error) {
     const fallback = descriptor ?? {
       audioId:
@@ -948,6 +1038,7 @@ async function handleRecordingDownload(event) {
     }
     reporter.post(await recordingErrorStatus(fallback, error))
   } finally {
+    if (port) port.onmessage = null
     if (operation) releaseRecordingOperation(operation, reporter)
     reporter.close()
   }
@@ -1188,11 +1279,12 @@ function startRecordingDownloadOperation(descriptor, currentStatus) {
     descriptor,
     currentStatus
   )
+  operation.abortController = new AbortController()
   return finishRecordingOperation(
     operation,
     downloadRecording(descriptor, (downloadedBytes) => {
       reportRecordingOperationProgress(operation, downloadedBytes)
-    })
+    }, operation.abortController.signal)
       .then(() => readRecordingDownloadStatus(descriptor))
       .catch((error) => recordingErrorStatus(descriptor, error))
   )
@@ -1224,6 +1316,11 @@ function releaseRecordingOperation(operation, reporter) {
 }
 
 async function removeRecording(descriptor) {
+  return withRecordingRemoval(descriptor.url, () => withUnusedRecordings(
+    [descriptor.url], () => removeRecordingUnlocked(descriptor)))
+}
+
+async function removeRecordingUnlocked(descriptor) {
   const cache = await caches.open(RECORDING_CACHE_NAME)
   const requests = await cache.keys()
   await settleRecordingCacheTasks(
@@ -1272,15 +1369,14 @@ function releaseOtherRecordingRemovalOperation(operation, reporter) {
 }
 
 async function removeOtherRecordings(descriptor) {
+  return withRecordingRemoval(null, () => removeOtherRecordingsUnlocked(descriptor))
+}
+
+async function removeOtherRecordingsUnlocked(descriptor) {
   const cache = await caches.open(RECORDING_CACHE_NAME)
-  const requests = await cache.keys()
-  await settleRecordingCacheTasks(
-    requests.map(async (request) => {
-      if (request.url !== descriptor.url) {
-        await deleteRecordingCacheEntry(cache, request)
-      }
-    })
-  )
+  const requests = (await cache.keys()).filter((request) => request.url !== descriptor.url)
+  await withUnusedRecordings(requests.map((request) => request.url), () =>
+    settleRecordingCacheTasks(requests.map((request) => deleteRecordingCacheEntry(cache, request))))
   return readRecordingDownloadStatus(descriptor)
 }
 
@@ -1321,11 +1417,14 @@ function releaseAllRecordingRemovalOperation(operation, reporter) {
 }
 
 async function removeAllRecordings() {
+  return withRecordingRemoval(null, () => removeAllRecordingsUnlocked())
+}
+
+async function removeAllRecordingsUnlocked() {
   const cache = await caches.open(RECORDING_CACHE_NAME)
   const requests = await cache.keys()
-  await settleRecordingCacheTasks(
-    requests.map((request) => deleteRecordingCacheEntry(cache, request))
-  )
+  await withUnusedRecordings(requests.map((request) => request.url), () =>
+    settleRecordingCacheTasks(requests.map((request) => deleteRecordingCacheEntry(cache, request))))
   return readRecordingInventoryCacheStatus()
 }
 
@@ -1458,9 +1557,21 @@ function createSha256() {
   return { update, digestHex }
 }
 
-async function downloadRecording(descriptor, onProgress) {
-  const response = await fetch(descriptor.url, { credentials: 'same-origin' })
+async function downloadRecording(descriptor, onProgress, signal) {
+  return withRecordingSave(descriptor.url, signal, async () => {
+    // A different worker may have committed this exact file while we waited.
+    if ((await inspectRecordingCache(descriptor)).exactStored) {
+      onProgress(descriptor.byteLength)
+      return
+    }
+    return withOfflineTransferSlot(signal, () => transferRecording(descriptor, onProgress, signal))
+  })
+}
+
+async function transferRecording(descriptor, onProgress, signal) {
+  const response = await fetch(descriptor.url, { credentials: 'same-origin', signal })
   if (!response.ok || response.status !== 200 || !response.body) {
+    await response.body?.cancel()
     throw new Error('The recording could not be downloaded.')
   }
   const declaredLengthValue = response.headers.get('Content-Length')
@@ -1473,6 +1584,7 @@ async function downloadRecording(descriptor, onProgress) {
     (!Number.isSafeInteger(declaredLength) ||
       declaredLength !== descriptor.byteLength)
   ) {
+    await response.body.cancel()
     throw new Error('The downloaded recording size does not match the published file.')
   }
 
@@ -1488,7 +1600,9 @@ async function downloadRecording(descriptor, onProgress) {
   let lastReportedBytes = 0
   const body = new ReadableStream({
     async pull(controller) {
+      signal?.throwIfAborted()
       const chunk = await reader.read()
+      signal?.throwIfAborted()
       if (chunk.done) {
         if (downloadedBytes !== descriptor.byteLength) {
           controller.error(
@@ -1527,20 +1641,22 @@ async function downloadRecording(descriptor, onProgress) {
       return reader.cancel(reason)
     },
   })
-  const cache = await caches.open(RECORDING_CACHE_NAME)
-  forgetRecordingCacheValidation(descriptor.url)
-  await cache.put(
-    descriptor.url,
-    new Response(body, {
-      status: response.status,
-      statusText: response.statusText,
-      headers,
-    })
-  )
-  // Download stream proved size and digest. Trust until this worker mutates the
-  // entry; a restarted worker hashes it once before status or playback.
-  rememberRecordingCacheValidation(descriptor.url, descriptor)
-
+  try {
+    const cache = await caches.open(RECORDING_CACHE_NAME)
+    forgetRecordingCacheValidation(descriptor.url)
+    await cache.put(
+      descriptor.url,
+      new Response(body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      })
+    )
+    // Trust the verified stream until mutation; a restarted worker hashes once.
+    rememberRecordingCacheValidation(descriptor.url, descriptor)
+  } finally {
+    await reader.cancel().finally(() => reader.releaseLock())
+  }
 }
 
 function parseByteRange(value, totalBytes) {
@@ -1738,11 +1854,16 @@ async function downloadTorahPages(onProgress) {
     while (nextIndex < pendingUrls.length) {
       const url = pendingUrls[nextIndex]
       nextIndex += 1
-      const response = await fetch(url)
-      if (!response.ok) {
-        throw new Error('Could not download Torah page ' + url)
-      }
-      await cache.put(url, response)
+      const controller = new AbortController()
+      await withOfflineTransferSlot(controller.signal, async () => {
+        try {
+          const response = await fetch(url, { signal: controller.signal })
+          if (!response.ok) throw new Error('Could not download Torah page ' + url)
+          await cache.put(url, response)
+        } finally {
+          controller.abort()
+        }
+      })
       downloaded += 1
       reportProgress()
     }
@@ -1799,14 +1920,23 @@ async function pruneRecordingCache() {
 }
 
 async function cacheFirst(request, cacheName) {
-  const cache = await caches.open(cacheName)
-  const cached = await cache.match(request)
-  if (cached) return cached
-
+  const preferred = dependencyCacheName(new URL(request.url).pathname)
+  const cacheOrder = preferred === DEPENDENCY_CACHE_NAME
+    ? [DEPENDENCY_CACHE_NAME, cacheName]
+    : [...new Set([preferred, cacheName, DEPENDENCY_CACHE_NAME])]
+  for (const name of cacheOrder) {
+    const candidate = await caches.open(name)
+    const response = await candidate.match(request)
+    if (response) return response
+  }
+  const cache = await caches.open(preferred === DEPENDENCY_CACHE_NAME ? cacheName : preferred)
   const response = await fetch(request)
   if (response.ok) await cache.put(request, response.clone())
   return response
 }
+
+${renderOfflineTransferQueue(cacheNamespace)}
+${renderRecordingDependenciesWorker(dependencyManifest, cacheNamespace)}
 
 async function matchCachedNavigation(cache, request) {
   const cached = await cache.match(request)
@@ -1872,6 +2002,20 @@ export async function generateServiceWorker(
   }
 
   const allFiles = await walk(root)
+  const contentManifest = await recordingDependencyManifest({
+    manifest,
+    inventory: JSON.parse(await readFile(path.join(path.dirname(manifestPath), 'content-inventory.json'), 'utf8')),
+    root,
+    outputFiles: allFiles.map((filePath) => normalizePath(path.relative(root, filePath))),
+    basePath: normalizedBasePath,
+  })
+  const manifestBytes = Buffer.from(JSON.stringify(contentManifest))
+  if (manifestBytes.length > 2_000_000) throw new Error('Offline dependency manifest exceeds bounded verification size')
+  const manifestDigest = createHash('sha256').update(manifestBytes).digest('hex')
+  const manifestFile = '_app/immutable/assets/recording-dependencies.' + manifestDigest.slice(0, 16) + '.json'
+  const dependencyManifest = { version: contentManifest.version, asset: {
+    url: toDeploymentUrl(manifestFile, normalizedBasePath), byteLength: manifestBytes.length, digest: manifestDigest,
+  } }
   const shellFiles = allFiles
     .map((filePath) => normalizePath(path.relative(root, filePath)))
     .filter((relativePath) => shouldPrecache(relativePath, excludedFiles))
@@ -1917,14 +2061,16 @@ export async function generateServiceWorker(
   )
   const distStats = await stat(root)
   const generatedAt = new Date(distStats.mtimeMs).toISOString()
-  const serviceWorkerSource = renderServiceWorkerSource({
+  const serviceWorkerSource = await compileServiceWorkerSource({
     basePath: normalizedBasePath,
     buildHash,
     shellUrls,
     torahPageUrls,
+    dependencyManifest,
   })
 
   const targetFile = path.join(root, 'service-worker.js')
+  await writeFile(path.join(root, manifestFile), manifestBytes)
   const stagedFile = `${targetFile}.stage-${process.pid}-${Date.now()}`
   try {
     await writeFile(stagedFile, serviceWorkerSource)

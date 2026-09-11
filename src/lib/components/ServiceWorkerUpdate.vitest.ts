@@ -1,10 +1,23 @@
 import { flushSync, mount, unmount } from 'svelte'
 import { afterEach, expect, test, vi } from 'vitest'
 import ServiceWorkerUpdate from './ServiceWorkerUpdate.svelte'
+import { Capacitor } from '@capacitor/core'
 
 let component: ReturnType<typeof mount> | null = null
 let target: HTMLElement | null = null
 let serviceWorkerDescriptor: PropertyDescriptor | undefined
+
+test('native mounts skip worker probing and registration', async () => {
+  vi.spyOn(Capacitor, 'isNativePlatform').mockReturnValue(true)
+  const fetch = vi.spyOn(globalThis, 'fetch')
+  target = document.createElement('div')
+  document.body.appendChild(target)
+  component = mount(ServiceWorkerUpdate, { target })
+  flushSync()
+  await Promise.resolve()
+  expect(fetch).not.toHaveBeenCalled()
+  expect(target.textContent).toBe('')
+})
 
 afterEach(async () => {
   if (component) await unmount(component)

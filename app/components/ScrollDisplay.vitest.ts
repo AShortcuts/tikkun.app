@@ -22,6 +22,13 @@ const generator = new LeiningGenerator(testSettings)
 // TODO(later): Consider extracting this to a shared helper
 let root: HTMLDivElement
 let vm: ScrollViewModel
+const displays: ScrollDisplay[] = []
+
+function createDisplay() {
+  const display = new ScrollDisplay(vm, root)
+  displays.push(display)
+  return display
+}
 
 beforeEach(() => {
   root = document.createElement('div')
@@ -29,6 +36,7 @@ beforeEach(() => {
   document.body.appendChild(root)
 })
 afterEach(() => {
+  displays.splice(0).forEach((display) => display.destroy())
   document.body.removeChild(root)
 })
 
@@ -169,6 +177,32 @@ test('centers the first token for the starting line', async () => {
   expect(Math.abs(root.scrollTop - expectedScrollTop)).toBeLessThan(5)
 })
 
+test('waits for the actual reader font before initial centering', async () => {
+  const originalLoad = document.fonts.load.bind(document.fonts)
+  let releaseFont: () => void = () => {}
+  const fontReady = new Promise<void>((resolve) => { releaseFont = resolve })
+  const load = vi.spyOn(document.fonts, 'load').mockImplementation(async (font, text) => {
+    await fontReady
+    return originalLoad(font, text)
+  })
+  let centered = false
+  const pending = renderRun('2025-10-04:shacharis,main').then((display) => {
+    centered = true
+    return display
+  })
+  try {
+    await vi.waitFor(() => expect(load).toHaveBeenCalledWith(
+      expect.stringContaining('ShlomosemiStam'), 'אשר',
+    ))
+    expect(centered).toBe(false)
+  } finally {
+    releaseFont()
+    load.mockRestore()
+    const display = await pending
+    display.destroy()
+  }
+})
+
 test.each(['match', 'reading'] as const)('preserves the focal token across %s side switches', async (layout) => {
   root.style.height = '650px'
   root.style.width = '1000px'
@@ -259,7 +293,7 @@ test('renders earlier aliyah markers when started later in Noach', async () => {
   })
   if (!model) throw new Error('Noach model not found')
   vm = model
-  const sd = new ScrollDisplay(vm, root)
+  const sd = createDisplay()
   await sd.scrolled
 
   const resolver = await vm.resolver
@@ -358,7 +392,7 @@ test('mounts a stable contiguous path before navigating to a distant aliyah', as
   )
   if (!model) throw new Error('Beresheet model not found')
   vm = model
-  const sd = new ScrollDisplay(vm, root)
+  const sd = createDisplay()
   await sd.scrolled
 
   const run = vm.relevantRuns.find(
@@ -862,7 +896,7 @@ test('mounts messages and repeated page occurrences along a navigation path', as
       entries.find((entry) => entry.contentIndex === contentIndex) ?? null,
   } as unknown as ScrollViewModel
   vm = fakeViewModel
-  const sd = new ScrollDisplay(vm, root)
+  const sd = createDisplay()
   await sd.scrolled
 
   const target = await sd.ensurePageMountedForNavigation(20, {
@@ -913,7 +947,7 @@ test('preserves logical order and identity for non-linear repeated pages', async
       entries.find((entry) => entry.contentIndex === contentIndex) ?? null,
   } as unknown as ScrollViewModel
   vm = fakeViewModel
-  const sd = new ScrollDisplay(vm, root)
+  const sd = createDisplay()
   await sd.scrolled
 
   while (root.children.length < entries.length) {
@@ -975,7 +1009,7 @@ async function renderRun(runId: string) {
   const model = ScrollViewModel.forId(generator, runId)
   if (!model) throw new Error(`ID ${runId} not found`)
   vm = model
-  const sd = new ScrollDisplay(vm, root)
+  const sd = createDisplay()
   await sd.scrolled
   return sd
 }
@@ -989,7 +1023,7 @@ async function renderNoachFromLaterPage() {
   })
   if (!model) throw new Error('Noach model not found')
   vm = model
-  const sd = new ScrollDisplay(vm, root)
+  const sd = createDisplay()
   await sd.scrolled
   return sd
 }

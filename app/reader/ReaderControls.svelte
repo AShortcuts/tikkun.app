@@ -14,6 +14,8 @@
     showAliyahStarts,
     toggleAnnotations,
     openSettings,
+    openMedia,
+    shareReading,
     connect,
   }: ReaderControlsComponentProps = $props()
 
@@ -23,6 +25,7 @@
 
   let controlState = $state(readState())
   let menuOpen = $state(false)
+  let sharing = $state(false)
   let menuToggle: HTMLButtonElement
 
   function sync() {
@@ -57,6 +60,17 @@
   function run(action: () => void) {
     close()
     action()
+  }
+
+  async function share(returnFocus: HTMLElement = menuToggle) {
+    if (sharing || !shareReading) return
+    sharing = true
+    close()
+    try { await shareReading(returnFocus) }
+    finally {
+      flushSync(() => { sharing = false })
+      if (returnFocus.isConnected) returnFocus.focus({ preventScroll: true })
+    }
   }
 
   function isElement(target: EventTarget | null): target is Element {
@@ -114,6 +128,18 @@
     name={controlState.bookmarked ? 'bookmarkFilled' : 'bookmark'}
   />
 </button>
+
+{#if shareReading}
+  <button
+    class="toolbar-button mod-icon-label toolbar-share-current"
+    data-target-id="share-current-reading"
+    type="button"
+    title="Share Reading"
+    aria-label="Share Reading"
+    disabled={sharing || !controlState.shareAvailable}
+    onclick={(event) => share(event.currentTarget)}
+  ><UiIcon name="link" /></button>
+{/if}
 
 <button
   bind:this={menuToggle}
@@ -190,7 +216,7 @@
     onclick={() => run(toggleAnnotations)}
   >
     <span data-target-id="toolbar-overflow-annotations-label">
-      {controlState.annotationsEnabled ? 'Hide Vowels' : 'Show Vowels'}
+      {controlState.annotationsEnabled ? 'Hide Nekudot' : 'Show Nekudot'}
     </span>
     <span
       class="toolbar-overflow-icon mod-annotations"
@@ -198,13 +224,23 @@
       aria-hidden="true"
     >
       <span class="toggle mod-compact">
-        <span class="shadowed-circle">
+        <span class="annotations-toggle-icon">
           <span class="toggle-state mod-off">א</span>
           <span class="toggle-state mod-on">אֶ֨</span>
         </span>
       </span>
     </span>
   </button>
+  {#if openMedia}
+    <button class="toolbar-overflow-item" type="button" data-toolbar-overflow-action="media" onclick={() => run(() => openMedia?.(menuToggle))}>
+      <span>Media &amp; Storage</span><span class="toolbar-overflow-icon" aria-hidden="true"><UiIcon name="download" /></span>
+    </button>
+  {/if}
+  {#if shareReading}
+    <button class="toolbar-overflow-item" type="button" data-toolbar-overflow-action="share" disabled={sharing || !controlState.shareAvailable} onclick={() => share()}>
+      <span>Share Reading</span><span class="toolbar-overflow-icon" aria-hidden="true"><UiIcon name="link" /></span>
+    </button>
+  {/if}
   <button
     class="toolbar-overflow-item"
     type="button"

@@ -1,50 +1,27 @@
 .annotations-toggle {
   font-family: ShlomosemiStam;
   border: none;
+  padding: 0;
+  background: transparent;
   border-radius: 50%; /* no border, but setting the border-radius allows the focused highlight to fit the button nicely */
   cursor: pointer;
 }
 
 .toggle {
-  --annotations-toggle-active-color: white;
-  --annotations-toggle-inactive-color: oklch(100% 0 0 / 0.6);
-  --annotations-toggle-hover-color: oklch(82% 0.18 190deg);
-  text-align: middle;
+  --annotations-toggle-inactive-color: var(--light-text-color);
+  --annotations-toggle-hover-color: var(--reader-focus-color);
   display: flex;
   align-items: center;
+  justify-content: center;
   -webkit-user-select: none;
   user-select: none;
-}
-
-@media (prefers-color-scheme: dark) {
-  html[data-reader-theme='automatic'] .toggle {
-    --annotations-toggle-active-color: black;
-    --annotations-toggle-inactive-color: oklch(0% 0 0 / 0.5);
-    --annotations-toggle-hover-color: oklch(50% 0.24 260deg);
-  }
-
-  html[data-reader-theme='automatic'] .shadowed-circle {
-    background: white;
-    color: black;
-  }
-}
-
-html[data-reader-theme='dark'] .toggle {
-  --annotations-toggle-active-color: black;
-  --annotations-toggle-inactive-color: oklch(0% 0 0 / 0.5);
-  --annotations-toggle-hover-color: oklch(50% 0.24 260deg);
 }
 
 .toggle-state {
   color: var(--annotations-toggle-inactive-color);
   transition: color var(--reader-motion-color) var(--reader-ease-standard);
-  position: relative;
-  right: 3px; /* <fb0f10> To give the appearance of the toggle-state being centered within the circle, shift things over a bit to the right when the toggle is checked. See comment `1adb87` for corresponding "unchecked" state. */
-}
-
-.toggle-state.mod-off {
-  display: inline-block;
-  margin-right: 0.25em;
+  flex: none;
+  line-height: 1;
 }
 
 .annotations-toggle[aria-pressed='true'] .toggle-state.mod-on,
@@ -53,7 +30,7 @@ html[data-reader-theme='dark'] .toggle {
   .toggle-state.mod-on,
 [data-toolbar-overflow-action='annotations'][aria-pressed='false']
   .toggle-state.mod-off {
-  transform: scale(1.5);
+  font-size: 1.5em;
   color: var(--annotations-toggle-active-color);
 }
 
@@ -68,34 +45,23 @@ html[data-reader-theme='dark'] .toggle {
   }
 }
 
-.annotations-toggle[aria-pressed='false'] .toggle-state.mod-on,
-.annotations-toggle[aria-pressed='false'] .toggle-state.mod-off,
-[data-toolbar-overflow-action='annotations'][aria-pressed='false']
-  .toggle-state.mod-on,
-[data-toolbar-overflow-action='annotations'][aria-pressed='false']
-  .toggle-state.mod-off {
-  right: -3px; /* <1adb87> When toggle is unchecked, give the appearance of shifting things to the left a little. See comment `fb0f10` for "checked" state. */
-}
-
 .toggle.mod-compact {
-  font-size: 0.42rem;
+  font-size: 0.65rem;
 }
 
-.shadowed-circle {
-  padding: 1em;
+.toggle.mod-compact .annotations-toggle-icon {
+  width: 1.8rem;
+  height: 1.8rem;
+}
+
+.annotations-toggle-icon {
   height: 4em;
   width: 4em;
-  /* border: 1px solid oklch(0% 0 0 / 0.5); */
-  /* box-shadow: 0 0 10px -5px oklch(100% 0 0 / 0.5); */
   display: flex;
+  flex: none;
+  gap: 0.25em;
   justify-content: center;
   align-items: center;
-  border-radius: 50%;
-  background: black;
-  color: white;
-}
-
-html[data-reader-theme='dark'] .shadowed-circle {
-  background: white;
-  color: black;
+  direction: ltr;
+  background: transparent;
 }

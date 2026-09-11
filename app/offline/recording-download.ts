@@ -33,10 +33,13 @@ export interface OfflineRecordingDownloadSnapshot {
   inventoryPhase: OfflineRecordingInventoryPhase
   inventoryErrorMessage: string | null
   errorMessage: string | null
+  removalPending?: boolean
+  storageLocation?: 'browser' | 'device'
+  requiresDependencyRepair?: boolean
 }
 
 export interface OfflineRecordingRemovalResult {
-  status: 'completed' | 'failed' | 'skipped'
+  status: 'completed' | 'failed' | 'skipped' | 'pending'
   errorMessage: string | null
 }
 
@@ -77,7 +80,7 @@ type RecordingDownloadInventoryWorkerMessage = {
   errorMessage?: string
 }
 
-type RecordingDescriptor = {
+export type RecordingDescriptor = {
   audioId: string
   title: string
   url: string
@@ -95,7 +98,7 @@ export type OfflineDownloadRecording = Pick<
 const isNonNegativeInteger = (value: unknown): value is number =>
   Number.isSafeInteger(value) && Number(value) >= 0
 
-function parseWorkerMessage(
+export function parseRecordingDownloadMessage(
   value: unknown,
   expectedAudioId: string
 ): RecordingDownloadWorkerMessage {
@@ -149,7 +152,7 @@ function parseInventoryWorkerMessage(
   return message as RecordingDownloadInventoryWorkerMessage
 }
 
-function descriptorForRecording(
+export function descriptorForRecording(
   recording: OfflineDownloadRecording | null
 ): RecordingDescriptor | null {
   if (
@@ -364,7 +367,7 @@ export function createOfflineRecordingDownloadController({
     const result = await workerRequests.request(
       { type: command, recording: descriptor },
       (value) => {
-        const message = parseWorkerMessage(value, descriptor.audioId)
+        const message = parseRecordingDownloadMessage(value, descriptor.audioId)
         if (isCurrentRequest(binding, presentation)) {
           updateSnapshot({
             phase: message.state,

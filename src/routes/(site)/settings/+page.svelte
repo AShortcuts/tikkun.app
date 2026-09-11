@@ -108,12 +108,12 @@
     <section aria-labelledby="record-title">
       <h2 id="record-title">Record & review cues</h2>
       <p>Choose an aliyah in the reader, import cues, adjust the waveform timings, and review orange flags.</p>
-      <a class="site-secondary-action" href={resolve('/reader/#/next')} data-sveltekit-reload onclick={openRecording}>Open recording panel</a>
+      <a class="site-secondary-action" href={resolve('/reader/#/next')} onclick={openRecording}>Open recording panel</a>
     </section>
     <section aria-labelledby="project-title">
       <h2 id="project-title">Project tools</h2>
       <div class="site-action-row">
-        <a class="site-secondary-action" href={resolve('/reader/#/about/playback-analytics')} data-sveltekit-reload>Cue analytics</a>
+        <a class="site-secondary-action" href={resolve('/reader/#/about/playback-analytics')}>Cue analytics</a>
         <a class="site-secondary-action" href={resolve('/readings/')}>Readings & coverage</a>
         <a class="site-secondary-action" href={resolve('/about/#taskboard-title')}>Taskboard</a>
       </div>

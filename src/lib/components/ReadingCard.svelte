@@ -15,7 +15,6 @@
     <a
       class="home-reading-title-link"
       href={resolve(`/reader/#/torah/parsha/${reading.parshaSlug}`)}
-      data-sveltekit-reload
     >
       <strong>{reading.parshaName}</strong>
     </a>
@@ -33,6 +32,5 @@
   <a
     class="home-reading-open"
     href={resolve(`/reader/#/torah/parsha/${reading.parshaSlug}`)}
-    data-sveltekit-reload
   >Open full reading</a>
 </article>

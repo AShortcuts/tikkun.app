@@ -7,6 +7,7 @@ export interface ReaderControlsState {
   bookmarked: boolean
   annotationsEnabled: boolean
   aliyahNavigationAvailable: boolean
+  shareAvailable?: boolean
 }
 
 export interface ReaderControlsOptions {
@@ -17,6 +18,8 @@ export interface ReaderControlsOptions {
   showAliyahStarts(): void
   toggleAnnotations(): void
   openSettings(returnFocus: HTMLElement): void
+  openMedia?(returnFocus: HTMLElement): void
+  shareReading?(returnFocus: HTMLElement): Promise<void>
 }
 
 export interface ReaderControls {

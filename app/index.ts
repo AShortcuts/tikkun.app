@@ -1,5 +1,6 @@
 import { getBrowserStorage } from './persistence/persisted-state.ts'
 import { getRecordingModeConfig } from './recording-mode.ts'
+import type { DownloadOwner } from './offline/download-owner.ts'
 import {
   startReaderRuntime,
   type ReaderRuntime,
@@ -7,7 +8,12 @@ import {
 
 let runtime: ReaderRuntime | null = null
 
-export function startApp() {
+export interface ReaderAppOptions {
+  downloadOwner?: DownloadOwner
+  openAbout?: () => Promise<void>
+}
+
+export function startApp(options: ReaderAppOptions = {}) {
   if (runtime) return runtime
   const appRoot = document.querySelector<HTMLElement>(
     '[data-target-id="app-root"]'
@@ -23,6 +29,7 @@ export function startApp() {
     sessionStorage: getBrowserStorage('session'),
     recordingMode: getRecordingModeConfig(new URL(window.location.href)),
     aboutHref,
+    ...options,
   })
   return runtime
 }

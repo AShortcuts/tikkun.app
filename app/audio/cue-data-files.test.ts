@@ -5,7 +5,7 @@ import {
 } from './cue-validation.ts'
 import { audioRecordings } from '../data/audio-catalog.ts'
 import { TOKENIZATION_VERSION } from './cue-schema.ts'
-import { cuePayloadPathForRecording } from './cue-data.ts'
+import { cuePayloadPathForRecording, publishedCueSourceForRecording } from './cue-data.ts'
 
 const publishedCuePayloads = import.meta.glob<unknown>('../../audio-cues/**/*.json', {
   eager: true,
@@ -34,5 +34,6 @@ test('every published cue file satisfies the runtime cue-data contract', () => {
     if (!recording) continue
     expect(cuePayloadMatchesRecording(payload, recording), path).toBe(true)
     expect(cuePayloadPathForRecording(recording), path).toBe(path)
+    expect(publishedCueSourceForRecording(recording), path).toBe(path.slice('../../'.length))
   }
 })

@@ -60,7 +60,7 @@ test('presents an honest local gate and clears the code after success', () => {
 
   dialog.open()
   expect(required('[data-target-id="admin-access-dialog"]').textContent).toContain(
-    'not a security control'
+    'local unlock code'
   )
   const input = enterUnlockCode('wrong')
   expect(document.activeElement).toBe(input)
