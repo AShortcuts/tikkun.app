@@ -35,6 +35,7 @@
     "native:share": "npm run native:sync && sqim upload --device ios/App --build --project App.xcodeproj --scheme App --allow-provisioning-updates",
     "updates:stage": "node --import tsx scripts/stage-update-feed.ts",
     "updates:verify": "node --import tsx scripts/verify-update-feed.ts",
+    "updates:release": "node --import tsx scripts/release-updates.ts",
     "native:open": "cap open ios",
     "native:branding": "node scripts/generate-native-branding.mjs",
     "preview": "vite preview",

@@ -142,7 +142,7 @@ npm run native:sync
 TIKKUN_UPDATE_PRIVATE_KEY_FILE=.asc/update-signing/private.pem npm run updates:web -- \
   --native-build BUILD_NUMBER \
   --target-archive /absolute/path/to/the/distributed.xcarchive \
-  --rollout 10 --approve-web-only
+  --rollout 100 --approve-web-only
 ```
 
 The generator checks the target archive's build number, installed public key,
@@ -153,10 +153,12 @@ over 50 MiB. Signed byte counts and signatures remain mandatory. The archive mus
 TestFlight build 3 cannot be used as a target.
 
 Output: `.asc/updates/web/BUILD_NUMBER/`, with a signed `latest.json` and signed,
-hash-named ZIP. Default rollout is **0%**. Only publish after local verification
+hash-named ZIP. The low-level `updates:web` generator defaults to **0%** when
+`--rollout` is omitted; the recommended `updates:release` workflow supplies
+**100%** by default. Only publish after local verification
 and explicit deployment approval. Host at `/updates/web/BUILD_NUMBER/`, ZIP first,
 manifest last. A stable local random bucket selects the rollout; it is not sent
-to a vendor service. Increase rollout after acceptance, not automatically.
+to a vendor service. Smaller rollouts remain available when explicitly requested.
 
 Setting rollout to zero stops new staging but does not revoke already staged
 bundles. To roll back a healthy but unwanted web revision, republish its known-good
@@ -164,6 +166,60 @@ predecessor with a newly signed manifest. A locally quarantined failing bundle
 will not be retried; fix it and publish a new ZIP digest.
 
 ## Stage And Deploy
+
+### One Local Release Command
+
+```sh
+npm run updates:release -- --native-build 6
+```
+
+This is an interactive local release workflow, not a background deployment or an
+App Store upload. It uses the repository-pinned Node/npm, `gh` authentication, and
+the existing private update key. The key stays outside Git. Set
+`TIKKUN_UPDATE_PRIVATE_KEY_FILE` for an externally stored key; the default is the
+ignored `.asc/update-signing/private.pem`, with owner-only permissions.
+The default archive is `.asc/artifacts/Tikkun-1.0-BUILD_NUMBER.xcarchive`; pass
+`--target-archive /absolute/path/to/distributed.xcarchive` for other versions or
+locations. Changing the native build number never bypasses archive compatibility.
+
+Use `--dry-run` for read-only preflight and a command preview, or `--help` for all
+options. A real run needs an interactive terminal and a clean `develop` checkout.
+Review and commit intended source changes first. Unpushed source commits are
+allowed only when local `develop` includes the current remote revision; all such
+commits appear in the final publication preview. The command never switches
+branches, stashes edits, discards files, force-pushes, or stages source changes.
+
+The command runs `verify:release`, builds native web assets, generates/signs both
+feeds, stages the public files into the website, and builds the complete site.
+It does not run Capacitor sync: an OTA release must preserve the distributed
+native project, not regenerate it for a different binary. Existing compatibility
+checks remain mandatory. Generator drift outside the release assets stops the
+workflow for review. Checks/builds may take 10-20 minutes and several GB of local
+output; this command does not install dependencies or browsers automatically.
+
+Before any Git staging/commit/push, the command shows the exact public release
+files, sizes, source commits and rollout. Type `publish` only after reviewing the
+web-only release. Rollout defaults to 100%, reaching every compatible installation;
+use `--rollout 10` only when a limited rollout is wanted. Declining leaves generated
+files unstaged for inspection. Review
+those files before rerunning, since a dirty tree is intentionally rejected.
+
+Packages are verified again before the preview. After confirmation, the command
+rechecks the branch, index, remote destinations and approved file bytes,
+commits only the release paths, and pushes the exact new commit to `develop`.
+It waits up to 20 minutes for that commit's Cloudflare Pages GitHub check
+(`--deployment-timeout MIN` adjusts this), then verifies the live signatures and
+requires the exact expected bundle digest, content digest and rollout. An older
+valid signed feed is not treated as success. No Wrangler command is involved.
+
+Failures stop the workflow. Once created, a release commit is retained even if
+push, deployment or live verification fails. Check `origin/develop` before
+retrying a push; no automatic retries or rollbacks run. After a deployment
+recovers, run `npm run updates:verify -- --native-build BUILD_NUMBER` and compare
+the reported digests/rollout with the retained release. Never create another
+release merely to retry a slow deployment.
+
+### Individual Steps
 
 The existing Cloudflare Pages project is **tikkun**, serving `tikkun.pages.dev`
 and `tikkunreader.com`. After creating both releases, run:

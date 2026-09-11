@@ -7,8 +7,9 @@ Editable listing source and delivery checkpoint, verified 2026-09-11.
 - App: Tikkun Reader (`6810923824`).
 - Bundle: `com.adamn.tikkunreader`.
 - Version: `1.0` (`cac2f8d9-a302-4b5a-9dc8-2ec9300647a6`).
-- Uploaded and attached build: `1.0 (3)` (`cc9aa9c7-1d76-442c-87d6-71ca12fb59df`),
-  processing `VALID`. English What to Test notes are attached; the existing
+- Current uploaded and attached build: `1.0 (5)` (`940f7701-1e72-462b-98ee-7d01bc58fe1f`),
+  processing `VALID`. The prior build 3 checkpoint remains documented below;
+  English What to Test notes are attached to that earlier checkpoint. The existing
   `usesNonExemptEncryption: false` declaration is carried forward from build 2.
 - Team: Adam Niyazov (`5D862AQ8GV`). Xcode GUI cloud signing succeeded despite
   CLI export reporting `No Accounts` and no distribution certificate. The account

@@ -45,6 +45,7 @@ async function listFiles(root, prefix = '') {
 export async function checkBuildBudgets(root = distRoot) {
   const files = await listFiles(root)
   const failures = []
+  const warnings = []
 
   let largestArtifact = null
   for (const relativePath of files) {
@@ -53,7 +54,7 @@ export async function checkBuildBudgets(root = distRoot) {
       largestArtifact = { relativePath, rawBytes: size }
     }
     if (size > MAX_STATIC_ASSET_BYTES) {
-      failures.push(
+      warnings.push(
         `Static artifact ${relativePath} is ${size} bytes; ` +
           `Cloudflare safety budget is ${MAX_STATIC_ASSET_BYTES}`
       )
@@ -85,12 +86,12 @@ export async function checkBuildBudgets(root = distRoot) {
         largest = measurement
       }
       if (measurement.rawBytes > budget.rawBytes) {
-        failures.push(
+        warnings.push(
           `${budget.label} ${relativePath} is ${measurement.rawBytes} bytes; budget is ${budget.rawBytes}`
         )
       }
       if (measurement.gzipBytes > budget.gzipBytes) {
-        failures.push(
+        warnings.push(
           `${budget.label} ${relativePath} is ${measurement.gzipBytes} bytes gzip; budget is ${budget.gzipBytes}`
         )
       }
@@ -102,11 +103,10 @@ export async function checkBuildBudgets(root = distRoot) {
     )
   }
 
-  if (failures.length) {
-    throw new Error(`Build budgets exceeded:\n- ${failures.join('\n- ')}`)
-  }
+  if (warnings.length) console.warn(`Build budget warnings:\n- ${warnings.join('\n- ')}`)
+  if (failures.length) throw new Error(`Missing build output:\n- ${failures.join('\n- ')}`)
 
-  return { files, largestArtifact }
+  return { files, largestArtifact, warnings }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

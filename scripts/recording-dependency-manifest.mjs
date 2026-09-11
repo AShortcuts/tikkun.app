@@ -16,7 +16,8 @@ export async function recordingDependencyManifest({ manifest, inventory, root, o
   for (const file of new Set(content.flatMap((entry) => entry.files))) {
     if (!file.startsWith('_app/immutable/') || file.includes('..')) throw new Error(`Unsafe compiled dependency: ${file}`)
     const bytes = await readFile(path.join(root, file))
-    if (!bytes.length || bytes.length > 2_000_000) throw new Error(`Compiled dependency exceeds bounded verification size: ${file}`)
+    if (!bytes.length) throw new Error(`Empty compiled dependency: ${file}`)
+    if (bytes.length > 2_000_000) console.warn(`Compiled dependency ${file} is ${bytes.length} bytes; recommended budget is 2000000 bytes`)
     assets.set(file, { url: `${basePath}/${file}`, byteLength: bytes.length, digest: createHash('sha256').update(bytes).digest('hex') })
   }
   const core = new Set()

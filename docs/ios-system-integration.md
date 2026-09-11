@@ -2,11 +2,11 @@
 
 Updated: 2026-09-11. Editable implementation and acceptance reference.
 
-Latest packaging checkpoint: app and widget are now **1.0 (3)**. The theme repair,
+Latest packaging checkpoint: app and widget are now **1.0 (5)**. The theme repair,
 Simulator verification and Sqim delivery succeeded. Private installation links
 belong in ignored local release records, not this public repository.
-Build 3 is now uploaded to TestFlight, processed `VALID`, and attached to version
-1.0 (`cc9aa9c7-1d76-442c-87d6-71ca12fb59df`). Xcode GUI cloud signing succeeded for
+Build 5 is now uploaded to TestFlight, processed `VALID`, and attached to version
+1.0 (`940f7701-1e72-462b-98ee-7d01bc58fe1f`). Xcode GUI cloud signing succeeded for
 Adam Niyazov (`5D862AQ8GV`) despite the CLI account-lookup failure. English test
 notes and export compliance are set; no tester access or review submission changed.
 See [listing handoff](../metadata/README.md) for delivery evidence and remaining
@@ -88,7 +88,7 @@ Commands, using the repository-pinned Node/npm and approved resource budget:
 npm run check
 npm run native:sync
 swift test --package-path ios/TikkunSystem --jobs 2
-sqim upload --device ios/App --build --allow-provisioning-updates
+npm run native:share
 ```
 
 ## Remaining Acceptance

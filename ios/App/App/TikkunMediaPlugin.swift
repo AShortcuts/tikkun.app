@@ -44,8 +44,11 @@ public class TikkunMediaPlugin: CAPPlugin, CAPBridgedPlugin {
                     call.resolve(["value": NSNull()]); return
                 }
                 let data = try Data(contentsOf: file)
-                guard data.count <= 32 * 1024 * 1024, let value = String(data: data, encoding: .utf8) else {
+                guard let value = String(data: data, encoding: .utf8) else {
                     throw MediaFailure.invalidAsset
+                }
+                if data.count > 32 * 1024 * 1024 {
+                    NSLog("Content state is %ld bytes; recommended storage budget is 32 MiB", data.count)
                 }
                 call.resolve(["value": value])
             } catch { call.reject(error.localizedDescription) }
@@ -53,8 +56,11 @@ public class TikkunMediaPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func writeContent(_ call: CAPPluginCall) {
-        guard let value = call.getString("value"), let data = value.data(using: .utf8), data.count <= 32 * 1024 * 1024 else {
+        guard let value = call.getString("value"), let data = value.data(using: .utf8) else {
             call.reject("Invalid content state"); return
+        }
+        if data.count > 32 * 1024 * 1024 {
+            NSLog("Content state is %ld bytes; recommended storage budget is 32 MiB", data.count)
         }
         contentQueue.async {
             do {

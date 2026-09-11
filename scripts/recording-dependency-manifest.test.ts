@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, expect, test } from 'vitest'
+import { afterEach, expect, test, vi } from 'vitest'
 import { recordingDependencyManifest } from './recording-dependency-manifest.mjs'
 
 const roots: string[] = []
@@ -52,4 +52,20 @@ test('fails rather than inventing missing content identities', async () => {
   await expect(recordingDependencyManifest({ ...f, inventory: { ...f.inventory, version: '' } })).rejects.toThrow('build-matched')
   await expect(recordingDependencyManifest({ ...f, outputFiles: [] })).rejects.toThrow('missing a bundled dependency')
   await expect(recordingDependencyManifest({ ...f, inventory: { version: 'build', modules: {} } })).rejects.toThrow('no text pages')
+})
+
+test('warns for oversized dependencies while preserving exact integrity metadata', async () => {
+  const f = await fixture()
+  const bytes = 'x'.repeat(2_000_001)
+  await writeFile(path.join(f.root, f.outputFiles[0]), bytes)
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  try {
+    const result = await recordingDependencyManifest(f)
+    expect(result.core.find(asset => asset.url.endsWith('/text.js'))).toMatchObject({
+      byteLength: bytes.length, digest: createHash('sha256').update(bytes).digest('hex'),
+    })
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('2000001 bytes'))
+    await writeFile(path.join(f.root, f.outputFiles[0]), '')
+    await expect(recordingDependencyManifest(f)).rejects.toThrow('Empty compiled dependency')
+  } finally { warn.mockRestore() }
 })

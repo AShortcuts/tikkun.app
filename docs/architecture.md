@@ -101,6 +101,7 @@ the same Reader for iOS; the native app does not depend on the web service worke
 - `site/manifest.webmanifest` defines install metadata, display mode, colors, and relative install URLs.
 - `src/app.html` includes Apple mobile web app metadata and icon links.
 - `scripts/generate-service-worker.mjs` creates a versioned cache after each build and compiles the worker with esbuild minification. Protocol property names are preserved.
+- Shell precache has no file-count cap. Shell bytes, per-file raw/gzip sizes, static asset sizes, and offline dependency sizes produce warnings when over budget; they do not block the build. Missing output and dependency integrity checks still fail.
 - The generated service worker precaches the app shell, page chunks, and first-use core reader chunks, then uses cache-first behavior for requested same-origin assets.
 - Navigation requests use network-first behavior with an exact cached clean-route match, then the cached Home page as a final fallback.
 - Cue Data, prototype routes/assets, Optional Feature bundles, the recording-only harness, and large media files are intentionally excluded from the initial precache so installation does not download content the reader has not requested.
@@ -288,6 +289,15 @@ the same Reader for iOS; the native app does not depend on the web service worke
 - Native media URLs use `https://tikkunreader.com`, preserving digest version
   queries. Web URLs remain deployment-relative. The native host can be overridden
   at build time, but must be an HTTPS origin without credentials or a path.
+- Native content and compatible web updates use separate signed feeds on the
+  existing Cloudflare Pages project `tikkun`. Automatic checks stage revisions
+  for the next cold launch. Settings > More > App Updates can force both checks.
+  Native and PWA delivery render the same `UpdatePrompt.svelte` pill. Native
+  Apply allows a brief cancellable delay, then applies after saving the current reading and
+  ensuring playback, authoring and transfers are idle. No browser service worker
+  runs inside Capacitor. `docs/app-updates.md` covers signatures, compatibility,
+  rollout, recovery and the staging/deployment workflow. `npm run native:share`
+  always rebuilds/syncs web assets before creating a Sqim phone build.
 - The iOS host routes clean paths to their prerendered `index.html` and confines
   the Reader to safe areas. Hashless native launch resumes the eligible recent
   reading or opens Reading Index; explicit reading hashes take precedence.
