@@ -21,9 +21,21 @@ test('requires valid signature covering rollout and native build metadata', asyn
   await expect(verifyWebRelease(tampered, pem)).rejects.toThrow('signature mismatch')
   await expect(verifyWebRelease(envelope({ ...release, rollout: 101 }), pem)).rejects.toThrow('Invalid web release')
 })
+
+test('warns for large signed web releases but rejects invalid byte counts', async () => {
+  const large = { ...release, bytes: 50 * 1024 * 1024 + 1 }
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  try {
+    expect(await verifyWebRelease(envelope(large), pem)).toEqual(large)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('recommended download budget is 50 MiB'))
+    for (const bytes of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+      await expect(verifyWebRelease(envelope({ ...release, bytes }), pem)).rejects.toThrow('Invalid web release')
+    }
+  } finally { warn.mockRestore() }
+})
 test('only stages matching native builds inside the rollout, never reloads', async () => {
   const bridge = plugin()
-  await stageWebRelease(release, '3', 0, 'https://tikkunreader.com', bridge)
+  await expect(stageWebRelease(release, '3', 0, 'https://tikkunreader.com', bridge)).rejects.toThrow('another native build')
   await stageWebRelease(release, '4', 10, 'https://tikkunreader.com', bridge)
   expect(bridge.downloadBundle).not.toHaveBeenCalled()
   await stageWebRelease(release, '4', 9, 'https://tikkunreader.com', bridge)
@@ -33,7 +45,7 @@ test('only stages matching native builds inside the rollout, never reloads', asy
 test('does not retry a rolled back bundle or schedule a failed download', async () => {
   const bridge = plugin()
   bridge.getBlockedBundles.mockResolvedValueOnce({ bundleIds: [release.bundleId] })
-  await stageWebRelease(release, '4', 0, 'https://tikkunreader.com', bridge)
+  await expect(stageWebRelease(release, '4', 0, 'https://tikkunreader.com', bridge)).rejects.toThrow('previously failed')
   expect(bridge.downloadBundle).not.toHaveBeenCalled()
   bridge.downloadBundle.mockRejectedValueOnce(new Error('Invalid signature'))
   await expect(stageWebRelease(release, '4', 0, 'https://tikkunreader.com', bridge)).rejects.toThrow('Invalid signature')

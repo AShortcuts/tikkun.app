@@ -23,7 +23,7 @@ export function nativeBuildConfig(environment = process.env) {
 export function includeNativeAsset(relativePath) {
   const parts = relativePath.replaceAll('\\', '/').split('/')
   return !parts.some((part) => part.startsWith('.') || part === 'prototypes') &&
-    parts[0] !== 'audio' &&
+    !['audio', 'updates'].includes(parts[0]) &&
     !['_headers', '_redirects', 'service-worker.js'].includes(parts[0]) &&
     !/\.(?:mp3|m4a|mp4|wav|webm|mov|aac|ogg|flac)$/i.test(relativePath)
 }

@@ -77,6 +77,8 @@ export class ContentSession {
   has(digest: string) {
     return this.state.active?.digest === digest || this.state.pending?.digest === digest || this.state.rejected.includes(digest)
   }
+  isRejected(digest: string) { return this.state.rejected.includes(digest) }
+  get pending() { return this.state.pending !== null }
   async stage(saved: SavedContent) {
     if (this.has(saved.digest)) return
     await this.validate(saved)

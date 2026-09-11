@@ -6,8 +6,9 @@
   import { NATIVE_READING_LINKS_CONTEXT, type NativeReadingLinks } from '../../../app/platform/native-reading-links.ts'
   import type { ReaderAppOptions } from '../../../app/index.ts'
   import '../../../css/master.css'
-  import { prepareNativeContent, nativeContentReady, checkNativeContent } from '../../../app/updates/content-runtime.ts'
+  import { prepareNativeContent, nativeContentReady } from '../../../app/updates/content-runtime.ts'
   import { nativeWebReady } from '../../../app/updates/web-runtime.ts'
+  import { checkNativeUpdates } from '../../../app/updates/native-updates.ts'
 
   type ReaderAppModule = {
     startApp(options?: ReaderAppOptions): { readonly ready: Promise<void> }
@@ -120,7 +121,7 @@
     syncThemeColor()
 
     void bootReader()
-    const checkUpdates = () => { if (document.visibilityState === 'visible') void checkNativeContent() }
+    const checkUpdates = () => { if (bootState === 'ready' && document.visibilityState === 'visible') void checkNativeUpdates() }
     window.addEventListener('online', checkUpdates)
     document.addEventListener('visibilitychange', checkUpdates)
 

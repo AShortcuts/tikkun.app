@@ -22,7 +22,7 @@ test('native configuration requires an explicit secure origin and root deploymen
 })
 
 test('native assets retain reader content and exclude bulk media and host configuration', () => {
-  for (const file of ['audio/narrator/file.m4a', 'audio', 'clips/file.mp4', 'prototypes/demo/index.html', '.DS_Store', '_headers', '_redirects', 'service-worker.js']) {
+  for (const file of ['audio/narrator/file.m4a', 'audio', 'updates/web/6/latest.json', 'updates', 'clips/file.mp4', 'prototypes/demo/index.html', '.DS_Store', '_headers', '_redirects', 'service-worker.js']) {
     expect(includeNativeAsset(file), file).toBe(false)
   }
   for (const file of ['fonts/reader.woff2', 'manifest.webmanifest', 'assets/icon.png', 'text/torah.json']) {

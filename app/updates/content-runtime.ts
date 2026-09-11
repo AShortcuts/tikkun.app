@@ -3,6 +3,7 @@ import { isNativeApp } from '../platform/native.ts'
 import { CONTENT_MAX_BYTES, object, type ContentSnapshot } from './content-schema.ts'
 import { ContentSession } from './content-session.ts'
 import { verifyReleaseEnvelope } from './release-signature.ts'
+import { updateChannel } from './update-state.ts'
 
 interface ContentBridge {
   readContent(): Promise<{ value: string | null }>
@@ -48,33 +49,54 @@ export function prepareNativeContent(): Promise<void> {
 }
 
 export async function nativeContentReady() {
-  try { await session?.ready() } catch (error) { report(error); return }
+  try {
+    await session?.ready()
+    updateChannel('content', { pending: session?.pending ?? false })
+  } catch (error) { updateChannel('content', { phase: 'error' }); report(error); return }
   readerReady = true
   void checkNativeContent()
 }
 
-export function checkNativeContent(): Promise<void> {
-  if (!session || !readerReady || !import.meta.env.TIKKUN_UPDATE_PUBLIC_KEY || Date.now() - lastCheck < 15 * 60_000) return Promise.resolve()
+export function checkNativeContent(force = false): Promise<void> {
+  if (!session || !readerReady || !import.meta.env.TIKKUN_UPDATE_PUBLIC_KEY) {
+    updateChannel('content', { phase: 'disabled' })
+    return Promise.resolve()
+  }
+  if (checking) return checking
+  if (!force && Date.now() - lastCheck < 15 * 60_000) return Promise.resolve()
   return checking ??= (async () => {
     const current = session
     if (!current) return
+    updateChannel('content', { phase: 'checking' })
     const origin = import.meta.env.TIKKUN_NATIVE_MEDIA_ORIGIN
     const prefix = `${origin}/updates/content/${import.meta.env.TIKKUN_CONTENT_COMPATIBILITY}/`
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 60_000)
     try {
       const response = await fetch(`${prefix}latest.json`, { cache: 'no-store', credentials: 'omit', redirect: 'error', signal: controller.signal })
-      if (response.status === 404) { lastCheck = Date.now(); return } // No release for this contract yet.
+      if (response.status === 404) {
+        lastCheck = Date.now()
+        updateChannel('content', { phase: 'unpublished', checkedAt: lastCheck })
+        return
+      }
       const manifest = await verifyReleaseEnvelope(JSON.parse(await readBoundedResponse(response, 4096)), import.meta.env.TIKKUN_UPDATE_PUBLIC_KEY)
       if (!object(manifest) || manifest.schema !== 1 || typeof manifest.digest !== 'string' || !/^[a-f0-9]{64}$/.test(manifest.digest) ||
-          typeof manifest.bytes !== 'number' || !Number.isSafeInteger(manifest.bytes) || manifest.bytes <= 0 || manifest.bytes > CONTENT_MAX_BYTES) throw new Error('Invalid content release manifest')
-      if (current.has(manifest.digest)) { lastCheck = Date.now(); return }
+          typeof manifest.bytes !== 'number' || !Number.isSafeInteger(manifest.bytes) || manifest.bytes <= 0) throw new Error('Invalid content release manifest')
+      if (manifest.bytes > CONTENT_MAX_BYTES) console.warn(`Content release is ${manifest.bytes} bytes; recommended download budget is ${CONTENT_MAX_BYTES} bytes`)
+      if (current.isRejected(manifest.digest)) throw new Error('Content release previously failed on this device')
+      if (current.has(manifest.digest)) {
+        lastCheck = Date.now()
+        updateChannel('content', { phase: current.pending ? 'ready' : 'current', pending: current.pending, checkedAt: lastCheck })
+        return
+      }
+      updateChannel('content', { phase: 'downloading' })
       const body = await fetch(`${prefix}${manifest.digest}.json`, { credentials: 'omit', redirect: 'error', signal: controller.signal })
       const payload = await readBoundedResponse(body, manifest.bytes)
       if (new TextEncoder().encode(payload).byteLength !== manifest.bytes) throw new Error('Incomplete content download')
       await current.stage({ digest: manifest.digest, payload })
       lastCheck = Date.now()
-    } catch (error) { report(error) }
+      updateChannel('content', { phase: 'ready', pending: true, checkedAt: lastCheck })
+    } catch (error) { updateChannel('content', { phase: 'error' }); report(error) }
     finally { clearTimeout(timeout) }
   })().finally(() => { checking = undefined })
 }

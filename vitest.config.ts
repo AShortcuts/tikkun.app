@@ -68,6 +68,8 @@ export default mergeConfig(
               'app/app-accessibility.vitest.ts',
               'app/app-smoke.vitest.ts',
               'app/updates/content-runtime.vitest.ts',
+              'app/updates/NativeUpdateSettings.vitest.ts',
+              'app/updates/NativeUpdatePrompt.vitest.ts',
               'app/components/ParshaPicker.vitest.ts',
               'app/components/ScrollDisplay.vitest.ts',
               'app/components/interactive-styles.vitest.ts',

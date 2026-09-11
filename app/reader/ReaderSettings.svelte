@@ -16,6 +16,8 @@
     type ReaderPreferences,
   } from '../reader-preferences.ts'
   import SupportDiagnosticsActions from '../support/SupportDiagnosticsActions.svelte'
+  import NativeUpdateSettings from '../updates/NativeUpdateSettings.svelte'
+  import { isNativeApp } from '../platform/native.ts'
   import { COMPACT_READER_QUERY } from '../adaptive/reader-viewport.ts'
   import { hexToOklch, oklchToHex, oklchGradient, editorChromaMax, type OklchColor } from './oklch-color.ts'
   import type {
@@ -1652,6 +1654,9 @@
         hidden={activeCategory !== 'more'}
         aria-label="Support settings"
       >
+        {#if isNativeApp()}
+          <NativeUpdateSettings />
+        {/if}
         <section class="settings-section">
       <h4 class="settings-section-title">Support</h4>
       <div class="settings-field">

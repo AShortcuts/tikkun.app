@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest'
 import { buildContentRelease } from '../../scripts/build-content-release.ts'
-import { digestText } from './content-schema.ts'
+import { CONTENT_MAX_BYTES, digestText } from './content-schema.ts'
 import { generateKeyPairSync, sign } from 'node:crypto'
 
 const native = vi.hoisted(() => ({ stored: null as string | null }))
@@ -10,11 +10,12 @@ vi.mock('@capacitor/core', () => ({ registerPlugin: () => ({
   writeContent: async ({ value }: { value: string }) => { native.stored = value },
 }) }))
 
-test('real content is downloaded once, stays staged, then supplies catalog, text and cues on a fresh document', async () => {
+test.each([false, true])('real content stages and activates on a fresh document (over budget: %s)', async (overBudget) => {
+  native.stored = null
   const release = await buildContentRelease()
   const data = JSON.parse(release.payload)
   data.recordings[0].title += ' Updated'
-  const payload = JSON.stringify(data)
+  const payload = JSON.stringify(data) + (overBudget ? ' '.repeat(CONTENT_MAX_BYTES) : '')
   const digest = await digestText(payload)
   vi.stubEnv('TIKKUN_NATIVE_MEDIA_ORIGIN', 'https://tikkunreader.com')
   vi.stubEnv('TIKKUN_CONTENT_COMPATIBILITY', release.compatibility)
@@ -24,6 +25,7 @@ test('real content is downloaded once, stays staged, then supplies catalog, text
   const fetcher = vi.fn(async (url: string) => new Response(url.endsWith('latest.json')
     ? JSON.stringify({ payload: manifest, signature: sign('sha256', Buffer.from(manifest), keys.privateKey).toString('base64') }) : payload))
   vi.stubGlobal('fetch', fetcher)
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
   try {
     vi.resetModules()
     const first = await import('./content-runtime.ts')
@@ -50,5 +52,6 @@ test('real content is downloaded once, stays staged, then supplies catalog, text
     await next.checkNativeContent()
     expect(fetcher).toHaveBeenCalledTimes(3)
     expect(JSON.parse(native.stored!).pending).toBeNull()
-  } finally { vi.unstubAllGlobals(); vi.unstubAllEnvs() }
+    if (overBudget) expect(warn).toHaveBeenCalledWith(expect.stringContaining('recommended download budget'))
+  } finally { warn.mockRestore(); vi.unstubAllGlobals(); vi.unstubAllEnvs() }
 }, 20_000)

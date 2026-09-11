@@ -18,21 +18,24 @@ export async function verifyWebRelease(value: unknown, publicKey: string): Promi
       typeof release.nativeBuild !== 'string' || !/^\d+$/.test(release.nativeBuild) ||
       typeof release.bundleId !== 'string' || !/^[a-f0-9]{64}$/.test(release.bundleId) || release.checksum !== release.bundleId ||
       typeof release.signature !== 'string' || !/^[A-Za-z0-9+/]+=*$/.test(release.signature) ||
-      typeof release.bytes !== 'number' || !Number.isSafeInteger(release.bytes) || release.bytes <= 0 || release.bytes > 50 * 1024 * 1024 ||
+      typeof release.bytes !== 'number' || !Number.isSafeInteger(release.bytes) || release.bytes <= 0 ||
       typeof release.rollout !== 'number' || !Number.isInteger(release.rollout) || release.rollout < 0 || release.rollout > 100) throw new Error('Invalid web release')
+  if (release.bytes > 50 * 1024 * 1024) console.warn(`Web release is ${release.bytes} bytes; recommended download budget is 50 MiB`)
   return { schema: 1, channel: 'production', nativeBuild: release.nativeBuild, bundleId: release.bundleId, checksum: release.bundleId,
     signature: release.signature, bytes: release.bytes, rollout: release.rollout }
 }
 
 export async function stageWebRelease(release: WebRelease, nativeBuild: string, bucket: number,
   origin: string, plugin: Pick<LiveUpdatePlugin, 'getBlockedBundles' | 'getCurrentBundle' | 'getBundles' | 'downloadBundle' | 'setNextBundle'>) {
-  if (release.nativeBuild !== nativeBuild || bucket >= release.rollout) return
-  if ((await plugin.getBlockedBundles()).bundleIds.includes(release.bundleId) ||
-      (await plugin.getCurrentBundle()).bundleId === release.bundleId) return
+  if (release.nativeBuild !== nativeBuild) throw new Error('Web release targets another native build')
+  if (bucket >= release.rollout) return 'deferred'
+  if ((await plugin.getBlockedBundles()).bundleIds.includes(release.bundleId)) throw new Error('Web release previously failed on this device')
+  if ((await plugin.getCurrentBundle()).bundleId === release.bundleId) return 'current'
   if (!(await plugin.getBundles()).bundleIds.includes(release.bundleId)) {
     await plugin.downloadBundle({ bundleId: release.bundleId, artifactType: 'zip', checksum: release.checksum,
       signature: release.signature, url: `${origin}/updates/web/${nativeBuild}/${release.bundleId}.zip` })
   }
   await plugin.setNextBundle({ bundleId: release.bundleId })
   // No reload: native cold-start activation must not interrupt practice/audio.
+  return 'ready'
 }

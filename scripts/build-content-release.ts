@@ -27,7 +27,7 @@ export async function buildContentRelease(contractOnly = false) {
   const compatibility = await contentCompatibility(snapshot)
   const payload = JSON.stringify(snapshot)
   const bytes = Buffer.byteLength(payload)
-  if (bytes > CONTENT_MAX_BYTES) throw new Error('Content release exceeds the automatic download limit')
+  if (bytes > CONTENT_MAX_BYTES) console.warn(`Content release is ${bytes} bytes; recommended download budget is ${CONTENT_MAX_BYTES} bytes`)
   const digest = await digestText(payload)
   return { compatibility, payload, manifest: { schema: 1, digest, bytes } }
 }

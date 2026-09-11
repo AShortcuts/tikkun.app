@@ -1,4 +1,5 @@
 import { getWebServiceWorker, isNativeApp } from '../platform/native.ts'
+import { createNativeUpdatePrompt } from '../updates/native-update-prompt.ts'
 import { loadPassageTokens } from '../audio/passage-tokens.ts'
 import { audioButtonState } from '../reading/audio-button-state.ts'
 import { createRecordingRangeResolver } from '../audio/recording-ranges.ts'
@@ -3694,6 +3695,17 @@ export function startReaderRuntime({
     setupAliyahStartPopup(scope)
     listenForRevealGesture(scope, book)
     setupReaderViewportResize(scope, book)
+
+    if (isNativeApp()) createNativeUpdatePrompt(scope, document, () => {
+      if (!readerPlayback.snapshot().paused) throw new Error('Pause audio before applying the update.')
+      if (cueAuthoringGlobal?.isActive() || recordingMode.enabled) throw new Error('Finish recording or editing before applying the update.')
+      if (downloadLibrary?.snapshot().entries.some(entry => ['queued', 'downloading', 'verifying', 'removing'].includes(entry.phase))) {
+        throw new Error('Wait for downloads to finish, or pause them before applying the update.')
+      }
+      const reading = captureCurrentLastReading()
+      if (!reading) throw new Error('Wait for your reading to load before applying the update.')
+      saveLastReading(browserLocalStorage, reading)
+    })
 
     const readerSettings = createLazyReaderSettings(scope, {
       document,

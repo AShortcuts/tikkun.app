@@ -1,12 +1,13 @@
 node_modules
 .svelte-kit
-app/__screenshots__
+**/__screenshots__/
 cypress/screenshots
 .playwright-cli/
 .vitest-attachments/
 .DS_Store
 .asc/
 .sqim/
+.wrangler/
 # Local credentials and signing material. Only the pinned public key is shared.
 .env
 .env.*

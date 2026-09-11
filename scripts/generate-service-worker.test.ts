@@ -3,12 +3,11 @@ import vm from 'node:vm'
 import { expect, test, vi } from 'vitest'
 import {
   assertPrecachedHtmlDependencies,
-  assertShellPrecacheBudget,
+  warnShellPrecacheBudget,
   cacheNamespaceForBasePath,
   classifyManifestFiles,
   compileServiceWorkerSource,
   MAX_SHELL_PRECACHE_RAW_BYTES,
-  MAX_SHELL_PRECACHE_URLS,
   normalizeBasePath,
   deferredRouteNodeSources,
   renderServiceWorkerSource,
@@ -335,6 +334,8 @@ test('precache keeps the app shell small and excludes deferred content', () => {
     shouldPrecache('_app/immutable/chunks/command-palette.js', excludedFiles)
   ).toBe(true)
   expect(shouldPrecache('audio/reader/aliyah.m4a', excludedFiles)).toBe(false)
+  expect(shouldPrecache('updates/web/6/latest.json', excludedFiles)).toBe(false)
+  expect(shouldPrecache(`updates/content/${'a'.repeat(64)}/${'b'.repeat(64)}.json`, excludedFiles)).toBe(false)
   expect(shouldPrecache('_app/immutable/assets/movie.mp4', excludedFiles)).toBe(false)
   expect(shouldPrecache('google-site-verification.html', excludedFiles)).toBe(false)
   expect(
@@ -419,40 +420,22 @@ test('passage playback tools load on demand without excluding shared reader code
   expect(shouldPrecache('reader.js', excludedFiles)).toBe(true)
 })
 
-test('accepts shell precache metrics at both release limits', () => {
+test('accepts shell precache at the raw-byte limit', () => {
   expect(() =>
-    assertShellPrecacheBudget({
-      urlCount: MAX_SHELL_PRECACHE_URLS,
+    warnShellPrecacheBudget({
       rawBytes: MAX_SHELL_PRECACHE_RAW_BYTES,
     })
   ).not.toThrow()
 })
 
-test('rejects shell precache URL and raw-byte budget overruns clearly', () => {
-  expect(() =>
-    assertShellPrecacheBudget({
-      urlCount: MAX_SHELL_PRECACHE_URLS + 1,
-      rawBytes: MAX_SHELL_PRECACHE_RAW_BYTES,
-    })
-  ).toThrow(
-    `${MAX_SHELL_PRECACHE_URLS + 1} URLs exceeds ${MAX_SHELL_PRECACHE_URLS}-URL limit`
-  )
-  expect(() =>
-    assertShellPrecacheBudget({
-      urlCount: MAX_SHELL_PRECACHE_URLS,
+test('warns without rejecting shell precache raw-byte budget overruns', () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  try {
+    expect(() => warnShellPrecacheBudget({
       rawBytes: MAX_SHELL_PRECACHE_RAW_BYTES + 1,
-    })
-  ).toThrow(
-    `${MAX_SHELL_PRECACHE_RAW_BYTES + 1} raw bytes exceeds ${MAX_SHELL_PRECACHE_RAW_BYTES}-byte limit`
-  )
-  expect(() =>
-    assertShellPrecacheBudget({
-      urlCount: MAX_SHELL_PRECACHE_URLS + 1,
-      rawBytes: MAX_SHELL_PRECACHE_RAW_BYTES + 1,
-    })
-  ).toThrow(
-    `Service-worker shell precache budget exceeded: ${MAX_SHELL_PRECACHE_URLS + 1} URLs exceeds ${MAX_SHELL_PRECACHE_URLS}-URL limit; ${MAX_SHELL_PRECACHE_RAW_BYTES + 1} raw bytes exceeds ${MAX_SHELL_PRECACHE_RAW_BYTES}-byte limit. Defer nonessential routes or assets.`
-  )
+    })).not.toThrow()
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(`${MAX_SHELL_PRECACHE_RAW_BYTES + 1} raw bytes`))
+  } finally { warn.mockRestore() }
 })
 
 test('selects only Torah entries from the SvelteKit client manifest', () => {

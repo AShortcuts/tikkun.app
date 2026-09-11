@@ -1,8 +1,14 @@
 # Tikkun Update Delivery
 
-Implementation checkpoint: 2026-09-11. No update feed has been deployed and the
-existing TestFlight build does not contain these additions. Ship a new native
-build before expecting installed apps to receive updates.
+Implementation checkpoint: 2026-09-11. Native build `1.0 (6)` is archived and
+uploaded through Sqim with manual update controls. Signed build-6 web and content
+feeds are included in `site/updates/` for the existing GitHub-triggered deployment.
+Do not deploy directly with Wrangler or change Cloudflare configuration.
+The App Store Connect build remains separate from this development distribution;
+the owner will publish a newer native app separately. Build 5 is not a web-feed
+target for this release. No compatibility override is enabled.
+The shared-prompt revision is prepared as a signed web update for that unchanged
+build-6 native contract; the existing Sqim binary predates this UI revision.
 
 ## Two Separate Paths
 
@@ -14,20 +20,46 @@ one revision; a fresh launch activates pending content before loading the catalo
 
 The first snapshot is 3,889,665 bytes (about 3.9 MB), without audio. This initial
 implementation downloads a complete snapshot when content changes, not individual
-changed files. A 12 MiB limit bounds automatic content downloads. Unchanged
+changed files. Downloads over 12 MiB produce a warning and continue. Unchanged
 releases only fetch the small manifest. Large audio remains user-controlled.
+Native content-state storage above 32 MiB also warns and continues; UTF-8, JSON,
+signed byte-count, digest, and compatibility validation remain enforced.
 
 **Controlled web updates** change compatible HTML/CSS/JavaScript. The app verifies
 a signed release manifest, checks the exact native build and staged rollout, and
 uses `@capawesome/capacitor-live-update` to verify and download the signed ZIP.
-It schedules that bundle for the next cold launch; it never calls `reload()`.
+Automatic checks schedule that bundle for the next cold launch without reloading.
 There is no paid cloud dependency or vendor update-service account.
+
+## Manual Checking
+
+Native Reader Settings > More > App Updates includes **Check for Updates**.
+It checks both feeds immediately, bypassing the normal 15-minute interval while
+sharing any check already in flight. Status distinguishes checking, downloading,
+up to date, unpublished feeds, unsupported builds, and failed checks. Missing or
+invalid feeds never report success.
+
+Once an update is staged, the Reader displays the same centered **Update available**
+pill as the PWA, with **Apply** and **Later**. Both delivery paths render
+`src/lib/components/UpdatePrompt.svelte`; Settings does not add a second Apply
+button. Manual checking reopens a dismissed prompt. **Apply** saves the current
+reading and reloads through the native LiveUpdate plugin. Playback, recording, cue authoring, and
+active download/removal work must finish first. The error remains visible and the
+update stays pending. Apply becomes the wine-colored **Cancel** button and hides
+Later during a 1.2-second grace period. Cancel or leaving Reader prevents the
+pending reload without removing the staged bundle. Cancel disables once native
+reload begins, which cannot be undone. Reload failure permits retry. Ignoring Apply preserves the
+automatic next-cold-launch behavior. Audio, preferences and bookmarks stay intact.
+
+The website service worker manages network-served browser assets. Capacitor loads
+bundled files under `capacitor://localhost`, so iOS uses the native signed-bundle
+installer instead. The PWA prompt cannot update those native files.
 
 ## Visible Prompt Preview
 
-The native updater currently has no visible prompt: it stages verified updates
-silently for the next cold launch. The web/PWA service worker has an
-"Update available" prompt with Apply and Later actions.
+Native checks/downloads remain automatic without interrupting practice. Once
+ready, the shared nonmodal prompt offers Apply and Later. The web/PWA service
+worker uses the same prompt, with its own activation and cancellation logic.
 
 On a local development server, open
 `/reader/?preview-update=1#/torah/parsha/vezos-haberacha` to demonstrate that
@@ -90,12 +122,15 @@ hash-named JSON snapshot in `.asc/updates/content/<compatibility>/`. It does not
 upload anything. A mismatched private/public signing key stops publication.
 `TIKKUN_UPDATE_PRIVATE_KEY_FILE` can point to an externally stored signing key.
 
-After owner deployment approval, host that directory at:
+The GitHub deployment serves the staged public files at:
 `https://tikkunreader.com/updates/content/<compatibility>/`.
-Upload the hash-named snapshot first and publish `latest.json` last. Retain
+Commit the snapshot and its signed `latest.json` together. Retain
 previous immutable files for in-flight clients. The feed needs real JSON responses,
 not the site's HTML fallback, and CORS for `capacitor://localhost`.
 `site/_headers` contains the required update-path CORS/cache headers.
+`functions/updates/[[path]].ts` also prevents Cloudflare Pages from returning its
+HTML fallback for absent feeds, returns a real 404, and sets native CORS plus
+no-store caching for manifests. Hash-named artifacts are immutable.
 
 ## Publish A Web Fix
 
@@ -112,8 +147,9 @@ TIKKUN_UPDATE_PRIVATE_KEY_FILE=.asc/update-signing/private.pem npm run updates:w
 
 The generator checks the target archive's build number, installed public key,
 and native compatibility fingerprint. Native code/config/dependency differences
-stop the release. It rejects symlinks, signing-key/audio files, and packages over
-50 MiB unpacked. The archive must itself contain this update system; the old
+stop the release. It rejects symlinks and signing-key/audio files; packages over
+50 MiB unpacked produce a warning and continue. The app also warns for downloads
+over 50 MiB. Signed byte counts and signatures remain mandatory. The archive must itself contain this update system; the old
 TestFlight build 3 cannot be used as a target.
 
 Output: `.asc/updates/web/BUILD_NUMBER/`, with a signed `latest.json` and signed,
@@ -127,7 +163,69 @@ bundles. To roll back a healthy but unwanted web revision, republish its known-g
 predecessor with a newly signed manifest. A locally quarantined failing bundle
 will not be retried; fix it and publish a new ZIP digest.
 
+## Stage And Deploy
+
+The existing Cloudflare Pages project is **tikkun**, serving `tikkun.pages.dev`
+and `tikkunreader.com`. After creating both releases, run:
+
+```sh
+npm run updates:stage -- --native-build 6
+npm run build
+```
+
+Staging verifies both manifest signatures, exact byte counts, hashes, ZIP
+signature, and the content contract before copying public artifacts into
+`site/updates/`. Only verified public artifacts enter the website; no private
+signing material is copied. Browser precaching and native asset packaging exclude
+this directory. Retain its prior immutable artifacts on subsequent deployments.
+
+Review the public artifacts, commit the release files and routing code, and push
+to **develop**. The existing Git integration builds and deploys the complete site,
+including `site/updates/` and the repository's Pages Functions. No Cloudflare login,
+new deployment configuration, direct upload, or private CI signing key is needed.
+Never commit `.asc/`, signing keys, credentials, or phone installation links.
+
+After the GitHub deployment succeeds, verify the actual public bytes:
+
+```sh
+npm run updates:verify -- --native-build 6
+```
+
+Verification checks manifest and ZIP signatures, exact byte counts and hashes,
+content compatibility, JSON/ZIP responses, native CORS, caching, and an absent-feed
+404. Build 6 is the first web-feed target; do not copy its manifest into build 5.
+Future native builds use the same updater but require their own signed
+`/updates/web/BUILD_NUMBER/` release. A newer build does not blindly install an
+older build's package. A GitHub push alone does not generate native update files;
+sign and stage approved web/content revisions locally before committing them.
+
+## Fresh Phone Builds
+
+```sh
+npm run native:share
+```
+
+This rebuilds and syncs web assets **before** asking Sqim to archive and upload.
+Running Sqim alone does not refresh Capacitor's copied web files. A web deployment
+also does not automatically create a signed native update: eligible fixes still
+need the signing, staging and publishing steps above.
+
 ## Verification And Remaining Gates
+
+- Shared prompt follow-up: 21 Node tests and 48 Chromium/WebKit tests pass,
+  including Cancel/retry, Reader teardown, Settings, and unchanged PWA behavior.
+  TypeScript, Svelte, ESLint and the native web bundle build pass. The signed
+  build-6 release has been regenerated and verified locally. Hosted delivery is
+  checked separately with `npm run updates:verify -- --native-build 6`.
+
+- Current manual-update work: type checks, Svelte and ESLint pass; 50 focused
+  Node tests and 62 unique Chromium/WebKit tests pass, including the existing
+  Settings suite. Build 6 archives successfully. A full web build and the Pages
+  Functions compilation pass. Local Pages HTTP checks verify both signatures,
+  exact bytes, CORS, cache policy, absent-feed 404, and a working Reader route.
+  The production feed and physical-device Apply/cold-launch acceptance remain
+  separate acceptance checks. The owner deferred phone acceptance until the
+  newer native app is published; no build-5 phone update is promised.
 
 - 20 unit/integration tests passed, covering real corpus/catalog/cue integration, signature tampering,
   native-build/rollout gates, failed downloads, disk-write failures, content
@@ -145,8 +243,9 @@ will not be retried; fix it and publish a new ZIP digest.
 - Before release: deploy and verify signed feeds/CORS, archive a new iOS build,
   test a real signed OTA download and rollback on a device, confirm settings/audio
   survive, review privacy/hosting behavior, and then expand beyond a test cohort.
-- This work did not publish server files, upload a new TestFlight build, change
-  tester access, or submit App Store review.
+- Native release and tester access are separate from the GitHub feed deployment.
+  Build `1.0 (5)` was uploaded and attached for TestFlight/App Store preparation;
+  build 6 has not been uploaded to App Store Connect by this feed-publishing work.
 
 Logs: `/tmp/tikkun-updates-node.log`, `/tmp/tikkun-updates-browser.log`,
 `/tmp/tikkun-updates-check.log`, `/tmp/tikkun-updates-native.log`, and
