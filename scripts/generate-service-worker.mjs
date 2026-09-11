@@ -35,6 +35,8 @@ const excludedPathPrefixes = [
   'assets/images/prototypes/',
   'old-v2.html',
   'about/',
+  'privacy/',
+  'support/',
   'settings/',
   'tidbits/',
   'assets/images/home-ambient.jpg',
@@ -159,7 +161,7 @@ function filesForManifestEntries(manifest, sourcePaths) {
 
 export function deferredRouteNodeSources(clientAppSource) {
   const nodeIds = new Set()
-  const routePattern = /^\s*"(?:\/prototypes[^"]*|\/(?:\(site\)\/)?(?:old-v2\.html|about|settings|tidbits(?:\/[^"]*)?))":\s*\[(\d+)(?:,\[([^\]]*)\])?\],?$/gm
+  const routePattern = /^\s*"(?:\/prototypes[^"]*|\/(?:\(site\)\/)?(?:old-v2\.html|about|privacy|support|settings|tidbits(?:\/[^"]*)?))":\s*\[(\d+)(?:,\[([^\]]*)\])?\],?$/gm
   for (const match of clientAppSource.matchAll(routePattern)) {
     nodeIds.add(Number(match[1]))
     // Informational pages share the public layout with the offline Reading Index.

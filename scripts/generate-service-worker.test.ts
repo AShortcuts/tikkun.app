@@ -301,12 +301,16 @@ test('finds prototype and backup nodes while keeping the homepage in the shell',
       "/(site)/tidbits/[slug]": [12,[3]],
       "/prototypes": [10],
       "/prototypes/scroll-story": [16,[4]],
+      "/(site)/privacy": [17,[3]],
+      "/(site)/support": [18,[3]],
     `)].sort()
   ).toEqual([
     '.svelte-kit/generated/client-optimized/nodes/10.js',
     '.svelte-kit/generated/client-optimized/nodes/11.js',
     '.svelte-kit/generated/client-optimized/nodes/12.js',
     '.svelte-kit/generated/client-optimized/nodes/16.js',
+    '.svelte-kit/generated/client-optimized/nodes/17.js',
+    '.svelte-kit/generated/client-optimized/nodes/18.js',
     '.svelte-kit/generated/client-optimized/nodes/4.js',
     '.svelte-kit/generated/client-optimized/nodes/7.js',
     '.svelte-kit/generated/client-optimized/nodes/8.js',
@@ -355,6 +359,8 @@ test('precache keeps the app shell small and excludes deferred content', () => {
   expect(shouldPrecache('prototypes/index.html', excludedFiles)).toBe(false)
   expect(shouldPrecache('old-v2.html', excludedFiles)).toBe(false)
   expect(shouldPrecache('about/index.html', excludedFiles)).toBe(false)
+  expect(shouldPrecache('privacy/index.html', excludedFiles)).toBe(false)
+  expect(shouldPrecache('support/index.html', excludedFiles)).toBe(false)
   expect(shouldPrecache('settings/index.html', excludedFiles)).toBe(false)
   expect(shouldPrecache('tidbits/index.html', excludedFiles)).toBe(false)
   expect(shouldPrecache('tidbits/example/index.html', excludedFiles)).toBe(false)
@@ -368,6 +374,38 @@ test('precache keeps the app shell small and excludes deferred content', () => {
   expect(
     shouldPrecache('assets/images/prototypes/reader.png', excludedFiles)
   ).toBe(false)
+})
+
+test('privacy and support defer their shared assets but retain the reading index layout', () => {
+  const { excludedFiles } = classifyManifestFiles({
+    '.svelte-kit/generated/client-optimized/nodes/3.js': {
+      file: 'site-layout.js', isEntry: true, css: ['site.css'],
+    },
+    '.svelte-kit/generated/client-optimized/nodes/8.js': {
+      file: 'readings.js', isEntry: true,
+    },
+    '.svelte-kit/generated/client-optimized/nodes/17.js': {
+      file: 'privacy.js', isEntry: true, imports: ['information-page'],
+    },
+    '.svelte-kit/generated/client-optimized/nodes/18.js': {
+      file: 'support.js', isEntry: true, imports: ['information-page'],
+    },
+    'information-page': {
+      file: 'information.js', css: ['information.css'],
+      imports: ['.svelte-kit/generated/client-optimized/nodes/3.js'],
+    },
+  }, deferredRouteNodeSources(`
+    "/(site)/readings": [8,[3]],
+    "/(site)/privacy": [17,[3]],
+    "/(site)/support": [18,[3]],
+  `))
+
+  expect([...excludedFiles].sort()).toEqual([
+    'information.css', 'information.js', 'privacy.js', 'support.js',
+  ])
+  for (const file of ['readings.js', 'site-layout.js', 'site.css']) {
+    expect(shouldPrecache(file, excludedFiles)).toBe(true)
+  }
 })
 
 test('passage playback tools load on demand without excluding shared reader code', () => {
