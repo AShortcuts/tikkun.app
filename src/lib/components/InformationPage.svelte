@@ -15,8 +15,8 @@
     <h1 id={`${current}-title`}>{title}</h1>
     <p>{introduction}</p>
     <nav aria-label="Help and privacy">
-      <a href={resolve('/support/')} aria-current={current === 'support' ? 'page' : undefined}>Support</a>
-      <a href={resolve('/privacy/')} aria-current={current === 'privacy' ? 'page' : undefined}>Privacy policy</a>
+      <a href={resolve('/support')} aria-current={current === 'support' ? 'page' : undefined}>Support</a>
+      <a href={resolve('/privacy')} aria-current={current === 'privacy' ? 'page' : undefined}>Privacy policy</a>
     </nav>
   </header>
   <div class="information-body">

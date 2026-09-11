@@ -6,6 +6,22 @@ cypress/screenshots
 .vitest-attachments/
 .DS_Store
 .asc/
+.sqim/
+# Local credentials and signing material. Only the pinned public key is shared.
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+!config/update-public-key.pem
+*.key
+*.p8
+*.p12
+*.pfx
+*.mobileprovision
+*.provisionprofile
+*.ipa
+*.xcarchive/
 download
 dist
 dist-native/

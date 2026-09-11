@@ -149,18 +149,26 @@ test('loads the real About route with support and project status', async () => {
   await assertRouteHealthy(route.document, errorCapture)
 })
 
+test.each(['/privacy', '/support'])('redirects the legacy trailing slash to %s', async (pathname) => {
+  const response = await fetch(`${pathname}/?from=legacy`)
+  expect(response.ok).toBe(true)
+  expect(response.redirected).toBe(true)
+  expect(new URL(response.url).pathname).toBe(pathname)
+  expect(new URL(response.url).search).toBe('?from=legacy')
+})
+
 test.each([1280, 390])('keeps Privacy and Support readable and connected at %ipx', async (width) => {
-  const route = await loadRoute('/privacy/', '#privacy-title', 'Privacy Policy — Tikkun Reader')
+  const route = await loadRoute('/privacy', '#privacy-title', 'Privacy Policy — Tikkun Reader')
   errorCapture = captureRouteErrors(route.view, 'Privacy and support')
   frame!.style.width = `${width}px`
   await settleDocument(route.document)
   expect(route.document.querySelector('main')?.textContent).toContain('What stays on your device')
   expect(route.document.documentElement.scrollWidth).toBeLessThanOrEqual(width)
-  expect(required<HTMLAnchorElement>(route.document, 'footer a[href="/support/"]').textContent).toBe('Support')
+  expect(required<HTMLAnchorElement>(route.document, 'footer a[href="/support"]').textContent).toBe('Support')
 
-  click(route.document, 'nav[aria-label="Help and privacy"] a[href="/support/"]')
+  click(route.document, 'nav[aria-label="Help and privacy"] a[href="/support"]')
   await vi.waitFor(() => {
-    expect(route.view.location.pathname).toBe('/support/')
+    expect(route.view.location.pathname).toBe('/support')
     expect(route.document.title).toBe('Support — Tikkun Reader')
   })
   await settleDocument(route.document)
@@ -168,7 +176,7 @@ test.each([1280, 390])('keeps Privacy and Support readable and connected at %ipx
   expect(required(route.document, '.support-email').textContent).toBe('support@oceanoftorah.com')
   expect(required<HTMLAnchorElement>(route.document, 'main a.site-primary-action').getAttribute('href'))
     .toBe('mailto:support@oceanoftorah.com?subject=Tikkun%20Reader%20support')
-  expect(required<HTMLAnchorElement>(route.document, 'footer a[href="/privacy/"]').textContent).toBe('Privacy policy')
+  expect(required<HTMLAnchorElement>(route.document, 'footer a[href="/privacy"]').textContent).toBe('Privacy policy')
   expect(route.document.documentElement.scrollWidth).toBeLessThanOrEqual(width)
   await assertRouteHealthy(route.document, errorCapture)
 })

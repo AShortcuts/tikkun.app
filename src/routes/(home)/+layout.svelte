@@ -61,15 +61,15 @@
       <p>A Torah-reading companion by Ocean of Torah</p>
     </div>
     <nav aria-label="Footer navigation">
-      <a href={resolve('/support/')}>Support</a>
-      <a href={resolve('/privacy/')}>Privacy policy</a>
+      <a href={resolve('/support')}>Support</a>
+      <a href={resolve('/privacy')}>Privacy policy</a>
       <a href={resolve('/readings/')}>Readings & coverage</a>
       <a href={resolve('/tidbits/')}>Tidbits</a>
       <a href={resolve('/about/')}>About</a>
       <a href="https://github.com/AShortcuts/tikkun.app" rel="noreferrer">Source</a>
     </nav>
     <p class="scroll-footer-credit">
-      Recordings by Yoni Davidov. Reader and timing tools by Tikkun Reader.
+      Recordings by Yoni Davidov. Reader and timing tools by Adam Niyazov.
     </p>
   </footer>
 </div>

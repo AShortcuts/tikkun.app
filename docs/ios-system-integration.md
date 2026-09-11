@@ -3,8 +3,8 @@
 Updated: 2026-09-11. Editable implementation and acceptance reference.
 
 Latest packaging checkpoint: app and widget are now **1.0 (3)**. The theme repair,
-Simulator verification and Sqim delivery succeeded; install through
-[the updated iPhone link](https://build.sqim.dev/sqim/install/bs7X-ngfodQq).
+Simulator verification and Sqim delivery succeeded. Private installation links
+belong in ignored local release records, not this public repository.
 Build 3 is now uploaded to TestFlight, processed `VALID`, and attached to version
 1.0 (`cc9aa9c7-1d76-442c-87d6-71ca12fb59df`). Xcode GUI cloud signing succeeded for
 Adam Niyazov (`5D862AQ8GV`) despite the CLI account-lookup failure. English test
@@ -64,8 +64,7 @@ gates. The initial feature-verification record below is historical.
   `com.adamn.tikkunreader`, primary locale `en-US`.
 - TestFlight upload completed and Apple processing passed: **VALID**, build ID
   `45fe2a84-729f-4b61-b7d1-716a5c6dd291`. English What to Test notes are attached.
-- Initial feature development-signed delivery:
-  [Install on iPhone](https://build.sqim.dev/sqim/install/ue8jzWiZ0KA7).
+- Initial feature development-signed delivery succeeded through Sqim.
 
 ## Verification
 

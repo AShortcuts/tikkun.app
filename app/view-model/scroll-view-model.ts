@@ -1,4 +1,5 @@
 import type { LineType } from '../components/Page.ts'
+import { activeContent } from '../updates/content-runtime.ts'
 import type { Ref, RefWithScroll, ScrollName } from '../ref.ts'
 import { LeiningGenerator } from '../calendar-model/generator.ts'
 import type {
@@ -48,6 +49,8 @@ const pageLoaders: Record<string, PageLoader> | null = isNodeRuntime
     })
 
 export async function loadScrollPageLines(scroll: ScrollName, pageNumber: number): Promise<LineType[]> {
+    const updated = activeContent()?.pages[`${scroll}/${pageNumber}`]
+    if (updated) return updated
     const pageLoader =
       pageLoaders?.[
         `../../text/pages/${scroll}/${pageNumber}.json`

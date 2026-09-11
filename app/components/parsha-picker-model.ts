@@ -481,7 +481,11 @@ export function buildParshaPickerModel(
         ? `parsha-aliyot-${choiceId++}`
         : leiningKey(leining),
       label,
-      englishLabel: englishReadingLabel(leining),
+      englishLabel: includeAliyot
+        ? isVezosHabracha(firstRunOf(leining))
+          ? 'Vezos Haberacha'
+          : englishLeiningTitle(leining).replace(/^Parshat\s+/, '')
+        : englishReadingLabel(leining),
       href: navigationHrefForLeining(leining),
       aliyahGroups,
     }

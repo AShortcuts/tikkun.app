@@ -39,6 +39,6 @@
   </section>
   <section aria-labelledby="privacy-changes">
     <h2 id="privacy-changes">Changes to this policy</h2>
-    <p>We will update this page and its date when our practices change. If anything is unclear, <a href={resolve('/support/')}>get in touch</a>.</p>
+    <p>We will update this page and its date when our practices change. If anything is unclear, <a href={resolve('/support')}>get in touch</a>.</p>
   </section>
 </InformationPage>

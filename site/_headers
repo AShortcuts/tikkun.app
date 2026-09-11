@@ -8,3 +8,7 @@
 
 /.well-known/apple-app-site-association
   Content-Type: application/json
+
+/updates/*
+  Access-Control-Allow-Origin: capacitor://localhost
+  Cache-Control: no-store

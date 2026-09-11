@@ -1,0 +1,1495 @@
+{
+  "renderer": "Playwright Chromium, forced sRGB, opaque canvas",
+  "mobileGallery": {
+    "width": 390,
+    "scroll": 390
+  },
+  "records": [
+    {
+      "device": "iphone",
+      "index": 0,
+      "width": 1284,
+      "height": 2778,
+      "scene": {
+        "slug": "within-reach",
+        "title": "Your next aliyah,<br><em>within reach.</em>",
+        "sub": "Read. Listen. Practice.",
+        "capture": "01-reader.png",
+        "kind": "hero",
+        "palette": "paper",
+        "foot": "Tikkun Reader"
+      },
+      "geometry": {
+        "w": 1470,
+        "h": 3000,
+        "screen": [
+          75,
+          66,
+          1320,
+          2868
+        ],
+        "radius": 185,
+        "frame": "iphone-17-pro-max-silver.png"
+      },
+      "title": {
+        "x": 92,
+        "y": 212,
+        "width": 1100,
+        "height": 246.375,
+        "bottom": 458.375,
+        "right": 1192
+      },
+      "copy": {
+        "x": 92,
+        "y": 212,
+        "width": 1100,
+        "height": 325.875,
+        "bottom": 537.875,
+        "right": 1192
+      },
+      "devices": [
+        {
+          "x": 97,
+          "y": 730,
+          "width": 1090,
+          "height": 2224.484375,
+          "bottom": 2954.484375,
+          "right": 1187
+        }
+      ],
+      "details": [],
+      "fontLoaded": true,
+      "images": [
+        {
+          "src": "../captures/iphone/01-reader.png",
+          "width": 1320,
+          "height": 2868
+        },
+        {
+          "src": "assets/iphone-17-pro-max-silver.png",
+          "width": 1470,
+          "height": 3000
+        }
+      ],
+      "filename": "01-within-reach.png"
+    },
+    {
+      "device": "iphone",
+      "index": 1,
+      "width": 1284,
+      "height": 2778,
+      "scene": {
+        "slug": "hear-and-follow",
+        "title": "Hear it.<br><em>Follow it.</em>",
+        "sub": "Listen with word-by-word highlighting.",
+        "capture": "03-audio.png",
+        "kind": "full",
+        "palette": "blue",
+        "foot": "Audio and word timing vary by reading."
+      },
+      "geometry": {
+        "w": 1470,
+        "h": 3000,
+        "screen": [
+          75,
+          66,
+          1320,
+          2868
+        ],
+        "radius": 185,
+        "frame": "iphone-17-pro-max-silver.png"
+      },
+      "title": {
+        "x": 92,
+        "y": 212,
+        "width": 1100,
+        "height": 246.375,
+        "bottom": 458.375,
+        "right": 1192
+      },
+      "copy": {
+        "x": 92,
+        "y": 212,
+        "width": 1100,
+        "height": 325.875,
+        "bottom": 537.875,
+        "right": 1192
+      },
+      "devices": [
+        {
+          "x": 209.5,
+          "y": 740,
+          "width": 865,
+          "height": 1765.296875,
+          "bottom": 2505.296875,
+          "right": 1074.5
+        }
+      ],
+      "details": [],
+      "fontLoaded": true,
+      "images": [
+        {
+          "src": "../captures/iphone/03-audio.png",
+          "width": 1320,
+          "height": 2868
+        },
+        {
+          "src": "assets/iphone-17-pro-max-silver.png",
+          "width": 1470,
+          "height": 3000
+        }
+      ],
+      "filename": "02-hear-and-follow.png"
+    },
+    {
+      "device": "iphone",
+      "index": 2,
+      "width": 1284,
+      "height": 2778,
+      "scene": {
+        "slug": "practice",
+        "title": "Now try<br><em>without vowels.</em>",
+        "sub": "Hide nekudot and cantillation. Keep your place.",
+        "capture": "02-practice.png",
+        "kind": "tilt",
+        "palette": "paper",
+        "foot": "Build your reading practice."
+      },
+      "geometry": {
+        "w": 1470,
+        "h": 3000,
+        "screen": [
+          75,
+          66,
+          1320,
+          2868
+        ],
+        "radius": 185,
+        "frame": "iphone-17-pro-max-silver.png"
+      },
+      "title": {
+        "x": 92,
+        "y": 212,
+        "width": 1100,
+        "height": 246.375,
+        "bottom": 458.375,
+        "right": 1192
+      },
+      "copy": {
+        "x": 92,
+        "y": 212,
+        "width": 1100,
+        "height": 325.875,
+        "bottom": 537.875,
+        "right": 1192
+      },
+      "devices": [
+        {
+          "x": 155.1826629638672,
+          "y": 727.3043212890625,
+          "width": 974.6347045898438,
+          "height": 1800.2818603515625,
+          "bottom": 2527.586181640625,
+          "right": 1129.817367553711
+        }
+      ],
+      "details": [],
+      "fontLoaded": true,
+      "images": [
+        {
+          "src": "../captures/iphone/02-practice.png",
+          "width": 1320,
+          "height": 2868
+        },
+        {
+          "src": "assets/iphone-17-pro-max-silver.png",
+          "width": 1470,
+          "height": 3000
+        }
+      ],
+      "filename": "03-practice.png"
+    },
+    {
+      "device": "iphone",
+      "index": 3,
+      "width": 1284,
+      "height": 2778,
+      "scene": {
+        "slug": "find-reading",
+        "title": "Find your<br><em>next reading.</em>",
+        "sub": "A library with upcoming readings close at hand.",
+        "capture": "08-library.png",
+        "kind": "full",
+        "palette": "ice",
+        "foot": "Israel and Diaspora calendar settings."
+      },
+      "geometry": {
+        "w": 1470,
+        "h": 3000,
+        "screen": [
+          75,
+          66,
+          1320,
+          2868
+        ],
+        "radius": 185,
+        "frame": "iphone-17-pro-max-silver.png"
+      },
+      "title": {
+        "x": 92,
+        "y": 212,
+        "width": 1100,
+        "height": 246.375,
+        "bottom": 458.375,
+        "right": 1192
+      },
+      "copy": {
+        "x": 92,
+        "y": 212,
+        "width": 1100,
+        "height": 325.875,
+        "bottom": 537.875,
+        "right": 1192
+      },
+      "devices": [
+        {
+          "x": 209.5,
+          "y": 740,
+          "width": 865,
+          "height": 1765.296875,
+          "bottom": 2505.296875,
+          "right": 1074.5
+        }
+      ],
+      "details": [],
+      "fontLoaded": true,
+      "images": [
+        {
+          "src": "../captures/iphone/08-library.png",
+          "width": 1320,
+          "height": 2868
+        },
+        {
+          "src": "assets/iphone-17-pro-max-silver.png",
+          "width": 1470,
+          "height": 3000
+        }
+      ],
+      "filename": "04-find-reading.png"
+    },
+    {
+      "device": "iphone",
+      "index": 4,
+      "width": 1284,
+      "height": 2778,
+      "scene": {
+        "slug": "choose-aliyah",
+        "title": "Straight to<br><em>your aliyah.</em>",
+        "sub": "Choose a section. Play available recordings.",
+        "capture": "09-aliyah.png",
+        "kind": "aliyah",
+        "palette": "paper",
+        "foot": "Start where you need to practice."
+      },
+      "geometry": {
+        "w": 1470,
+        "h": 3000,
+        "screen": [
+          75,
+          66,
+          1320,
+          2868
+        ],
+        "radius": 185,
+        "frame": "iphone-17-pro-max-silver.png"
+      },
+      "title": {
+        "x": 92,
+        "y": 212,
+        "width": 1100,
+        "height": 246.375,
+        "bottom": 458.375,
+        "right": 1192
+      },
+      "copy": {
+        "x": 92,
+        "y": 212,
+        "width": 1100,
+        "height": 325.875,
+        "bottom": 537.875,
+        "right": 1192
+      },
+      "devices": [
+        {
+          "x": 209.5,
+          "y": 740,
+          "width": 865,
+          "height": 1765.296875,
+          "bottom": 2505.296875,
+          "right": 1074.5
+        }
+      ],
+      "details": [],
+      "fontLoaded": true,
+      "images": [
+        {
+          "src": "../captures/iphone/09-aliyah.png",
+          "width": 1320,
+          "height": 2868
+        },
+        {
+          "src": "assets/iphone-17-pro-max-silver.png",
+          "width": 1470,
+          "height": 3000
+        }
+      ],
+      "filename": "05-choose-aliyah.png"
+    },
+    {
+      "device": "iphone",
+      "index": 5,
+      "width": 1284,
+      "height": 2778,
+      "scene": {
+        "slug": "your-layout",
+        "title": "A layout<br><em>that fits.</em>",
+        "sub": "Flowing Reading or Torah-line Match.",
+        "capture": "06-settings.png",
+        "kind": "detail",
+        "palette": "paper",
+        "foot": "Side-by-side views on supported layouts.",
+        "crop": {
+          "iphone": [
+            145,
+            176,
+            1125,
+            1330
+          ],
+          "ipad": [
+            1180,
+            124,
+            850,
+            970
+          ]
+        }
+      },
+      "geometry": {
+        "w": 1470,
+        "h": 3000,
+        "screen": [
+          75,
+          66,
+          1320,
+          2868
+        ],
+        "radius": 185,
+        "frame": "iphone-17-pro-max-silver.png"
+      },
+      "title": {
+        "x": 92,
+        "y": 212,
+        "width": 1100,
+        "height": 246.375,
+        "bottom": 458.375,
+        "right": 1192
+      },
+      "copy": {
+        "x": 92,
+        "y": 212,
+        "width": 1100,
+        "height": 325.875,
+        "bottom": 537.875,
+        "right": 1192
+      },
+      "devices": [
+        {
+          "x": 600.733154296875,
+          "y": 1233.8997802734375,
+          "width": 718.53369140625,
+          "height": 1358.7159423828125,
+          "bottom": 2592.61572265625,
+          "right": 1319.266845703125
+        }
+      ],
+      "details": [
+        {
+          "x": 92,
+          "y": 795,
+          "width": 900,
+          "height": 1106,
+          "bottom": 1901,
+          "right": 992
+        }
+      ],
+      "fontLoaded": true,
+      "images": [
+        {
+          "src": "../captures/iphone/06-settings.png",
+          "width": 1320,
+          "height": 2868
+        },
+        {
+          "src": "assets/iphone-17-pro-max-silver.png",
+          "width": 1470,
+          "height": 3000
+        },
+        {
+          "src": "../captures/iphone/06-settings.png",
+          "width": 1320,
+          "height": 2868
+        }
+      ],
+      "filename": "06-your-layout.png"
+    },
+    {
+      "device": "iphone",
+      "index": 6,
+      "width": 1284,
+      "height": 2778,
+      "scene": {
+        "slug": "your-pace",
+        "title": "Practice<br><em>at your pace.</em>",
+        "sub": "Adjust playback speed for your practice.",
+        "capture": "10-playback.png",
+        "kind": "detail",
+        "palette": "blue",
+        "foot": "Listen with available aliyah recordings.",
+        "crop": {
+          "iphone": [
+            145,
+            176,
+            1125,
+            1590
+          ],
+          "ipad": [
+            1180,
+            124,
+            850,
+            1080
+          ]
+        }
+      },
+      "geometry": {
+        "w": 1470,
+        "h": 3000,
+        "screen": [
+          75,
+          66,
+          1320,
+          2868
+        ],
+        "radius": 185,
+        "frame": "iphone-17-pro-max-silver.png"
+      },
+      "title": {
+        "x": 92,
+        "y": 212,
+        "width": 1100,
+        "height": 246.375,
+        "bottom": 458.375,
+        "right": 1192
+      },
+      "copy": {
+        "x": 92,
+        "y": 212,
+        "width": 1100,
+        "height": 325.875,
+        "bottom": 537.875,
+        "right": 1192
+      },
+      "devices": [
+        {
+          "x": 600.733154296875,
+          "y": 1233.8997802734375,
+          "width": 718.53369140625,
+          "height": 1358.7159423828125,
+          "bottom": 2592.61572265625,
+          "right": 1319.266845703125
+        }
+      ],
+      "details": [
+        {
+          "x": 92,
+          "y": 795,
+          "width": 900,
+          "height": 1314,
+          "bottom": 2109,
+          "right": 992
+        }
+      ],
+      "fontLoaded": true,
+      "images": [
+        {
+          "src": "../captures/iphone/10-playback.png",
+          "width": 1320,
+          "height": 2868
+        },
+        {
+          "src": "assets/iphone-17-pro-max-silver.png",
+          "width": 1470,
+          "height": 3000
+        },
+        {
+          "src": "../captures/iphone/10-playback.png",
+          "width": 1320,
+          "height": 2868
+        }
+      ],
+      "filename": "07-your-pace.png"
+    },
+    {
+      "device": "iphone",
+      "index": 7,
+      "width": 1284,
+      "height": 2778,
+      "scene": {
+        "slug": "take-it-along",
+        "title": "Take the<br><em>recording along.</em>",
+        "sub": "Save available audio for offline listening.",
+        "capture": "04-media.png",
+        "kind": "full",
+        "palette": "paper",
+        "foot": "Download recordings while online."
+      },
+      "geometry": {
+        "w": 1470,
+        "h": 3000,
+        "screen": [
+          75,
+          66,
+          1320,
+          2868
+        ],
+        "radius": 185,
+        "frame": "iphone-17-pro-max-silver.png"
+      },
+      "title": {
+        "x": 92,
+        "y": 212,
+        "width": 1100,
+        "height": 246.375,
+        "bottom": 458.375,
+        "right": 1192
+      },
+      "copy": {
+        "x": 92,
+        "y": 212,
+        "width": 1100,
+        "height": 325.875,
+        "bottom": 537.875,
+        "right": 1192
+      },
+      "devices": [
+        {
+          "x": 209.5,
+          "y": 740,
+          "width": 865,
+          "height": 1765.296875,
+          "bottom": 2505.296875,
+          "right": 1074.5
+        }
+      ],
+      "details": [],
+      "fontLoaded": true,
+      "images": [
+        {
+          "src": "../captures/iphone/04-media.png",
+          "width": 1320,
+          "height": 2868
+        },
+        {
+          "src": "assets/iphone-17-pro-max-silver.png",
+          "width": 1470,
+          "height": 3000
+        }
+      ],
+      "filename": "08-take-it-along.png"
+    },
+    {
+      "device": "iphone",
+      "index": 8,
+      "width": 1284,
+      "height": 2778,
+      "scene": {
+        "slug": "saved-on-device",
+        "title": "Know what<br><em>is saved.</em>",
+        "sub": "See and manage recordings on your device.",
+        "capture": "05-storage.png",
+        "kind": "full",
+        "palette": "ice",
+        "foot": "Clear storage. Keep the readings you need."
+      },
+      "geometry": {
+        "w": 1470,
+        "h": 3000,
+        "screen": [
+          75,
+          66,
+          1320,
+          2868
+        ],
+        "radius": 185,
+        "frame": "iphone-17-pro-max-silver.png"
+      },
+      "title": {
+        "x": 92,
+        "y": 212,
+        "width": 1100,
+        "height": 246.375,
+        "bottom": 458.375,
+        "right": 1192
+      },
+      "copy": {
+        "x": 92,
+        "y": 212,
+        "width": 1100,
+        "height": 325.875,
+        "bottom": 537.875,
+        "right": 1192
+      },
+      "devices": [
+        {
+          "x": 209.5,
+          "y": 740,
+          "width": 865,
+          "height": 1765.296875,
+          "bottom": 2505.296875,
+          "right": 1074.5
+        }
+      ],
+      "details": [],
+      "fontLoaded": true,
+      "images": [
+        {
+          "src": "../captures/iphone/05-storage.png",
+          "width": 1320,
+          "height": 2868
+        },
+        {
+          "src": "assets/iphone-17-pro-max-silver.png",
+          "width": 1470,
+          "height": 3000
+        }
+      ],
+      "filename": "09-saved-on-device.png"
+    },
+    {
+      "device": "iphone",
+      "index": 9,
+      "width": 1284,
+      "height": 2778,
+      "scene": {
+        "slug": "after-dark",
+        "title": "A quieter view<br><em>after dark.</em>",
+        "sub": "Choose the appearance that suits your reading.",
+        "capture": "07-dark.png",
+        "kind": "full",
+        "palette": "night",
+        "foot": "Light, dark, and sepia appearances."
+      },
+      "geometry": {
+        "w": 1470,
+        "h": 3000,
+        "screen": [
+          75,
+          66,
+          1320,
+          2868
+        ],
+        "radius": 185,
+        "frame": "iphone-17-pro-max-silver.png"
+      },
+      "title": {
+        "x": 92,
+        "y": 212,
+        "width": 1100,
+        "height": 246.375,
+        "bottom": 458.375,
+        "right": 1192
+      },
+      "copy": {
+        "x": 92,
+        "y": 212,
+        "width": 1100,
+        "height": 325.875,
+        "bottom": 537.875,
+        "right": 1192
+      },
+      "devices": [
+        {
+          "x": 209.5,
+          "y": 740,
+          "width": 865,
+          "height": 1765.296875,
+          "bottom": 2505.296875,
+          "right": 1074.5
+        }
+      ],
+      "details": [],
+      "fontLoaded": true,
+      "images": [
+        {
+          "src": "../captures/iphone/07-dark.png",
+          "width": 1320,
+          "height": 2868
+        },
+        {
+          "src": "assets/iphone-17-pro-max-silver.png",
+          "width": 1470,
+          "height": 3000
+        }
+      ],
+      "filename": "10-after-dark.png"
+    },
+    {
+      "device": "ipad",
+      "index": 0,
+      "width": 2064,
+      "height": 2752,
+      "scene": {
+        "slug": "within-reach",
+        "title": "Your next aliyah,<br><em>within reach.</em>",
+        "sub": "Read. Listen. Practice.",
+        "capture": "01-reader.png",
+        "kind": "hero",
+        "palette": "paper",
+        "foot": "Tikkun Reader"
+      },
+      "geometry": {
+        "w": 2300,
+        "h": 3000,
+        "screen": [
+          118,
+          124,
+          2064,
+          2752
+        ],
+        "radius": 65,
+        "frame": "ipad-pro-13-silver.png"
+      },
+      "title": {
+        "x": 124,
+        "y": 219,
+        "width": 1816,
+        "height": 323.375,
+        "bottom": 542.375,
+        "right": 1940
+      },
+      "copy": {
+        "x": 124,
+        "y": 219,
+        "width": 1816,
+        "height": 414.875,
+        "bottom": 633.875,
+        "right": 1940
+      },
+      "devices": [
+        {
+          "x": 142,
+          "y": 760,
+          "width": 1780,
+          "height": 2321.734375,
+          "bottom": 3081.734375,
+          "right": 1922
+        }
+      ],
+      "details": [],
+      "fontLoaded": true,
+      "images": [
+        {
+          "src": "../captures/ipad/01-reader.png",
+          "width": 2064,
+          "height": 2752
+        },
+        {
+          "src": "assets/ipad-pro-13-silver.png",
+          "width": 2300,
+          "height": 3000
+        }
+      ],
+      "filename": "01-within-reach.png"
+    },
+    {
+      "device": "ipad",
+      "index": 1,
+      "width": 2064,
+      "height": 2752,
+      "scene": {
+        "slug": "hear-and-follow",
+        "title": "Hear it.<br><em>Follow it.</em>",
+        "sub": "Listen with word-by-word highlighting.",
+        "capture": "03-audio.png",
+        "kind": "full",
+        "palette": "blue",
+        "foot": "Audio and word timing vary by reading."
+      },
+      "geometry": {
+        "w": 2300,
+        "h": 3000,
+        "screen": [
+          118,
+          124,
+          2064,
+          2752
+        ],
+        "radius": 65,
+        "frame": "ipad-pro-13-silver.png"
+      },
+      "title": {
+        "x": 124,
+        "y": 219,
+        "width": 1816,
+        "height": 323.375,
+        "bottom": 542.375,
+        "right": 1940
+      },
+      "copy": {
+        "x": 124,
+        "y": 219,
+        "width": 1816,
+        "height": 414.875,
+        "bottom": 633.875,
+        "right": 1940
+      },
+      "devices": [
+        {
+          "x": 312,
+          "y": 715,
+          "width": 1440,
+          "height": 1878.25,
+          "bottom": 2593.25,
+          "right": 1752
+        }
+      ],
+      "details": [],
+      "fontLoaded": true,
+      "images": [
+        {
+          "src": "../captures/ipad/03-audio.png",
+          "width": 2064,
+          "height": 2752
+        },
+        {
+          "src": "assets/ipad-pro-13-silver.png",
+          "width": 2300,
+          "height": 3000
+        }
+      ],
+      "filename": "02-hear-and-follow.png"
+    },
+    {
+      "device": "ipad",
+      "index": 2,
+      "width": 2064,
+      "height": 2752,
+      "scene": {
+        "slug": "practice",
+        "title": "Now try<br><em>without vowels.</em>",
+        "sub": "Hide nekudot and cantillation. Keep your place.",
+        "capture": "02-practice.png",
+        "kind": "tilt",
+        "palette": "paper",
+        "foot": "Build your reading practice."
+      },
+      "geometry": {
+        "w": 2300,
+        "h": 3000,
+        "screen": [
+          118,
+          124,
+          2064,
+          2752
+        ],
+        "radius": 65,
+        "frame": "ipad-pro-13-silver.png"
+      },
+      "title": {
+        "x": 124,
+        "y": 219,
+        "width": 1816,
+        "height": 323.375,
+        "bottom": 542.375,
+        "right": 1940
+      },
+      "copy": {
+        "x": 124,
+        "y": 219,
+        "width": 1816,
+        "height": 414.875,
+        "bottom": 633.875,
+        "right": 1940
+      },
+      "devices": [
+        {
+          "x": 270.0147705078125,
+          "y": 693.3945922851562,
+          "width": 1523.970458984375,
+          "height": 1919.2890625,
+          "bottom": 2612.6836547851562,
+          "right": 1793.9852294921875
+        }
+      ],
+      "details": [],
+      "fontLoaded": true,
+      "images": [
+        {
+          "src": "../captures/ipad/02-practice.png",
+          "width": 2064,
+          "height": 2752
+        },
+        {
+          "src": "assets/ipad-pro-13-silver.png",
+          "width": 2300,
+          "height": 3000
+        }
+      ],
+      "filename": "03-practice.png"
+    },
+    {
+      "device": "ipad",
+      "index": 3,
+      "width": 2064,
+      "height": 2752,
+      "scene": {
+        "slug": "find-reading",
+        "title": "Find your<br><em>next reading.</em>",
+        "sub": "A library with upcoming readings close at hand.",
+        "capture": "08-library.png",
+        "kind": "full",
+        "palette": "ice",
+        "foot": "Israel and Diaspora calendar settings."
+      },
+      "geometry": {
+        "w": 2300,
+        "h": 3000,
+        "screen": [
+          118,
+          124,
+          2064,
+          2752
+        ],
+        "radius": 65,
+        "frame": "ipad-pro-13-silver.png"
+      },
+      "title": {
+        "x": 124,
+        "y": 219,
+        "width": 1816,
+        "height": 323.375,
+        "bottom": 542.375,
+        "right": 1940
+      },
+      "copy": {
+        "x": 124,
+        "y": 219,
+        "width": 1816,
+        "height": 414.875,
+        "bottom": 633.875,
+        "right": 1940
+      },
+      "devices": [
+        {
+          "x": 312,
+          "y": 715,
+          "width": 1440,
+          "height": 1878.25,
+          "bottom": 2593.25,
+          "right": 1752
+        }
+      ],
+      "details": [],
+      "fontLoaded": true,
+      "images": [
+        {
+          "src": "../captures/ipad/08-library.png",
+          "width": 2064,
+          "height": 2752
+        },
+        {
+          "src": "assets/ipad-pro-13-silver.png",
+          "width": 2300,
+          "height": 3000
+        }
+      ],
+      "filename": "04-find-reading.png"
+    },
+    {
+      "device": "ipad",
+      "index": 4,
+      "width": 2064,
+      "height": 2752,
+      "scene": {
+        "slug": "choose-aliyah",
+        "title": "Straight to<br><em>your aliyah.</em>",
+        "sub": "Choose a section. Play available recordings.",
+        "capture": "09-aliyah.png",
+        "kind": "aliyah",
+        "palette": "paper",
+        "foot": "Start where you need to practice."
+      },
+      "geometry": {
+        "w": 2300,
+        "h": 3000,
+        "screen": [
+          118,
+          124,
+          2064,
+          2752
+        ],
+        "radius": 65,
+        "frame": "ipad-pro-13-silver.png"
+      },
+      "title": {
+        "x": 124,
+        "y": 219,
+        "width": 1816,
+        "height": 323.375,
+        "bottom": 542.375,
+        "right": 1940
+      },
+      "copy": {
+        "x": 124,
+        "y": 219,
+        "width": 1816,
+        "height": 414.875,
+        "bottom": 633.875,
+        "right": 1940
+      },
+      "devices": [
+        {
+          "x": 865,
+          "y": 975,
+          "width": 1120,
+          "height": 1460.859375,
+          "bottom": 2435.859375,
+          "right": 1985
+        }
+      ],
+      "details": [
+        {
+          "x": 160,
+          "y": 790,
+          "width": 510,
+          "height": 1203,
+          "bottom": 1993,
+          "right": 670
+        }
+      ],
+      "fontLoaded": true,
+      "images": [
+        {
+          "src": "../captures/ipad/09-aliyah.png",
+          "width": 2064,
+          "height": 2752
+        },
+        {
+          "src": "assets/ipad-pro-13-silver.png",
+          "width": 2300,
+          "height": 3000
+        },
+        {
+          "src": "../captures/ipad/09-aliyah.png",
+          "width": 2064,
+          "height": 2752
+        }
+      ],
+      "filename": "05-choose-aliyah.png"
+    },
+    {
+      "device": "ipad",
+      "index": 5,
+      "width": 2064,
+      "height": 2752,
+      "scene": {
+        "slug": "your-layout",
+        "title": "A layout<br><em>that fits.</em>",
+        "sub": "Flowing Reading or Torah-line Match.",
+        "capture": "06-settings.png",
+        "kind": "detail",
+        "palette": "paper",
+        "foot": "Side-by-side views on supported layouts.",
+        "crop": {
+          "iphone": [
+            145,
+            176,
+            1125,
+            1330
+          ],
+          "ipad": [
+            1180,
+            124,
+            850,
+            970
+          ]
+        }
+      },
+      "geometry": {
+        "w": 2300,
+        "h": 3000,
+        "screen": [
+          118,
+          124,
+          2064,
+          2752
+        ],
+        "radius": 65,
+        "frame": "ipad-pro-13-silver.png"
+      },
+      "title": {
+        "x": 124,
+        "y": 219,
+        "width": 1816,
+        "height": 323.375,
+        "bottom": 542.375,
+        "right": 1940
+      },
+      "copy": {
+        "x": 124,
+        "y": 219,
+        "width": 1816,
+        "height": 414.875,
+        "bottom": 633.875,
+        "right": 1940
+      },
+      "devices": [
+        {
+          "x": 887.2051391601562,
+          "y": 1061.440185546875,
+          "width": 1205.58984375,
+          "height": 1531.02587890625,
+          "bottom": 2592.466064453125,
+          "right": 2092.7949829101562
+        }
+      ],
+      "details": [
+        {
+          "x": 124,
+          "y": 815,
+          "width": 900,
+          "height": 1075.046875,
+          "bottom": 1890.046875,
+          "right": 1024
+        }
+      ],
+      "fontLoaded": true,
+      "images": [
+        {
+          "src": "../captures/ipad/06-settings.png",
+          "width": 2064,
+          "height": 2752
+        },
+        {
+          "src": "assets/ipad-pro-13-silver.png",
+          "width": 2300,
+          "height": 3000
+        },
+        {
+          "src": "../captures/ipad/06-settings.png",
+          "width": 2064,
+          "height": 2752
+        }
+      ],
+      "filename": "06-your-layout.png"
+    },
+    {
+      "device": "ipad",
+      "index": 6,
+      "width": 2064,
+      "height": 2752,
+      "scene": {
+        "slug": "your-pace",
+        "title": "Practice<br><em>at your pace.</em>",
+        "sub": "Adjust playback speed for your practice.",
+        "capture": "10-playback.png",
+        "kind": "detail",
+        "palette": "blue",
+        "foot": "Listen with available aliyah recordings.",
+        "crop": {
+          "iphone": [
+            145,
+            176,
+            1125,
+            1590
+          ],
+          "ipad": [
+            1180,
+            124,
+            850,
+            1080
+          ]
+        }
+      },
+      "geometry": {
+        "w": 2300,
+        "h": 3000,
+        "screen": [
+          118,
+          124,
+          2064,
+          2752
+        ],
+        "radius": 65,
+        "frame": "ipad-pro-13-silver.png"
+      },
+      "title": {
+        "x": 124,
+        "y": 219,
+        "width": 1816,
+        "height": 323.375,
+        "bottom": 542.375,
+        "right": 1940
+      },
+      "copy": {
+        "x": 124,
+        "y": 219,
+        "width": 1816,
+        "height": 414.875,
+        "bottom": 633.875,
+        "right": 1940
+      },
+      "devices": [
+        {
+          "x": 887.2051391601562,
+          "y": 1061.440185546875,
+          "width": 1205.58984375,
+          "height": 1531.02587890625,
+          "bottom": 2592.466064453125,
+          "right": 2092.7949829101562
+        }
+      ],
+      "details": [
+        {
+          "x": 124,
+          "y": 815,
+          "width": 900,
+          "height": 1191.515625,
+          "bottom": 2006.515625,
+          "right": 1024
+        }
+      ],
+      "fontLoaded": true,
+      "images": [
+        {
+          "src": "../captures/ipad/10-playback.png",
+          "width": 2064,
+          "height": 2752
+        },
+        {
+          "src": "assets/ipad-pro-13-silver.png",
+          "width": 2300,
+          "height": 3000
+        },
+        {
+          "src": "../captures/ipad/10-playback.png",
+          "width": 2064,
+          "height": 2752
+        }
+      ],
+      "filename": "07-your-pace.png"
+    },
+    {
+      "device": "ipad",
+      "index": 7,
+      "width": 2064,
+      "height": 2752,
+      "scene": {
+        "slug": "take-it-along",
+        "title": "Take the<br><em>recording along.</em>",
+        "sub": "Save available audio for offline listening.",
+        "capture": "04-media.png",
+        "kind": "full",
+        "palette": "paper",
+        "foot": "Download recordings while online."
+      },
+      "geometry": {
+        "w": 2300,
+        "h": 3000,
+        "screen": [
+          118,
+          124,
+          2064,
+          2752
+        ],
+        "radius": 65,
+        "frame": "ipad-pro-13-silver.png"
+      },
+      "title": {
+        "x": 124,
+        "y": 219,
+        "width": 1816,
+        "height": 323.375,
+        "bottom": 542.375,
+        "right": 1940
+      },
+      "copy": {
+        "x": 124,
+        "y": 219,
+        "width": 1816,
+        "height": 414.875,
+        "bottom": 633.875,
+        "right": 1940
+      },
+      "devices": [
+        {
+          "x": 312,
+          "y": 715,
+          "width": 1440,
+          "height": 1878.25,
+          "bottom": 2593.25,
+          "right": 1752
+        }
+      ],
+      "details": [],
+      "fontLoaded": true,
+      "images": [
+        {
+          "src": "../captures/ipad/04-media.png",
+          "width": 2064,
+          "height": 2752
+        },
+        {
+          "src": "assets/ipad-pro-13-silver.png",
+          "width": 2300,
+          "height": 3000
+        }
+      ],
+      "filename": "08-take-it-along.png"
+    },
+    {
+      "device": "ipad",
+      "index": 8,
+      "width": 2064,
+      "height": 2752,
+      "scene": {
+        "slug": "saved-on-device",
+        "title": "Know what<br><em>is saved.</em>",
+        "sub": "See and manage recordings on your device.",
+        "capture": "05-storage.png",
+        "kind": "full",
+        "palette": "ice",
+        "foot": "Clear storage. Keep the readings you need."
+      },
+      "geometry": {
+        "w": 2300,
+        "h": 3000,
+        "screen": [
+          118,
+          124,
+          2064,
+          2752
+        ],
+        "radius": 65,
+        "frame": "ipad-pro-13-silver.png"
+      },
+      "title": {
+        "x": 124,
+        "y": 219,
+        "width": 1816,
+        "height": 323.375,
+        "bottom": 542.375,
+        "right": 1940
+      },
+      "copy": {
+        "x": 124,
+        "y": 219,
+        "width": 1816,
+        "height": 414.875,
+        "bottom": 633.875,
+        "right": 1940
+      },
+      "devices": [
+        {
+          "x": 312,
+          "y": 715,
+          "width": 1440,
+          "height": 1878.25,
+          "bottom": 2593.25,
+          "right": 1752
+        }
+      ],
+      "details": [],
+      "fontLoaded": true,
+      "images": [
+        {
+          "src": "../captures/ipad/05-storage.png",
+          "width": 2064,
+          "height": 2752
+        },
+        {
+          "src": "assets/ipad-pro-13-silver.png",
+          "width": 2300,
+          "height": 3000
+        }
+      ],
+      "filename": "09-saved-on-device.png"
+    },
+    {
+      "device": "ipad",
+      "index": 9,
+      "width": 2064,
+      "height": 2752,
+      "scene": {
+        "slug": "after-dark",
+        "title": "A quieter view<br><em>after dark.</em>",
+        "sub": "Choose the appearance that suits your reading.",
+        "capture": "07-dark.png",
+        "kind": "full",
+        "palette": "night",
+        "foot": "Light, dark, and sepia appearances."
+      },
+      "geometry": {
+        "w": 2300,
+        "h": 3000,
+        "screen": [
+          118,
+          124,
+          2064,
+          2752
+        ],
+        "radius": 65,
+        "frame": "ipad-pro-13-silver.png"
+      },
+      "title": {
+        "x": 124,
+        "y": 219,
+        "width": 1816,
+        "height": 323.375,
+        "bottom": 542.375,
+        "right": 1940
+      },
+      "copy": {
+        "x": 124,
+        "y": 219,
+        "width": 1816,
+        "height": 414.875,
+        "bottom": 633.875,
+        "right": 1940
+      },
+      "devices": [
+        {
+          "x": 312,
+          "y": 715,
+          "width": 1440,
+          "height": 1878.25,
+          "bottom": 2593.25,
+          "right": 1752
+        }
+      ],
+      "details": [],
+      "fontLoaded": true,
+      "images": [
+        {
+          "src": "../captures/ipad/07-dark.png",
+          "width": 2064,
+          "height": 2752
+        },
+        {
+          "src": "assets/ipad-pro-13-silver.png",
+          "width": 2300,
+          "height": 3000
+        }
+      ],
+      "filename": "10-after-dark.png"
+    }
+  ]
+}

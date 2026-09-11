@@ -10,12 +10,15 @@ These routes are prerendered as static HTML during `npm run build`.
 /tidbits/
 /tidbits/{slug}/
 /about/
-/privacy/
-/support/
+/privacy
+/support
 /reader/
 ```
 
 Tidbit detail pages exist only for published entries in `src/lib/tidbits.ts`.
+
+Privacy and Support use `trailingSlash = 'never'` and build to `privacy.html`
+and `support.html`. Their canonical URLs are `/privacy` and `/support`.
 
 ## Reader Defaults
 

@@ -392,7 +392,7 @@
     onclick={() => onAnnotationsChange(!annotationsEnabled)}
   >
     <span class="toggle" aria-hidden="true">
-      <span class="annotations-toggle-icon">
+      <span class="shadowed-circle">
         <span class="toggle-state mod-off">א</span>
         <span class="toggle-state mod-on">אֶ֨</span>
       </span>

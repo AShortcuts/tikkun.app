@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import process from 'node:process'
+import { nativeUpdateContract } from './native-update-contract.mjs'
 import { includeNativeAsset, nativeBuildConfig, nativeContentFiles } from './native-build-config.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -47,6 +48,7 @@ typescript.include = typescript.include.map((entry) => entry.replace('./.svelte-
 await writeFile(path.join(root, 'tsconfig.native.json'), `${JSON.stringify(typescript, null, 2)}\n`)
 
 for (const args of [
+  ['--import', 'tsx', 'scripts/build-content-release.ts', '--contract'],
   ['scripts/build-system-calendar.mjs'],
   ['scripts/generate-torah-index.mjs'],
   ['--import', 'tsx', 'scripts/generate-public-reading-manifest.mjs'],
@@ -62,6 +64,10 @@ for (const args of [
 
 const output = path.join(root, 'dist-native')
 await stat(path.join(output, 'reader/index.html'))
+let publicKey = ''
+try { publicKey = await readFile(process.env.TIKKUN_UPDATE_PUBLIC_KEY_FILE ?? path.join(root, 'config/update-public-key.pem'), 'utf8') }
+catch (error) { if (error.code !== 'ENOENT' || process.env.TIKKUN_UPDATE_PUBLIC_KEY_FILE) throw error }
+await writeFile(path.join(output, 'native-update-contract.json'), JSON.stringify(await nativeUpdateContract(root, publicKey)))
 const files = []
 async function inventory(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {

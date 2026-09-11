@@ -7,6 +7,50 @@ let component: ReturnType<typeof mount> | null = null
 let target: HTMLElement | null = null
 let serviceWorkerDescriptor: PropertyDescriptor | undefined
 
+test('local preview shows real prompt states without fetching or activating a worker', async () => {
+  const originalUrl = window.location.href
+  const fetch = vi.spyOn(globalThis, 'fetch')
+  window.history.replaceState(null, '', '?preview-update=1')
+  try {
+    target = document.createElement('div')
+    document.body.appendChild(target)
+    component = mount(ServiceWorkerUpdate, { target })
+    flushSync()
+    expect(required<HTMLElement>('.service-worker-update').getAttribute('aria-label')).toContain('Web update demo')
+    expect(target.querySelector('.update-preview-label')).toBeNull()
+    expect(target.textContent).toContain('Update available')
+    const prompt = required<HTMLElement>('.service-worker-update')
+    const bounds = prompt.getBoundingClientRect()
+    expect(Math.abs(bounds.left + bounds.width / 2 - window.innerWidth / 2)).toBeLessThan(1)
+    expect(getComputedStyle(prompt).borderRadius).toBe('999px')
+    expect(getComputedStyle(required<HTMLElement>('.service-worker-update-action')).backgroundColor).not.toBe('rgba(0, 0, 0, 0)')
+    vi.useFakeTimers()
+    required<HTMLButtonElement>('.service-worker-update-action').click()
+    flushSync()
+    expect(required<HTMLButtonElement>('.service-worker-update-action').textContent).toBe('Cancel')
+    expect(target.querySelector('[aria-label="Dismiss update"]')).toBeNull()
+    expect(target.textContent).toContain('Applying update')
+    required<HTMLButtonElement>('.service-worker-update-action').click()
+    await vi.advanceTimersByTimeAsync(1200)
+    flushSync()
+    expect(target.textContent).toContain('Update available')
+    expect(target.textContent).not.toContain('Nothing was updated')
+    required<HTMLButtonElement>('.service-worker-update-action').click()
+    await vi.advanceTimersByTimeAsync(1200)
+    flushSync()
+    expect(target.textContent).toContain('Nothing was updated')
+    required<HTMLButtonElement>('.service-worker-update-action').click()
+    flushSync()
+    expect(target.textContent).toContain('Update available')
+    required<HTMLButtonElement>('[aria-label="Dismiss update"]').click()
+    flushSync()
+    expect(target.textContent).toBe('')
+    expect(fetch).not.toHaveBeenCalled()
+  } finally {
+    window.history.replaceState(null, '', originalUrl)
+  }
+})
+
 test('native mounts skip worker probing and registration', async () => {
   vi.spyOn(Capacitor, 'isNativePlatform').mockReturnValue(true)
   const fetch = vi.spyOn(globalThis, 'fetch')
@@ -39,7 +83,7 @@ afterEach(async () => {
   serviceWorkerDescriptor = undefined
 })
 
-test('announces and locks the applying state after requesting an update', async () => {
+test('replaces Apply with Cancel and suppresses reload after cancellation', async () => {
   const waitingWorker = Object.assign(new EventTarget(), {
     postMessage: vi.fn(),
     state: 'installed' as ServiceWorkerState,
@@ -78,8 +122,10 @@ test('announces and locks the applying state after requesting an update', async 
   const status = required<HTMLElement>('.service-worker-update')
   const reload = required<HTMLButtonElement>('.service-worker-update-action')
   expect(status.getAttribute('aria-busy')).toBe('false')
-  expect(reload.textContent).toBe('Reload')
+  expect(reload.textContent).toBe('Apply')
+  expect(getComputedStyle(reload).fontWeight).toBe('500')
 
+  vi.useFakeTimers()
   reload.click()
   flushSync()
 
@@ -88,11 +134,23 @@ test('announces and locks the applying state after requesting an update', async 
   })
   expect(status.getAttribute('aria-busy')).toBe('true')
   expect(status.textContent).toContain('Applying update…')
-  expect(reload.textContent).toBe('Reloading…')
-  expect(reload.disabled).toBe(true)
-  expect(
-    required<HTMLButtonElement>('[aria-label="Dismiss update"]').disabled
-  ).toBe(true)
+  expect(reload.textContent).toBe('Cancel')
+  expect(getComputedStyle(reload).backgroundColor).toBe('rgb(139, 32, 64)')
+  expect(getComputedStyle(reload).color).toBe('rgb(255, 255, 255)')
+  expect(reload.disabled).toBe(false)
+  expect(target.querySelector('[aria-label="Dismiss update"]')).toBeNull()
+
+  reload.click()
+  flushSync()
+  serviceWorker.dispatchEvent(new Event('controllerchange'))
+  await vi.advanceTimersByTimeAsync(10_000)
+  flushSync()
+  expect(status.getAttribute('aria-busy')).toBe('false')
+  expect(status.textContent).toContain('Update available')
+  expect(status.textContent).not.toContain('Update did not finish')
+  expect(reload.textContent).toBe('Apply')
+  expect(required<HTMLButtonElement>('[aria-label="Dismiss update"]').textContent).toContain('Later')
+  expect(waitingWorker.postMessage).toHaveBeenCalledTimes(1)
 })
 
 test('recovers controls when activation never changes the controller', async () => {

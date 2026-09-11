@@ -9,6 +9,8 @@
   let updateError = $state<string | null>(null)
   let activationTimer: number | null = null
   const activationTimeoutMs = 10_000
+  let preview = $state(false)
+  let previewComplete = $state(false)
 
   function clearActivationTimer() {
     if (activationTimer !== null) window.clearTimeout(activationTimer)
@@ -21,8 +23,33 @@
     updateError = 'Update did not finish. Reload the page to try again.'
   }
 
+  function cancelUpdate() {
+    clearActivationTimer()
+    reloadingForUpdate = false
+    updateError = null
+  }
+
   function applyUpdate() {
+    if (preview) {
+      if (reloadingForUpdate) return
+      if (previewComplete) {
+        previewComplete = false
+        return
+      }
+      reloadingForUpdate = true
+      activationTimer = window.setTimeout(() => {
+        activationTimer = null
+        reloadingForUpdate = false
+        previewComplete = true
+      }, 1200)
+      return
+    }
     if (!waitingWorker || reloadingForUpdate) return
+    // Activation cannot be undone; a later Apply can still reload into that worker.
+    if (waitingWorker.state === 'activated' || navigator.serviceWorker.controller === waitingWorker) {
+      reloadPage()
+      return
+    }
     updateError = null
     reloadingForUpdate = true
     try {
@@ -38,6 +65,12 @@
   }
 
   onMount(() => {
+    // Local UI demonstration only: never touch workers, downloads, or navigation.
+    if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('preview-update') === '1') {
+      preview = true
+      visible = true
+      return clearActivationTimer
+    }
     if (isNativeApp()) return
     if (!('serviceWorker' in navigator)) return
 
@@ -157,72 +190,105 @@
   })
 </script>
 
+<svelte:head>
+  {#if preview}
+    <title>Update prompt demo | Tikkun Reader</title>
+  {/if}
+</svelte:head>
+
 {#if visible}
   <div
     class="service-worker-update"
     role={updateError ? 'alert' : 'status'}
+    aria-label={preview ? 'Web update demo. No changes applied.' : undefined}
     aria-live={updateError ? 'assertive' : 'polite'}
     aria-busy={reloadingForUpdate}
   >
     <span>{reloadingForUpdate
         ? 'Applying update…'
-        : updateError ?? 'Update available'}</span>
+        : previewComplete
+          ? 'Demo complete. Nothing was updated.'
+          : updateError ?? 'Update available'}</span>
     <button
       class="service-worker-update-action"
+      class:canceling={reloadingForUpdate}
       type="button"
-      disabled={reloadingForUpdate}
-      onclick={updateError ? reloadPage : applyUpdate}
+      onclick={reloadingForUpdate ? cancelUpdate : updateError ? reloadPage : applyUpdate}
     >{reloadingForUpdate
-        ? 'Reloading…'
-        : updateError
-          ? 'Reload page'
-          : 'Reload'}</button>
-    <button
-      type="button"
-      aria-label="Dismiss update"
-      disabled={reloadingForUpdate}
-      onclick={() => (visible = false)}
-    >
-      Later
-    </button>
+        ? 'Cancel'
+        : previewComplete
+          ? 'Show again'
+          : updateError
+            ? 'Reload page'
+            : 'Apply'}</button>
+    {#if !reloadingForUpdate}
+      <button
+        type="button"
+        aria-label="Dismiss update"
+        onclick={() => (visible = false)}
+      >
+        Later
+      </button>
+    {/if}
   </div>
 {/if}
 
 <style>
   .service-worker-update {
+    --update-ink: var(--text-color, var(--site-text, #f5f7fa));
+    --update-paper: var(--paper-color, var(--site-surface, #11161d));
     position: fixed;
     z-index: 10000;
-    right: max(1rem, env(safe-area-inset-right, 0px));
-    bottom: max(1rem, env(safe-area-inset-bottom, 0px));
-    display: flex;
+    left: 50%;
+    bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    display: inline-flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.45rem;
+    box-sizing: border-box;
+    width: max-content;
     max-width: calc(
       100vw - max(1rem, env(safe-area-inset-left, 0px)) -
         max(1rem, env(safe-area-inset-right, 0px))
     );
-    border: 1px solid
-      var(--site-line-strong, color-mix(in srgb, currentColor 18%, transparent));
-    border-radius: 0.9rem;
-    padding: 0.75rem 0.9rem;
-    background: var(--site-surface, var(--paper-color, #11161d));
-    box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.35);
-    color: var(--site-text, var(--text-color, #f5f7fa));
-    font: 600 0.875rem/1.2 var(--hebrew-ui-font-family, sans-serif);
+    border: 1px solid color-mix(in srgb, var(--update-ink) 12%, transparent);
+    border-radius: 999px;
+    padding: 0.45rem 0.5rem 0.45rem 0.75rem;
+    background: color-mix(in srgb, var(--update-paper) 94%, transparent);
+    box-shadow: 0 16px 36px -28px black;
+    color: var(--update-ink);
+    font: 400 0.86rem/1.4 var(--hebrew-ui-font-family, sans-serif);
+    transform: translateX(-50%);
+    backdrop-filter: blur(18px);
+  }
+
+  span {
+    overflow-wrap: anywhere;
   }
 
   button {
     border: 0;
-    min-width: 2.75rem;
-    min-height: 2.75rem;
-    border-radius: 0.6rem;
-    padding: 0.55rem;
+    flex-shrink: 0;
+    border-radius: 999px;
+    padding: 0.32rem 0.45rem;
     background: transparent;
-    color: var(--site-accent-soft, var(--reader-focus-color, #79aaff));
+    color: var(--light-text-color, var(--update-ink));
     font: inherit;
     cursor: pointer;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
+  }
+
+  .service-worker-update-action {
+    padding: 0.32rem 0.62rem;
+    background: color-mix(in srgb, var(--update-ink) 80%, white);
+    color: var(--update-paper);
+    font-weight: 500;
+  }
+
+  .service-worker-update-action.canceling {
+    background: #8b2040;
+    color: #ffffff;
   }
 
   button:focus-visible {
@@ -237,17 +303,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     button:not(:disabled):hover {
-      background: color-mix(in srgb, currentColor 10%, transparent);
-    }
-  }
-
-  @media (max-width: 36rem) {
-    .service-worker-update {
-      right: max(0.75rem, env(safe-area-inset-right, 0px));
-      bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
-      left: max(0.75rem, env(safe-area-inset-left, 0px));
-      max-width: none;
-      flex-wrap: wrap;
+      opacity: 0.8;
     }
   }
 

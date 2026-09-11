@@ -4,6 +4,10 @@ Updated: 2026-09-11. Current editable handoff; older development checkpoints are
 
 ## Store Preparation Checkpoint
 
+Local follow-up: [content and controlled web updates](app-updates.md) are implemented
+and separately verified. They are not in the uploaded build 3; feeds and a new
+native release remain pending. Do not describe the existing TestFlight build as OTA-enabled.
+
 See [editable App Store listing](../metadata/README.md) for current copy, screenshots,
 remote IDs and remaining gates. Build 1.0 (3) is processed and attached. Pricing is
 free in all 175 territories, including future territories. Description, subtitle,

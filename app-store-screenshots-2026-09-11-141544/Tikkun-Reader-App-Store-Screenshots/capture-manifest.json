@@ -1,0 +1,182 @@
+[
+  {
+    "file": "captures/ipad/01-reader.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "6ff47f10234004816e6e22f2a5656f5e14a1fe708efb70fc5e517c9c1976c6c0",
+    "build": "1.0 (2)",
+    "source": "metadata/screenshots/en-US/ipad/01-reader.png",
+    "capturedDate": "2026-09-11"
+  },
+  {
+    "file": "captures/ipad/02-practice.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "c18172b442266c16d33cddd87db6d380003ba298882793fe4ed7daf2e433242e",
+    "build": "1.0 (2)",
+    "source": "metadata/screenshots/en-US/ipad/02-practice.png",
+    "capturedDate": "2026-09-11"
+  },
+  {
+    "file": "captures/ipad/03-audio.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "9ca63d00d36d352c6065a3f19cfc960ff98f45ec5681cdf43f0382ed220072d9",
+    "build": "1.0 (2)",
+    "source": "metadata/screenshots/en-US/ipad/03-audio.png",
+    "capturedDate": "2026-09-11"
+  },
+  {
+    "file": "captures/ipad/04-media.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "c55a30b4737b7ca0a6b761f7d5a1cc6f60a541d53fd04a133681b5eef8bdeaae",
+    "build": "1.0 (3)",
+    "source": "native Simulator capture in this task",
+    "capturedDate": "2026-09-11"
+  },
+  {
+    "file": "captures/ipad/05-storage.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "aba082f89cae589389d52214355061afce2ccce0accfb095ab8c5ad1608981b3",
+    "build": "1.0 (3)",
+    "source": "native Simulator capture in this task",
+    "capturedDate": "2026-09-11"
+  },
+  {
+    "file": "captures/ipad/06-settings.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "be6b3ef42a8845f7046b083e014d9713e2f679fe1324a29ff1c149b00ebc31d3",
+    "build": "1.0 (3)",
+    "source": "native Simulator capture in this task",
+    "capturedDate": "2026-09-11"
+  },
+  {
+    "file": "captures/ipad/07-dark.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "389b3f112916a7c9505a79ebc7ca8d9edf320deec01f520c53eb98149c46de5b",
+    "build": "1.0 (3)",
+    "source": "native Simulator capture in this task",
+    "capturedDate": "2026-09-11"
+  },
+  {
+    "file": "captures/ipad/08-library.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "f3c77e5344511f4205101447b439d2a5e0d93e05dded514e41566f29d3d9f1dc",
+    "build": "1.0 (3)",
+    "source": "native Simulator capture in this task",
+    "capturedDate": "2026-09-11"
+  },
+  {
+    "file": "captures/ipad/09-aliyah.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "dd10993f1d13702c075dbd37d2e2f03cdc2c2f5a95517849b777eaa370105ca6",
+    "build": "1.0 (3)",
+    "source": "native Simulator capture in this task",
+    "capturedDate": "2026-09-11"
+  },
+  {
+    "file": "captures/ipad/10-playback.png",
+    "width": 2064,
+    "height": 2752,
+    "sha256": "8374efd9995352269d32eaa25f5cd4031aece9313059ccfbe63b3155531491b6",
+    "build": "1.0 (3)",
+    "source": "native Simulator capture in this task",
+    "capturedDate": "2026-09-11"
+  },
+  {
+    "file": "captures/iphone/01-reader.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "1c36a01978ce4c7cb48df333ed4bde375c667af62c80de44f1186805e09ce66b",
+    "build": "1.0 (2)",
+    "source": "metadata/screenshots/en-US/iphone/01-reader.png",
+    "capturedDate": "2026-09-11"
+  },
+  {
+    "file": "captures/iphone/02-practice.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "2624f7cefa2797a41afaab30e4b5ba1814e624b0c673208336f34867490134e6",
+    "build": "1.0 (2)",
+    "source": "metadata/screenshots/en-US/iphone/02-practice.png",
+    "capturedDate": "2026-09-11"
+  },
+  {
+    "file": "captures/iphone/03-audio.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "0f972e9f9de6c228d2d8a7b2b223e04fad2591635c500578698570c84ffa4141",
+    "build": "1.0 (2)",
+    "source": "metadata/screenshots/en-US/iphone/03-audio.png",
+    "capturedDate": "2026-09-11"
+  },
+  {
+    "file": "captures/iphone/04-media.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "89ebf9f3c54647be91189876abeaf31b2daac8c517cf2304eced1471fb1bd32d",
+    "build": "1.0 (3)",
+    "source": "metadata/screenshots/en-US/iphone/04-media.png",
+    "capturedDate": "2026-09-11"
+  },
+  {
+    "file": "captures/iphone/05-storage.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "db1b535166ec383edff791a1d2a65eacf449d0505bd4a975fedd0301a8d8df43",
+    "build": "1.0 (3)",
+    "source": "metadata/screenshots/en-US/iphone/05-storage.png",
+    "capturedDate": "2026-09-11"
+  },
+  {
+    "file": "captures/iphone/06-settings.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "15d576a00c494eb117a3bd8b8a4825f4352e118c100c278034846e50557f7e91",
+    "build": "1.0 (3)",
+    "source": "native Simulator capture in this task",
+    "capturedDate": "2026-09-11"
+  },
+  {
+    "file": "captures/iphone/07-dark.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "d16e5c28ea4f9c510b9978d965c4c2145b0a75290e1bfca83cc02c70fc8b590f",
+    "build": "1.0 (3)",
+    "source": "native Simulator capture in this task",
+    "capturedDate": "2026-09-11"
+  },
+  {
+    "file": "captures/iphone/08-library.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "a2b80af4cc282af3bad28b42749edb0abf2799616ce5b8edef56249d7cd803c2",
+    "build": "1.0 (3)",
+    "source": "native Simulator capture in this task",
+    "capturedDate": "2026-09-11"
+  },
+  {
+    "file": "captures/iphone/09-aliyah.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "f9bb007478a265c48f649d878d85b38dcd19d146eddbe48d69f95c869d190f13",
+    "build": "1.0 (3)",
+    "source": "native Simulator capture in this task",
+    "capturedDate": "2026-09-11"
+  },
+  {
+    "file": "captures/iphone/10-playback.png",
+    "width": 1320,
+    "height": 2868,
+    "sha256": "e7ee9b3bd765c9ddcac1e08631e2b83bb8a8d2697429852ec21da0effd470322",
+    "build": "1.0 (3)",
+    "source": "native Simulator capture in this task",
+    "capturedDate": "2026-09-11"
+  }
+]

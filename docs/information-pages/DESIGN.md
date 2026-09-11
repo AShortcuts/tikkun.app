@@ -60,7 +60,7 @@ components:
 
 ## Overview
 
-This reference applies only to `/privacy/` and `/support/`. It records the built extension of Tikkun's public site: the existing dark shell, ambient background, Lora titles, Noto Sans Hebrew reading text, blue links, and quiet borders. It neither replaces nor defines the global visual system.
+This reference applies only to `/privacy` and `/support`. It records the built extension of Tikkun's public site: the existing dark shell, ambient background, Lora titles, Noto Sans Hebrew reading text, blue links, and quiet borders. It neither replaces nor defines the global visual system.
 
 The confirmed direction in [the surface brief](../privacy-support-design.md) uses the user-pinned Ocean of Torah composition: an introduction beside one readable panel, stacked on mobile. No new visual identity, product interview, or generated raster assets belong to this extension.
 

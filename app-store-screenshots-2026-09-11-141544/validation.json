@@ -1,0 +1,162 @@
+{
+  "ok": true,
+  "root": "/Users/adambh/Documents/HTML Projects/Tikkun with Highlighted Audio/app-store-screenshots-2026-09-11-141544/exports",
+  "expected_count": 10,
+  "accepted_sizes": [
+    [
+      1284,
+      2778
+    ],
+    [
+      2064,
+      2752
+    ]
+  ],
+  "sets": [
+    {
+      "directory": "en-US/ipad",
+      "count": 10,
+      "dimensions": [
+        [
+          2064,
+          2752
+        ]
+      ],
+      "files": [
+        {
+          "path": "en-US/ipad/01-within-reach.png",
+          "width": 2064,
+          "height": 2752,
+          "sha256": "4f319fb790bf955836e296e1a4f9089c3181b95d03f54c71a83ac8ccbf586b7e"
+        },
+        {
+          "path": "en-US/ipad/02-hear-and-follow.png",
+          "width": 2064,
+          "height": 2752,
+          "sha256": "2200a09e042b6d242f3bec39d73cac89ff3d3e9cc5415fc0bc6128e0b33823ad"
+        },
+        {
+          "path": "en-US/ipad/03-practice.png",
+          "width": 2064,
+          "height": 2752,
+          "sha256": "419b520cc37d0ff15b8c52521df5a58cfcc5f8c1e697629fe37c5e1e36a9c34f"
+        },
+        {
+          "path": "en-US/ipad/04-find-reading.png",
+          "width": 2064,
+          "height": 2752,
+          "sha256": "8c504b3beb7268577955b454ebf799bd88ce94abc261e69a945a0a8e7724898c"
+        },
+        {
+          "path": "en-US/ipad/05-choose-aliyah.png",
+          "width": 2064,
+          "height": 2752,
+          "sha256": "5c33b05298764f04d7ae0f80bc73efa20aed092591239a55a33c87dab65471f1"
+        },
+        {
+          "path": "en-US/ipad/06-your-layout.png",
+          "width": 2064,
+          "height": 2752,
+          "sha256": "96ef41333bc9695b35a893bab72ef15a6b8e59746102a9dac4e672c473b17f54"
+        },
+        {
+          "path": "en-US/ipad/07-your-pace.png",
+          "width": 2064,
+          "height": 2752,
+          "sha256": "fd43902db70ac1dc34a6c57030839116e502546b5b37f42f10756309d7a14144"
+        },
+        {
+          "path": "en-US/ipad/08-take-it-along.png",
+          "width": 2064,
+          "height": 2752,
+          "sha256": "f04ed24ee8ede635c66f33b90b01dc9bf559171bc1da7aa94c1620ca7edbc631"
+        },
+        {
+          "path": "en-US/ipad/09-saved-on-device.png",
+          "width": 2064,
+          "height": 2752,
+          "sha256": "759756423c0cf27ae236891d8e9988ffca6cd684f54d8115a88c62f4fe2a7306"
+        },
+        {
+          "path": "en-US/ipad/10-after-dark.png",
+          "width": 2064,
+          "height": 2752,
+          "sha256": "b771f01fc358d7e0c97678afedcedba3eff45a329bb9a3bfb21b83ce4981ff18"
+        }
+      ]
+    },
+    {
+      "directory": "en-US/iphone",
+      "count": 10,
+      "dimensions": [
+        [
+          1284,
+          2778
+        ]
+      ],
+      "files": [
+        {
+          "path": "en-US/iphone/01-within-reach.png",
+          "width": 1284,
+          "height": 2778,
+          "sha256": "6f479509ffdba30c281677b5030f449581f031a0190254e2fb37bda5075c4653"
+        },
+        {
+          "path": "en-US/iphone/02-hear-and-follow.png",
+          "width": 1284,
+          "height": 2778,
+          "sha256": "b0d5e986bb20db8e061c1eae1e03b8703e23b35d7e7b4a5d11bf31f1cd7b3569"
+        },
+        {
+          "path": "en-US/iphone/03-practice.png",
+          "width": 1284,
+          "height": 2778,
+          "sha256": "b117889b99c41336c5be4b915bbb4c8c60daca5fd34247789863f4f49a2733d9"
+        },
+        {
+          "path": "en-US/iphone/04-find-reading.png",
+          "width": 1284,
+          "height": 2778,
+          "sha256": "5f072e42ad3b0f37de42b925fd07c889bf7ab2e49a548f8b447e18c740741a2f"
+        },
+        {
+          "path": "en-US/iphone/05-choose-aliyah.png",
+          "width": 1284,
+          "height": 2778,
+          "sha256": "daabc219a11b92fa8e7507d306028ebb63f11f99a9b43487ae28e6fd1d950520"
+        },
+        {
+          "path": "en-US/iphone/06-your-layout.png",
+          "width": 1284,
+          "height": 2778,
+          "sha256": "0aae10d27e7d7331c9c6d945e5416935b65e678faf33d7bc678d5ea63d06b01a"
+        },
+        {
+          "path": "en-US/iphone/07-your-pace.png",
+          "width": 1284,
+          "height": 2778,
+          "sha256": "08bab2842df6de1a6b8763b9d0d5e0a4a41fbc0c2042a5c3377516ee8da44f20"
+        },
+        {
+          "path": "en-US/iphone/08-take-it-along.png",
+          "width": 1284,
+          "height": 2778,
+          "sha256": "3ce1f4cf3978ed967eaea9a4460879c82ff0e8b334ef0ceb854e272a63ea2729"
+        },
+        {
+          "path": "en-US/iphone/09-saved-on-device.png",
+          "width": 1284,
+          "height": 2778,
+          "sha256": "cdd1f25347ed126d8d9dab40821b85a355b8dc0cc9a645c586195144f1a44b19"
+        },
+        {
+          "path": "en-US/iphone/10-after-dark.png",
+          "width": 1284,
+          "height": 2778,
+          "sha256": "cecc44f520b4489e01d8f007ae72951316d43512d6470bc76ea35aadc31ebf4f"
+        }
+      ]
+    }
+  ],
+  "errors": []
+}

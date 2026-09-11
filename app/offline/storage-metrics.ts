@@ -26,6 +26,7 @@ export function parseNativeStorageMetrics(value: unknown): StorageMetrics {
     { id: 'audio', label: 'Audio downloads', bytes: bytes('audioBytes') },
     { id: 'temporary', label: 'Temporary files', bytes: bytes('temporaryBytes') },
     { id: 'metadata', label: 'Download records', bytes: bytes('metadataBytes') },
+    ...(Reflect.has(value, 'contentBytes') ? [{ id: 'content', label: 'Content updates', bytes: bytes('contentBytes') }] : []),
   ], availableBytes: Reflect.get(value, 'availableBytes') === null ? null : bytes('availableBytes'),
   availableLabel: 'Device space available for downloads',
   note: 'Logical file sizes. Personal data and system overhead are not included.' }

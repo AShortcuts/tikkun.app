@@ -867,6 +867,38 @@
     line-height: 1.25;
   }
 
+  .mobile-library-book-title {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    direction: ltr;
+    gap: 0.65rem;
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+
+  .mobile-library-book-title > span,
+  .mobile-library-book-title > strong {
+    grid-row: 1;
+    min-width: 0;
+    overflow: hidden;
+    color: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-library-book-title > span {
+    grid-column: 1;
+    font-weight: 400;
+    text-align: left;
+  }
+
+  .mobile-library-book-title > strong {
+    grid-column: 2;
+    font-weight: 700;
+  }
+
   .mobile-library-arrow {
     display: inline-flex;
     color: var(--light-text-color);
@@ -982,6 +1014,7 @@
   }
 
   .mobile-parsha-card {
+    --mobile-parsha-text-color: var(--text-color);
     overflow: hidden;
     border: 1px solid color-mix(in srgb, var(--text-color) 15%, transparent);
     border-radius: 14px;
@@ -992,63 +1025,79 @@
     );
   }
 
-  .mobile-parsha-card-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 3.2rem;
-    align-items: stretch;
+  .mobile-parsha-card.is-expanded {
+    --mobile-parsha-text-color: oklch(from var(--text-color) l c h / 0.9);
   }
 
-  .mobile-parsha-card-row > a {
+  .mobile-parsha-card-row {
     display: grid;
-    gap: 0.14rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
     min-height: 4rem;
-    padding: 0.72rem 0.3rem 0.72rem 0.85rem;
-    color: var(--text-color);
-    text-decoration: none;
+    padding: 0.72rem 0.85rem;
+    border: 0;
+    background: transparent;
+    color: var(--mobile-parsha-text-color);
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
     transition: transform var(--reader-motion-fast) var(--reader-ease-out);
   }
 
-  .mobile-parsha-card-row > a strong {
-    align-self: end;
-    font-size: 1.05rem;
-    font-weight: 760;
-    line-height: 1.2;
-    text-align: right;
-  }
-
-  .mobile-parsha-card-row > a small {
-    align-self: start;
-    color: var(--light-text-color);
-    font-size: 0.76rem;
-  }
-
-  .mobile-parsha-card-row > button {
+  .mobile-parsha-title {
     display: grid;
-    place-items: center;
-    align-self: center;
-    width: 2.75rem;
-    height: 2.75rem;
-    padding: 0;
-    border: 1px solid color-mix(in srgb, var(--text-color) 14%, transparent);
-    border-radius: 12px;
-    background: var(--light-accent-color);
-    color: var(--light-text-color);
-    cursor: pointer;
-    transition:
-      background-color var(--reader-motion-color) var(--reader-ease-standard),
-      color var(--reader-motion-color) var(--reader-ease-standard),
-      transform var(--reader-motion-fast) var(--reader-ease-out);
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    direction: ltr;
+    gap: 0.65rem;
+    min-width: 0;
+    font-size: 1rem;
+    line-height: 1.4;
   }
 
-  .mobile-parsha-card.is-expanded .mobile-parsha-card-row > button {
-    border-color: color-mix(in srgb, var(--reader-focus-color) 55%, transparent);
-    background: color-mix(in srgb, var(--reader-focus-color) 22%, transparent);
-    color: var(--reader-focus-color);
+  .mobile-parsha-title > strong {
+    grid-column: 2;
+    grid-row: 1;
+    font-size: inherit;
+    color: inherit;
+    font-weight: 700;
+    line-height: inherit;
+    text-align: right;
+    white-space: nowrap;
   }
 
-  .mobile-parsha-card-row > button .ui-icon {
+  .mobile-parsha-title > span {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+    color: inherit;
+    font-size: inherit;
+    font-weight: 400;
+    line-height: inherit;
+  }
+
+  .mobile-parsha-card-row > .ui-icon {
     width: 1.15rem;
     height: 1.15rem;
+    color: var(--light-text-color);
+    transform: rotate(-90deg);
+    transition: transform 160ms cubic-bezier(0.77, 0, 0.175, 1);
+  }
+
+  .mobile-parsha-card-row[aria-expanded='true'] > .ui-icon {
+    color: inherit;
+    transform: rotate(0deg);
+  }
+
+  .mobile-parsha-card-row:focus-visible,
+  .mobile-parsha-card-row:focus-visible > .ui-icon {
+    transition: none;
   }
 
   .mobile-aliyah-choices {
@@ -1090,11 +1139,14 @@
   }
 
   .mobile-aliyah-links a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     min-height: 2.6rem;
     padding: 0.6rem 0.72rem;
-    border: 1px solid color-mix(in srgb, var(--text-color) 18%, transparent);
+    border: 1px solid color-mix(in srgb, var(--mobile-parsha-text-color) 28%, transparent);
     border-radius: 999px;
-    color: var(--text-color);
+    color: var(--mobile-parsha-text-color);
     font-size: 0.75rem;
     line-height: 1.25;
     text-decoration: none;
@@ -1204,8 +1256,7 @@
   .mobile-library-destination:active,
   .mobile-coming-up a:active,
   .mobile-library-more button:active,
-  .mobile-parsha-card-row > a:active,
-  .mobile-parsha-card-row > button:active,
+  .mobile-parsha-card-row:active,
   .mobile-aliyah-links a:active,
   .mobile-reference-grid button:active,
   .mobile-reference-grid a:active,
@@ -1223,8 +1274,7 @@
     .mobile-library-destination:hover,
     .mobile-coming-up a:hover,
     .mobile-library-more button:hover,
-    .mobile-parsha-card-row > a:hover,
-    .mobile-parsha-card-row > button:hover,
+    .mobile-parsha-card-row[aria-expanded='false']:hover,
     .mobile-aliyah-links a:hover,
     .mobile-reference-grid button:hover,
     .mobile-reference-grid a:hover,
@@ -1248,8 +1298,8 @@
     .mobile-library-destination,
     .mobile-coming-up a,
     .mobile-library-more button,
-    .mobile-parsha-card-row > a,
-    .mobile-parsha-card-row > button,
+    .mobile-parsha-card-row,
+    .mobile-parsha-card-row > .ui-icon,
     .mobile-aliyah-links a,
     .mobile-reference-grid button,
     .mobile-reference-grid a,
@@ -1262,8 +1312,7 @@
     .mobile-library-destination:active,
     .mobile-coming-up a:active,
     .mobile-library-more button:active,
-    .mobile-parsha-card-row > a:active,
-    .mobile-parsha-card-row > button:active,
+    .mobile-parsha-card-row:active,
     .mobile-aliyah-links a:active,
     .mobile-reference-grid button:active,
     .mobile-reference-grid a:active,

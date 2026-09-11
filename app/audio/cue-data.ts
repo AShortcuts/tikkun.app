@@ -8,6 +8,7 @@ import {
 } from './cue-validation.ts'
 import type { AudioRecording, CueExportPayload } from './types.ts'
 import { RetryablePromiseCache } from '../data/retryable-promise-cache.ts'
+import { activeContent } from '../updates/content-runtime.ts'
 
 const cuePayloadLoaders = import.meta.glob<unknown>('../../audio-cues/**/*.json', {
   import: 'default',
@@ -83,11 +84,12 @@ export class CueDataResolver {
   >()
 
   constructor(
-    private readonly loaders: Readonly<Record<string, CuePayloadLoader>>
+    private readonly loaders: Readonly<Record<string, CuePayloadLoader>>,
+    private readonly lookup: (path: string) => CuePayloadLoader | undefined = (path) => this.loaders[path]
   ) {}
 
   resolvePath(path: string): Promise<CueDataResolution> {
-    const loader = this.loaders[path]
+    const loader = this.lookup(path)
     if (!loader) {
       return Promise.resolve({ status: 'missing', path, payload: null })
     }
@@ -168,11 +170,19 @@ export class CueDataResolver {
   }
 }
 
-const cueDataResolver = new CueDataResolver(cuePayloadLoaders)
+const cueDataResolver = new CueDataResolver(cuePayloadLoaders, (path) => {
+  const updated = activeContent()
+  if (!updated) return cuePayloadLoaders[path]
+  const cue = updated.cues[path.slice('../../'.length)]
+  return cue ? async () => cue : undefined
+})
 
 export function publishedCueSourceForRecording(recording: AudioRecording): string | null {
   const path = cuePayloadPathForRecording(recording)
-  return path && Object.hasOwn(cuePayloadLoaders, path) ? path.slice('../../'.length) : null
+  const relative = path?.slice('../../'.length)
+  const updated = activeContent()
+  if (!path || !relative) return null
+  return (updated ? Object.hasOwn(updated.cues, relative) : Object.hasOwn(cuePayloadLoaders, path)) ? relative : null
 }
 
 export function cuePayloadPathForRecording({

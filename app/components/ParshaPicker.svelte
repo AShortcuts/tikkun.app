@@ -675,9 +675,9 @@
                     data-mobile-book={book.number}
                     onclick={(event) => openMobileBook(event, bookIndex)}
                   >
-                    <span class="mobile-library-destination-copy">
-                      <strong dir="rtl">{book.hebrew}</strong>
-                      <small>{book.label}</small>
+                    <span class="mobile-library-destination-copy mobile-library-book-title">
+                      <span lang="en" dir="ltr">{book.label}</span>
+                      <strong lang="he" dir="rtl">{book.hebrew}</strong>
                     </span>
                     <span class="mobile-library-arrow" aria-hidden="true">
                       <UiIcon name="arrowRight" />
@@ -730,7 +730,6 @@
             <section class="mobile-library-section mod-detail-list">
               <div class="mobile-library-section-heading">
                 <h2>Parsha</h2>
-                <span>Tap card · arrow: aliyah</span>
               </div>
               <ol class="mobile-parsha-list">
                 {#each entries as entry (entry.id)}
@@ -738,29 +737,21 @@
                     class="mobile-parsha-card"
                     class:is-expanded={mobileExpandedEntryId === entry.id}
                   >
-                    <div class="mobile-parsha-card-row">
-                      <a
-                        href={entry.href}
-                        data-mobile-parsha={entry.id}
-                        onclick={(event) => navigateLink(event, entry.href)}
-                      >
-                        <strong dir="rtl">{entry.label}</strong>
-                        <small>Open at beginning</small>
-                      </a>
-                      <button
-                        type="button"
-                        aria-label={`Choose aliyah for ${entry.label}`}
-                        aria-expanded={mobileExpandedEntryId === entry.id}
-                        aria-controls={`${entry.id}-mobile-aliyot`}
-                        onclick={() => toggleMobileAliyot(entry)}
-                      >
-                        <UiIcon
-                          name={mobileExpandedEntryId === entry.id
-                            ? 'chevronUp'
-                            : 'chevronDown'}
-                        />
-                      </button>
-                    </div>
+                    <button
+                      class="mobile-parsha-card-row"
+                      type="button"
+                      data-mobile-parsha={entry.id}
+                      aria-label={`Choose aliyah for ${entry.label}`}
+                      aria-expanded={mobileExpandedEntryId === entry.id}
+                      aria-controls={`${entry.id}-mobile-aliyot`}
+                      onclick={() => toggleMobileAliyot(entry)}
+                    >
+                      <span class="mobile-parsha-title">
+                        <span lang="en" dir="ltr" title={entry.englishLabel}>{entry.englishLabel}</span>
+                        <strong lang="he" dir="rtl">{entry.label}</strong>
+                      </span>
+                      <UiIcon name="chevronDown" />
+                    </button>
                     {#if mobileExpandedEntryId === entry.id}
                       {@const activeGroup = entry.aliyahGroups[mobileGroupIndex] ?? entry.aliyahGroups[0]}
                       <div
@@ -788,7 +779,7 @@
                               <a
                                 href={choice.href}
                                 onclick={(event) => handleChoiceClick(event, choice)}
-                              >{choice.label}</a>
+                              ><span>{choice.label}</span></a>
                             {/each}
                           </div>
                         {/if}
@@ -854,9 +845,9 @@
                         book: book.number,
                       })}
                   >
-                    <span class="mobile-library-destination-copy">
-                      <strong dir="rtl">{book.hebrew}</strong>
-                      <small>{book.label}</small>
+                    <span class="mobile-library-destination-copy mobile-library-book-title">
+                      <span lang="en" dir="ltr">{book.label}</span>
+                      <strong lang="he" dir="rtl">{book.hebrew}</strong>
                     </span>
                     <span class="mobile-library-arrow" aria-hidden="true">
                       <UiIcon name="arrowRight" />

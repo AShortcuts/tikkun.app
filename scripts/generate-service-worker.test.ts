@@ -361,6 +361,8 @@ test('precache keeps the app shell small and excludes deferred content', () => {
   expect(shouldPrecache('about/index.html', excludedFiles)).toBe(false)
   expect(shouldPrecache('privacy/index.html', excludedFiles)).toBe(false)
   expect(shouldPrecache('support/index.html', excludedFiles)).toBe(false)
+  expect(shouldPrecache('privacy.html', excludedFiles)).toBe(false)
+  expect(shouldPrecache('support.html', excludedFiles)).toBe(false)
   expect(shouldPrecache('settings/index.html', excludedFiles)).toBe(false)
   expect(shouldPrecache('tidbits/index.html', excludedFiles)).toBe(false)
   expect(shouldPrecache('tidbits/example/index.html', excludedFiles)).toBe(false)

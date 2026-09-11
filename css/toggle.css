@@ -1,8 +1,6 @@
 .annotations-toggle {
   font-family: ShlomosemiStam;
   border: none;
-  padding: 0;
-  background: transparent;
   border-radius: 50%; /* no border, but setting the border-radius allows the focused highlight to fit the button nicely */
   cursor: pointer;
 }
@@ -20,12 +18,19 @@
 .toggle-state {
   color: var(--annotations-toggle-inactive-color);
   transition: color var(--reader-motion-color) var(--reader-ease-standard);
+}
+
+.toggle.mod-compact .toggle-state {
   flex: none;
   line-height: 1;
 }
 
 .annotations-toggle[aria-pressed='true'] .toggle-state.mod-on,
-.annotations-toggle[aria-pressed='false'] .toggle-state.mod-off,
+.annotations-toggle[aria-pressed='false'] .toggle-state.mod-off {
+  transform: scale(1.5);
+  color: var(--annotations-toggle-active-color);
+}
+
 [data-toolbar-overflow-action='annotations'][aria-pressed='true']
   .toggle-state.mod-on,
 [data-toolbar-overflow-action='annotations'][aria-pressed='false']
@@ -64,4 +69,61 @@
   align-items: center;
   direction: ltr;
   background: transparent;
+}
+
+/* Keep the floating button's original appearance separate from the menu icon. */
+.annotations-toggle .toggle {
+  --annotations-toggle-active-color: white;
+  --annotations-toggle-inactive-color: oklch(100% 0 0 / 0.6);
+  --annotations-toggle-hover-color: oklch(82% 0.18 190deg);
+}
+
+.annotations-toggle .toggle-state {
+  position: relative;
+  right: 3px;
+}
+
+.annotations-toggle .toggle-state.mod-off {
+  display: inline-block;
+  margin-right: 0.25em;
+}
+
+.annotations-toggle[aria-pressed='false'] .toggle-state {
+  right: -3px;
+}
+
+.annotations-toggle .shadowed-circle {
+  padding: 1em;
+  height: 4em;
+  width: 4em;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 50%;
+  background: black;
+  color: white;
+}
+
+html[data-reader-theme='dark'] .annotations-toggle .toggle {
+  --annotations-toggle-active-color: black;
+  --annotations-toggle-inactive-color: oklch(0% 0 0 / 0.5);
+  --annotations-toggle-hover-color: oklch(50% 0.24 260deg);
+}
+
+html[data-reader-theme='dark'] .annotations-toggle .shadowed-circle {
+  background: white;
+  color: black;
+}
+
+@media (prefers-color-scheme: dark) {
+  html[data-reader-theme='automatic'] .annotations-toggle .toggle {
+    --annotations-toggle-active-color: black;
+    --annotations-toggle-inactive-color: oklch(0% 0 0 / 0.5);
+    --annotations-toggle-hover-color: oklch(50% 0.24 260deg);
+  }
+
+  html[data-reader-theme='automatic'] .annotations-toggle .shadowed-circle {
+    background: white;
+    color: black;
+  }
 }

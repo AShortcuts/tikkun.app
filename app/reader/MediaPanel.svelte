@@ -170,7 +170,9 @@
       {#if narrators.length > 1}<label class="media-picker media-narrator"><span>Narrator</span><select aria-label="Narrator" bind:value={narrator}>{#each narrators as item (item.id)}<option value={item.id}>{item.displayName}</option>{/each}</select></label>{/if}
       <div class="media-filters media-library-tools">
         <select aria-label="Download filter" bind:value={filter}><option value="all">All parshiot</option><option value="downloaded">Downloaded</option></select>
-        <button class="media-icon" type="button" title="Download library" aria-label="Download library" disabled={!snapshot.supported || busy || !rows.some((row) => row.remaining.some((entry) => !isActiveDownload(entry)))} onclick={downloadLibrary}><UiIcon name="fileDown" /></button>
+        {#if rows.some((row) => row.available)}
+          <button class="media-icon" type="button" title="Download library" aria-label="Download library" disabled={!snapshot.supported || busy || !rows.some((row) => row.remaining.some((entry) => !isActiveDownload(entry)))} onclick={downloadLibrary}><UiIcon name="fileDown" /></button>
+        {/if}
         <button class="media-icon" type="button" title="Refresh downloads" aria-label="Refresh downloads" disabled={busy} onclick={() => run(() => library.refresh())}><UiIcon name="reset" /></button>
       </div>
       {#if snapshot.phase === 'checking'}<p role="status">Checking downloads...</p>{/if}
@@ -178,16 +180,20 @@
       {#each groups as group (group)}
         <h3 class="media-group">{group}</h3>
         {#each visibleRows.filter((row) => row.group === group) as row (row.id)}
+          {@const availability = row.available ? row.available < row.aliyot.length ? `${row.available} of ${row.aliyot.length} available` : row.missingBytes ? `${bytes(row.missingBytes)} remaining` : 'Audio saved' : 'Audio unavailable'}
           <div class="media-reading">
             <div class="media-reading-row">
-              <button class="media-disclosure" type="button" aria-expanded={expanded.includes(row.id)} aria-controls={expanded.includes(row.id) ? `media-aliyot-${row.id}` : undefined} onclick={() => expanded = expanded.includes(row.id) ? expanded.filter((id) => id !== row.id) : [...expanded, row.id]}>
-                <span><strong>{row.name}</strong><span class="media-hebrew" lang="he" dir="rtl">{row.hebrew}</span><small>{row.available ? row.available < row.aliyot.length ? `${row.available} of ${row.aliyot.length} available` : row.missingBytes ? `${bytes(row.missingBytes)} remaining` : 'Audio saved' : 'Audio unavailable'}</small></span>
+              <button class="media-disclosure" type="button" aria-label={`${row.name} - ${row.hebrew}. ${availability}`} aria-expanded={expanded.includes(row.id)} aria-controls={expanded.includes(row.id) ? `media-aliyot-${row.id}` : undefined} onclick={() => expanded = expanded.includes(row.id) ? expanded.filter((id) => id !== row.id) : [...expanded, row.id]}>
+                <span class="media-reading-title" dir="ltr"><span class="media-english" lang="en">{row.name}</span><span aria-hidden="true">-</span><strong class="media-hebrew" lang="he" dir="rtl">{row.hebrew}</strong></span>
                 <UiIcon name={expanded.includes(row.id) ? 'chevronUp' : 'chevronDown'} />
               </button>
+              <small class="media-availability">{availability}</small>
+              {#if row.available}
               <button class="media-download" type="button" class:is-complete={row.complete}
-                disabled={!snapshot.supported || busy || !row.available || row.complete || row.active.length > 0 || row.assets.some((entry) => ['removing', 'removal-pending'].includes(entry.phase))}
-                aria-label={!row.available ? `${row.name}: Audio unavailable` : row.complete ? `${row.name}: ${row.label}` : `Download remaining ${row.available - row.ready} aliyot for ${row.name}`}
+                disabled={!snapshot.supported || busy || row.complete || row.active.length > 0 || row.assets.some((entry) => ['removing', 'removal-pending'].includes(entry.phase))}
+                aria-label={row.complete ? `${row.name}: ${row.label}` : `Download remaining ${row.available - row.ready} aliyot for ${row.name}`}
                 onclick={() => run(() => queue(row.remaining.map((entry) => entry.key)))}><UiIcon name={row.complete ? 'check' : 'download'} /><span>{row.label}</span></button>
+              {/if}
             </div>
             {#if row.active.length}
               <div class="media-progress"><progress max={row.totalBytes || 1} value={row.progressBytes} aria-label={`${row.name} download progress`}></progress><button type="button" class="media-icon" aria-label={`Cancel ${row.name} downloads`} title="Cancel downloads" onclick={() => run(() => library.cancel(row.active.map((entry) => entry.key)))}><UiIcon name="x" /></button></div>
@@ -197,10 +203,12 @@
               <div class="media-aliyot" id={`media-aliyot-${row.id}`}>
                 {#each row.aliyot as aliyah (aliyah.number)}
                   <div class="media-aliyah"><span><strong>{aliyah.title}</strong><small>{!aliyah.entry ? 'Audio unavailable' : aliyah.entry.phase === 'removal-pending' ? 'Removal pending' : aliyah.entry.phase === 'paused' ? aliyah.saved ? 'Offline support needs repair' : 'Paused' : aliyah.entry.readiness === 'audio-only' && aliyah.ready ? 'Audio only' : bytes(aliyah.entry.asset.byteLength)}</small></span>
+                    {#if aliyah.entry}
                     <button class="media-icon" type="button" title={aliyah.ready ? 'Downloaded' : aliyah.entry && isActiveDownload(aliyah.entry) ? 'Cancel download' : aliyah.saved ? 'Repair offline download' : 'Download'}
                       aria-label={`${aliyah.ready ? 'Downloaded' : aliyah.entry && isActiveDownload(aliyah.entry) ? 'Cancel download of' : aliyah.saved ? 'Repair' : 'Download'} ${aliyah.title}`}
                       disabled={!snapshot.supported || busy || !aliyah.entry || aliyah.ready || ['removing', 'removal-pending'].includes(aliyah.entry.phase)}
                       onclick={() => { const entry = aliyah.entry; if (entry) void run(() => isActiveDownload(entry) ? library.cancel([entry.key]) : queue([entry.key])) }}><UiIcon name={aliyah.ready ? 'check' : aliyah.entry && isActiveDownload(aliyah.entry) ? 'x' : 'download'} /></button>
+                    {/if}
                   </div>
                 {/each}
               </div>
@@ -284,12 +292,15 @@
   .media-group { margin: 24px 0 8px; color: var(--media-secondary); font-size: 13px; font-weight: 500; }
   .media-reading { background: var(--media-surface); margin-inline: -20px; padding-inline: 20px; }
   .media-reading + .media-reading .media-reading-row { border-top: 1px solid var(--media-rule); }
-  .media-reading-row { display: grid; grid-template-columns: minmax(0, 1fr) 132px; align-items: center; gap: 12px; padding: 12px 0; }
-  .media-disclosure { justify-content: space-between; text-align: start; padding: 4px 0; border: 0; gap: 10px; color: var(--media-label); }
+  .media-reading-row { display: grid; grid-template-columns: minmax(0, 1fr) 132px; align-items: center; gap: 4px 12px; padding: 12px 0; }
+  .media-disclosure { grid-column: 1 / -1; min-width: 0; justify-content: space-between; text-align: start; padding: 4px 0; border: 0; gap: 10px; color: var(--media-label); }
   .media-disclosure :global(.ui-icon) { width: 16px; height: 16px; color: var(--media-secondary); }
   .media-disclosure > span, .media-aliyah > span, .media-stored > span { min-width: 0; overflow-wrap: anywhere; }
   strong { font-weight: 600; } small { display: block; font-size: 12px; margin-top: 4px; line-height: 1.4; color: var(--media-secondary); }
-  .media-hebrew { display: block; font-size: 16px; margin-top: 3px; }
+  .media-reading-title { display: inline-flex; flex-flow: row nowrap; align-items: baseline; gap: 0.3em; white-space: nowrap; font-size: 16px; line-height: 1.4; color: var(--media-label); }
+  .media-english { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: inherit; line-height: inherit; color: inherit; font-weight: 400; }
+  .media-hebrew { flex-shrink: 0; font-size: inherit; line-height: inherit; color: inherit; font-weight: 700; }
+  .media-availability { margin: 0; }
   .media-download { width: 132px; height: 44px; white-space: nowrap; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; padding: 4px 6px; background: color-mix(in srgb, var(--media-tint) 9%, var(--media-surface)); }
   .media-download.is-complete { background: transparent; font-weight: 400; }
   .media-progress { display: flex; align-items: center; gap: 12px; padding-bottom: 8px; } progress { width: 100%; height: 6px; accent-color: var(--media-tint); }

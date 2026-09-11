@@ -13,8 +13,8 @@ Editable listing source and delivery checkpoint, verified 2026-09-11.
 - Team: Adam Niyazov (`5D862AQ8GV`). Xcode GUI cloud signing succeeded despite
   CLI export reporting `No Accounts` and no distribution certificate. The account
   was present and valid; no account reset or source rebuild was needed.
-- Development-signed direct install remains available through
-  [Sqim](https://build.sqim.dev/sqim/install/bs7X-ngfodQq).
+- Development-signed direct install was delivered through Sqim. Keep private
+  installation links in ignored local release records, not this public repository.
 - Release mode: manual. No public review submission or release performed.
 
 ## Listing configuration

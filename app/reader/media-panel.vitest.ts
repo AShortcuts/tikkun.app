@@ -21,8 +21,8 @@ const readings: MediaReading[] = [
 let cleanup: (() => Promise<void>) | undefined
 afterEach(async () => { await cleanup?.(); cleanup = undefined; document.documentElement.removeAttribute('data-reader-theme'); document.documentElement.removeAttribute('data-reader-custom-scheme'); document.documentElement.style.colorScheme = ''; vi.restoreAllMocks() })
 
-async function setup(saved = 1, inUse = false) {
-  const assets = recordings.map((recording) => resolveRecordingAsset(descriptorForRecording(recording)!, document.baseURI))
+async function setup(saved = 1, inUse = false, availableRecordings = recordings) {
+  const assets = availableRecordings.map((recording) => resolveRecordingAsset(descriptorForRecording(recording)!, document.baseURI))
   const stored = new Map<string, StoredRecording>(assets.slice(0, saved).map((asset) => [recordingAssetKey(asset), asset]))
   const backend: RecordingStorage = { supported: true, location: 'device', inventory: async () => [...stored.values()],
     preflight: vi.fn(async () => {}),
@@ -36,7 +36,7 @@ async function setup(saved = 1, inUse = false) {
   trigger.textContent = 'Open media'
   document.body.append(trigger, target)
   let connected: MediaPanelApi | undefined
-  const component = mount(MediaPanel, { target, props: { library, readings, recordings, narrators: audioNarrators,
+  const component = mount(MediaPanel, { target, props: { library, readings, recordings: availableRecordings, narrators: audioNarrators,
     initialNarrator: audioNarrators[0].id, baseUrl: document.baseURI,
     meter: { measure: async () => ({ categories: [
       { id: 'core', label: 'App and core text', bytes: 6_014_015 },
@@ -59,6 +59,19 @@ for (const width of [320, 390, 768, 1280]) test(`Media download disclosure, stab
   const button = document.querySelector<HTMLButtonElement>('.media-download')!
   expect(button.textContent).toContain('1/7')
   const before = button.getBoundingClientRect()
+  const title = document.querySelector<HTMLElement>('.media-reading-title')!
+  const englishLabel = title.querySelector<HTMLElement>('.media-english')!
+  const hebrewLabel = title.querySelector<HTMLElement>('.media-hebrew')!
+  const english = englishLabel.getBoundingClientRect()
+  const hebrew = title.querySelector('.media-hebrew')!.getBoundingClientRect()
+  expect(getComputedStyle(englishLabel).fontSize).toBe(getComputedStyle(hebrewLabel).fontSize)
+  expect(getComputedStyle(englishLabel).color).toBe(getComputedStyle(hebrewLabel).color)
+  expect(getComputedStyle(englishLabel).fontWeight).toBe('400')
+  expect(getComputedStyle(hebrewLabel).fontWeight).toBe('700')
+  expect(Array.from(title.children, (part) => part.textContent).join(' ')).toBe('Beresheet - בְּרֵאשִׁית')
+  expect(Math.abs(english.top - hebrew.top)).toBeLessThan(2)
+  expect(english.right).toBeLessThan(hebrew.left)
+  expect(title.scrollWidth).toBeLessThanOrEqual(title.clientWidth)
   await page.getByRole('button', { name: /Beresheet.*remaining/ }).click()
   await expect.element(page.getByRole('button', { name: 'Download Beresheet Aliyah 2', exact: true })).toBeVisible()
   await page.screenshot({ path: `../../.vitest-attachments/media-${width}.png` })
@@ -83,6 +96,25 @@ for (const width of [320, 390, 768, 1280]) test(`Media download disclosure, stab
     expect(rect.left, control.outerHTML).toBeGreaterThanOrEqual(panel.getBoundingClientRect().left)
     expect(rect.right, control.outerHTML).toBeLessThanOrEqual(panel.getBoundingClientRect().right + 1)
   }
+})
+
+test('shows download controls only for readings and aliyot with audio', async () => {
+  await page.viewport(390, 844)
+  await setup(0, false, recordings.slice(0, 1))
+  const noach = [...document.querySelectorAll('.media-reading')].find((row) => row.textContent?.includes('Noach'))!
+  expect(noach.querySelector('.media-download')).toBeNull()
+  await page.getByRole('button', { name: /Noach.*Audio unavailable/ }).click()
+  expect(noach.querySelectorAll('.media-aliyah')).toHaveLength(7)
+  expect(noach.querySelectorAll('.media-aliyah button')).toHaveLength(0)
+  await page.getByRole('button', { name: /Beresheet.*1 of 7 available/ }).click()
+  await expect.element(page.getByRole('button', { name: 'Download Beresheet Aliyah 1', exact: true })).toBeEnabled()
+  await expect.element(page.getByRole('button', { name: 'Download Aliyah 2', exact: true })).not.toBeInTheDocument()
+})
+
+test('omits bulk downloads when the catalog has no audio', async () => {
+  await setup(0, false, [])
+  expect(document.querySelector('.media-download')).toBeNull()
+  await expect.element(page.getByRole('button', { name: 'Download library', exact: true })).not.toBeInTheDocument()
 })
 
 test('iOS-style segmented navigation supports the keyboard and dark appearance', async () => {

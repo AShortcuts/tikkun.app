@@ -67,7 +67,7 @@
       </p>
     </div>
     <SupportDiagnosticsActions variant="site" />
-    <a class="site-inline-action" href={resolve('/support/')}>Contact support</a>
+    <a class="site-inline-action" href={resolve('/support')}>Contact support</a>
   </section>
 
   <section class="site-section about-taskboard" aria-labelledby="taskboard-title">

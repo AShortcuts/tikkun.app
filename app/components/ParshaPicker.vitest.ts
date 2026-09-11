@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { tick } from 'svelte'
+import { page } from 'vitest/browser'
+import '../../css/master.css'
 
 import { LeiningGenerator } from '../calendar-model/generator.ts'
 import type { UserSettings } from '../calendar-model/user-settings.ts'
@@ -265,6 +267,108 @@ test('opens a parsha at its beginning while its chevron owns aliyah choices', ()
   expect(document.querySelector('.aliyah-selection-popup')).not.toBeNull()
 })
 
+test.each([320, 390])('aligns bilingual mobile parsha titles with matching typography at %ipx', async (width) => {
+  await page.viewport(width, 844)
+  setCompactLibrarySupport(true)
+  const picker = mountPicker()
+  picker.style.position = 'relative'
+  picker.style.height = '844px'
+  async function verifyBookTitles(selector: string) {
+    await tick()
+    await document.fonts.ready
+    const books = picker.querySelectorAll<HTMLElement>(selector)
+    expect(books).toHaveLength(5)
+    for (const book of books) {
+      const english = book.querySelector<HTMLElement>('[lang="en"]')!
+      const hebrew = book.querySelector<HTMLElement>('[lang="he"]')!
+      const enStyle = getComputedStyle(english)
+      const heStyle = getComputedStyle(hebrew)
+      const enBounds = english.getBoundingClientRect()
+      const heBounds = hebrew.getBoundingClientRect()
+      expect(enStyle.fontSize).toBe(heStyle.fontSize)
+      expect(enStyle.color).toBe(heStyle.color)
+      expect(enStyle.fontWeight).toBe('400')
+      expect(heStyle.fontWeight).toBe('700')
+      expect(Math.abs(enBounds.top - heBounds.top), book.textContent ?? '').toBeLessThan(2)
+      expect(enBounds.right).toBeLessThanOrEqual(heBounds.left)
+      expect(book.scrollWidth).toBeLessThanOrEqual(book.clientWidth)
+    }
+  }
+  try {
+    await verifyBookTitles('[data-mobile-book]')
+    for (const book of [1, 2, 3, 4, 5]) {
+      requiredButton(picker, `[data-mobile-book="${book}"]`).click()
+      await tick()
+      await document.fonts.ready
+      const links = picker.querySelectorAll<HTMLElement>('[data-mobile-parsha]')
+      expect(links.length).toBeGreaterThan(0)
+      for (const link of links) {
+        const english = link.querySelector<HTMLElement>('[lang="en"]')!
+        const hebrew = link.querySelector<HTMLElement>('[lang="he"]')!
+        const enStyle = getComputedStyle(english)
+        const heStyle = getComputedStyle(hebrew)
+        const enBounds = english.getBoundingClientRect()
+        const heBounds = hebrew.getBoundingClientRect()
+        expect(enStyle.fontSize).toBe(heStyle.fontSize)
+        expect(enStyle.color).toBe(heStyle.color)
+        expect(enStyle.fontWeight).toBe('400')
+        expect(heStyle.fontWeight).toBe('700')
+        expect(Math.abs(enBounds.top - heBounds.top), link.textContent ?? '').toBeLessThan(2)
+        expect(enBounds.right).toBeLessThanOrEqual(heBounds.left)
+        expect(link.scrollWidth).toBeLessThanOrEqual(link.clientWidth)
+      }
+      requiredButton(picker, '.mobile-library-back').click()
+      await tick()
+    }
+    requiredButton(picker, '[data-mobile-destination="reference"]').click()
+    await verifyBookTitles('[data-mobile-reference-book]')
+  } finally {
+    await page.viewport(1280, 844)
+  }
+})
+
+test.each([320, 390])('opens aliyot from the whole mobile row and centers capsule labels at %ipx', async (width) => {
+  await page.viewport(width, 844)
+  setCompactLibrarySupport(true)
+  const navigate = vi.fn()
+  const picker = mountPicker({ navigate })
+  picker.style.position = 'relative'
+  picker.style.height = '844px'
+  try {
+    requiredButton(picker, '[data-mobile-book="1"]').click()
+    await tick()
+    const row = requiredButton(picker, '[data-mobile-parsha]')
+    const icon = row.querySelector<SVGElement>('.ui-icon')!
+    expect(row.querySelectorAll('a, button')).toHaveLength(0)
+    expect(getComputedStyle(row).borderWidth).toBe('0px')
+    expect(getComputedStyle(icon).transform).toBe('matrix(0, -1, 1, 0, 0, 0)')
+    for (const selector of ['[lang="en"]', '[lang="he"]', '.ui-icon']) {
+      row.querySelector(selector)!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await tick()
+      expect(row.getAttribute('aria-expanded')).toBe('true')
+      expect(navigate).not.toHaveBeenCalled()
+      await document.fonts.ready
+      const links = picker.querySelectorAll<HTMLAnchorElement>('.mobile-aliyah-links a')
+      expect(links.length).toBeGreaterThan(6)
+      for (const link of links) {
+        const capsule = link.getBoundingClientRect()
+        const label = link.querySelector('span')!.getBoundingClientRect()
+        expect(Math.abs(label.top + label.height / 2 - capsule.top - capsule.height / 2)).toBeLessThan(1)
+      }
+      row.click()
+      await tick()
+      expect(row.getAttribute('aria-expanded')).toBe('false')
+    }
+    row.click()
+    await tick()
+    const choice = picker.querySelector<HTMLAnchorElement>('.mobile-aliyah-links a')!
+    choice.click()
+    expect(navigate).toHaveBeenCalledExactlyOnceWith(choice.getAttribute('href'))
+  } finally {
+    await page.viewport(1280, 844)
+  }
+})
+
 test('uses mobile Library depth without a Go button', async () => {
   setCompactLibrarySupport(true)
   const navigate = vi.fn()
@@ -313,6 +417,10 @@ test('uses mobile Library depth without a Go button', async () => {
   expect(requiredButton(picker, '.mobile-library-back').textContent).toContain(
     'Books'
   )
+  const parshaTitle = picker.querySelector('[data-mobile-parsha]')!
+  expect(parshaTitle.querySelector('[lang="en"]')?.textContent).toBe('Vayikra')
+  expect(parshaTitle.querySelector('[lang="he"]')?.textContent).toBe('ויקרא')
+  expect(picker.textContent).not.toContain('Open at beginning')
   const aliyahToggle = picker.querySelector<HTMLButtonElement>(
     'button[aria-label^="Choose aliyah for תזריע"]'
   )

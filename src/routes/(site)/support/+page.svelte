@@ -28,6 +28,6 @@
   <section aria-labelledby="support-diagnostics">
     <h2 id="support-diagnostics">Troubleshooting a technical issue?</h2>
     <p>You can copy or download a diagnostic report from <a href={resolve('/about/#support-title')}>About</a> or Reader Settings, then attach it to your email. Nothing is sent automatically.</p>
-    <p>Only share details you're comfortable sending. Our <a href={resolve('/privacy/')}>privacy policy</a> explains how local data and support requests are handled.</p>
+    <p>Only share details you're comfortable sending. Our <a href={resolve('/privacy')}>privacy policy</a> explains how local data and support requests are handled.</p>
   </section>
 </InformationPage>

@@ -107,10 +107,10 @@
   {@render children()}
 
   <footer class="home-footer">
-    <p>Recordings by Yoni Davidov. Reader and timing tools by Tikkun Korim.</p>
+    <p>Recordings by Yoni Davidov. Reader and timing tools by Adam Niyazov.</p>
     <nav class="site-footer-nav" aria-label="Footer navigation">
-      <a href={resolve('/support/')}>Support</a>
-      <a href={resolve('/privacy/')}>Privacy policy</a>
+      <a href={resolve('/support')}>Support</a>
+      <a href={resolve('/privacy')}>Privacy policy</a>
       <a href={resolve('/readings/')}>Readings & coverage</a>
       <a href={resolve('/tidbits/')}>Tidbits</a>
       <a href={resolve('/about/')}>About</a>
