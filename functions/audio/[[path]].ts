@@ -5,6 +5,12 @@ import { rangeAudioRecordings } from '../../app/data/range-audio-manifest.ts'
 // Cloudflare uses this stream's byte count for Content-Length on the wire.
 declare const FixedLengthStream: new (length: number) => TransformStream<Uint8Array, Uint8Array>
 
+declare global {
+  interface ReadableStreamBYOBReader {
+    readAtLeast(minBytes: number, view: Uint8Array<ArrayBuffer>): Promise<ReadableStreamReadResult<Uint8Array<ArrayBuffer>>>
+  }
+}
+
 const publishedLengths = new Map([...audioRecordings, ...rangeAudioRecordings]
   .filter((recording) => recording.status === 'available' && recording.mediaIdentity)
   .map((recording) => [recording.playSrc, recording.mediaIdentity!.byteLength]))
@@ -93,19 +99,26 @@ function ifRangeMatches(request: Request, response: Response) {
 }
 
 function streamRange(body: ReadableStream<Uint8Array>, start: number, end: number) {
-  const reader = body.getReader()
+  const reader = body.getReader({ mode: 'byob' })
+  const chunkSize = 1024 * 1024
+  let buffer = new ArrayBuffer(Math.min(chunkSize, end + 1))
   let offset = 0
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       while (offset <= end) {
-        const { done, value } = await reader.read()
+        // Native coalescing avoids spending the CPU budget on tiny network chunks.
+        const length = Math.min(buffer.byteLength, end + 1 - offset)
+        const { done, value } = await reader.readAtLeast(length, new Uint8Array(buffer, 0, length))
         if (done) {
           controller.error(new Error('Audio asset ended before the requested range.'))
           return
         }
         const chunkStart = offset
         offset += value.byteLength
-        if (offset <= start) continue
+        if (offset <= start) {
+          buffer = value.buffer
+          continue
+        }
         controller.enqueue(value.subarray(
           Math.max(0, start - chunkStart),
           Math.min(value.byteLength, end + 1 - chunkStart),
@@ -117,6 +130,8 @@ function streamRange(body: ReadableStream<Uint8Array>, start: number, end: numbe
           } catch (error) {
             console.warn('Could not cancel completed audio source', error)
           }
+        } else {
+          buffer = new ArrayBuffer(Math.min(chunkSize, end + 1 - offset))
         }
         return
       }

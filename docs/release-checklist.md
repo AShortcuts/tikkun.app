@@ -39,6 +39,7 @@ build.
 - Test `If-Range` with both a current and stale validator. Confirm playback seeks from the beginning, middle, and near the end.
 - Do not infer proportional origin bandwidth from app tests. Confirm the CDN or storage origin itself serves native range responses before claiming that benefit.
 - Pages currently ignores Range and can omit Content-Length inside its asset binding. The audio Function uses the existing generated recording sizes when needed, requests the cacheable full asset, and streams only the requested portion with bounded memory and cancellation. FixedLengthStream preserves the response length on the wire. A late seek still reads the preceding bytes internally; no separate media service or cache is involved.
+- Range reads use Cloudflare's native `readAtLeast` with a maximum 1 MiB buffer. This avoids exhausting the Function CPU allowance on tiny upstream chunks. Check deployment logs for `exceededCpu` when diagnosing aborted audio transfers.
 
 ## Security Headers
 

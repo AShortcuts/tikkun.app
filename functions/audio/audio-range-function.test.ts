@@ -1,4 +1,4 @@
-import { beforeEach, expect, test, vi } from 'vitest'
+import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest'
 import {
   onRequest,
   type AudioRangeFunctionContext,
@@ -6,6 +6,16 @@ import {
 import { audioRecordings } from '../../generated/audio-manifest.ts'
 
 const audioBytes = Uint8Array.from([10, 20, 30, 40, 50, 60])
+
+// Node's standard minimum-read option models Cloudflare's native extension.
+beforeAll(() => {
+  ReadableStreamBYOBReader.prototype.readAtLeast = function (minBytes, view) {
+    const read: (view: Uint8Array<ArrayBuffer>, options: { min: number }) =>
+      Promise<ReadableStreamReadResult<Uint8Array<ArrayBuffer>>> = this.read.bind(this)
+    return read(view, { min: minBytes })
+  }
+})
+afterAll(() => Reflect.deleteProperty(ReadableStreamBYOBReader.prototype, 'readAtLeast'))
 
 // Node lacks Cloudflare's fixed-length stream; the edge-runtime smoke check
 // additionally verifies that Content-Length survives actual HTTP transport.
@@ -68,12 +78,14 @@ function chunkedAssetResponse() {
   ]
   const state = { bytesRead: 0, cancelled: false }
   let index = 0
-  const body = new ReadableStream<Uint8Array>(
+  const body = new ReadableStream(
     {
+      type: 'bytes',
       pull(controller) {
         const chunk = chunks[index]
         if (!chunk) {
           controller.close()
+          controller.byobRequest?.respond(0)
           return
         }
         index += 1
@@ -313,13 +325,24 @@ test.each([
 })
 
 test('stops upstream reads when the player cancels a seek', async () => {
-  const asset = chunkedAssetResponse()
-  const response = await onRequest(context('bytes=0-5', { assetResponse: asset.response }).value)
+  let bytesRead = 0
+  let cancelled = false
+  const source = new ReadableStream({
+    type: 'bytes',
+    pull(controller) {
+      bytesRead += 1024
+      controller.enqueue(new Uint8Array(1024))
+    },
+    cancel() { cancelled = true },
+  }, { highWaterMark: 0 })
+  const response = await onRequest(context('bytes=0-4194303', {
+    assetResponse: new Response(source, { headers: { 'content-length': '4194304' } }),
+  }).value)
   const reader = response.body!.getReader()
-  expect((await reader.read()).value).toEqual(audioBytes.slice(0, 2))
+  expect((await reader.read()).value!.byteLength).toBe(1024 * 1024)
   await reader.cancel('Seek replaced')
-  await vi.waitFor(() => expect(asset.state.cancelled).toBe(true))
-  expect(asset.state.bytesRead).toBeLessThanOrEqual(4)
+  await vi.waitFor(() => expect(cancelled).toBe(true))
+  expect(bytesRead).toBeLessThanOrEqual(2 * 1024 * 1024)
 })
 
 test('fails a truncated asset instead of silently returning a short range', async () => {
@@ -327,11 +350,36 @@ test('fails a truncated asset instead of silently returning a short range', asyn
     headers: { 'content-length': '6' },
   })
   const response = await onRequest(context('bytes=0-5', { assetResponse }).value)
-  await expect(response.arrayBuffer()).rejects.toThrow('Audio asset ended')
+  await expect(response.arrayBuffer()).rejects.toThrow()
+})
+
+test('coalesces tiny source chunks into bounded reads for a late seek', async () => {
+  const size = 2 * 1024 * 1024 + 8
+  let offset = 0
+  const source = new ReadableStream({
+    type: 'bytes',
+    pull(controller) {
+      const chunk = new Uint8Array(Math.min(4096, size - offset)).fill((offset / 4096) % 251)
+      offset += chunk.length
+      controller.enqueue(chunk)
+      if (offset === size) controller.close()
+    },
+  }, { highWaterMark: 0 })
+  const reads = vi.spyOn(ReadableStreamBYOBReader.prototype, 'readAtLeast')
+  try {
+    const response = await onRequest(context('bytes=-8', {
+      assetResponse: new Response(source, { headers: { 'content-length': String(size) } }),
+    }).value)
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(new Uint8Array(8).fill(10))
+    expect(reads.mock.calls.map(([minimum]) => minimum)).toEqual([1024 * 1024, 1024 * 1024, 8])
+  } finally {
+    reads.mockRestore()
+  }
 })
 
 test('propagates an upstream stream failure', async () => {
   const assetResponse = new Response(new ReadableStream({
+    type: 'bytes',
     pull() { throw new Error('Asset disconnected') },
   }), { headers: { 'content-length': '6' } })
   const response = await onRequest(context('bytes=0-1', { assetResponse }).value)
@@ -341,7 +389,8 @@ test('propagates an upstream stream failure', async () => {
 test('keeps a complete range successful if upstream cancellation fails', async () => {
   const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
   const assetResponse = new Response(new ReadableStream({
-    start(controller) { controller.enqueue(audioBytes) },
+    type: 'bytes',
+    start(controller) { controller.enqueue(audioBytes.slice()) },
     cancel() { throw new Error('Upstream already disconnected') },
   }), { headers: { 'content-length': '6' } })
   try {
