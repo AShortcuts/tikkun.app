@@ -1,7 +1,13 @@
 import { parseHttpByteRange } from '../../app/audio/http-byte-range.ts'
+import { audioRecordings } from '../../generated/audio-manifest.ts'
+import { rangeAudioRecordings } from '../../app/data/range-audio-manifest.ts'
 
 // Cloudflare uses this stream's byte count for Content-Length on the wire.
 declare const FixedLengthStream: new (length: number) => TransformStream<Uint8Array, Uint8Array>
+
+const publishedLengths = new Map([...audioRecordings, ...rangeAudioRecordings]
+  .filter((recording) => recording.status === 'available' && recording.mediaIdentity)
+  .map((recording) => [recording.playSrc, recording.mediaIdentity!.byteLength]))
 
 interface AssetFetcher {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
@@ -34,17 +40,26 @@ function forwardAsset(
   method: string,
   advertiseRanges =
     response.status === 206 ||
-    response.headers.get('accept-ranges')?.toLowerCase() === 'bytes'
+    response.headers.get('accept-ranges')?.toLowerCase() === 'bytes',
+  length: number | null = null,
 ) {
-  return new Response(method === 'HEAD' ? null : response.body, {
+  const headers = mediaHeaders(response, advertiseRanges)
+  if (length !== null) headers.set('content-length', String(length))
+  const body = method === 'HEAD' ? null : response.body
+  return new Response(body && length !== null ? body.pipeThrough(new FixedLengthStream(length)) : body, {
     status: response.status,
     statusText: response.statusText,
-    headers: mediaHeaders(response, advertiseRanges),
+    headers,
   })
 }
 
-function responseContentLength(response: Response) {
+function responseContentLength(response: Response, request: Request) {
   const header = response.headers.get('content-length')
+  // Pages can omit Content-Length inside ASSETS.fetch. The generated catalogue
+  // travels with these exact assets and already records their verified sizes.
+  if (header === null && response.headers.get('content-type')?.startsWith('audio/')) {
+    return publishedLengths.get(new URL(request.url).pathname) ?? null
+  }
   if (!header || !/^\d+$/.test(header)) return null
 
   const length = Number(header)
@@ -131,17 +146,15 @@ export async function onRequest({
   // Fetch the cacheable representation, then stream the requested portion.
   const assetRequest = rangeHeader ? requestWithoutRange(request) : request
   const assetResponse = await env.ASSETS.fetch(assetRequest)
-  const totalLength = responseContentLength(assetResponse)
+  const totalLength = responseContentLength(assetResponse, request)
   const canSlice = totalLength !== null && canSliceIdentityResponse(assetResponse)
-  if (!assetResponse.ok || assetResponse.status !== 200 || !rangeHeader) {
-    return forwardAsset(assetResponse, request.method,
-      assetResponse.status === 200 ? canSlice : undefined)
+  if (assetResponse.status !== 200) {
+    return forwardAsset(assetResponse, request.method)
   }
 
-  if (request.method === 'HEAD') return forwardAsset(assetResponse, request.method, canSlice)
-
-  if (!isByteRangeHeader(rangeHeader) || !ifRangeMatches(request, assetResponse)) {
-    return forwardAsset(assetResponse, request.method, canSlice)
+  if (!rangeHeader || request.method === 'HEAD' ||
+      !isByteRangeHeader(rangeHeader) || !ifRangeMatches(request, assetResponse)) {
+    return forwardAsset(assetResponse, request.method, canSlice, canSlice ? totalLength : null)
   }
 
   if (totalLength === null || !canSlice || !assetResponse.body) {

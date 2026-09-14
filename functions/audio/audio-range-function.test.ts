@@ -3,6 +3,7 @@ import {
   onRequest,
   type AudioRangeFunctionContext,
 } from './[[path]].ts'
+import { audioRecordings } from '../../generated/audio-manifest.ts'
 
 const audioBytes = Uint8Array.from([10, 20, 30, 40, 50, 60])
 
@@ -254,6 +255,30 @@ test('streams a full response when upstream omits required range metadata', asyn
   expect(response.headers.has('accept-ranges')).toBe(false)
   expect(new Uint8Array(await response.arrayBuffer())).toEqual(audioBytes)
   expect(upstreamArrayBuffer).not.toHaveBeenCalled()
+})
+
+test.each(['GET', 'HEAD'])('uses published asset size when Pages omits Content-Length (%s)', async (method) => {
+  const recording = audioRecordings.find((recording) => recording.status === 'available')!
+  const fixture = context('bytes=0-1', {
+    method,
+    assetResponse: new Response(method === 'HEAD' ? null : audioBytes, {
+      headers: { 'content-type': 'audio/mp4' },
+    }),
+  })
+  fixture.value.request = new Request(`https://tikkun.test${recording.playSrc}?tikkun-media=${recording.mediaIdentity!.digest}`, {
+    method, headers: { range: 'bytes=0-1' },
+  })
+  const response = await onRequest(fixture.value)
+  expect(response.headers.get('accept-ranges')).toBe('bytes')
+  if (method === 'HEAD') {
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-length')).toBe(String(recording.mediaIdentity!.byteLength))
+    expect((await response.arrayBuffer()).byteLength).toBe(0)
+  } else {
+    expect(response.status).toBe(206)
+    expect(response.headers.get('content-range')).toBe(`bytes 0-1/${recording.mediaIdentity!.byteLength}`)
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(audioBytes.slice(0, 2))
+  }
 })
 
 test('streams ordinary downloads and advertises available range support', async () => {

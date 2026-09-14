@@ -38,7 +38,7 @@ build.
 - Request a suffix range and an unsatisfiable range; verify a correct suffix response and `416` with `Content-Range: bytes */<length>`.
 - Test `If-Range` with both a current and stale validator. Confirm playback seeks from the beginning, middle, and near the end.
 - Do not infer proportional origin bandwidth from app tests. Confirm the CDN or storage origin itself serves native range responses before claiming that benefit.
-- Pages currently ignores Range. The audio Function requests the cacheable full asset and streams only the requested portion with bounded memory and cancellation. A late seek still reads the preceding bytes internally; no separate media service or cache is involved.
+- Pages currently ignores Range and can omit Content-Length inside its asset binding. The audio Function uses the existing generated recording sizes when needed, requests the cacheable full asset, and streams only the requested portion with bounded memory and cancellation. FixedLengthStream preserves the response length on the wire. A late seek still reads the preceding bytes internally; no separate media service or cache is involved.
 
 ## Security Headers
 
