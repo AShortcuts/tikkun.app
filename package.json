@@ -21,6 +21,7 @@
     "video:status": "node scripts/record-aliyah-videos.mjs status",
     "video:shut-down": "node scripts/record-aliyah-videos.mjs shutdown",
     "generated:check": "vitest run --project=node app/data/generated-catalog-validation.test.ts scripts/generate-audio-manifest.test.ts scripts/generate-public-reading-manifest.test.ts scripts/generate-service-worker.test.ts scripts/generate-torah-index.test.ts scripts/generate-video-manifest.test.ts",
+    "audio:verify-delivery": "node --import tsx scripts/verify-audio-delivery.ts",
     "test": "npm run test:node",
     "test:node": "vitest run --project=node",
     "test:watch": "vitest --project=node",

@@ -1,5 +1,8 @@
 import { parseHttpByteRange } from '../../app/audio/http-byte-range.ts'
 
+// Cloudflare uses this stream's byte count for Content-Length on the wire.
+declare const FixedLengthStream: new (length: number) => TransformStream<Uint8Array, Uint8Array>
+
 interface AssetFetcher {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
 }
@@ -74,6 +77,35 @@ function ifRangeMatches(request: Request, response: Response) {
   return response.headers.get('last-modified') === validator
 }
 
+function streamRange(body: ReadableStream<Uint8Array>, start: number, end: number) {
+  const reader = body.getReader()
+  let offset = 0
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      while (offset <= end) {
+        const { done, value } = await reader.read()
+        if (done) {
+          controller.error(new Error('Audio asset ended before the requested range.'))
+          return
+        }
+        const chunkStart = offset
+        offset += value.byteLength
+        if (offset <= start) continue
+        controller.enqueue(value.subarray(
+          Math.max(0, start - chunkStart),
+          Math.min(value.byteLength, end + 1 - chunkStart),
+        ))
+        if (offset > end) {
+          await reader.cancel('Audio range complete')
+          controller.close()
+        }
+        return
+      }
+    },
+    cancel: (reason) => reader.cancel(reason),
+  }, { highWaterMark: 0 })
+}
+
 function rangeNotSatisfiable(response: Response, totalLength: number) {
   const headers = mediaHeaders(response, false)
   headers.delete('content-encoding')
@@ -95,23 +127,24 @@ export async function onRequest({
   }
 
   const rangeHeader = request.headers.get('range')
-  const assetRequest =
-    request.method === 'HEAD' && rangeHeader
-      ? requestWithoutRange(request)
-      : request
+  // Pages ignores Range and bypasses its asset cache for ranged requests.
+  // Fetch the cacheable representation, then stream the requested portion.
+  const assetRequest = rangeHeader ? requestWithoutRange(request) : request
   const assetResponse = await env.ASSETS.fetch(assetRequest)
+  const totalLength = responseContentLength(assetResponse)
+  const canSlice = totalLength !== null && canSliceIdentityResponse(assetResponse)
   if (!assetResponse.ok || assetResponse.status !== 200 || !rangeHeader) {
-    return forwardAsset(assetResponse, request.method)
+    return forwardAsset(assetResponse, request.method,
+      assetResponse.status === 200 ? canSlice : undefined)
   }
 
-  if (request.method === 'HEAD') return forwardAsset(assetResponse, request.method)
+  if (request.method === 'HEAD') return forwardAsset(assetResponse, request.method, canSlice)
 
   if (!isByteRangeHeader(rangeHeader) || !ifRangeMatches(request, assetResponse)) {
-    return forwardAsset(assetResponse, request.method)
+    return forwardAsset(assetResponse, request.method, canSlice)
   }
 
-  const totalLength = responseContentLength(assetResponse)
-  if (totalLength === null || !canSliceIdentityResponse(assetResponse)) {
+  if (totalLength === null || !canSlice || !assetResponse.body) {
     return forwardAsset(assetResponse, request.method, false)
   }
 
@@ -121,10 +154,15 @@ export async function onRequest({
     return rangeNotSatisfiable(assetResponse, totalLength)
   }
 
-  // A 200 response is sequential. Synthesizing a middle or suffix 206 from it
-  // would consume every preceding byte and make seek cost scale with file size.
-  // Stream the honest full response instead; release verification requires the
-  // deployed asset binding to return a native 206 for byte-range requests.
-  void range
-  return forwardAsset(assetResponse, request.method, false)
+  const headers = mediaHeaders(assetResponse, true)
+  const length = range.end - range.start + 1
+  headers.set('content-length', String(length))
+  headers.set('content-range', `bytes ${range.start}-${range.end}/${totalLength}`)
+  const body = streamRange(assetResponse.body, range.start, range.end)
+    .pipeThrough(new FixedLengthStream(length))
+  return new Response(body, {
+    status: 206,
+    statusText: 'Partial Content',
+    headers,
+  })
 }
