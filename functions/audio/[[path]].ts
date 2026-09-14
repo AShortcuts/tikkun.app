@@ -111,8 +111,12 @@ function streamRange(body: ReadableStream<Uint8Array>, start: number, end: numbe
           Math.min(value.byteLength, end + 1 - chunkStart),
         ))
         if (offset > end) {
-          await reader.cancel('Audio range complete')
           controller.close()
+          try {
+            await reader.cancel('Audio range complete')
+          } catch (error) {
+            console.warn('Could not cancel completed audio source', error)
+          }
         }
         return
       }

@@ -338,6 +338,21 @@ test('propagates an upstream stream failure', async () => {
   await expect(response.arrayBuffer()).rejects.toThrow('Asset disconnected')
 })
 
+test('keeps a complete range successful if upstream cancellation fails', async () => {
+  const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  const assetResponse = new Response(new ReadableStream({
+    start(controller) { controller.enqueue(audioBytes) },
+    cancel() { throw new Error('Upstream already disconnected') },
+  }), { headers: { 'content-length': '6' } })
+  try {
+    const response = await onRequest(context('bytes=0-1', { assetResponse }).value)
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(audioBytes.slice(0, 2))
+    expect(warning).toHaveBeenCalledOnce()
+  } finally {
+    warning.mockRestore()
+  }
+})
+
 test('does not slice compressed representations', async () => {
   const assetResponse = new Response(audioBytes, {
     headers: { 'content-length': '6', 'content-encoding': 'gzip' },

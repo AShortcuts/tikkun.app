@@ -52,6 +52,9 @@ async function verify(recording: typeof recordings[number]) {
         assert.equal((await file.read(expected, 0, length, start)).bytesRead, length)
         assert.deepEqual(received, expected, `${url.pathname} ${range}: wrong audio bytes`)
         transferred += received.length
+      } catch (error) {
+        console.error(`Audio delivery failed: ${url.pathname} ${range}`)
+        throw error
       } finally {
         if (!response.bodyUsed) await response.body?.cancel()
       }
@@ -63,6 +66,9 @@ async function verify(recording: typeof recordings[number]) {
       assert.equal(invalid.status, 416, `${url.pathname}: out-of-bounds range`)
       assert.equal(invalid.headers.get('content-range'), `bytes */${size}`)
       assert.equal((await invalid.arrayBuffer()).byteLength, 0)
+    } catch (error) {
+      console.error(`Audio delivery failed: ${url.pathname} bytes=${size}-`)
+      throw error
     } finally {
       if (!invalid.bodyUsed) await invalid.body?.cancel()
     }
