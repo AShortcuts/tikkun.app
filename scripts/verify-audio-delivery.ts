@@ -17,6 +17,7 @@ const recordings = [...new Map([...audioRecordings, ...rangeAudioRecordings]
 assert(recordings.length > 0, 'No matching published recordings')
 let checked = 0
 let transferred = 0
+const unadvertisedRanges = new Set<string>()
 
 async function verify(recording: typeof recordings[number]) {
   const identity = recording.mediaIdentity
@@ -39,9 +40,12 @@ async function verify(recording: typeof recordings[number]) {
       })
       try {
         assert.equal(response.status, 206, `${url.pathname} ${range}: expected HTTP 206`)
-        assert.equal(response.headers.get('accept-ranges'), 'bytes')
-        assert.equal(response.headers.get('content-range'), `bytes ${start}-${start + length - 1}/${size}`)
-        assert.equal(response.headers.get('content-length'), String(length))
+        // RFC 9110 14.3 makes this header advisory; correct 206 bytes prove support.
+        const advertised = response.headers.get('accept-ranges')
+        if (advertised === null) unadvertisedRanges.add(url.pathname)
+        else assert.equal(advertised, 'bytes', `${url.pathname}: Accept-Ranges`)
+        assert.equal(response.headers.get('content-range'), `bytes ${start}-${start + length - 1}/${size}`, `${url.pathname} ${range}: Content-Range`)
+        assert.equal(response.headers.get('content-length'), String(length), `${url.pathname} ${range}: Content-Length`)
         assert.match(response.headers.get('content-type') ?? '', /^audio\//)
         const received = Buffer.from(await response.arrayBuffer())
         const expected = Buffer.alloc(length)
@@ -76,3 +80,4 @@ for (let index = 0; index < recordings.length; index += 4) {
   if (checked % 40 === 0) console.log(`Verified ${checked}/${recordings.length} recordings`)
 }
 console.log(`PASS: ${checked} recordings; beginning/middle/suffix bytes match local audio; invalid ranges rejected; ${transferred} audio bytes received.`)
+if (unadvertisedRanges.size) console.log(`NOTE: ${unadvertisedRanges.size} recordings omit optional Accept-Ranges advertisement; actual range responses passed.`)

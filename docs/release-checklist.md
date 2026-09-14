@@ -34,7 +34,7 @@ build.
 
 - Run `npm run audio:verify-delivery -- https://tikkunreader.com` after the GitHub-triggered Pages deployment succeeds. This checks every published recording's beginning, middle, suffix, and invalid ranges against the local audio bytes. An optional recording path limits diagnosis to one file.
 - On the deployed origin, request an available recording with `HEAD`; verify a valid media type and length.
-- Request `Range: bytes=0-1023`; verify `206`, `Accept-Ranges: bytes`, an exact `Content-Range`, and `Content-Length: 1024`.
+- Request `Range: bytes=0-1023`; verify `206`, an exact `Content-Range`, and `Content-Length: 1024`. The Function advertises `Accept-Ranges: bytes`; cached responses can omit this advisory header, so the live verifier reports its absence without accepting incorrect status, length, or bytes.
 - Request a suffix range and an unsatisfiable range; verify a correct suffix response and `416` with `Content-Range: bytes */<length>`.
 - Test `If-Range` with both a current and stale validator. Confirm playback seeks from the beginning, middle, and near the end.
 - Do not infer proportional origin bandwidth from app tests. Confirm the CDN or storage origin itself serves native range responses before claiming that benefit.
