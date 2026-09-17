@@ -11,6 +11,12 @@ const rootInputs = new Set([
   'package-lock.json',
   'scripts/record-aliyah-videos.mjs',
   'scripts/video-provenance.mjs',
+  'scripts/video-frame-stream.mjs',
+  'scripts/video-output-validation.mjs',
+  'scripts/video-resource-scheduler.mjs',
+  'scripts/video-server.mjs',
+  'scripts/video-progress.mjs',
+  'scripts/video-resume.mjs',
   'tsconfig.json',
   'vite.config.ts',
 ])

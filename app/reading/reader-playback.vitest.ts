@@ -9,6 +9,7 @@ import {
 } from '../calendar-model/model-types.ts'
 import { createMount } from '../lifecycle/mount.ts'
 import type { ReaderViewport } from '../adaptive/reader-viewport.ts'
+import { HighlightController } from './highlight-controller.ts'
 import {
   createReaderPlayback,
   type ReaderPlayback,
@@ -316,6 +317,76 @@ test('replaces the active recording when the narrator changes on the same aliyah
   const replaced = await playback.loadRecording(target)
   expect(replaced?.recording.id).toBe(second.id)
   expect(playback.snapshot().session?.recording.id).toBe(second.id)
+})
+
+test('gives the recording clock sole control over highlights until frame capture is released', async () => {
+  const release = vi.fn()
+  vi.spyOn(HighlightController.prototype, 'prepareRecordingPages').mockResolvedValue(release)
+  const { playback, run, audio } = createHarness()
+  await playback.loadRecording({ runId: run.id, aliyahIndex: 1 })
+  const recorder = playback.recordingHarnessAdapter()
+  await recorder.prepareFrames()
+  recorder.clearHighlight()
+  audio.dispatchEvent(new Event('seeked'))
+  await Promise.resolve()
+  expect(playback.snapshot().activeTokenKey).toBeNull()
+  recorder.releaseFrames()
+  audio.dispatchEvent(new Event('seeked'))
+  await vi.waitFor(() => expect(playback.snapshot().activeTokenKey).toBe(tokenKey))
+  expect(release).toHaveBeenCalledOnce()
+})
+
+test('shows Play at time zero and playing on later frames without starting audio', async () => {
+  vi.spyOn(HighlightController.prototype, 'prepareRecordingPages').mockResolvedValue(vi.fn())
+  const { playback, run, audio, play } = createHarness()
+  await playback.loadRecording({ runId: run.id, aliyahIndex: 1 })
+  const listener = vi.fn()
+  playback.subscribe(listener)
+  const recorder = playback.recordingHarnessAdapter()
+  await recorder.prepareFrames()
+  expect(audio.paused).toBe(true)
+  expect(play).not.toHaveBeenCalled()
+  expect(listener).toHaveBeenLastCalledWith(
+    { type: 'reader-chrome' }, expect.objectContaining({ playing: false, paused: true })
+  )
+  recorder.seek(1 / 60)
+  expect(playback.snapshot().playing).toBe(true)
+  expect(listener).toHaveBeenLastCalledWith(
+    { type: 'reader-chrome' }, expect.objectContaining({ playing: true, paused: true })
+  )
+  recorder.seek(0)
+  expect(playback.snapshot().playing).toBe(false)
+  recorder.seek(3)
+  recorder.releaseFrames()
+  expect(listener).toHaveBeenLastCalledWith(
+    { type: 'reader-chrome' }, expect.objectContaining({ playing: false, paused: true })
+  )
+  expect(play).not.toHaveBeenCalled()
+})
+
+test('restores paused controls when frame preparation fails', async () => {
+  vi.spyOn(HighlightController.prototype, 'prepareRecordingPages').mockRejectedValue(new Error('Layout failed'))
+  const { playback, run } = createHarness()
+  await playback.loadRecording({ runId: run.id, aliyahIndex: 1 })
+  await expect(playback.recordingHarnessAdapter().prepareFrames()).rejects.toThrow('Layout failed')
+  expect(playback.snapshot().playing).toBe(false)
+})
+
+test('releases a page preparation that completes after capture was cancelled', async () => {
+  const release = vi.fn()
+  let finish!: (release: () => void) => void
+  vi.spyOn(HighlightController.prototype, 'prepareRecordingPages').mockImplementation(() =>
+    new Promise(resolve => { finish = resolve })
+  )
+  const { playback, run } = createHarness()
+  await playback.loadRecording({ runId: run.id, aliyahIndex: 1 })
+  const recorder = playback.recordingHarnessAdapter()
+  const preparing = recorder.prepareFrames()
+  const rejected = expect(preparing).rejects.toThrow(/session changed/)
+  recorder.releaseFrames()
+  finish(release)
+  await rejected
+  expect(release).toHaveBeenCalledOnce()
 })
 
 test('keeps only the newest narrator load during rapid replacement', async () => {

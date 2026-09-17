@@ -30,7 +30,7 @@ test('keeps the legacy home separate while the promoted story and prototype shar
   const storyRoot = required(storyDocument, '.prototype-scroll-story')
   expect(storyRoot.textContent).toContain('Tikkun Reader')
   expect(storyRoot.textContent).toContain(
-    'A Torah-reading companion by Ocean of Torah'
+    'A Torah-reading companion website'
   )
   expect(storyRoot.textContent).toContain('The work behind the reader')
   expect(storyDocument.querySelectorAll('iframe')).toHaveLength(1)

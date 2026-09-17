@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -8,11 +8,17 @@ import { Buffer } from 'node:buffer'
 import process from 'node:process'
 import { audioRecordings } from '../generated/audio-manifest.ts'
 import {
-  buildCueFramePlan,
+  nextCaptureFrame,
   createCueConcatEntries,
   renderCueConcatFile,
 } from '../app/video/cue-frame-plan.ts'
 import { currentAppBuildHash } from './video-provenance.mjs'
+import { createResourceSampler, runResourceAware } from './video-resource-scheduler.mjs'
+import { outputValidationErrors } from './video-output-validation.mjs'
+import { frameEncoderArgs, startFrameEncoder } from './video-frame-stream.mjs'
+import { canReuseVideoServer } from './video-server.mjs'
+import { createVideoProgress } from './video-progress.mjs'
+import { completedVideoMatches, recordingSettings, videoFileHash } from './video-resume.mjs'
 import {
   inspectOwnedRun,
   openOwnedProcessRegistry,
@@ -33,21 +39,22 @@ let shuttingDown = false
 const ownedProcesses = new Map()
 
 const defaults = {
-  width: 1920,
-  height: 1080,
+  width: 1300,
+  height: 600,
   deviceScaleFactor: 3,
-  fps: 30,
+  fps: 60,
   crf: 18,
   preset: 'veryfast',
   outputRoot: process.env.TIKKUN_VIDEO_OUTPUT_ROOT || defaultOutputRoot,
   workRoot: process.env.TIKKUN_VIDEO_WORK_ROOT || defaultWorkRoot,
-  baseUrl: 'http://127.0.0.1:4177',
-  concurrency: 1,
-  // Default to deterministic frames until cue-keyframe rendering is tuned.
-  renderMode: 'deterministic-frames',
+  baseUrl: 'http://127.0.0.1:5176',
+  concurrency: 'auto',
+  maxConcurrency: 5,
+  renderMode: 'cue-keyframes',
+  frameTransport: 'stream',
   cueBurstPreEndMs: 120,
   cueBurstMaxMs: 500,
-  crop: true,
+  crop: false,
   cropMargin: 96,
 }
 
@@ -56,11 +63,11 @@ function parseArgs(argv) {
     ...defaults,
     ids: [],
     command: 'record',
-    maxConcurrency: 3,
     keepFrames: false,
     includeOutput: false,
     externalServer: false,
     dryRun: false,
+    force: false,
   }
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -75,6 +82,8 @@ function parseArgs(argv) {
       options.command = 'status'
     } else if (arg === '--dry-run') {
       options.dryRun = true
+    } else if (arg === '--force') {
+      options.force = true
     } else if (arg === '--keep-frames') {
       options.keepFrames = true
     } else if (arg === '--include-output') {
@@ -83,12 +92,17 @@ function parseArgs(argv) {
       options.externalServer = true
     } else if (arg === '--no-crop') {
       options.crop = false
+    } else if (arg === '--crop') {
+      options.crop = true
     } else if (arg.startsWith('--ids=')) {
       options.ids = arg.slice('--ids='.length).split(',').filter(Boolean)
     } else if (arg.startsWith('--render-mode=')) {
       options.renderMode = arg.slice('--render-mode='.length)
+    } else if (arg.startsWith('--frame-transport=')) {
+      options.frameTransport = arg.slice('--frame-transport='.length)
     } else if (arg.startsWith('--concurrency=')) {
-      options.concurrency = Number(arg.slice('--concurrency='.length))
+      const value = arg.slice('--concurrency='.length)
+      options.concurrency = value === 'auto' ? 'auto' : Number(value)
     } else if (arg.startsWith('--max-concurrency=')) {
       options.maxConcurrency = Number(arg.slice('--max-concurrency='.length))
     } else if (arg.startsWith('--base-url=')) {
@@ -119,8 +133,16 @@ function parseArgs(argv) {
     }
   }
 
-  if (!Number.isInteger(options.concurrency) || options.concurrency < 1) {
-    throw new Error('--concurrency must be a positive integer')
+  if (options.concurrency !== 'auto' && (!Number.isInteger(options.concurrency) || options.concurrency < 1)) {
+    throw new Error('--concurrency must be auto or a positive integer')
+  }
+  if (!Number.isSafeInteger(options.maxConcurrency) || options.maxConcurrency < 1) {
+    throw new Error('--max-concurrency must be a positive integer')
+  }
+  for (const dimension of ['width', 'height']) {
+    if (!Number.isSafeInteger(options[dimension]) || options[dimension] <= 0) {
+      throw new Error(`--${dimension} must be a positive integer`)
+    }
   }
   if (!Number.isInteger(options.fps) || options.fps < 24) {
     throw new Error('--fps must be an integer of at least 24')
@@ -131,6 +153,9 @@ function parseArgs(argv) {
   if (!['cue-keyframes', 'deterministic-frames'].includes(options.renderMode)) {
     throw new Error('--render-mode must be cue-keyframes or deterministic-frames')
   }
+  if (!['stream', 'files'].includes(options.frameTransport)) {
+    throw new Error('--frame-transport must be stream or files')
+  }
   if (!Number.isFinite(options.cueBurstPreEndMs) || options.cueBurstPreEndMs < 0) {
     throw new Error('--cue-burst-pre-end-ms must be a non-negative number')
   }
@@ -139,6 +164,9 @@ function parseArgs(argv) {
   }
   if (options.dryRun && options.command !== 'shutdown') {
     throw new Error('--dry-run requires the shutdown command')
+  }
+  if (argv.some(arg => arg.startsWith('--cue-burst-'))) {
+    console.warn('Cue burst options are deprecated and ignored: captures now follow the complete animation timeline.')
   }
   return options
 }
@@ -172,7 +200,7 @@ function appBuildHash() {
   return appBuildHashPromise
 }
 
-async function execFileText(command, args, options = {}, kind = command) {
+async function execFileText(command, args, options = {}, kind = command, returnStderr = false) {
   let completion
   await spawnOwnedProcess(command, args, {
     ...options,
@@ -188,7 +216,7 @@ async function execFileText(command, args, options = {}, kind = command) {
         stderr += chunk.toString()
       })
       child.on('close', (code) => {
-        if (code === 0) resolve(stdout)
+        if (code === 0) resolve(returnStderr ? stderr : stdout)
         else reject(new Error(`${command} ${args.join(' ')} failed: ${stderr || `exit ${code}`}`))
       })
       child.on('error', reject)
@@ -210,13 +238,13 @@ async function readJsonFile(filePath, fallback) {
   }
 }
 
-async function listJsonFiles(root) {
+async function listFilesWithExtension(root, extension) {
   const entries = await readdir(root, { withFileTypes: true })
   const nested = await Promise.all(
     entries.map(async (entry) => {
       const entryPath = path.join(root, entry.name)
-      if (entry.isDirectory()) return listJsonFiles(entryPath)
-      return entry.isFile() && entry.name.endsWith('.json') ? [entryPath] : []
+      if (entry.isDirectory()) return listFilesWithExtension(entryPath, extension)
+      return entry.isFile() && entry.name.endsWith(extension) ? [entryPath] : []
     })
   )
   return nested.flat()
@@ -224,7 +252,7 @@ async function listJsonFiles(root) {
 
 async function getCuesForRecording(recording) {
   if (!cuePayloadsByAudioId) {
-    const files = await listJsonFiles(cueRoot)
+    const files = await listFilesWithExtension(cueRoot, '.json')
     const payloads = await Promise.all(
       files.map(async (filePath) => JSON.parse(await readFile(filePath, 'utf8')))
     )
@@ -320,10 +348,16 @@ function chromeExecutable() {
 
 async function startVite(options) {
   if (options.externalServer) return null
+  const port = Number(new URL(options.baseUrl).port)
+  if (await canReuseVideoServer({ port, repoRoot })) {
+    await waitForHttp(`${options.baseUrl}/reader`, 30000)
+    console.log(`[video] Reusing this project's Vite server at ${options.baseUrl}`)
+    return null
+  }
 
   const vite = await spawnOwnedProcess(
     'npm',
-    ['run', 'dev', '--', '--host', '127.0.0.1', '--port', '4177'],
+    ['run', 'dev', '--', '--host', '0.0.0.0', '--port', String(port), '--strictPort'],
     {
       cwd: repoRoot,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -332,7 +366,9 @@ async function startVite(options) {
   )
 
   try {
-    await waitForHttp(options.baseUrl, 30000)
+    await waitForHttp(`${options.baseUrl}/reader`, 30000, () => {
+      if (vite.exitCode !== null || vite.signalCode !== null) throw new Error('The recording app server exited before it was ready')
+    })
     return vite
   } catch (error) {
     await stopOwnedProcess(vite)
@@ -340,12 +376,13 @@ async function startVite(options) {
   }
 }
 
-async function waitForHttp(url, timeoutMs) {
+async function waitForHttp(url, timeoutMs, check = () => {}) {
   const started = Date.now()
   let lastError = null
   while (Date.now() - started < timeoutMs) {
+    check()
     try {
-      const response = await fetch(url)
+      const response = await fetch(url, { signal: AbortSignal.timeout(5000) })
       if (response.ok) return
     } catch (error) {
       lastError = error
@@ -395,6 +432,10 @@ async function startChrome(options, userDataDir) {
       clearTimeout(timeout)
       reject(error)
     })
+    chrome.once('exit', (code, signal) => {
+      clearTimeout(timeout)
+      reject(new Error(`Chrome exited before startup completed (${signal ?? code})`))
+    })
   })
 }
 
@@ -413,12 +454,16 @@ class CdpClient {
       const pending = this.pending.get(message.id)
       if (!pending) return
       this.pending.delete(message.id)
+      clearTimeout(pending.timer)
       if (message.error) pending.reject(new Error(message.error.message))
       else pending.resolve(message.result)
     })
+    this.socket.addEventListener('close', () => this.rejectPending('CDP connection closed'))
+    this.socket.addEventListener('error', () => this.rejectPending('CDP websocket failed'))
 
     return new Promise((resolve, reject) => {
       this.socket.addEventListener('open', () => resolve(), { once: true })
+      this.socket.addEventListener('close', () => reject(new Error('CDP connection closed')), { once: true })
       this.socket.addEventListener('error', () => reject(new Error('CDP websocket failed')), {
         once: true,
       })
@@ -427,13 +472,32 @@ class CdpClient {
 
   send(method, params = {}) {
     const id = this.nextId++
-    this.socket.send(JSON.stringify({ id, method, params }))
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject })
+      const timer = setTimeout(() => {
+        this.pending.delete(id)
+        reject(new Error(`Timed out after 120s: ${method}`))
+      }, 120000)
+      this.pending.set(id, { resolve, reject, timer })
+      try {
+        this.socket.send(JSON.stringify({ id, method, params }))
+      } catch (error) {
+        clearTimeout(timer)
+        this.pending.delete(id)
+        reject(error)
+      }
     })
   }
 
+  rejectPending(message) {
+    for (const pending of this.pending.values()) {
+      clearTimeout(pending.timer)
+      pending.reject(new Error(message))
+    }
+    this.pending.clear()
+  }
+
   close() {
+    this.rejectPending('CDP client closed')
     this.socket?.close()
   }
 }
@@ -468,7 +532,7 @@ async function evaluate(client, expression, awaitPromise = true) {
     returnByValue: true,
   })
   if (result.exceptionDetails) {
-    throw new Error(result.exceptionDetails.text || 'Runtime.evaluate failed')
+    throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text || 'Runtime.evaluate failed')
   }
   return result.result.value
 }
@@ -519,7 +583,9 @@ async function captureFrame(client, filePath, clip = null) {
   }
 
   const result = await client.send('Page.captureScreenshot', params)
-  await writeFile(filePath, Buffer.from(result.data, 'base64'))
+  const png = Buffer.from(result.data, 'base64')
+  if (filePath) await writeFile(filePath, png)
+  return png
 }
 
 async function validateFrameSequence(frameDir, frameCount) {
@@ -537,97 +603,17 @@ async function validateFrameSequence(frameDir, frameCount) {
 }
 
 async function encodeVideo({ frameDir, audioPath, outputPath, options }) {
-  const args = [
-    '-y',
-    '-framerate',
-    String(options.fps),
-    '-i',
-    path.join(frameDir, 'frame-%06d.png'),
-    '-i',
-    audioPath,
-    '-c:v',
-    'libx264',
-    '-preset',
-    options.preset,
-    '-crf',
-    String(options.crf),
-    '-pix_fmt',
-    'yuv420p',
-    '-c:a',
-    'aac',
-    '-b:a',
-    '192k',
-    '-shortest',
-    outputPath,
-  ]
-
-  const ffmpeg = await spawnOwnedProcess(
-    'ffmpeg',
-    args,
-    { stdio: ['ignore', 'ignore', 'pipe'] },
-    'ffmpeg'
-  )
-  return new Promise((resolve, reject) => {
-    let stderr = ''
-    ffmpeg.stderr.on('data', (chunk) => {
-      stderr += chunk.toString()
-    })
-    ffmpeg.on('close', (code) => {
-      if (code === 0) resolve(stderr)
-      else reject(new Error(`ffmpeg exited ${code}: ${stderr}`))
-    })
-    ffmpeg.on('error', reject)
+  const args = frameEncoderArgs({ ...options, audioPath, outputPath,
+    framePattern: path.join(frameDir, 'frame-%06d.png'),
   })
+
+  return execFileText('ffmpeg', args, {}, 'ffmpeg', true)
 }
 
-async function encodeConcatVideo({ concatPath, audioPath, outputPath, options }) {
-  const args = [
-    '-y',
-    '-f',
-    'concat',
-    '-safe',
-    '0',
-    '-i',
-    concatPath,
-    '-i',
-    audioPath,
-    '-vf',
-    `fps=${options.fps}`,
-    '-fps_mode',
-    'cfr',
-    '-c:v',
-    'libx264',
-    '-preset',
-    options.preset,
-    '-crf',
-    String(options.crf),
-    '-pix_fmt',
-    'yuv420p',
-    '-c:a',
-    'aac',
-    '-b:a',
-    '192k',
-    '-shortest',
-    outputPath,
-  ]
+async function encodeConcatVideo({ concatPath, audioPath, outputPath, frameCount, options }) {
+  const args = frameEncoderArgs({ ...options, concatPath, audioPath, outputPath, frameCount })
 
-  const ffmpeg = await spawnOwnedProcess(
-    'ffmpeg',
-    args,
-    { stdio: ['ignore', 'ignore', 'pipe'] },
-    'ffmpeg'
-  )
-  return new Promise((resolve, reject) => {
-    let stderr = ''
-    ffmpeg.stderr.on('data', (chunk) => {
-      stderr += chunk.toString()
-    })
-    ffmpeg.on('close', (code) => {
-      if (code === 0) resolve(stderr)
-      else reject(new Error(`ffmpeg exited ${code}: ${stderr}`))
-    })
-    ffmpeg.on('error', reject)
-  })
+  return execFileText('ffmpeg', args, {}, 'ffmpeg', true)
 }
 
 async function ffprobe(outputPath) {
@@ -637,6 +623,8 @@ async function ffprobe(outputPath) {
       '-v',
       'error',
       '-count_frames',
+      '-threads',
+      '2',
       '-show_streams',
       '-show_format',
       '-of',
@@ -647,11 +635,6 @@ async function ffprobe(outputPath) {
     'ffprobe'
   )
   return JSON.parse(stdout)
-}
-
-function parseFrameRate(value) {
-  const [numerator, denominator] = String(value).split('/').map(Number)
-  return denominator ? numerator / denominator : numerator
 }
 
 function capturedPixelDimensions(crop, options) {
@@ -673,43 +656,20 @@ async function validateOutput({
   options,
   ffmpegLog,
 }) {
-  const errors = []
   const warnings = []
   const probe = await ffprobe(outputPath)
-  const videoStream = probe.streams.find((stream) => stream.codec_type === 'video')
-  const audioStream = probe.streams.find((stream) => stream.codec_type === 'audio')
-  const duration = Number(probe.format.duration)
-  const actualFps = parseFrameRate(videoStream?.avg_frame_rate)
-  const actualFrames = Number(videoStream?.nb_read_frames ?? videoStream?.nb_frames)
-
-  if (!videoStream) errors.push('missing video stream')
-  if (!audioStream) errors.push('missing audio stream')
-  if (videoStream && Number(videoStream.width) !== expectedWidth) {
-    errors.push(`width mismatch: ${videoStream.width} !== ${expectedWidth}`)
-  }
-  if (videoStream && Number(videoStream.height) !== expectedHeight) {
-    errors.push(`height mismatch: ${videoStream.height} !== ${expectedHeight}`)
-  }
-  if (Math.abs(actualFps - options.fps) > 0.01) errors.push(`fps mismatch: ${actualFps}`)
-  if (Number.isFinite(actualFrames) && Math.abs(actualFrames - expectedFrameCount) > 1) {
-    errors.push(`frame count mismatch: ${actualFrames} !== ${expectedFrameCount}`)
-  }
-  if (Math.abs(duration - expectedDuration) > 0.35) {
-    errors.push(`duration mismatch: ${duration} !== ${expectedDuration}`)
-  }
-  if (/\bdrop=\s*[1-9]\d*/i.test(ffmpegLog)) errors.push('ffmpeg reported dropped frames')
-  if (
-    options.renderMode !== 'cue-keyframes' &&
-    /\bdup=\s*[1-9]\d*/i.test(ffmpegLog)
-  ) {
-    errors.push('ffmpeg reported duplicated frames')
-  }
-  if (/non-monotonous/i.test(ffmpegLog)) errors.push('ffmpeg reported non-monotonous timestamps')
-  if (/\berror\b/i.test(ffmpegLog)) errors.push('ffmpeg log contains error wording')
+  const errors = outputValidationErrors(probe, {
+    width: expectedWidth,
+    height: expectedHeight,
+    fps: options.fps,
+    frameCount: expectedFrameCount,
+    duration: expectedDuration,
+    renderMode: options.renderMode,
+  }, ffmpegLog)
 
   await execFileText(
     'ffmpeg',
-    ['-v', 'error', '-i', outputPath, '-f', 'null', '-'],
+    ['-v', 'error', '-xerror', '-threads', '2', '-i', outputPath, '-f', 'null', '-'],
     {},
     'ffmpeg-validation'
   )
@@ -721,11 +681,13 @@ async function validateOutput({
   }
 }
 
-async function activeWordSample(client) {
+async function activeWordSample(client, firstCue) {
+  const tokenKey = [firstCue.pageNumber, firstCue.lineIndex, firstCue.fragmentIndex, firstCue.wordIndex].join(':')
   return evaluate(
     client,
     `(() => {
-      const active = document.querySelector('.is-active-word');
+      const active = document.querySelector('.is-active-word') ??
+        document.querySelector('[data-token-key="${tokenKey}"]');
       if (!active) return null;
       const rect = active.getBoundingClientRect();
       return {
@@ -745,6 +707,16 @@ function outputFileName({ recording, quality, generatedFrom }) {
     .digest('hex')
     .slice(0, 8)
   return `${recording.id}_${narratorInitials(recording.narratorId)}_${quality}_${contentHash}.mp4`
+}
+
+function outputFolderName(recording) {
+  const { parshaNumber, parshaName } = recording
+  if (!Number.isSafeInteger(parshaNumber) || parshaNumber < 1 ||
+      typeof parshaName !== 'string' || !parshaName.trim() || /[/\\]/.test(parshaName) ||
+      [...parshaName].some(character => character.charCodeAt(0) < 32)) {
+    throw new Error(`Invalid canonical parsha folder identity for ${recording.id}`)
+  }
+  return `${String(parshaNumber).padStart(2, '0')} ${parshaName}`
 }
 
 async function nextAvailableOutput({ outputRoot, fileName }) {
@@ -856,125 +828,60 @@ async function removeWorkDir(dirPath) {
   })
 }
 
-const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
+async function renderFrameAt({ client, seconds, filePath, options }) {
+  options.checkpoint()
+  const state = await evaluate(client, `window.tikkunRecorder.renderAt(${seconds})`)
+  if (!state || !Number.isFinite(state.currentTime) || Math.abs(state.currentTime - seconds) > 0.001) {
+    throw new Error(`Reader time mismatch at ${seconds}s`)
+  }
+  const crop = options.captureCrop
+  const png = await captureFrame(client, filePath, crop)
+  options.checkpoint()
+  return { state, crop, png }
+}
 
-async function renderFrameAt({
-  client,
-  seconds,
-  filePath,
-  options,
-  settleMs = 0,
-  highlightAnimationMs,
-  settleBeforeAnimation = false,
-  scrollTransition = false,
-  transitionWaitMs = 0,
-}) {
-  const state =
-    highlightAnimationMs !== undefined
-      ? await evaluate(
-          client,
-          `window.tikkunRecorder.renderHighlightAnimationAt(${seconds}, ${highlightAnimationMs}, ${settleBeforeAnimation}, ${scrollTransition}, ${transitionWaitMs})`
-        )
-      : settleMs > 0
-        ? await evaluate(client, `window.tikkunRecorder.settleAt(${seconds})`)
-        : await evaluate(client, `window.tikkunRecorder.renderAt(${seconds})`)
-  if (settleMs > 0) await wait(settleMs)
-  const crop = options.crop
+async function captureFrameSequence({ client, frameDir, duration, options, writer }) {
+  const frameCount = Math.ceil(duration * options.fps)
+  options.onProgress?.({ stage: 'capturing', frameCount, fps: options.fps })
+  const entries = []
+  const frameLatencies = []
+  const captureCrop = options.crop
     ? await evaluate(client, `window.tikkunRecorder.captureRect(${options.cropMargin})`)
     : null
-  await captureFrame(client, filePath, crop)
-  return { state, crop }
-}
-
-async function captureFullFrameSequence({
-  client,
-  frameDir,
-  duration,
-  options,
-}) {
-  const frameCount = Math.ceil(duration * options.fps)
-  const frameLatencies = []
-  let lastCrop = null
-
-  for (let index = 0; index < frameCount; index += 1) {
+  const captureOptions = { ...options, captureCrop }
+  for (let frameIndex = 0; frameIndex < frameCount;) {
     const frameStartedAt = performance.now()
-    const seconds = index / options.fps
+    const seconds = frameIndex / options.fps
     const result = await renderFrameAt({
-      client,
-      seconds,
-      filePath: path.join(frameDir, `frame-${String(index).padStart(6, '0')}.png`),
-      options,
+      client, seconds, options: captureOptions,
+      filePath: !writer || options.keepFrames
+        ? path.join(frameDir, `frame-${String(entries.length).padStart(6, '0')}.png`) : undefined,
     })
-    lastCrop = result.crop
+    const reusableUntil = nextCaptureFrame({ frameIndex, frameCount, fps: options.fps, stableUntil: result.state.stableUntil })
+    const nextFrameIndex = options.renderMode === 'cue-keyframes' ? reusableUntil : frameIndex + 1
+    if (writer) await writer.writeFrame(result.png, nextFrameIndex - frameIndex)
+    else options.onProgress?.({ framesCompleted: nextFrameIndex })
+    entries.push({ frameIndex, seconds })
     frameLatencies.push(Number((performance.now() - frameStartedAt).toFixed(2)))
+    frameIndex = nextFrameIndex
   }
-
-  const frameErrors = await validateFrameSequence(frameDir, frameCount)
-  if (frameErrors.length) throw new Error(frameErrors.join('; '))
-
-  return {
-    ffmpegInput: { kind: 'frames', frameDir },
-    frameCount,
-    capturedFrameCount: frameCount,
-    frameLatencies,
-    crop: lastCrop,
-    ...capturedPixelDimensions(lastCrop, options),
+  if (!writer || options.keepFrames) {
+    const errors = await validateFrameSequence(frameDir, entries.length)
+    if (errors.length) throw new Error(errors.join('; '))
   }
-}
-
-async function captureCueKeyframes({
-  client,
-  frameDir,
-  cues,
-  duration,
-  options,
-}) {
-  const plan = buildCueFramePlan({
-    cues,
-    durationSeconds: duration,
-    fps: options.fps,
-    burstPreEndMs: options.cueBurstPreEndMs,
-    burstMaxMs: options.cueBurstMaxMs,
-  })
-  const frameLatencies = []
-  let lastCrop = null
-
-  for (let index = 0; index < plan.entries.length; index += 1) {
-    const frameStartedAt = performance.now()
-    const entry = plan.entries[index]
-    const result = await renderFrameAt({
-      client,
-      seconds: entry.seconds,
-      filePath: path.join(frameDir, `frame-${String(index).padStart(6, '0')}.png`),
-      options,
-      settleMs: entry.settleMs ?? 0,
-      highlightAnimationMs: entry.highlightAnimationMs,
-      settleBeforeAnimation: entry.settleBeforeAnimation ?? false,
-      scrollTransition: entry.scrollTransition ?? false,
-      transitionWaitMs: entry.transitionWaitMs ?? 0,
+  let ffmpegInput = writer ? { kind: 'stream' } : { kind: 'frames', frameDir }
+  if (!writer && options.renderMode === 'cue-keyframes') {
+    const concatEntries = createCueConcatEntries({
+      plan: { frameCount, entries }, fps: options.fps,
+      frameName: index => path.join(frameDir, `frame-${String(index).padStart(6, '0')}.png`),
     })
-    lastCrop = result.crop
-    frameLatencies.push(Number((performance.now() - frameStartedAt).toFixed(2)))
+    const concatPath = path.join(frameDir, 'frames.concat.txt')
+    await writeFile(concatPath, renderCueConcatFile(concatEntries, options.fps))
+    ffmpegInput = { kind: 'concat', concatPath }
   }
-
-  const frameErrors = await validateFrameSequence(frameDir, plan.entries.length)
-  if (frameErrors.length) throw new Error(frameErrors.join('; '))
-
-  const concatEntries = createCueConcatEntries({
-    plan,
-    fps: options.fps,
-    frameName: (index) => path.join(frameDir, `frame-${String(index).padStart(6, '0')}.png`),
-  })
-  const concatPath = path.join(frameDir, 'frames.concat.txt')
-  await writeFile(concatPath, renderCueConcatFile(concatEntries))
-
   return {
-    ffmpegInput: { kind: 'concat', concatPath },
-    frameCount: plan.frameCount,
-    capturedFrameCount: plan.entries.length,
-    frameLatencies,
-    crop: lastCrop,
-    ...capturedPixelDimensions(lastCrop, options),
+    ffmpegInput, frameCount, capturedFrameCount: entries.length, frameLatencies,
+    crop: captureCrop, ...capturedPixelDimensions(captureCrop, options),
   }
 }
 
@@ -983,12 +890,17 @@ async function recordOne(recording, options) {
   const userDataDir = path.join(options.workRoot, `chrome-${recording.id}-${Date.now()}`)
   const frameDir = path.join(options.workRoot, `frames-${recording.id}-${Date.now()}`)
   const quality = `${Math.round(options.height)}p${options.fps}`
-  await mkdir(frameDir, { recursive: true })
+  if (options.frameTransport === 'files' || options.keepFrames) {
+    await mkdir(frameDir, { recursive: true })
+  }
   await mkdir(options.outputRoot, { recursive: true })
 
   let chrome
   let client
+  let stagedOutputPath
+  let encoder
   try {
+    options.checkpoint()
     const audioPath = siteAudioUrlToLocalPath(recording.playSrc)
     const cues = await getCuesForRecording(recording)
     if (!cues.length) throw new Error('missing cue data')
@@ -998,16 +910,19 @@ async function recordOne(recording, options) {
       cueHash: sha256Json(cues),
       appBuildHash: await appBuildHash(),
     }
+    const outputDirectory = path.join(options.outputRoot, outputFolderName(recording))
+    await mkdir(outputDirectory, { recursive: true })
     const output = await nextAvailableOutput({
-      outputRoot: options.outputRoot,
+      outputRoot: outputDirectory,
       fileName: outputFileName({ recording, quality, generatedFrom }),
     })
     const { fileName, outputPath } = output
+    stagedOutputPath = path.join(outputDirectory, `.${fileName}.${process.pid}.partial.mp4`)
     const launched = await startChrome(options, userDataDir)
     chrome = launched.chrome
     client = await createPage(launched.browserWsUrl)
 
-    const url = `${options.baseUrl}/?recording=1&audioId=${encodeURIComponent(recording.id)}#/torah/parsha/${recording.parshaSlug}`
+    const url = `${options.baseUrl}/reader?recording=1&audioId=${encodeURIComponent(recording.id)}#/torah/parsha/${recording.parshaSlug}`
     await navigate(client, url, options)
     const captureOptions = {
       ...options,
@@ -1028,39 +943,54 @@ async function recordOne(recording, options) {
       throw new Error(`invalid audio duration: ${state.duration}`)
     }
 
-    await evaluate(client, `window.tikkunRecorder.settleAt(${session.cues[0].timeStart})`)
-    const sample = await activeWordSample(client)
+    await evaluate(client, 'window.tikkunRecorder.prepare()')
+    const sample = await activeWordSample(client, session.cues[0])
     if (!sample?.text || sample.width <= 0 || sample.height <= 0) {
       throw new Error('active Hebrew word sample was not visible')
     }
 
-    const capture =
-      options.renderMode === 'deterministic-frames'
-        ? await captureFullFrameSequence({ client, frameDir, duration, options: captureOptions })
-        : await captureCueKeyframes({
-            client,
-            frameDir,
-            cues: session.cues,
-            duration,
-            options: captureOptions,
-          })
+    if (options.frameTransport === 'stream') {
+      encoder = await startFrameEncoder({
+        ...options,
+        audioPath,
+        outputPath: stagedOutputPath,
+        expectedFrameCount: Math.ceil(duration * options.fps),
+        onFrameWritten: framesCompleted => options.onProgress?.({ framesCompleted }),
+        spawnProcess: spawnOwnedProcess,
+        stopProcess: stopOwnedProcess,
+      })
+    }
+    const frameOptions = {
+      ...captureOptions,
+      checkpoint: () => {
+        options.checkpoint()
+        encoder?.writer.check()
+      },
+    }
 
+    const capture = await captureFrameSequence({ client, frameDir, duration, options: frameOptions, writer: encoder?.writer })
+
+    options.onProgress?.({ stage: 'encoding' })
     const ffmpegLog =
-      capture.ffmpegInput.kind === 'concat'
+      encoder
+        ? await encoder.writer.finish()
+        : capture.ffmpegInput.kind === 'concat'
         ? await encodeConcatVideo({
             concatPath: capture.ffmpegInput.concatPath,
+            frameCount: capture.frameCount,
             audioPath,
-            outputPath,
+            outputPath: stagedOutputPath,
             options,
           })
         : await encodeVideo({
             frameDir: capture.ffmpegInput.frameDir,
             audioPath,
-            outputPath,
+            outputPath: stagedOutputPath,
             options,
           })
+    options.onProgress?.({ stage: 'validating' })
     const validation = await validateOutput({
-      outputPath,
+      outputPath: stagedOutputPath,
       expectedDuration: duration,
       expectedFrameCount: capture.frameCount,
       expectedWidth: capture.outputWidth,
@@ -1068,6 +998,10 @@ async function recordOne(recording, options) {
       options,
       ffmpegLog,
     })
+    if (!validation.passed) throw new Error(`Video validation failed: ${validation.errors.join('; ')}`)
+    options.checkpoint()
+    await rename(stagedOutputPath, outputPath)
+    stagedOutputPath = null
     const outputStat = await stat(outputPath)
 
     const metadata = {
@@ -1078,12 +1012,16 @@ async function recordOne(recording, options) {
       aliyah: recording.aliyah,
       title: recording.title,
       fileName,
+      outputRelativePath: path.relative(options.outputRoot, outputPath),
+      outputHash: await videoFileHash(outputPath),
+      recordingSettings: recordingSettings(options),
       width: capture.outputWidth,
       height: capture.outputHeight,
       fps: options.fps,
       durationSeconds: Number(duration.toFixed(3)),
       frameCount: capture.frameCount,
       renderMode: options.renderMode,
+      frameTransport: options.frameTransport,
       capturedFrameCount: capture.capturedFrameCount,
       crop: capture.crop ?? undefined,
       bytes: outputStat.size,
@@ -1101,6 +1039,7 @@ async function recordOne(recording, options) {
         ok: validation.passed,
         outputPath,
         renderMode: options.renderMode,
+        frameTransport: options.frameTransport,
         renderSeconds: Number(((Date.now() - startedAt) / 1000).toFixed(2)),
         frameCount: capture.frameCount,
         capturedFrameCount: capture.capturedFrameCount,
@@ -1126,7 +1065,12 @@ async function recordOne(recording, options) {
     }
   } finally {
     client?.close()
+    if (encoder) {
+      encoder.writer.abort()
+      await stopOwnedProcess(encoder.child)
+    }
     await stopChrome(chrome)
+    if (stagedOutputPath) await rm(stagedOutputPath, { force: true })
     if (!options.keepFrames) {
       await removeWorkDir(frameDir)
       await removeWorkDir(userDataDir)
@@ -1138,20 +1082,6 @@ function average(values) {
   return values.length
     ? Number((values.reduce((total, value) => total + value, 0) / values.length).toFixed(2))
     : 0
-}
-
-async function runLimited(items, concurrency, worker) {
-  const results = []
-  let nextIndex = 0
-  const workers = Array.from({ length: concurrency }, async () => {
-    while (nextIndex < items.length) {
-      const index = nextIndex
-      nextIndex += 1
-      results[index] = await worker(items[index])
-    }
-  })
-  await Promise.all(workers)
-  return results
 }
 
 async function updateMetadata(results) {
@@ -1184,49 +1114,112 @@ function selectedRecordings(options) {
 }
 
 async function recordBatch(options) {
-  const vite = await startVite(options)
-  try {
-    const recordings = selectedRecordings(options)
-    if (!recordings.length) throw new Error('No matching available recordings')
-    const results = await runLimited(recordings, options.concurrency, (recording) =>
-      recordOne(recording, options)
-    )
-    await updateMetadata(results)
-    await appendReports(results)
-    const failed = results.filter((result) => !result.ok)
-    if (failed.length) {
-      const summary = failed
-        .map((result) => {
-          const details =
-            result.report.error ??
-            result.report.validation?.errors?.join(', ') ??
-            'unknown failure'
-          return `${result.report.audioId}: ${details}`
-        })
-        .join('; ')
-      throw new Error(`${failed.length}/${results.length} video job(s) failed: ${summary}`)
+  const selected = selectedRecordings(options)
+  if (!selected.length) throw new Error('No matching available recordings')
+  const recordings = []
+  const missingCues = []
+  const metadata = options.force ? [] : await readJsonFile(metadataPath, [])
+  const byAudioId = new Map(metadata.map(entry => [entry.audioId, entry]))
+  for (const recording of selected) {
+    const cues = await getCuesForRecording(recording)
+    if (Array.isArray(cues) && cues.length === 0) {
+      console.log(`[video] Skipped ${recording.id}: missing cue data`)
+      missingCues.push(recording.id)
+      continue
     }
+    const saved = byAudioId.get(recording.id)
+    let completed = false
+    if (saved?.outputHash && saved.fileName && path.basename(saved.fileName) === saved.fileName) {
+      console.log(`[video] Checking completed file: ${recording.id}`)
+      const generatedFrom = {
+        audioHash: await sha256File(siteAudioUrlToLocalPath(recording.playSrc)),
+        cueHash: sha256Json(cues),
+      }
+      completed = await completedVideoMatches({ metadata: saved, outputRoot: options.outputRoot,
+        relativePath: path.join(outputFolderName(recording), saved.fileName), options, generatedFrom })
+    }
+    if (completed) console.log(`[video] Skipped ${recording.id}: completed file matches current sources and settings`)
+    else recordings.push(recording)
+  }
+  if (missingCues.length) {
+    await appendReports(missingCues.map(audioId => ({
+      report: { audioId, ok: false, skipped: true, reason: 'missing cue data' },
+    })))
+  }
+  console.log(`[video] ${selected.length - recordings.length - missingCues.length} completed; ${missingCues.length} skipped without cues; ${recordings.length} remaining`)
+  if (!recordings.length) return { results: [], peakConcurrency: 0, unstarted: [] }
+  await mkdir(options.workRoot, { recursive: true })
+  await mkdir(options.outputRoot, { recursive: true })
+  const vite = await startVite(options)
+  let progress
+  try {
+    const limit = options.concurrency === 'auto' ? options.maxConcurrency : Math.min(options.concurrency, options.maxConcurrency)
+    progress = createVideoProgress(recordings, { limit })
+    const batch = await runResourceAware(recordings, {
+      limit,
+      memoryPerJob: Math.max(1.5 * 1024 ** 3, options.width * options.height * options.deviceScaleFactor ** 2 * 64),
+      sample: createResourceSampler(options.workRoot, options.outputRoot),
+      worker: (recording, checkpoint) => {
+        progress.update(recording.id, { stage: 'preparing' })
+        return recordOne(recording, {
+          ...options, checkpoint,
+          onProgress: patch => progress.update(recording.id, patch),
+        })
+      },
+      onResult: async (result) => {
+        await updateMetadata([result])
+        await appendReports([result])
+        progress.complete(result)
+      },
+      onFatal: async () => {
+        shuttingDown = true
+        await stopAllOwnedProcesses()
+      },
+      log: (message) => progress.log(`[video] ${message}`),
+      onState: state => progress.scheduler(state),
+    })
+    progress.log(`[video] Peak concurrency: ${batch.peakConcurrency}; validated: ${batch.results.filter((result) => result.ok).length}/${recordings.length}`)
+    if (batch.failure) {
+      if (batch.unstarted.length) {
+        progress.log(`Not started: ${batch.unstarted.join(', ')}`)
+        await appendReports(batch.unstarted.map((audioId) => ({
+          report: { audioId, ok: false, error: `Not started: ${batch.failure.message}` },
+        })))
+      }
+      throw batch.failure
+    }
+    return batch
   } finally {
+    progress?.close()
     await stopOwnedProcess(vite)
   }
 }
 
 async function calibrate(options) {
-  const recordings = selectedRecordings(options).slice(0, Math.max(1, options.concurrency))
+  const recordings = selectedRecordings(options)
   if (!recordings.length) throw new Error('No recordings available for calibration')
+  if (recordings.length < options.maxConcurrency) {
+    throw new Error(`Calibration needs at least ${options.maxConcurrency} distinct recordings; selected ${recordings.length}. Provide more --ids or lower --max-concurrency.`)
+  }
   const summaries = []
 
   for (let concurrency = 1; concurrency <= options.maxConcurrency; concurrency += 1) {
     const calibrationOptions = {
       ...options,
+      force: true,
       concurrency,
-      ids: recordings.map((recording) => recording.id),
+      ids: recordings.slice(0, concurrency).map((recording) => recording.id),
     }
     const startedAt = Date.now()
     try {
-      await recordBatch(calibrationOptions)
+      const batch = await recordBatch(calibrationOptions)
+      if (batch.peakConcurrency !== concurrency) {
+        console.warn(`Requested ${concurrency} workers; observed ${batch.peakConcurrency}. This run does not establish capacity for ${concurrency} workers.`)
+      }
       summaries.push({
         concurrency,
+        observedConcurrency: batch.peakConcurrency,
+        reachedRequestedConcurrency: batch.peakConcurrency === concurrency,
         ok: true,
         seconds: Number(((Date.now() - startedAt) / 1000).toFixed(2)),
       })
@@ -1242,17 +1235,16 @@ async function calibrate(options) {
   }
 
   await writeJsonFile(path.join(repoRoot, 'video-calibration.local.json'), summaries)
+  const failed = summaries.find((summary) => !summary.ok)
+  if (failed) throw new Error(`Calibration failed at concurrency ${failed.concurrency}: ${failed.error}`)
 }
 
 async function cleanup(options) {
   await removeWorkDir(options.workRoot)
   if (options.includeOutput) {
-    const entries = await readdir(options.outputRoot).catch(() => [])
-    await Promise.all(
-      entries
-        .filter((entry) => entry.endsWith('.mp4'))
-        .map((entry) => removeWorkDir(path.join(options.outputRoot, entry)))
-    )
+    if (!(await pathExists(options.outputRoot))) return
+    const files = await listFilesWithExtension(options.outputRoot, '.mp4')
+    await Promise.all(files.map((file) => removeWorkDir(file)))
   }
 }
 

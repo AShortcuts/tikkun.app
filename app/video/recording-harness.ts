@@ -1,5 +1,6 @@
 import type { MountScope } from '../lifecycle/mount.ts'
 import { calculateCaptureRect } from '../recording-mode.ts'
+import { RecordingClock } from './recording-clock.ts'
 import type {
   ReaderPlaybackRecordingHarnessAdapter,
   ReaderPlaybackRecordingHarnessSessionSnapshot,
@@ -20,11 +21,8 @@ export interface RecordingHarnessRenderState {
   currentTime: number
   duration: number
   activeTokenKey: string | null
-}
-
-export interface RecordingHarnessSettledState
-  extends RecordingHarnessRenderState {
   scrollTop: number
+  stableUntil: number | null
 }
 
 export interface RecordingHarness {
@@ -33,14 +31,7 @@ export interface RecordingHarness {
     audioId: string
   ): Promise<ReaderPlaybackRecordingHarnessSessionSnapshot | null>
   renderAt(seconds: number): Promise<RecordingHarnessRenderState | null>
-  renderHighlightAnimationAt(
-    seconds: number,
-    elapsedMs: number,
-    settleBeforeAnimation: boolean,
-    scrollTransition: boolean,
-    transitionWaitMs: number
-  ): Promise<RecordingHarnessSettledState | null>
-  settleAt(seconds: number): Promise<RecordingHarnessSettledState | null>
+  prepare(): Promise<RecordingHarnessRenderState>
   play(): Promise<void>
   pause(): void
   state(): RecordingHarnessState
@@ -82,6 +73,42 @@ export function mountRecordingHarness(
     throw new Error('Recording Harness is already mounted')
   }
 
+  let clock: RecordingClock | null = null
+  let clockSession: ReaderPlaybackRecordingHarnessSessionSnapshot | null = null
+  let busy = false
+  let commandRevision = 0
+  const checkCommand = (revision: number) => {
+    scope.signal.throwIfAborted()
+    if (revision !== commandRevision) throw new Error('Recording command was cancelled')
+  }
+  const releaseClock = () => {
+    clock?.dispose()
+    clock = null
+    clockSession = null
+    playback.releaseFrames()
+  }
+  const exclusively = async <T>(action: () => Promise<T>): Promise<T> => {
+    if (busy) throw new Error('Concurrent recording commands are not supported')
+    busy = true
+    const revision = ++commandRevision
+    let deadline = 0
+    const timeout = new Promise<never>((_, reject) => {
+      deadline = view.setTimeout(() => {
+        if (commandRevision === revision) commandRevision += 1
+        reject(new Error('Recording frame preparation timed out'))
+      }, 30000)
+    })
+    try {
+      return await Promise.race([action(), timeout])
+    } catch (error) {
+      releaseClock()
+      throw error
+    } finally {
+      view.clearTimeout(deadline)
+      busy = false
+    }
+  }
+
   const hasSessionIdentity = (
     expected: ReaderPlaybackRecordingHarnessSessionSnapshot,
     snapshot: ReaderPlaybackRecordingHarnessSnapshot
@@ -89,118 +116,77 @@ export function mountRecordingHarness(
     snapshot.session?.sessionRevision === expected.sessionRevision &&
     snapshot.session.recording.id === expected.recording.id
 
-  const renderState = (
-    session: ReaderPlaybackRecordingHarnessSessionSnapshot
-  ): RecordingHarnessRenderState | null => {
+  const prepareClock = async () => {
+    releaseClock()
+    const revision = commandRevision
+    await waitUntilReaderReady()
+    checkCommand(revision)
     const snapshot = playback.snapshot()
-    if (!hasSessionIdentity(session, snapshot)) return null
-    return {
-      audioId: session.recording.id,
-      currentTime: snapshot.currentTime,
-      duration: snapshot.duration,
-      activeTokenKey: snapshot.activeTokenKey,
-    }
-  }
-
-  const renderAt = async (
-    seconds: number
-  ): Promise<RecordingHarnessRenderState | null> => {
-    const session = playback.snapshot().session
-    if (!session) return null
-
-    document.documentElement.style.removeProperty(
-      '--recording-highlight-animation-delay'
-    )
-    document.documentElement.style.removeProperty(
-      '--recording-highlight-animation-play-state'
-    )
-    playback.seek(seconds)
-    await playback.syncHighlight()
-    await waitForAnimationFrame(view)
-    return renderState(session)
-  }
-
-  const settleAt = async (
-    seconds: number
-  ): Promise<RecordingHarnessSettledState | null> => {
-    const session = playback.snapshot().session
-    if (!session) return null
-
-    if (!(await renderAt(seconds))) return null
+    const session = snapshot.session
+    if (!session) throw new Error('No recording session is loaded')
+    await playback.prepareFrames()
+    await document.fonts.ready
+    checkCommand(revision)
+    let previous = ''
     let stableFrames = 0
-    let previousScrollTop = getBook().scrollTop
-
     for (let frame = 0; frame < 90; frame += 1) {
       await waitForAnimationFrame(view)
-      if (scope.signal.aborted) return null
+      checkCommand(revision)
       const book = getBook()
-      const scrollTop = book.scrollTop
-      const activeWord = book.querySelector<HTMLElement>('.word.is-active-word')
-      const activeRect = activeWord?.getBoundingClientRect()
-      const highlightVisible = Boolean(
-        activeRect &&
-          activeRect.top >= 0 &&
-          activeRect.bottom <= view.innerHeight &&
-          activeRect.left >= 0 &&
-          activeRect.right <= view.innerWidth
-      )
-
-      stableFrames =
-        Math.abs(scrollTop - previousScrollTop) < 0.5 && highlightVisible
-          ? stableFrames + 1
-          : 0
-      if (stableFrames >= 6) break
-      previousScrollTop = scrollTop
+      const key = [book.scrollHeight, book.scrollWidth, book.clientWidth, book.clientHeight,
+        ...[...book.querySelectorAll('.tikkun-page')].map(page => page.getBoundingClientRect().height)].join(':')
+      stableFrames = key === previous && document.fonts.status === 'loaded' ? stableFrames + 1 : 0
+      if (stableFrames >= 3) break
+      previous = key
     }
-
-    const rendered = renderState(session)
-    return rendered
-      ? { ...rendered, scrollTop: getBook().scrollTop }
-      : null
+    if (stableFrames < 3) throw new Error('Recording layout did not settle before capture')
+    if (!hasSessionIdentity(session, playback.snapshot())) throw new Error('Recording session changed during preparation')
+    clockSession = session
+    clock = new RecordingClock({
+      book: getBook(), cues: session.cues, duration: snapshot.duration, signal: scope.signal,
+      activate: seconds => playback.activateHighlightAt(seconds, { scroll: false }),
+      clearHighlight: () => playback.clearHighlight(),
+    })
+    await clock.prepare()
   }
 
-  const renderHighlightAnimationAt = async (
-    seconds: number,
-    elapsedMs: number,
-    settleBeforeAnimation: boolean,
-    scrollTransition: boolean,
-    transitionWaitMs: number
-  ): Promise<RecordingHarnessSettledState | null> => {
-    const session = playback.snapshot().session
-    if (!session) return null
-
-    if (settleBeforeAnimation && !(await settleAt(seconds))) return null
-
-    document.documentElement.style.setProperty(
-      '--recording-highlight-animation-delay',
-      `${-Math.max(0, elapsedMs)}ms`
-    )
-    document.documentElement.style.setProperty(
-      '--recording-highlight-animation-play-state',
-      'paused'
-    )
-    if (scrollTransition || settleBeforeAnimation) {
-      playback.seek(seconds)
-      const activated = await playback.activateHighlightAt(seconds, {
-        scroll: scrollTransition,
-      })
-      if (!activated) return null
-    }
+  const render = async (seconds: number): Promise<RecordingHarnessRenderState> => {
+    const revision = commandRevision
+    if (!clock || !clockSession || !hasSessionIdentity(clockSession, playback.snapshot())) await prepareClock()
+    const activeClock = clock
+    const session = clockSession
+    if (!activeClock || !session) throw new Error('Recording clock could not be prepared')
+    const frame = await activeClock.renderAt(seconds)
+    checkCommand(revision)
+    playback.seek(seconds)
     await waitForAnimationFrame(view)
-    if (transitionWaitMs > 0) {
-      await new Promise<void>((resolve) =>
-        view.setTimeout(resolve, transitionWaitMs)
-      )
+    checkCommand(revision)
+    const snapshot = playback.snapshot()
+    if (!hasSessionIdentity(session, snapshot)) throw new Error('Recording session changed while capturing')
+    if (snapshot.activeTokenKey !== frame.activeTokenKey || Math.abs(snapshot.currentTime - seconds) > 0.001) {
+      throw new Error(`Recording cue or audio time mismatch at ${seconds}s`)
     }
-
-    const rendered = renderState(session)
-    return rendered
-      ? { ...rendered, scrollTop: getBook().scrollTop }
-      : null
+    activeClock.validateFrame()
+    // The opening Play button changes on the next frame, even when the text is still.
+    return { ...frame, stableUntil: seconds === 0 ? null : frame.stableUntil,
+      audioId: session.recording.id, currentTime: snapshot.currentTime, duration: snapshot.duration }
   }
+  const renderAt = (seconds: number) => exclusively(() => render(seconds))
 
   const captureRect = (margin = 240) => {
     const book = getBook()
+    if (clock) {
+      const rects = [...book.querySelectorAll('.tikkun-page .line')]
+        .map(line => line.getBoundingClientRect())
+        .filter(rect => rect.width > 0)
+      if (!rects.length) throw new Error('Recording pages have no measurable reading area')
+      const left = Math.min(...rects.map(rect => rect.left))
+      const right = Math.max(...rects.map(rect => rect.right))
+      return calculateCaptureRect({
+        contentRect: { x: left, y: 0, width: right - left, height: view.innerHeight },
+        viewport: { width: view.innerWidth, height: view.innerHeight }, margin,
+      })
+    }
     const isVisible = (rect: DOMRect) =>
       rect.left < view.innerWidth &&
       rect.right > 0 &&
@@ -274,11 +260,19 @@ export function mountRecordingHarness(
 
   const recorder: RecordingHarness = {
     ready: waitUntilReaderReady,
-    loadAudio: (audioId) => playback.loadByAudioId(audioId),
+    loadAudio: (audioId) => exclusively(async () => {
+      releaseClock()
+      return playback.loadByAudioId(audioId)
+    }),
     renderAt,
-    renderHighlightAnimationAt,
-    settleAt,
-    play: () => playback.play(),
+    prepare: () => exclusively(async () => {
+      await prepareClock()
+      return render(0)
+    }),
+    play: () => exclusively(async () => {
+      releaseClock()
+      await playback.play()
+    }),
     pause: () => playback.pause(),
     state: () => {
       const snapshot = playback.snapshot()
@@ -296,12 +290,8 @@ export function mountRecordingHarness(
 
   view.tikkunRecorder = recorder
   scope.own(() => {
+    commandRevision += 1
     if (view.tikkunRecorder === recorder) delete view.tikkunRecorder
-    document.documentElement.style.removeProperty(
-      '--recording-highlight-animation-delay'
-    )
-    document.documentElement.style.removeProperty(
-      '--recording-highlight-animation-play-state'
-    )
+    releaseClock()
   })
 }

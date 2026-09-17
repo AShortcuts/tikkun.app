@@ -180,6 +180,9 @@ export interface ReaderPlaybackRecordingHarnessAdapter {
   seek(time: number): void
   play(): Promise<void>
   pause(): void
+  prepareFrames(): Promise<void>
+  releaseFrames(): void
+  clearHighlight(): void
   syncHighlight(): Promise<void>
   activateHighlightAt(
     time: number,
@@ -280,6 +283,9 @@ export function createReaderPlayback(
   >()
   let sessionRevision = 0
   let sessionContentRevision = 0
+  let frameControlled = false
+  let framePreparation = 0
+  let releaseRecordingPages: (() => void) | null = null
   let timeline: PlaybackTimeline | null = null
   let recordingSession: RecordingSession | null = null
   let offlineRetry: (() => Promise<void>) | null = null
@@ -486,7 +492,8 @@ export function createReaderPlayback(
       ended: audioController.ended,
       playing: Boolean(
         session &&
-          !audioController.paused &&
+          // Keep the opening frame on Play; later frames present paused audio as playing.
+          (frameControlled ? audioController.currentTime > 0 : !audioController.paused) &&
           !audioController.ended
       ),
       error: audioController.error,
@@ -539,6 +546,7 @@ export function createReaderPlayback(
     viewport: options.viewport,
     audioController,
     highlightController,
+    isFrameControlled: () => frameControlled,
     attemptPlayback: play,
     attemptReplayFromStart: replayFromStart,
     onChange: (change) => {
@@ -715,9 +723,47 @@ export function createReaderPlayback(
         ? recordingHarnessSessionSnapshot()
         : null
     },
-    seek: (time: number) => audioController.seek(time),
+    seek: (time: number) => {
+      const wasPlaying = snapshot().playing
+      audioController.seek(time)
+      if (frameControlled && snapshot().playing !== wasPlaying) {
+        emit({ type: 'reader-chrome' })
+      }
+    },
     play: () => audioController.play(),
     pause: () => audioController.pause(),
+    async prepareFrames() {
+      const generation = ++framePreparation
+      const session = audioController.session
+      if (!session) throw new Error('No recording session is loaded')
+      audioController.pause()
+      frameControlled = true
+      releaseRecordingPages?.()
+      releaseRecordingPages = null
+      try {
+        const release = await highlightController.prepareRecordingPages(session.cues)
+        if (scope.signal.aborted || audioController.session !== session || generation !== framePreparation) {
+          release()
+          throw new Error('Recording session changed during preparation')
+        }
+        releaseRecordingPages = release
+        emit({ type: 'reader-chrome' })
+      } catch (error) {
+        if (generation === framePreparation) {
+          frameControlled = false
+          emit({ type: 'reader-chrome' })
+        }
+        throw error
+      }
+    },
+    releaseFrames() {
+      framePreparation += 1
+      frameControlled = false
+      releaseRecordingPages?.()
+      releaseRecordingPages = null
+      emit({ type: 'reader-chrome' })
+    },
+    clearHighlight: () => highlightController.clear(),
     syncHighlight: () => timeline!.syncHighlight(),
     async activateHighlightAt(
       time: number,
@@ -733,13 +779,14 @@ export function createReaderPlayback(
         await timeline!.syncHighlight()
         return audioController.session === session
       }
-      highlightController.clear()
       await highlightController.activateCue(session.cues[cueIndex], {
         scroll,
       })
       return audioController.session === session
     },
   }) satisfies ReaderPlaybackRecordingHarnessAdapter
+
+  scope.own(() => recordingHarnessAdapter.releaseFrames())
 
   return {
     snapshot,

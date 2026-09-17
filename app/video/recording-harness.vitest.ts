@@ -53,7 +53,7 @@ function createOptions(): {
     <main data-target-id="book">
       <section class="tikkun-page">
         <table><tbody><tr><td class="line">
-          <span class="word is-active-word">Word</span>
+          <span class="word is-active-word" data-token-key="1:0:0:0">Word</span>
         </td></tr></tbody></table>
       </section>
     </main>
@@ -78,11 +78,17 @@ function createOptions(): {
     status: 'current-only',
   }
   let currentTime = 0
+  let activeTokenKey: string | null = '1:0:0:0'
+  const word = book.querySelector<HTMLElement>('.word')!
   const seek = vi.fn((seconds: number) => {
     currentTime = seconds
   })
   const syncHighlight = vi.fn(async () => {})
-  const activateHighlightAt = vi.fn(async () => true)
+  const activateHighlightAt = vi.fn(async () => {
+    activeTokenKey = '1:0:0:0'
+    word.classList.add('is-active-word')
+    return true
+  })
   const loadByAudioId = vi.fn(async () => session)
   const play = vi.fn(async () => {})
   const pause = vi.fn()
@@ -103,12 +109,18 @@ function createOptions(): {
           session,
           currentTime,
           duration: 12,
-          activeTokenKey: '1:0:0:0',
+          activeTokenKey,
         }),
         loadByAudioId,
         seek,
         play,
         pause,
+        prepareFrames: vi.fn(async () => {}),
+        releaseFrames: vi.fn(),
+        clearHighlight: () => {
+          activeTokenKey = null
+          word.classList.remove('is-active-word')
+        },
         syncHighlight,
         activateHighlightAt,
       },
@@ -129,7 +141,6 @@ test('mounts the external recording interface and cleans it up with its lifetime
     pause,
     play,
     seek,
-    syncHighlight,
   } = createOptions()
   destroy = createMount()((scope) => {
     mountRecordingHarness(scope, options)
@@ -146,9 +157,11 @@ test('mounts the external recording interface and cleans it up with its lifetime
   expect(loaded?.cues).toHaveLength(1)
   expect(loaded?.tokenKeys).toEqual(['1:0:0:0'])
 
+  const opening = await window.tikkunRecorder?.renderAt(0)
+  expect(opening?.stableUntil).toBeNull()
+
   const rendered = await window.tikkunRecorder?.renderAt(3.5)
   expect(seek).toHaveBeenCalledWith(3.5)
-  expect(syncHighlight).toHaveBeenCalledOnce()
   expect(rendered).toMatchObject({
     audioId: 'reader-beresheet-1',
     currentTime: 3.5,
@@ -156,15 +169,15 @@ test('mounts the external recording interface and cleans it up with its lifetime
     activeTokenKey: '1:0:0:0',
   })
 
-  const animated = await window.tikkunRecorder?.renderHighlightAnimationAt(
-    1.25,
-    120,
-    false,
-    true,
-    0
-  )
-  expect(activateHighlightAt).toHaveBeenCalledWith(1.25, { scroll: true })
+  const animated = await window.tikkunRecorder?.renderAt(1.283333)
+  expect(activateHighlightAt).toHaveBeenCalledWith(1.25, { scroll: false })
   expect(animated?.audioId).toBe('reader-beresheet-1')
+
+  const prepared = await window.tikkunRecorder?.prepare()
+  expect(prepared?.activeTokenKey).toBeNull()
+  expect(prepared?.stableUntil).toBeNull()
+  const secondFrame = await window.tikkunRecorder?.renderAt(1 / 60)
+  expect(secondFrame?.stableUntil).toBe(1.25)
 
   await window.tikkunRecorder?.play()
   window.tikkunRecorder?.pause()

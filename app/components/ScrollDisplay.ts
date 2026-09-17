@@ -83,6 +83,7 @@ export class ScrollDisplay {
   private edgeLoadingReady = false
   private pendingInitialCenterScrollTop: number | null = null
   private edgeLoadPromise: Promise<Element | null> | null = null
+  private recordingPageLocks = 0
   private presentation: ReaderPagePresentation
   private readonly pageLayoutObserver: ResizeObserver | null
   private pageLayoutFrame = 0
@@ -274,7 +275,7 @@ export class ScrollDisplay {
   }
 
   private readonly handleEdgeScroll = () => {
-    if (this.disposed || !this.edgeLoadingReady) return
+    if (this.disposed || !this.edgeLoadingReady || this.recordingPageLocks > 0) return
     if (this.consumePendingInitialCenterScroll()) return
     if (this.edgeLoadPromise) return
     const direction = this.getEdgeLoadDirection()
@@ -429,6 +430,31 @@ export class ScrollDisplay {
       return this.mountPageByContentIndex(entry.contentIndex)
     }
     return this.mountPageByNumber(pageNumber)
+  }
+
+  async prepareRecordingPages(pageNumbers: readonly number[]) {
+    this.recordingPageLocks += 1
+    let released = false
+    const release = () => {
+      if (released) return
+      released = true
+      this.recordingPageLocks -= 1
+    }
+    try {
+      await this.scrolled
+      await this.edgeLoadPromise
+      for (const pageNumber of new Set(pageNumbers)) {
+        if (!await this.ensurePageMountedForNavigation(pageNumber)) {
+          throw new Error(`Could not prepare recording page ${pageNumber}`)
+        }
+      }
+      await waitForDocumentFonts(this.root)
+      this.refreshMountedPageLayouts()
+      return release
+    } catch (error) {
+      release()
+      throw error
+    }
   }
 
   /**
@@ -618,7 +644,7 @@ export class ScrollDisplay {
   }
 
   evictPage(pageNumber: number) {
-    if (this.disposed) return false
+    if (this.disposed || this.recordingPageLocks > 0) return false
     const records = this.getPageRecords(pageNumber)
     let didEvict = false
     for (const record of records) {

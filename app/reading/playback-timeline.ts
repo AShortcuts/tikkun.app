@@ -50,6 +50,7 @@ export interface PlaybackTimelineOptions {
   attemptPlayback(retry?: () => Promise<void>): Promise<boolean>
   attemptReplayFromStart(retry?: () => Promise<void>): Promise<boolean>
   isCueAuthoringRecording(): boolean
+  isFrameControlled?(): boolean
   saveReadingPosition(): void
   focusReader(): void
   restoreFocus(target: HTMLElement | null): void
@@ -771,7 +772,7 @@ export function createPlaybackTimeline(
   scope.own(
     audioController.on('frame-updated', ({ currentTime }) => {
       updateTimeline()
-      if (options.isCueAuthoringRecording() || scrubbing) return
+      if (options.isCueAuthoringRecording() || options.isFrameControlled?.() || scrubbing) return
       const session = audioController.session
       if (session?.passage) {
         void syncHighlight({ currentTime })

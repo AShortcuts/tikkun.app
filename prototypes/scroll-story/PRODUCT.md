@@ -4,7 +4,7 @@ Status: isolated design draft. It is not approved to replace the current public 
 
 ## Product
 
-Tikkun Reader is a Torah-reading companion by Ocean of Torah. Its unique mechanism keeps a recording, the active word, the aliyah boundary, and the original Torah layout connected during practice.
+Tikkun Reader is a Torah-reading companion website. Its unique mechanism keeps a recording, the active word, the aliyah boundary, and the original Torah layout connected during practice.
 
 The primary audience is a Torah reader preparing a specific aliyah on a phone or computer. This surface must make the practice workflow clear, demonstrate the real reader, and provide a direct path into the selected reading.
 

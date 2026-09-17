@@ -1014,6 +1014,33 @@ async function renderRun(runId: string) {
   return sd
 }
 
+test('prepares the recording path and pins pages until the last owner releases them', async () => {
+  const display = await renderRun('2024-10-26:shacharis,main')
+  const first = await display.prepareRecordingPages([1, 3, 3])
+  const second = await display.prepareRecordingPages([2])
+  for (const pageNumber of [1, 2, 3]) {
+    expect(root.querySelector(`.tikkun-page table[data-page-number="${pageNumber}"]`)).not.toBeNull()
+    expect(display.evictPage(pageNumber)).toBe(false)
+  }
+  const fetchNext = vi.spyOn(vm, 'fetchNextPage')
+  root.scrollTop = root.scrollHeight
+  root.dispatchEvent(new Event('scroll'))
+  await nextAnimationFrame()
+  expect(fetchNext).not.toHaveBeenCalled()
+  first()
+  first()
+  expect(display.evictPage(1)).toBe(false)
+  second()
+  expect(display.evictPage(1)).toBe(true)
+})
+
+test('releases recording page pins when preparation fails', async () => {
+  const display = await renderRun('2024-10-26:shacharis,main')
+  vi.spyOn(display, 'ensurePageMountedForNavigation').mockRejectedValueOnce(new Error('Page unavailable'))
+  await expect(display.prepareRecordingPages([1])).rejects.toThrow('Page unavailable')
+  expect(display.evictPage(1)).toBe(true)
+})
+
 async function renderNoachFromLaterPage() {
   const model = ScrollViewModel.forId(generator, '2026-10-17:shacharis,main', {
     scroll: 'torah',

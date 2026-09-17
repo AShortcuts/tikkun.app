@@ -814,7 +814,7 @@
   <title>Tikkun Reader — Torah reading practice in sync</title>
   <meta
     name="description"
-    content="Practice Torah reading with aliyah recordings, word highlighting, and the original Torah layout kept in sync. A Torah-reading companion by Ocean of Torah."
+    content="Practice Torah reading with aliyah recordings, word highlighting, and the original Torah layout kept in sync. A Torah-reading companion website."
   />
   <link rel="preload" as="image" href={ambientImage} fetchpriority="high" />
 </svelte:head>
@@ -922,7 +922,7 @@
 
       <div class="scroll-hero-copy">
         <h1 id="scroll-hero-title">Read along.<br /><span>In sync.</span></h1>
-        <p class="scroll-hero-byline">A Torah-reading companion by Ocean of Torah</p>
+        <p class="scroll-hero-byline">A Torah-reading companion website</p>
         <p class="scroll-hero-lede">
           Choose the reading, press play, and follow every word where it appears in the Torah.
         </p>

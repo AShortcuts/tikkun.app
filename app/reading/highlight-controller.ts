@@ -72,6 +72,11 @@ export class HighlightController {
     if (hadActiveToken) this.emitActiveTokenChanged(null)
   }
 
+  prepareRecordingPages(cues: readonly Readonly<WordCue>[]) {
+    if (!this.display) throw new Error('The reader display is not available for recording')
+    return this.display.prepareRecordingPages(cues.map(cue => cue.pageNumber))
+  }
+
   async activateCue(cue: WordCue, options?: HighlightActivationOptions) {
     const tokenKey = formatTokenKey(cue)
     if (this.activeTokenKey === tokenKey) {

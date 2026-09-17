@@ -64,10 +64,6 @@ html.mod-theme-transition .toolbar-button {
   display: none !important;
 }
 
-[data-recording-mode='true'] .reader-shell {
-  grid-template-columns: minmax(0, 1fr);
-}
-
 [data-recording-mode='true'] .tikkun-book {
   scrollbar-width: none;
 }

@@ -357,7 +357,6 @@ html[data-reader-reduced-motion='on'] .word {
     border-width 0.1s ease,
     box-shadow 0.1s ease,
     background-color 0.1s ease;
-  transition-delay: var(--recording-highlight-animation-delay, 0s);
 }
 
 .special-letter.mod-small {

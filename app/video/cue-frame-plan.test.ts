@@ -1,292 +1,62 @@
 import { expect, test } from 'vitest'
-import {
-  buildCueFramePlan,
-  createCueConcatEntries,
-  renderCueConcatFile,
-} from './cue-frame-plan.ts'
+import { nextCaptureFrame, validateRecordingCues, createCueConcatEntries, renderCueConcatFile } from './cue-frame-plan.ts'
 import type { WordCue } from '../audio/types.ts'
 
-const cue = (timeStart: number, timeEnd?: number): WordCue => ({
-  timeStart,
-  timeEnd,
-  pageNumber: 1,
-  lineIndex: 0,
-  fragmentIndex: 0,
-  wordIndex: Math.round(timeStart * 1000),
+const cue = (timeStart: number): WordCue => ({ timeStart, pageNumber: 1, lineIndex: 0, fragmentIndex: 0, wordIndex: 0 })
+
+test.each([30, 60])('captures every moving frame at %s fps', fps => {
+  for (let frameIndex = 0; frameIndex < fps; frameIndex++) {
+    expect(nextCaptureFrame({ frameIndex, frameCount: fps, fps, stableUntil: null })).toBe(frameIndex + 1)
+  }
 })
 
-test('cue frame plan captures one cue frame and a burst before cue end', () => {
-  const plan = buildCueFramePlan({
-    cues: [cue(0.5, 1.2), cue(1.7, 1.9)],
-    durationSeconds: 2,
-    fps: 10,
-    burstPreEndMs: 200,
-    burstMaxMs: 300,
-  })
-
-  expect(plan.frameCount).toBe(20)
-  expect(plan.entries.map((entry) => entry.frameIndex)).toEqual([0, 5, 6, 10, 11, 12, 13, 17, 18, 19])
-  expect(plan.entries.map((entry) => entry.seconds)).toEqual([0.5, 0.5, 0.5, 1, 1.1, 1.2, 1.3, 1.7, 1.7, 1.9])
-  expect(plan.entries.map((entry) => entry.settleMs ?? 0)).toEqual([100, 0, 100, 0, 0, 0, 0, 0, 100, 0])
-  expect(plan.entries.map((entry) => entry.highlightAnimationMs ?? null)).toEqual([null, 100, null, null, null, null, null, 100, null, null])
+test('holds only until the first frame at or after a real cue start', () => {
+  expect(nextCaptureFrame({ frameIndex: 4, frameCount: 60, fps: 30, stableUntil: 0.517 })).toBe(16)
+  expect(nextCaptureFrame({ frameIndex: 4, frameCount: 60, fps: 30, stableUntil: 0.5 })).toBe(15)
+  expect(nextCaptureFrame({ frameIndex: 16, frameCount: 60, fps: 30, stableUntil: 0.552 })).toBe(17)
 })
 
-test('cue start held frames settle before capture without moving the output frame', () => {
-  const plan = buildCueFramePlan({
-    cues: [cue(0.5, 0.8)],
-    durationSeconds: 1,
-    fps: 30,
-    burstPreEndMs: 100,
-    burstMaxMs: 100,
-  })
-
-  const cueStart = plan.entries.find((entry) => entry.frameIndex === 18)
-  expect(cueStart).toEqual({ frameIndex: 18, seconds: 0.5, settleMs: 100 })
+test('clamps a final held image to the exact output frame count', () => {
+  expect(nextCaptureFrame({ frameIndex: 4, frameCount: 10, fps: 30, stableUntil: 0.3331 })).toBe(10)
+  expect(nextCaptureFrame({ frameIndex: 9, frameCount: 10, fps: 30, stableUntil: null })).toBe(10)
 })
 
-test('cue start frames capture the highlight animation before the held frame', () => {
-  const plan = buildCueFramePlan({
-    cues: [cue(0.5, 0.8)],
-    durationSeconds: 1,
-    fps: 30,
-    burstPreEndMs: 100,
-    burstMaxMs: 100,
-  })
-
-  const animationFrames = plan.entries.filter(
-    (entry) => entry.highlightAnimationMs !== undefined
-  )
-  expect(animationFrames.map((entry) => ({
-      frameIndex: entry.frameIndex,
-      seconds: entry.seconds,
-      highlightAnimationMs: entry.highlightAnimationMs,
-      settleBeforeAnimation: entry.settleBeforeAnimation ?? false,
-    }))).toEqual([
-      {
-        frameIndex: 15,
-        seconds: 0.5,
-        highlightAnimationMs: 33.333,
-        settleBeforeAnimation: true,
-      },
-      {
-        frameIndex: 16,
-        seconds: 0.5,
-        highlightAnimationMs: 66.667,
-        settleBeforeAnimation: false,
-      },
-      {
-        frameIndex: 17,
-        seconds: 0.5,
-        highlightAnimationMs: 100,
-        settleBeforeAnimation: false,
-      },
-    ])
+test('rejects missing, invalid, or stale motion state', () => {
+  for (const stableUntil of [undefined, NaN, Infinity, -1, 0]) {
+    expect(() => nextCaptureFrame({ frameIndex: 4, frameCount: 60, fps: 30, stableUntil: stableUntil! })).toThrow()
+  }
 })
 
-test('line changes capture a scroll transition before the held frame', () => {
-  const plan = buildCueFramePlan({
-    cues: [
-      { ...cue(0.5, 0.8), lineIndex: 0 },
-      { ...cue(0.9, 1.2), lineIndex: 1 },
-    ],
-    durationSeconds: 1.5,
-    fps: 30,
-    burstPreEndMs: 100,
-    burstMaxMs: 100,
-  })
-
-  const transition = plan.entries.filter((entry) => entry.seconds === 0.9)
-  expect(transition.map((entry) => ({
-      frameIndex: entry.frameIndex,
-      scrollTransition: entry.scrollTransition ?? false,
-      settleBeforeAnimation: entry.settleBeforeAnimation ?? false,
-      transitionWaitMs: entry.transitionWaitMs,
-      settleMs: entry.settleMs ?? 0,
-    }))).toEqual([
-      {
-        frameIndex: 27,
-        scrollTransition: true,
-        settleBeforeAnimation: false,
-        transitionWaitMs: 33.333,
-        settleMs: 0,
-      },
-      {
-        frameIndex: 28,
-        scrollTransition: false,
-        settleBeforeAnimation: false,
-        transitionWaitMs: 33.333,
-        settleMs: 0,
-      },
-      {
-        frameIndex: 29,
-        scrollTransition: false,
-        settleBeforeAnimation: false,
-        transitionWaitMs: 33.333,
-        settleMs: 0,
-      },
-      {
-        frameIndex: 30,
-        scrollTransition: false,
-        settleBeforeAnimation: false,
-        transitionWaitMs: 33.333,
-        settleMs: 0,
-      },
-      {
-        frameIndex: 31,
-        scrollTransition: false,
-        settleBeforeAnimation: false,
-        transitionWaitMs: 33.333,
-        settleMs: 0,
-      },
-      {
-        frameIndex: 32,
-        scrollTransition: false,
-        settleBeforeAnimation: false,
-        transitionWaitMs: 33.333,
-        settleMs: 0,
-      },
-      {
-        frameIndex: 33,
-        scrollTransition: false,
-        settleBeforeAnimation: false,
-        transitionWaitMs: undefined,
-        settleMs: 100,
-      },
-    ])
+test('rejects invalid frame ranges and frame rates', () => {
+  for (const frameIndex of [-1, 0.5, 60, NaN]) {
+    expect(() => nextCaptureFrame({ frameIndex, frameCount: 60, fps: 30, stableUntil: null })).toThrow()
+  }
+  expect(() => nextCaptureFrame({ frameIndex: 0, frameCount: 60, fps: 0, stableUntil: null })).toThrow()
 })
 
-test('cue starts never collapse onto the same output frame', () => {
-  const plan = buildCueFramePlan({
-    cues: [cue(0.5, 0.54), cue(0.516, 0.58), cue(0.548, 0.62)],
-    durationSeconds: 1,
-    fps: 30,
-    burstPreEndMs: 100,
-    burstMaxMs: 100,
-  })
-
-  expect([0.5, 0.516, 0.548].map((seconds) => {
-      const entry = plan.entries.find(
-        (candidate) => candidate.seconds === seconds && candidate.frameIndex > 0
-      )
-      return [entry?.frameIndex, seconds]
-    })).toEqual([
-      [15, 0.5],
-      [16, 0.516],
-      [17, 0.548],
-    ])
+test('validates cues without moving tightly spaced cues to later frames', () => {
+  const cues = [cue(0.501), cue(0.502), cue(0.503)]
+  expect(() => validateRecordingCues(cues, 1)).not.toThrow()
+  expect(cues.map(cue => cue.timeStart)).toEqual([0.501, 0.502, 0.503])
+  for (const invalid of [[cue(-1)], [cue(2)], [cue(0.5), cue(0.5)], [cue(0.5), cue(0.4)], [{ ...cue(0.5), timeEnd: 0.4 }]]) {
+    expect(() => validateRecordingCues(invalid, 1)).toThrow()
+  }
 })
 
-test('cue frame plan clamps windows to the output duration', () => {
-  const plan = buildCueFramePlan({
-    cues: [cue(0.01, 0.1), cue(1.99, 2.2)],
-    durationSeconds: 2,
-    fps: 10,
-    burstPreEndMs: 300,
-    burstMaxMs: 500,
-  })
-
-  expect(plan.entries.map((entry) => entry.frameIndex)).toEqual([0, 1, 2, 3, 4, 5, 19])
-})
-
-test('concat entries hold each captured frame until the next planned output frame', () => {
-  const plan = buildCueFramePlan({
-    cues: [cue(0.5, 0.8)],
-    durationSeconds: 1,
-    fps: 10,
-    burstPreEndMs: 100,
-    burstMaxMs: 200,
-  })
+test('concat durations cover all held frames and escape paths', () => {
   const entries = createCueConcatEntries({
-    plan,
-    fps: 10,
-    frameName: (index) => `frame-${index}.png`,
+    plan: { frameCount: 60, entries: [{ frameIndex: 0, seconds: 0 }, { frameIndex: 16, seconds: 16 / 30 }, { frameIndex: 17, seconds: 17 / 30 }] },
+    fps: 30, frameName: index => "/tmp/reader's frame-" + index + '.png',
   })
-
-  expect(entries).toEqual([
-    { file: 'frame-0.png', durationSeconds: 0.5 },
-    { file: 'frame-1.png', durationSeconds: 0.1 },
-    { file: 'frame-2.png', durationSeconds: 0.1 },
-    { file: 'frame-3.png', durationSeconds: 0.1 },
-    { file: 'frame-4.png', durationSeconds: 0.1 },
-    { file: 'frame-5.png', durationSeconds: 0.1 },
-  ])
-  expect(Math.abs(entries.reduce((total, entry) => total + entry.durationSeconds, 0) - 1) <
-      Number.EPSILON).toBe(true)
+  expect(entries.map(entry => entry.durationSeconds)).toEqual([0.533333, 0.033333, 1.433333])
+  expect(entries.reduce((total, entry) => total + entry.durationSeconds, 0)).toBeCloseTo(2, 5)
+  expect(renderCueConcatFile(entries, 30)).toContain("duration 1.433333")
+  expect(renderCueConcatFile(entries, 30).split('\n').filter(line => line.startsWith('file '))).toHaveLength(4)
+  expect(renderCueConcatFile(entries, 30).split('\n').filter(line => line === 'option framerate 30')).toHaveLength(4)
 })
 
-test('cue frame plan caps bursts before the next cue begins', () => {
-  const plan = buildCueFramePlan({
-    cues: [cue(1, 1.9), cue(2, 2.3)],
-    durationSeconds: 3,
-    fps: 30,
-    burstPreEndMs: 200,
-    burstMaxMs: 500,
-  })
-
-  expect(plan.entries.map((entry) => entry.frameIndex)).toEqual([
-      0, 30, 31, 32, 33, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62,
-      63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 89,
-    ])
-})
-
-test('concat file repeats final frame and escapes single quotes', () => {
-  const source = renderCueConcatFile([
-    { file: "frame-'0'.png", durationSeconds: 0.5 },
-    { file: 'frame-1.png', durationSeconds: 0.1 },
-  ])
-
-  expect(source).toBe("file 'frame-'\\''0'\\''.png'\nduration 0.500000\nfile 'frame-1.png'\nduration 0.100000\nfile 'frame-1.png'\n")
-})
-
-test('cue frame planning rejects invalid timing inputs explicitly', () => {
-  expect(() =>
-    buildCueFramePlan({
-      cues: [cue(0.5), cue(0.4)],
-      durationSeconds: 1,
-      fps: 30,
-      burstPreEndMs: 100,
-      burstMaxMs: 100,
-    })
-  ).toThrow(/strictly increasing/)
-  expect(() =>
-    buildCueFramePlan({
-      cues: [cue(0.5, Number.NaN)],
-      durationSeconds: 1,
-      fps: 30,
-      burstPreEndMs: 100,
-      burstMaxMs: 100,
-    })
-  ).toThrow(/Cue end times/)
-  expect(() =>
-    buildCueFramePlan({
-      cues: [],
-      durationSeconds: 1,
-      fps: 0,
-      burstPreEndMs: 100,
-      burstMaxMs: 100,
-    })
-  ).toThrow(/fps must be a positive finite number/)
-})
-
-test('concat planning rejects empty and out-of-order frame plans', () => {
-  expect(() =>
-    createCueConcatEntries({
-      plan: { frameCount: 1, entries: [] },
-      fps: 30,
-      frameName: (index) => `frame-${index}.png`,
-    })
-  ).toThrow(/at least one entry/)
-  expect(() =>
-    createCueConcatEntries({
-      plan: {
-        frameCount: 10,
-        entries: [
-          { frameIndex: 5, seconds: 0.5 },
-          { frameIndex: 4, seconds: 0.4 },
-        ],
-      },
-      fps: 10,
-      frameName: (index) => `frame-${index}.png`,
-    })
-  ).toThrow(/not strictly increasing/)
+test('rejects malformed concat coverage', () => {
+  expect(() => createCueConcatEntries({ plan: { frameCount: 4, entries: [{ frameIndex: 1, seconds: 1 / 30 }] }, fps: 30, frameName: () => 'frame.png' })).toThrow(/frame zero/)
+  expect(() => createCueConcatEntries({ plan: { frameCount: 4, entries: [] }, fps: 30, frameName: () => 'frame.png' })).toThrow()
+  expect(() => createCueConcatEntries({ plan: { frameCount: 4, entries: [{ frameIndex: 0, seconds: 0 }, { frameIndex: 0, seconds: 0 }] }, fps: 30, frameName: () => 'frame.png' })).toThrow()
 })

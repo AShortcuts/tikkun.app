@@ -53,6 +53,7 @@ test('recording mode is disabled by default', () => {
 
 test('recording mode locks playback and visual preferences', () => {
   expect(applyRecordingModePreferences(preferences)).toMatchObject({
+    reducedMotion: 'off',
     narratorId: 'custom-narrator',
     playbackRate: 1,
     autoScrollWithPlayback: true,

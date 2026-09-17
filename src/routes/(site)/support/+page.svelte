@@ -6,7 +6,7 @@
 
 <svelte:head>
   <title>Support — Tikkun Reader</title>
-  <meta name="description" content="Get help with Tikkun Reader. Email Ocean of Torah about a reading, recording, technical issue, or suggestion." />
+  <meta name="description" content="Get help with Tikkun Reader. Email support about a reading, recording, technical issue, or suggestion." />
 </svelte:head>
 
 <InformationPage title="Here to help." current="support" introduction="A question, a recording that needs attention, or an idea for the reader? We'd like to hear from you.">

@@ -36,7 +36,6 @@
       </span>
       <span class="scroll-brand-copy">
         <strong>Tikkun Reader</strong>
-        <small>A Torah-reading companion by Ocean of Torah</small>
       </span>
     </a>
 
@@ -58,7 +57,7 @@
       <a class="scroll-footer-brand" href={resolve('/')}>
         Tikkun Reader
       </a>
-      <p>A Torah-reading companion by Ocean of Torah</p>
+      <p>A Torah-reading companion website</p>
     </div>
     <nav aria-label="Footer navigation">
       <a href={resolve('/support')}>Support</a>

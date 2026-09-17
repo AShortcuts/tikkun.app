@@ -13,7 +13,7 @@
   <p class="information-date">Last updated <time datetime="2026-09-11">September 11, 2026</time></p>
   <section aria-labelledby="privacy-overview">
     <h2 id="privacy-overview">A reader without an account</h2>
-    <p>Tikkun Reader, by Ocean of Torah, lets you read and practice without signing up. This policy covers the Tikkun Reader website and app.</p>
+    <p>Tikkun Reader lets you read and practice without signing up. This policy covers the Tikkun Reader website and app.</p>
     <p>We do not use advertising trackers or sell your personal information. Reading preferences and saved places are kept on your device, not in a Tikkun user account.</p>
   </section>
   <section aria-labelledby="privacy-local">
