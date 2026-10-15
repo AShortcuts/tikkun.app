@@ -93,7 +93,7 @@ test('uses the same reading and reference engine in the overlay host', () => {
   const result = fixture.querySelector<HTMLAnchorElement>(
     '[data-result-source="reading"] a'
   )
-  expect(result?.getAttribute('href')).toBe('#/r/1-6-9')
+  expect(result?.getAttribute('href')).toBe('#/torah/1-6-9')
   expect(result?.textContent).toContain('Genesis 6:9')
   destroy()
 })

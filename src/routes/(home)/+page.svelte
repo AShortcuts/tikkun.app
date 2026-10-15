@@ -5,6 +5,7 @@
   import { availableReadings, getRequiredReading } from '$lib/readings'
   import { onMount } from 'svelte'
   import { Spring } from 'svelte/motion'
+  import { APP_BANNER_CONTENT } from '../../../app/platform/smart-app-banner.ts'
 
   type PreviewTheme = 'automatic' | 'light' | 'sepia' | 'dark'
   type MobileThemeSheetState = 'waiting' | 'pinned' | 'released'
@@ -811,6 +812,7 @@
 </script>
 
 <svelte:head>
+  <meta name="apple-itunes-app" content={APP_BANNER_CONTENT} />
   <title>Tikkun Reader — Torah reading practice in sync</title>
   <meta
     name="description"

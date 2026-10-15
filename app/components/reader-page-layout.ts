@@ -9,10 +9,61 @@ const visibleWords = (root: ParentNode, selector: string) =>
     (word) => !word.hidden && word.getClientRects().length > 0,
   )
 
+const readingMaqafSpaces = new WeakMap<HTMLElement, Map<Node, string>>()
+
+function joinReadingMaqafBoundaries(page: HTMLElement, sides: ReaderPagePresentation['sides']) {
+  const book = page.closest<HTMLElement>('.tikkun-book') ?? page
+  const spaces = readingMaqafSpaces.get(book) ?? new Map<Node, string>()
+  for (const [node, original] of spaces) {
+    node.nodeValue = original
+  }
+  spaces.clear()
+  book.querySelectorAll('.mod-maqaf-boundary').forEach((word) => word.classList.remove('mod-maqaf-boundary'))
+
+  const surfaces = sides === 'one'
+    ? [book]
+    : [...book.querySelectorAll<HTMLElement>('.reader-reading-page-side')]
+  for (const surface of surfaces) {
+    const words = [...surface.querySelectorAll<HTMLElement>('.word:not([hidden])')]
+    const walker = document.createTreeWalker(surface, NodeFilter.SHOW_TEXT)
+    for (let index = 0; index < words.length - 1; index++) {
+      const word = words[index]
+      if (!word.textContent?.trimEnd().endsWith('\u05be')) continue
+      const next = words[index + 1]
+      const sourcePage = word.closest('.tikkun-page')
+      const nextPage = next.closest('.tikkun-page')
+      if (sourcePage !== nextPage && (
+        sourcePage?.nextElementSibling !== nextPage ||
+        Number(next.dataset.pageNumber) !== Number(word.dataset.pageNumber) + 1
+      )) continue
+      if (sides === 'two') {
+        word.classList.add('mod-maqaf-boundary')
+        next.classList.add('mod-maqaf-boundary')
+      }
+
+      // Physical source rows may end mid-phrase. Join only their intervening
+      // whitespace, leaving word elements and audio token identities intact.
+      walker.currentNode = word
+      let node: Node | null
+      while ((node = walker.nextNode()) && !next.contains(node)) {
+        if (node.parentElement?.closest('.word, .line-gutter, .tikkun-page-number')) continue
+        const original = node.nodeValue
+        if (!original || original.trim()) continue
+        spaces.set(node, original)
+        node.nodeValue = '\u2060'
+      }
+    }
+  }
+  readingMaqafSpaces.set(book, spaces)
+}
+
 function clearPairedWordWidths(page: HTMLElement) {
   page
     .querySelectorAll<HTMLElement>('.word[data-token-key]')
-    .forEach((word) => word.style.removeProperty('--reader-paired-word-width'))
+    .forEach((word) => {
+      word.style.removeProperty('--reader-paired-word-width')
+      word.style.removeProperty('--reader-paired-word-spacing')
+    })
 }
 
 type ShirahWidths = {
@@ -388,7 +439,7 @@ function sizeMatchShirah(
 function synchronizeReadingWordWidths(page: HTMLElement) {
   clearPairedWordWidths(page)
   const torahWordsByToken = new Map<string, HTMLElement>()
-  const updates: { torah: HTMLElement; tikkun: HTMLElement; width: string }[] = []
+  const updates: { torah: HTMLElement; tikkun: HTMLElement; width: string; torahSpacing: string; tikkunSpacing: string }[] = []
 
   for (const word of visibleWords(
     page,
@@ -415,17 +466,24 @@ function synchronizeReadingWordWidths(page: HTMLElement) {
     const fontSize = Math.max(tikkunFontSize, torahFontSize)
     if (!Number.isFinite(fontSize) || fontSize <= 0) continue
 
-    const pairedWidth = Math.max(
-      tikkunWord.getBoundingClientRect().width,
-      torahWord.getBoundingClientRect().width,
-    )
+    const tikkunWidth = tikkunWord.getBoundingClientRect().width
+    const torahWidth = torahWord.getBoundingClientRect().width
+    const pairedWidth = Math.max(tikkunWidth, torahWidth)
     const value = `${(pairedWidth / fontSize).toFixed(4)}em`
-    updates.push({ torah: torahWord, tikkun: tikkunWord, width: value })
+    updates.push({
+      torah: torahWord, tikkun: tikkunWord, width: value,
+      torahSpacing: `${((pairedWidth - torahWidth) / fontSize).toFixed(4)}em`,
+      tikkunSpacing: `${((pairedWidth - tikkunWidth) / fontSize).toFixed(4)}em`,
+    })
   }
   // Measure the natural widths first; interleaved writes force layout per word.
-  for (const { torah, tikkun, width } of updates) {
+  for (const { torah, tikkun, width, torahSpacing, tikkunSpacing } of updates) {
     tikkun.style.setProperty('--reader-paired-word-width', width)
     torah.style.setProperty('--reader-paired-word-width', width)
+    if (tikkun.classList.contains('mod-maqaf-boundary')) {
+      tikkun.style.setProperty('--reader-paired-word-spacing', tikkunSpacing)
+      torah.style.setProperty('--reader-paired-word-spacing', torahSpacing)
+    }
   }
 }
 
@@ -546,6 +604,8 @@ export function applyReaderPageLayout(
     songPages?.forEach((member) => alignMatchSongFrame(member, presentation.sides))
     return
   }
+
+  joinReadingMaqafBoundaries(page, presentation.sides)
 
   if (presentation.sides === 'two') {
     synchronizeReadingWordWidths(page)

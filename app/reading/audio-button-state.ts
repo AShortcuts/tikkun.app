@@ -11,7 +11,7 @@ export function audioButtonState({ state, available, cueIncomplete = false, admi
   const absent = adminMissing || (!state?.recording && (!available || problem === 'missing-audio'))
   const canPlay = !absent && (state?.canPlay ?? (available && !['checking', 'timing-needed', 'load-failed', 'missing-audio'].includes(problem ?? '')))
   const tone = absent ? 'empty' : problem === 'load-failed' ? 'audio' :
-    state?.issue ?? (problem === 'timing-needed' || problem === 'incomplete-cues' || cueIncomplete ? 'cue' :
+    state?.issue ?? (problem === 'checking' || problem === 'timing-needed' || problem === 'incomplete-cues' || cueIncomplete ? 'cue' :
       problem === 'partial-audio' || problem === 'missing-audio' ? 'audio' : 'normal')
   let tooltip = playing ? 'Pause this aliyah' : 'Play this aliyah'
   if (absent) tooltip = adminMissing ? 'No recording yet. Select this aliyah to record.' : 'No recording available for this aliyah.'

@@ -1,7 +1,10 @@
 import type { LeiningAliyah } from '../calendar-model/model-types.ts'
+import { readingTitle } from '../calendar-model/model-types.ts'
+import { aliyahLabel } from '../calendar-model/aliyah-label.ts'
 import type { RenderedLineInfo } from '../view-model/scroll-view-model.ts'
+import type { ScrollName } from '../ref.ts'
 import displayRange from '../display-range.ts'
-import hebrewNumeralFromInteger from '../hebrew-numeral.ts'
+import { verseRangeLabel } from './verse-range-label.ts'
 import { createLastReadingHash } from '../reading/last-reading.ts'
 import { isInvertedNun, tokenizeReaderWords } from '../reader/word-tokenization.ts'
 import { createSpecialLetterRenderer } from '../special-letters.ts'
@@ -95,40 +98,17 @@ const addLabelBreakOpportunities = (label: string) =>
   label.replace(/([־-])/g, '$1<wbr>')
 
 const aliyahStartTitle = (run: RenderedLineInfo['run']) =>
-  run?.leining.date.title.he.replace(/^פרשת /, '') ??
-  run?.leining.date.title.en.replace(/^Parshat\s+/i, '') ??
-  ''
+  run ? readingTitle(run.leining).he.replace(/^פרשת /, '') : ''
 
-const aliyahIndexLabels = new Map<LeiningAliyah['index'], string>([
-  [1, 'ראשון'],
-  [2, 'שני'],
-  [3, 'שלישי'],
-  [4, 'רביעי'],
-  [5, 'חמישי'],
-  [6, 'ששי'],
-  [7, 'שביעי'],
-  ['Maftir', 'מפטיר'],
-])
-
-const aliyahStartLabel = (aliyahStarts: LeiningAliyah[]) =>
+const aliyahStartLabel = (aliyahStarts: LeiningAliyah[], run: RenderedLineInfo['run']) =>
   aliyahStarts
-    .map((aliyah) => aliyahIndexLabels.get(aliyah.index))
+    .map((aliyah) => aliyahLabel(aliyah.index, run))
     .filter(Boolean)
     .join(', ')
 
-const formatRefChapterVerse = ({ c, v }: { c: number; v: number }) =>
-  `${hebrewNumeralFromInteger(c)}:${hebrewNumeralFromInteger(v)}`
-
 const aliyahStartVerseRange = (aliyahStarts: LeiningAliyah[]) =>
   aliyahStarts
-    .map((aliyah) => {
-      const start = formatRefChapterVerse(aliyah.start)
-      const end =
-        aliyah.start.c === aliyah.end.c
-          ? hebrewNumeralFromInteger(aliyah.end.v)
-          : formatRefChapterVerse(aliyah.end)
-      return start === end ? start : `${start}-${end}`
-    })
+    .map((aliyah) => verseRangeLabel(aliyah))
     .join(', ')
 
 const renderLabelBadge = (
@@ -142,6 +122,7 @@ const renderLabelBadge = (
     ${aliyah?.index ? `data-aliyah-marker="true"` : ''}
     ${runId ? `data-run-id="${runId}"` : ''}
     ${aliyah?.index ? `data-aliyah-index="${aliyah.index}"` : ''}
+    ${aliyah?.index ? `data-aliyah-start-label="${escapeAttribute(aliyahLabel(aliyah.index, run))}" data-aliyah-start-verse="${escapeAttribute(verseRangeLabel(aliyah))}"` : ''}
   >
     ${
       aliyah?.index
@@ -221,6 +202,7 @@ export const getMatchShirahLayout = (
 
 export const renderTextFlow = ({
   text,
+  scroll = 'torah',
   references,
   annotationsEnabled,
   pageNumber,
@@ -229,6 +211,7 @@ export const renderTextFlow = ({
   surface,
 }: {
   text: string[][]
+  scroll?: ScrollName
   references: (
     | RenderedLineInfo['focalRef']
     | RenderedLineInfo['verses'][number]
@@ -242,9 +225,9 @@ export const renderTextFlow = ({
   const fixedAnnotations =
     surface === 'tikkun' ? true : surface === 'torah' ? false : null
   const enabled = fixedAnnotations ?? annotationsEnabled
-  const renderAnnotatedSpecialLetters = createSpecialLetterRenderer(references)
+  const renderAnnotatedSpecialLetters = createSpecialLetterRenderer(references, scroll)
   const renderUnannotatedSpecialLetters =
-    createSpecialLetterRenderer(references)
+    createSpecialLetterRenderer(references, scroll)
 
   return `<div
     class="reader-text-side mod-${surface}"
@@ -342,6 +325,7 @@ const renderLineAttributes = ({
 
 const Line = ({
   pageNumber,
+  scroll = 'torah',
   text,
   verses,
   focalRef,
@@ -366,7 +350,7 @@ const Line = ({
   renderVerseGutter?: boolean
   pageReference?: RenderedLineInfo['focalRef']
 } & RenderedLineInfo) => {
-  const startLabel = aliyahStartLabel(aliyahStarts)
+  const startLabel = aliyahStartLabel(aliyahStarts, run)
   const startTitle = aliyahStartTitle(run)
   const startVerse = aliyahStartVerseRange(aliyahStarts)
   const references = [focalRef, ...verses]
@@ -400,6 +384,7 @@ const Line = ({
           .map((side) =>
             renderTextFlow({
               text,
+              scroll,
               references,
               annotationsEnabled,
               pageNumber,
@@ -411,6 +396,7 @@ const Line = ({
           .join('')
       : renderTextFlow({
           text,
+          scroll,
           references,
           annotationsEnabled,
           pageNumber,

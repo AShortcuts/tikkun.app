@@ -63,10 +63,11 @@ test('loads a recent last reading with display labels', () => {
   })
 })
 
-test('reads the current checkpoint JSON without rewriting it', () => {
+test.each(['#/torah/parsha/noach', '#/torah/5-33-24', '#/r/5-33-24'])(
+  'reads checkpoint %s without rewriting it', (hash) => {
   const storage = createStorage()
   const checkpoint = {
-    hash: '#/torah/parsha/noach',
+    hash,
     parshaName: 'Noach',
     savedAt: now,
   }
@@ -215,7 +216,7 @@ test('ignores the moving calendar default route', () => {
   expect(loadEligibleLastReading(storage, now)).toBeNull()
 })
 
-test('prefers semantic parsha urls with verse refs for last reading links', () => {
+test('preserves the date when saving a weekly service', () => {
   const generator = new LeiningGenerator(testSettings)
   const beresheet = generator
     .forHebrewYear(5785)
@@ -226,11 +227,11 @@ test('prefers semantic parsha urls with verse refs for last reading links', () =
   if (!run) throw new Error('Missing Beresheet run')
 
   expect(createLastReadingHash(run, run.aliyot[0].start)).toBe(
-    '#/torah/parsha/beresheet/1-1-1'
+    '#/run/2024-10-26:shacharis,main/1-1-1'
   )
 })
 
-test('uses a semantic combined-parsha URL for scroll checkpoints', () => {
+test('preserves the date when saving a combined-parsha service', () => {
   const generator = new LeiningGenerator(testSettings)
   const combined = generator
     .forHebrewYear(5786)
@@ -243,7 +244,7 @@ test('uses a semantic combined-parsha URL for scroll checkpoints', () => {
   if (!run) throw new Error('Missing Nitzavim-Vayeilech run')
 
   expect(createLastReadingHash(run, run.aliyot[0].start)).toBe(
-    '#/torah/parsha/nitzavim-vayelech/5-29-9'
+    '#/run/2026-09-05:shacharis,main/5-29-9'
   )
 })
 

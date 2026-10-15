@@ -23,8 +23,8 @@ export interface ReaderShellOptions {
   document: Document
   initialTitle: string
   initialAnnotationsEnabled: boolean
-  onTitleClick(): void
-  onAboutClick(): void
+  onTitleClick(event: MouseEvent): void
+  onAboutClick(event: MouseEvent): void
   onAnnotationsChange(enabled: boolean): void
   onSwapSides?(): void
 }

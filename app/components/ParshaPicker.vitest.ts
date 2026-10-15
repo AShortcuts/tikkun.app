@@ -18,6 +18,9 @@ const mountedPickers: ReturnType<typeof ParshaPicker>[] = []
 let compactLibrarySupported = false
 
 beforeEach(() => {
+  // Keep double-portion fixtures stable across Hebrew calendar years.
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-02-01T12:00:00Z'))
   vi.spyOn(window, 'matchMedia')
   compactLibrarySupported = false
   setHoverFlyoutSupport(true)
@@ -50,6 +53,7 @@ afterEach(() => {
   for (const picker of mountedPickers.splice(0)) picker.destroy()
   document.body.replaceChildren()
   vi.restoreAllMocks()
+  vi.useRealTimers()
 })
 
 test('keeps nested flyouts open while moving backward and closes outside', () => {
@@ -445,7 +449,7 @@ test('uses mobile Library depth without a Go button', async () => {
   if (!verse) throw new Error('Expected verse 1 destination')
   verse.click()
 
-  expect(navigate).toHaveBeenLastCalledWith('#/r/1-1-1')
+  expect(navigate).toHaveBeenLastCalledWith('#/torah/1-1-1')
   expect(picker.querySelector('.torah-reference-button')).toBeNull()
 })
 
@@ -612,7 +616,7 @@ test('shows alias context and navigates structured search results', () => {
   const input = picker.querySelector<HTMLInputElement>('.search-input')
   if (!input) throw new Error('Expected the parsha search input')
 
-  expect(input.getAttribute('aria-label')).toBe('Search readings and commands')
+  expect(input.getAttribute('aria-label')).toBe('Search readings and settings')
   inputValue(input, 'beresheet')
   expect(
     picker
@@ -642,7 +646,7 @@ test('shows alias context and navigates structured search results', () => {
   input.dispatchEvent(
     new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
   )
-  expect(navigate).toHaveBeenLastCalledWith('#/r/1-6-9')
+  expect(navigate).toHaveBeenLastCalledWith('#/torah/1-6-9')
 })
 
 test('inherits command behavior and keeps the Cmd-K hint in the search bar', () => {

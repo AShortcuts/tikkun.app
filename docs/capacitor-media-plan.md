@@ -4,7 +4,7 @@ Updated: 2026-09-10
 
 Status: Local iOS implementation and release preparation are in place; device,
 deployment and distribution acceptance remain open. Current remaining work is
-consolidated in [iOS release checklist](ios-release-checklist.md).
+consolidated in [canonical release checklist](release-checklist.md).
 Native distribution, offline practice, Media, and Storage remain the agreed scope.
 Details below are implementation defaults and remain editable.
 
@@ -94,8 +94,8 @@ Details below are implementation defaults and remain editable.
 - Implemented: iOS-style Media/Storage controls and presentation, including
   segmented tabs, system UI typography, adaptive light/dark surfaces, native
   pickers and fixed-size download controls. Reader layout and queue behavior
-  are unchanged. Current browser and native-package verification is recorded in
-  [the release checklist](ios-release-checklist.md#latest-ui-package-verification);
+  are unchanged. Historical browser and native-package verification is recorded in
+  [historical UI package verification](native-development.md#ui-package-verification);
   this presentation update has not yet been installed for native UI acceptance.
 - Verified in Simulator: native Media entry, a 501,397-byte Beresheet aliyah 5
   download, `1/7` state, measured audio/metadata growth, local `file:` playback with

@@ -1,5 +1,6 @@
 import type { DownloadLibrary } from './download-library.ts'
 import type { RecordingDescriptor } from './recording-download.ts'
+import { createDownloadAnalytics } from '../analytics/observers.ts'
 
 export const DOWNLOAD_OWNER_CONTEXT = Symbol('download-owner')
 type PlaybackUse = (asset: RecordingDescriptor) => boolean
@@ -24,6 +25,7 @@ export function createDownloadOwner() {
       if (destroyed) throw new Error('Download owner was destroyed.')
       if (!library) {
         library = create((asset) => [...playback].some((inUse) => inUse(asset)))
+        cleanups.push(library.subscribe(createDownloadAnalytics()))
         const { view, document, intentKey } = events
         const storage = (event: StorageEvent) => { if (event.key === intentKey || event.key === null) refresh() }
         const visible = () => { if (document.visibilityState === 'visible') refresh() }

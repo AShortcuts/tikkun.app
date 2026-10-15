@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { Capacitor } from '@capacitor/core'
 import type { CalendarSettings } from '../calendar-settings.ts'
 import { LeiningGenerator } from '../calendar-model/generator.ts'
 import createParshaPicker from '../components/ParshaPicker.ts'
 import type { UserSettings } from '../calendar-model/user-settings.ts'
 import { createMount } from '../lifecycle/mount.ts'
 import type { ReaderShell, ReaderShellViewName } from './reader-shell.ts'
+import { APP_BANNER_CONTENT } from '../platform/smart-app-banner.ts'
 import {
   createReaderRoute,
   INITIAL_READER_TITLE,
@@ -134,6 +136,73 @@ async function flushRouteWork() {
   await Promise.resolve()
 }
 
+test('swipe preview leaves the reader visible until committed and closes without changing the reading', async () => {
+  const { route, state, host, ready } = mountRoute()
+  await ready
+  const hash = window.location.hash
+  const canceled = await route.preparePickerSwipe()
+  expect(canceled).not.toBeNull()
+  expect(canceled!.element.inert).toBe(true)
+  expect(state.pickerOpen).toBe(false)
+  canceled!.cancel()
+  expect(route.snapshot().pickerOpen).toBe(false)
+  expect(window.location.hash).toBe(hash)
+
+  const committed = await route.preparePickerSwipe()
+  expect(committed).not.toBeNull()
+  committed!.commit()
+  expect(state.pickerOpen).toBe(true)
+  expect(committed!.element.inert).toBe(false)
+  expect(committed!.element.hasAttribute('aria-hidden')).toBe(false)
+  expect(document.activeElement).toBe(committed!.element)
+  expect(host.openAbout).not.toHaveBeenCalled()
+  route.closePicker()
+  expect(window.location.hash).toBe(hash)
+})
+
+test('native home action opens contents and legacy About hashes stay in the reader', async () => {
+  const native = vi.spyOn(Capacitor, 'isNativePlatform').mockReturnValue(true)
+  try {
+    const { route, state, host, ready } = mountRoute()
+    await ready
+    route.toggleAbout()
+    await vi.waitFor(() => expect(state.pickerOpen).toBe(true))
+    expect(host.openAbout).not.toHaveBeenCalled()
+    route.closePicker()
+    route.navigate('#/about')
+    await vi.waitFor(() => expect(window.location.hash).not.toBe('#/about'))
+    expect(state.view).toBe('reader')
+    expect(host.openAbout).not.toHaveBeenCalled()
+  } finally {
+    native.mockRestore()
+  }
+})
+
+test('shows arrival only after route positioning and does not replay on scroll checkpoints', async () => {
+  const page = document.createElement('section')
+  page.className = 'tikkun-page'
+  page.innerHTML = '<div class="reader-text-side"><div class="line"><span class="word" data-token-key="1:7:0:0">ויאמר</span> <span class="word" data-token-key="1:7:0:1">אלהים</span></div></div>'
+  document.querySelector('[data-target-id="reader-shell"]')!.append(page)
+  let settle!: () => void
+  const rendering = createRendering(page)
+  const host = createHost({
+    ...rendering,
+    ready: Promise.resolve(page.querySelector('.line')),
+    complete: new Promise<void>(resolve => { settle = resolve }),
+  })
+  const { route, ready } = mountRoute({ host })
+  await flushRouteWork()
+  expect(page.querySelector('.reader-arrival-cue')).toBeNull()
+  settle()
+  await ready
+  const cue = page.querySelector('.reader-arrival-cue')
+  expect(cue).not.toBeNull()
+  route.syncScrolledReading('#/torah/parsha/beresheet/1-1-6')
+  expect(page.querySelector('.reader-arrival-cue')).toBe(cue)
+  route.navigate('#/about')
+  await vi.waitFor(() => expect(page.querySelector('.reader-arrival-cue')).toBeNull())
+})
+
 beforeEach(() => {
   installFixture()
   setHash()
@@ -143,7 +212,26 @@ afterEach(() => {
   for (const destroy of mountedRoutes.splice(0)) destroy()
   setHash()
   document.body.replaceChildren()
+  document.head.querySelector('meta[name="apple-itunes-app"]')?.remove()
   vi.restoreAllMocks()
+})
+
+test('app banner follows next, parsha navigation, scroll checkpoints, and return navigation', async () => {
+  const banner = document.createElement('meta')
+  banner.name = 'apple-itunes-app'
+  banner.content = APP_BANNER_CONTENT
+  document.head.append(banner)
+  const { route } = mountRoute()
+  const expected = (hash: string) => `${APP_BANNER_CONTENT}, app-argument=https://tikkunreader.com/reader/${window.location.search}${hash}`
+  expect(banner.content).toBe(expected('#/next'))
+
+  route.navigate('#/torah/parsha/beresheet')
+  await vi.waitFor(() => expect(banner.content).toBe(expected('#/torah/parsha/beresheet')))
+  route.syncScrolledReading('#/torah/parsha/beresheet/1-2-4')
+  expect(banner.content).toBe(expected('#/torah/parsha/beresheet/1-2-4'))
+
+  route.navigate('#/next')
+  await vi.waitFor(() => expect(banner.content).toBe(expected('#/next')))
 })
 
 test('canonicalizes hashless startup before completing the first reader render', async () => {
@@ -162,13 +250,31 @@ test('canonicalizes hashless startup before completing the first reader render',
 
 test.each([
   '#/torah/parsha/beshalach/2-15-1',
-  '#/r/2-15-1',
+  '#/torah/2-15-1',
   '#/torah/page/242',
 ])('resumes a supplied reading on native hashless startup: %s', async (hash) => {
   const { ready, route, host } = mountRoute({ launch: { resumeHash: hash } })
   await ready
   expect(route.snapshot().currentReaderHash).toBe(hash)
   expect(window.location.hash).toBe(hash)
+  expect(host.preparePicker).not.toHaveBeenCalled()
+})
+
+test.each(['explicit', 'resume'])('canonicalizes a legacy %s reference without adding browser history', async (entry) => {
+  const legacy = '#/r/5-33-24'
+  if (entry === 'explicit') setHash(legacy)
+  const historyLength = window.history.length
+  const search = window.location.search
+  const { ready, route, host } = mountRoute(
+    entry === 'resume' ? { launch: { resumeHash: legacy } } : {}
+  )
+
+  await ready
+  expect(window.location.hash).toBe('#/torah/5-33-24')
+  expect(route.snapshot().currentReaderHash).toBe('#/torah/5-33-24')
+  expect(window.history.length).toBe(historyLength)
+  expect(window.location.search).toBe(search)
+  expect(host.renderReader).toHaveBeenCalledOnce()
   expect(host.preparePicker).not.toHaveBeenCalled()
 })
 

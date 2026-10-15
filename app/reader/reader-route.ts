@@ -13,6 +13,10 @@ import {
   type AppRoute,
 } from '../view-model/navigation/url-parser.ts'
 import type { ReaderShell } from './reader-shell.ts'
+import { updateReaderAppBanner } from '../platform/smart-app-banner.ts'
+import { createArrivalCue } from './arrival-cue.ts'
+import { isNativeApp } from '../platform/native.ts'
+import type { ReaderSwipeDestination } from './reader-swipe-back.ts'
 
 export const INITIAL_READER_TITLE = 'תיקון קוראים'
 
@@ -65,8 +69,9 @@ export interface ReaderRoute {
     }
   ): void
   syncScrolledReading(hash: string): boolean
-  toggleAbout(): void
+  toggleAbout(options?: PickerOpenOptions): void
   togglePicker(options?: PickerOpenOptions): void
+  preparePickerSwipe(): Promise<ReaderSwipeDestination | null>
   focusPickerSearch(): boolean
   refreshPickerSearch(): void
   closePicker(): void
@@ -119,6 +124,7 @@ export function createReaderRoute(
   options: ReaderRouteOptions
 ): ReaderRoute {
   const { document, view, shell, host } = options
+  const arrivalCue = createArrivalCue(scope, document, view)
   const optionalView = requiredElement<HTMLElement>(
     document,
     '[data-target-id="about-view"]'
@@ -248,6 +254,7 @@ export function createReaderRoute(
     if (changed) {
       view.history.replaceState(view.history.state, '', nextUrl)
     }
+    updateReaderAppBanner(document, view.location)
 
     currentReaderHash = nextReaderHash
     lastReaderHash = nextReaderHash
@@ -277,7 +284,8 @@ export function createReaderRoute(
 
   const openPicker = (
     returnView: 'not-found' | null = null,
-    { animate = false, focusSearch = !animate }: PickerOpenOptions = {}
+    { animate = false, focusSearch = !animate }: PickerOpenOptions = {},
+    preview = false
   ) => {
     pickerReturnFocus =
       document.activeElement instanceof HTMLElement
@@ -292,14 +300,14 @@ export function createReaderRoute(
     pickerReturnReading = host.captureReadingPosition()
     host.preparePicker()
 
-    void loadPickerModule()
+    return loadPickerModule()
       .then(({ default: createPicker }) => {
         if (
           scope.signal.aborted ||
           requestGeneration !== pickerRequestGeneration ||
           !pickerLoading
         ) {
-          return
+          return null
         }
 
         const nextPicker = createPicker(options.createGenerator(), {
@@ -325,10 +333,16 @@ export function createReaderRoute(
         })
 
         try {
+          if (preview) {
+            nextPicker.node.classList.add('reader-swipe-destination')
+            nextPicker.node.inert = true
+            nextPicker.node.setAttribute('aria-hidden', 'true')
+          }
           readerShell.appendChild(nextPicker.node)
           nextPicker.onMount()
           picker = nextPicker
           pickerLoading = false
+          if (preview) return nextPicker
           if (pickerReturnView === 'not-found') shell.setView('reader')
           shell.setPickerOpen(true)
           host.pickerChanged(true)
@@ -336,12 +350,14 @@ export function createReaderRoute(
           pickerFocusSearchPending = false
           if (shouldFocusSearch) nextPicker.focusSearch()
           else nextPicker.node.focus({ preventScroll: true })
+          return nextPicker
         } catch (error) {
           nextPicker.destroy()
-          if (requestGeneration !== pickerRequestGeneration) return
+          if (requestGeneration !== pickerRequestGeneration) return null
           pickerLoading = false
           restoreViewAfterPickerFailure()
           host.pickerLoadFailed(error)
+          return null
         }
       })
       .catch((error: unknown) => {
@@ -349,12 +365,34 @@ export function createReaderRoute(
           scope.signal.aborted ||
           requestGeneration !== pickerRequestGeneration
         ) {
-          return
+          return null
         }
         pickerLoading = false
         restoreViewAfterPickerFailure()
         host.pickerLoadFailed(error)
+        return null
       })
+  }
+
+  const preparePickerSwipe = async (): Promise<ReaderSwipeDestination | null> => {
+    if (picker || pickerLoading || !shell.isReaderVisible()) return null
+    const preview = await openPicker(null, { focusSearch: false }, true)
+    if (!preview) return null
+    return {
+      element: preview.node,
+      commit: () => {
+        if (picker !== preview) return
+        preview.node.classList.remove('reader-swipe-destination')
+        preview.node.style.removeProperty('transform')
+        preview.node.style.removeProperty('transition')
+        preview.node.inert = false
+        preview.node.removeAttribute('aria-hidden')
+        shell.setPickerOpen(true)
+        host.pickerChanged(true)
+        preview.node.focus({ preventScroll: true })
+      },
+      cancel: () => { if (picker === preview) closePicker() },
+    }
   }
 
   const togglePicker = (pickerOptions: PickerOpenOptions = {}) => {
@@ -407,6 +445,7 @@ export function createReaderRoute(
   }
 
   const leaveReader = () => {
+    arrivalCue.clear()
     activeRendering = null
     host.leaveReader()
     abortOptionalRoute()
@@ -461,6 +500,7 @@ export function createReaderRoute(
     previousReading: LastReading | null
   ) => {
     abortOptionalRoute()
+    arrivalCue.clear()
     setTitle(formatTopBarTitle(route.model.initialTitle))
     shell.setView('reader')
     optionalView.innerHTML = ''
@@ -472,6 +512,7 @@ export function createReaderRoute(
     if (canonicalUrl.href !== view.location.href) {
       view.history.replaceState(null, '', canonicalUrl)
     }
+    updateReaderAppBanner(document, view.location)
 
     const readerRouteChanged =
       currentReaderHash !== null && currentReaderHash !== nextReaderHash
@@ -488,19 +529,23 @@ export function createReaderRoute(
     const isCurrent = () =>
       activeRendering === rendering && rendering.isCurrent()
 
-    const readerReady = rendering.ready.then(() => {
+    const readerReady = rendering.ready.then((line) => {
       if (!isCurrent()) return
       host.readerReady()
       if (previousReading && previousReading.hash !== nextReaderHash) {
         host.showReturnToPreviousReading(previousReading)
       }
+      return line
     })
 
     void Promise.all([readerReady, rendering.complete])
-      .then(() => {
+      .then(([line]) => {
         if (!isCurrent()) return
         if (shouldSaveReading) host.saveReadingPosition()
         revealPageNumber(nextReaderHash, rendering)
+        if (!pageNumberFromPageRouteHash(nextReaderHash) && line instanceof HTMLElement) {
+          arrivalCue.show(line)
+        }
         finishStartup()
       })
       .catch((error) => {
@@ -514,6 +559,10 @@ export function createReaderRoute(
   function renderRoute(route: AppRoute) {
     const previousReading = returnReadingAfterRender
     returnReadingAfterRender = null
+    if (route.view === 'about' && isNativeApp()) {
+      navigate(lastReaderHash)
+      return
+    }
     if (route.view === 'not-found') {
       renderNotFound()
       finishStartup()
@@ -527,8 +576,9 @@ export function createReaderRoute(
     renderReaderRoute(route, previousReading)
   }
 
-  const toggleAbout = () => {
-    host.openAbout()
+  const toggleAbout = (options: PickerOpenOptions = {}) => {
+    if (isNativeApp()) togglePicker({ focusSearch: false, ...options })
+    else host.openAbout()
   }
 
   const snapshot = (): ReaderRouteSnapshot => ({
@@ -591,6 +641,7 @@ export function createReaderRoute(
     syncScrolledReading,
     toggleAbout,
     togglePicker,
+    preparePickerSwipe,
     focusPickerSearch,
     refreshPickerSearch,
     closePicker,

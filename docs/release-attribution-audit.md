@@ -93,6 +93,6 @@ MIT notice, applicable dependency notices/source obligations, font notices and
 text attribution in the shipped app. Keep them readable offline. Review actual
 bundle contents, not only the development dependency tree.
 
-This gate applies alongside the [release checklist](ios-release-checklist.md).
+This gate applies alongside the [canonical release checklist](release-checklist.md).
 No dependency relicensing or publication was performed. Optional text/font
 attribution work is deferred at the owner's request.

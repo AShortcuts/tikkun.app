@@ -67,6 +67,7 @@ function createRunFixture(): LeiningRun {
     leinings: [],
   }
   const leining: LeiningInstance = {
+    kind: 'service',
     date,
     id: LeiningInstanceId.Shacharis,
     isParsha: true,

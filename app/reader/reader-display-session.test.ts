@@ -53,10 +53,13 @@ test('replaces one display generation in the original lifecycle order and ignore
 
   first.resolveScrolled()
   await flushMicrotasks()
+  expect(fixture.effects.displayPositioned).not.toHaveBeenCalled()
   expect(fixture.frame.pendingCount()).toBe(0)
 
   second.resolveScrolled()
   await flushMicrotasks()
+  expect(fixture.effects.displayPositioned).toHaveBeenCalledOnce()
+  expect(fixture.events).not.toContain('root:visibility:')
   expect(fixture.frame.pendingCount()).toBe(1)
   expect(fixture.frame.requestCount()).toBe(1)
   fixture.frame.runNext()
@@ -273,6 +276,7 @@ function createFixture({ search = '' }: { search?: string } = {}) {
     displayCreated: vi.fn((display: ScrollDisplay) =>
       events.push(`effect:display-created:${fakeDisplay(display).id}`),
     ),
+    displayPositioned: vi.fn(),
     displayDeactivating: vi.fn(() =>
       events.push('effect:display-deactivating'),
     ),

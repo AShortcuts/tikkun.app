@@ -9,15 +9,15 @@ import {
   specialLetterCatalog,
 } from './special-letters.ts'
 
-const torahPages = import.meta.glob<LineType[]>(
-  '../text/pages/torah/*.json',
+const scrollPages = import.meta.glob<LineType[]>(
+  '../text/pages/*/*.json',
   {
     eager: true,
     import: 'default',
   }
 )
 
-test('loads seven small letters and both inverted nuns from the catalog', () => {
+test('loads ten small letters and both inverted nuns from the catalog', () => {
   expect(specialLetterCatalog.schemaVersion).toBe(1)
   expect(specialLetterCatalog.tradition).toBe(
     'contemporary-ashkenazi-sephardi'
@@ -40,6 +40,9 @@ test('loads seven small letters and both inverted nuns from the catalog', () => 
     { ref: '4:10:36', word: '׆', letter: '׆', position: 1, form: 'inverted' },
     { ref: '4:25:11', word: 'פינחס', letter: 'י', position: 2, form: 'small' },
     { ref: '5:32:18', word: 'תשי', letter: 'י', position: 3, form: 'small' },
+    { ref: '1:9:7', word: 'פרשנדתא', letter: 'ת', position: 6, form: 'small' },
+    { ref: '1:9:9', word: 'פרמשתא', letter: 'ש', position: 4, form: 'small' },
+    { ref: '1:9:9', word: 'ויזתא', letter: 'ז', position: 3, form: 'small' },
   ])
 })
 
@@ -49,10 +52,11 @@ test('each catalog entry resolves to exactly one word in its canonical verse', (
   )
   let activeVerse: LineType['verses'][number] | undefined
 
-  const orderedPages = Object.entries(torahPages).sort(
-    ([left], [right]) => pageNumber(left) - pageNumber(right)
+  const orderedPages = Object.entries(scrollPages).sort(
+    ([left], [right]) => scrollName(left).localeCompare(scrollName(right)) || pageNumber(left) - pageNumber(right)
   )
-  for (const [, lines] of orderedPages) {
+  for (const [path, lines] of orderedPages) {
+    if (pageNumber(path) === 1) activeVerse = undefined
     for (const line of lines) {
       const lineVerses = activeVerse
         ? [activeVerse, ...line.verses]
@@ -69,7 +73,7 @@ test('each catalog entry resolves to exactly one word in its canonical verse', (
             verse.chapter === entry.verse.chapter &&
             verse.verse === entry.verse.verse
         )
-        if (!verseIsOnLine) continue
+        if (entry.scroll !== scrollName(path) || !verseIsOnLine) continue
 
         const matches = words.filter((word) => word === entry.word.text).length
         matchCounts.set(entry.id, (matchCounts.get(entry.id) ?? 0) + matches)
@@ -94,8 +98,8 @@ test('the line renderer keeps one live marker and one stored alternate', () => {
   const targetWords = new Set(
     specialLetterCatalog.entries.map((entry) => entry.word.text)
   )
-  const orderedPages = Object.entries(torahPages).sort(
-    ([left], [right]) => pageNumber(left) - pageNumber(right)
+  const orderedPages = Object.entries(scrollPages).sort(
+    ([left], [right]) => scrollName(left).localeCompare(scrollName(right)) || pageNumber(left) - pageNumber(right)
   )
 
   for (const [path, lines] of orderedPages) {
@@ -118,6 +122,7 @@ test('the line renderer keeps one live marker and one stored alternate', () => {
       if (containsTargetWord) {
         const html = Line({
           pageNumber: currentPageNumber,
+          scroll: scrollName(path),
           lineIndex,
           text: line.text,
           verses,
@@ -175,3 +180,12 @@ test('does not change the same word outside its cataloged verse', () => {
 
 const pageNumber = (path: string) =>
   Number(/\/(\d+)\.json$/.exec(path)?.[1] ?? Number.NaN)
+
+const scrollName = (path: string) => path.includes('/esther/') ? 'esther' : 'torah'
+
+test('special letters never leak between scrolls sharing numeric references', () => {
+  const torah = createSpecialLetterRenderer([{ b: 1, c: 9, v: 9 }], 'torah')
+  expect(torah('ויזתא')).toBe('ויזתא')
+  const esther = createSpecialLetterRenderer([{ b: 1, c: 9, v: 9 }], 'esther')
+  expect(esther('וַיְזָֽתָא׃')).toContain('>זָֽ</span>')
+})

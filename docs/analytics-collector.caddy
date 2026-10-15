@@ -1,0 +1,32 @@
+# Insert inside the existing :2369 site, alongside its other handle routes.
+# Supply a 64-character hex MELYTICS_RELAY_TOKEN in Caddy's private environment
+# and the same secret in Cloudflare Pages. Never put it in client configuration.
+# Remove Caddy's --environ startup flag before loading the private environment.
+# This is a deployment template, not a complete Caddyfile.
+handle /api/tikkun-echo {
+    @authorized {
+        method POST
+        expression `size('{$MELYTICS_RELAY_TOKEN}') >= 32 && {http.request.header.X-Tikkun-Relay-Token} == '{$MELYTICS_RELAY_TOKEN}'`
+        header_regexp X-Tikkun-Client-IP ^[0-9a-fA-F:.]+$
+    }
+    handle @authorized {
+        request_body {
+            max_size 32KB
+        }
+        rewrite * /api/echo
+        header X-Tikkun-Collector 1
+        header Cache-Control no-store
+        reverse_proxy 192.168.1.181:8910 {
+            header_up CF-Connecting-IP {http.request.header.X-Tikkun-Client-IP}
+            header_up CF-IPCountry {http.request.header.X-Tikkun-Country}
+            header_up -Cookie
+            header_up -Authorization
+            header_up -X-Tikkun-Relay-Token
+            header_up -X-Tikkun-Client-IP
+            header_up -X-Tikkun-Country
+        }
+    }
+    handle {
+        respond 404
+    }
+}

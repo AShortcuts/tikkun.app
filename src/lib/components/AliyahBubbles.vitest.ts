@@ -90,6 +90,6 @@ test('keeps published missing status while disclosing a full local draft as unve
   expect(bubble?.classList.contains('mod-missing')).toBe(true)
   expect(bubble?.classList.contains('mod-cued')).toBe(false)
   expect(bubble?.getAttribute('aria-label')).toContain(
-    'timing not started; local timing draft present, not publicly verified'
+    'Not synced yet; local timing draft present, not publicly verified'
   )
 })

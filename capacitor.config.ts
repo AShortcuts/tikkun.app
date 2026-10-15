@@ -8,6 +8,7 @@ const config: CapacitorConfig = {
   appId: 'com.adamn.tikkunreader',
   appName: 'Tikkun',
   webDir: 'dist-native',
+  zoomEnabled: true,
   server: {
     appStartPath: '/reader/',
   },

@@ -3,8 +3,11 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import {
   applyReaderPreferences,
   colorContrastRatio,
+  customThemeColorUpdates,
+  customThemeInterfaceColors,
   defaultReaderPreferences,
   getDefaultHighlightPreferences,
+  getCustomThemeColors,
   loadReaderPreferences,
   loadReaderPreferencesState,
   mergeReaderPreferences,
@@ -53,6 +56,73 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
+})
+
+test('migrates a legacy custom theme without changing its colors and keeps deleted slots empty', () => {
+  localStorage.setItem('tikkun.reader-preferences', JSON.stringify({
+    themeMode: 'custom', customBackgroundColor: '#112233', customTextColor: '#abcdef',
+  }))
+  const preferences = loadReaderPreferences()
+  expect(getCustomThemeColors(preferences)).toEqual({ background: '#112233', text: '#abcdef' })
+  expect(preferences.savedThemes).toHaveLength(1)
+  expect(preferences.activeSavedThemeId).toBeNull()
+  saveReaderPreferences({ ...preferences, savedThemes: [] })
+  expect(loadReaderPreferences().savedThemes).toEqual([])
+})
+
+test('saved themes edit independently, restore their selection, and apply the selected colors', () => {
+  const preferences = mergeReaderPreferences(defaultReaderPreferences, {
+    themeMode: 'custom', activeSavedThemeId: 'one',
+    savedThemes: [
+      { id: 'one', background: '#eeeeee', text: '#000000' },
+      { id: 'two', background: '#ffffff', text: '#112233' },
+    ],
+  })
+  const updated = mergeReaderPreferences(preferences, customThemeColorUpdates(preferences, {
+    background: '#112233', text: '#f4f1e8',
+  }))
+  expect(updated.customBackgroundColor).toBe(defaultReaderPreferences.customBackgroundColor)
+  expect(updated.savedThemes[1]).toEqual(preferences.savedThemes[1])
+  expect(preferences.savedThemes[0].background).toBe('#eeeeee')
+  saveReaderPreferences(updated)
+  const restored = loadReaderPreferences()
+  expect(restored.activeSavedThemeId).toBe('one')
+  applyReaderPreferences(restored)
+  expect(styleProperties.get('--reader-custom-background-color')).toBe('#112233')
+  expect(styleProperties.get('--reader-custom-text-color')).toBe('#f4f1e8')
+  expect(document.documentElement.style.colorScheme).toBe('dark')
+  const deleted = mergeReaderPreferences(restored, { savedThemes: restored.savedThemes.slice(1) })
+  expect(deleted.activeSavedThemeId).toBeNull()
+  expect(getCustomThemeColors(deleted).background).toBe(defaultReaderPreferences.customBackgroundColor)
+})
+
+test('restores at most five valid unique themes and rejects stale selection', () => {
+  localStorage.setItem('tikkun.reader-preferences', JSON.stringify({
+    activeSavedThemeId: 'invalid',
+    savedThemes: [
+      null, { id: 'invalid', background: 'red', text: '#000000' },
+      { id: 'one', background: '#eeeeee', text: '#000000' },
+      { id: 'one', background: '#eeeeee', text: '#000000' },
+      ...Array.from({ length: 6 }, (_, index) => ({ id: `theme-${index}`, background: '#ffffff', text: '#000000' })),
+    ],
+  }))
+  const preferences = loadReaderPreferences()
+  expect(preferences.savedThemes).toHaveLength(5)
+  expect(new Set(preferences.savedThemes.map((theme) => theme.id)).size).toBe(5)
+  expect(preferences.activeSavedThemeId).toBeNull()
+})
+
+test('normalizes and persists Reading font size for existing and new preferences', () => {
+  expect(loadReaderPreferences().readingFontScale).toBe(1)
+  for (const [value, expected] of [[0.2, 0.8], [4, 1.5], [NaN, 1], [Infinity, 1], [1.25, 1.25]]) {
+    const preferences = mergeReaderPreferences(defaultReaderPreferences, { readingFontScale: value })
+    expect(preferences.readingFontScale).toBe(expected)
+  }
+  saveReaderPreferences({ ...defaultReaderPreferences, readingFontScale: 1.25 })
+  const restored = loadReaderPreferences()
+  expect(restored.readingFontScale).toBe(1.25)
+  applyReaderPreferences(restored)
+  expect(styleProperties.get('--reading-font-scale')).toBe('1.25')
 })
 
 test('defaults a new compact reader to Reading without changing the desktop default', () => {
@@ -193,6 +263,18 @@ test('loads and applies a custom page and text color', () => {
   applyReaderPreferences({ ...preferences, themeMode: 'light' })
   expect(document.documentElement.dataset.readerCustomScheme).toBe('')
 })
+
+test.each(['#eee6d6', '#112233', '#000000', '#ffffff', '#757575', '#777777', '#999999', '#cc2244', '#00ff00', '#6600cc'])(
+  'keeps interface labels legible on custom background %s', (background) => {
+    const colors = customThemeInterfaceColors(background)
+    expect(colorContrastRatio(background, colors.text)).toBeGreaterThanOrEqual(4.5)
+    expect(colorContrastRatio(background, colors.secondary)).toBeGreaterThanOrEqual(4.5)
+    applyReaderPreferences({ ...defaultReaderPreferences, themeMode: 'custom', customBackgroundColor: background })
+    expect(styleProperties.get('--reader-custom-ui-text-color')).toBe(colors.text)
+    expect(styleProperties.get('--reader-custom-ui-secondary-color')).toBe(colors.secondary)
+    expect(document.documentElement.style.colorScheme).toBe(colors.scheme)
+  }
+)
 
 test('keeps custom contrast advisory and recommends the clearer text color', () => {
   expect(colorContrastRatio('#777777', '#888888')).toBeLessThan(4.5)

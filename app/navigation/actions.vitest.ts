@@ -154,8 +154,8 @@ test('creates exact aliyah navigation actions for seventh aliyah and Maftir', ()
   maftirByLetter?.run()
 
   expect(navigated).toEqual([
-    '#/torah/parsha/noach/1-5-1',
-    '#/torah/parsha/noach/1-6-1',
+    '#/run/2026-10-17:shacharis,main/1-5-1',
+    '#/run/2026-10-17:shacharis,main/1-6-1',
   ])
 })
 
@@ -229,6 +229,7 @@ function createRunFixture(): LeiningRun {
     leinings: [],
   }
   const leining: LeiningInstance = {
+    kind: 'service',
     date,
     id: LeiningInstanceId.Shacharis,
     isParsha: true,
@@ -257,6 +258,7 @@ function createTishahBavRunFixture(): LeiningRun {
     leinings: [],
   }
   const leining: LeiningInstance = {
+    kind: 'service',
     date,
     id: LeiningInstanceId.Shacharis,
     isParsha: false,

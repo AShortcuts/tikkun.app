@@ -30,6 +30,27 @@ beforeEach(async () => {
 
 afterEach(() => fixture.remove())
 
+test('bookmark filling preserves its outline, dimensions, and settled scale', async () => {
+  await page.viewport(390, 844)
+  fixture.innerHTML = `<header class="app-toolbar"><button class="toolbar-button mod-icon-label"
+    data-target-id="bookmark-current" aria-pressed="false">${iconMarkup('bookmark')}</button></header>`
+  const button = required<HTMLElement>('[data-target-id="bookmark-current"]')
+  const initialPath = required<SVGPathElement>('path')
+  const initialStroke = getComputedStyle(initialPath).stroke
+  const initialWidth = getComputedStyle(initialPath).strokeWidth
+  const initialRect = required('svg').getBoundingClientRect()
+  button.innerHTML = iconMarkup('bookmarkFilled')
+  button.setAttribute('aria-pressed', 'true')
+  await transitionSettled()
+  const path = required<SVGPathElement>('path')
+  expect(getComputedStyle(path).stroke).toBe(initialStroke)
+  expect(getComputedStyle(path).strokeWidth).toBe(initialWidth)
+  expect(getComputedStyle(path).fill).toBe(initialStroke)
+  expect(required('svg').getBoundingClientRect().width).toBe(initialRect.width)
+  expect(required('svg').getBoundingClientRect().height).toBe(initialRect.height)
+  expect(getComputedStyle(button).transform).toBe('none')
+})
+
 test.each([389, 1280])('switches playback colors with the icon on the first frame at %ipx', async (width) => {
   await page.viewport(width, 900)
   fixture.insertAdjacentHTML('beforeend', `

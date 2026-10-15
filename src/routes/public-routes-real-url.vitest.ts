@@ -27,7 +27,7 @@ test('preserves the old homepage and its navigation at old-v2.html', async () =>
   const route = await loadRoute(
     '/old-v2.html',
     '#home-title',
-    'Tikkun Korim — Torah reading practice in sync'
+    'Tikkun Reader — Torah reading practice in sync'
   )
   errorCapture = captureRouteErrors(route.view, 'Home')
 
@@ -57,7 +57,7 @@ test('loads the real Readings route and filters published coverage', async () =>
   const route = await loadRoute(
     '/readings/',
     '#readings-title',
-    'Readings & coverage — Tikkun Korim'
+    'Readings & coverage — Tikkun Reader'
   )
   errorCapture = captureRouteErrors(route.view, 'Readings')
 
@@ -91,7 +91,7 @@ test('loads the real Tidbits route with its honest empty state', async () => {
   const route = await loadRoute(
     '/tidbits/',
     '#tidbits-title',
-    'Tidbits — Tikkun Korim'
+    'Tidbits — Tikkun Reader'
   )
   errorCapture = captureRouteErrors(route.view, 'Tidbits')
 
@@ -102,7 +102,7 @@ test('loads the real Tidbits route with its honest empty state', async () => {
 })
 
 test.each(['about-link', 'mobile-library'])('opens Home from Reader %s and returns through Reading Index without reloading', async (control) => {
-  const route = await loadRoute('/reader/#/torah/parsha/noach', '[data-reader-boot-state="ready"]', 'Reader — Tikkun Korim')
+  const route = await loadRoute('/reader/#/torah/parsha/noach', '[data-reader-boot-state="ready"]', 'Reader — Tikkun Reader')
   errorCapture = captureRouteErrors(route.view, 'Reader navigation')
   const timeOrigin = route.view.performance.timeOrigin
   const readerStyle = () => {
@@ -138,7 +138,7 @@ test('loads the real About route with support and project status', async () => {
   const route = await loadRoute(
     '/about/',
     '#about-title',
-    'About — Tikkun Korim'
+    'About — Tikkun Reader'
   )
   errorCapture = captureRouteErrors(route.view, 'About')
 

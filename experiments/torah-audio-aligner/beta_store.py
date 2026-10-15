@@ -16,7 +16,7 @@ import wave
 import numpy as np
 
 from aligner import (HERE, REPO, WORK, file_hash, input_for_result, load_json,
-                     recording_for, verify_sources, work_path, write_json)
+                     recording_for, work_path, write_json)
 from core import AlignmentError, digest_json, reviewed_draft, validate_result
 
 
@@ -231,8 +231,13 @@ class BetaStore:
 
     def detail(self, identifier):
         entry = self.get(identifier)
+        return {"id": identifier, "recording": {key: value for key, value in entry["recording"].items() if key != "mediaPath"},
+                "proposal": entry["proposal"], **self.saved(identifier)}
+
+    def verify_waveform(self, identifier):
+        entry = self.get(identifier)
         if identifier not in self.verified:
-            verify_sources(entry["bundle"], entry["recording"])
+            # Completed results use their saved words and timings, not today's compiler.
             seed = load_json(entry["seedPath"])
             expected = seed["acoustics"].get("analysisWaveSha256")
             if expected and file_hash(entry["wavePath"]) != expected:
@@ -241,13 +246,11 @@ class BetaStore:
                 from diagnostics import verified_samples
                 verified_samples(entry["seedPath"].parent, seed["acoustics"], entry["recording"])
             self.verified.add(identifier)
-        return {"id": identifier, "recording": {key: value for key, value in entry["recording"].items() if key != "mediaPath"},
-                "proposal": entry["proposal"], **self.saved(identifier)}
 
     def waveform(self, identifier):
         if identifier in self.peaks:
             return self.peaks[identifier]
-        self.detail(identifier)
+        self.verify_waveform(identifier)
         with wave.open(str(self.get(identifier)["wavePath"]), "rb") as source:
             if source.getnchannels() != 1 or source.getsampwidth() != 2 or source.getframerate() != 16000:
                 raise AlignmentError("Expected mono 16 kHz analysis audio.")

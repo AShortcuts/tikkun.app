@@ -46,6 +46,8 @@ const canonicalParshaIdentities = new Map([
   ['beresheet', { slug: 'beresheet', name: 'Beresheet' }],
   ['vayetze', { slug: 'vayetzei', name: 'Vayetzei' }],
   ['vayetzei', { slug: 'vayetzei', name: 'Vayetzei' }],
+  ['vezot-haberacha', { slug: 'vezot-haberacha', name: 'Vezot Haberacha' }],
+  ['vezos-haberacha', { slug: 'vezot-haberacha', name: 'Vezot Haberacha' }],
 ])
 
 export const slugify = (value) =>

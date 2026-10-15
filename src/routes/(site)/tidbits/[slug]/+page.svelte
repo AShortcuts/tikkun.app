@@ -6,7 +6,7 @@
 </script>
 
 <svelte:head>
-  <title>{data.tidbit.title} — Tikkun Korim</title>
+  <title>{data.tidbit.title} — Tikkun Reader</title>
   <meta name="description" content={data.tidbit.summary} />
 </svelte:head>
 

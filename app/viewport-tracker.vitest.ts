@@ -12,10 +12,11 @@ import {
 } from 'vitest'
 import { LeiningGenerator } from './calendar-model/generator'
 import { UserSettings } from './calendar-model/user-settings'
-import { ScrollViewModel } from './view-model/scroll-view-model'
+import { ScrollViewModel, type RenderedLineInfo } from './view-model/scroll-view-model'
 import { ScrollDisplay } from './components/ScrollDisplay'
 import { ViewportTracker } from './viewport-tracker'
 import { renderLine } from './view-model/test-utils'
+import { getReaderFocalPointClientY } from './reader-scroll'
 
 const testSettings: UserSettings = {
   ashkenazi: true,
@@ -85,7 +86,7 @@ test('reports the initial viewport', async () => {
   expect(lastReportedRange).toEqual({
     first: ': בָּהָ֔ר אַרְבָּעִ֣ים י֔וֹם וְאַרְבָּעִ֖ים לָֽיְלָה׃#(פ)',
     center:
-      ': וְיִקְחוּ־לִ֖י תְּרוּמָ֑ה מֵאֵ֤ת כׇּל־אִישׁ֙ אֲשֶׁ֣ר יִדְּבֶ֣נּוּ לִבּ֔וֹ',
+      'תרומה: וַיְדַבֵּ֥ר יְהֹוָ֖ה אֶל־מֹשֶׁ֥ה לֵּאמֹֽר׃ דַּבֵּר֙ אֶל־בְּנֵ֣י יִשְׂרָאֵ֔ל',
     last:
       ': תִּקְח֖וּ אֶת־תְּרוּמָתִֽי׃ וְזֹאת֙ הַתְּרוּמָ֔ה אֲשֶׁ֥ר תִּקְח֖וּ מֵאִתָּ֑ם',
   })
@@ -113,7 +114,7 @@ test('uses the configured focal center when the book is offset from the viewport
   await renderRun('2025-03-01:shacharis,main')
 
   expect(lastReportedRange.center).toBe(
-    ': וְיִקְחוּ־לִ֖י תְּרוּמָ֑ה מֵאֵ֤ת כׇּל־אִישׁ֙ אֲשֶׁ֣ר יִדְּבֶ֣נּוּ לִבּ֔וֹ'
+    'תרומה: וַיְדַבֵּ֥ר יְהֹוָ֖ה אֶל־מֹשֶׁ֥ה לֵּאמֹֽר׃ דַּבֵּר֙ אֶל־בְּנֵ֣י יִשְׂרָאֵ֔ל'
   )
 })
 
@@ -150,7 +151,7 @@ test('finds the focal line immediately when a hidden initial display is revealed
   tracker!.refresh()
 
   expect(lastReportedRange.center).toBe(
-    ': וְיִקְחוּ־לִ֖י תְּרוּמָ֑ה מֵאֵ֤ת כׇּל־אִישׁ֙ אֲשֶׁ֣ר יִדְּבֶ֣נּוּ לִבּ֔וֹ'
+    'תרומה: וַיְדַבֵּ֥ר יְהֹוָ֖ה אֶל־מֹשֶׁ֥ה לֵּאמֹֽר׃ דַּבֵּר֙ אֶל־בְּנֵ֣י יִשְׂרָאֵ֔ל'
   )
 })
 
@@ -187,10 +188,109 @@ test('only reports fully-visible lines', async () => {
   expect(lastReportedRange).toEqual({
     first: ': בָּהָ֔ר אַרְבָּעִ֣ים י֔וֹם וְאַרְבָּעִ֖ים לָֽיְלָה׃#(פ)',
     center:
-      ': וְיִקְחוּ־לִ֖י תְּרוּמָ֑ה מֵאֵ֤ת כׇּל־אִישׁ֙ אֲשֶׁ֣ר יִדְּבֶ֣נּוּ לִבּ֔וֹ',
+      'תרומה: וַיְדַבֵּ֥ר יְהֹוָ֖ה אֶל־מֹשֶׁ֥ה לֵּאמֹֽר׃ דַּבֵּר֙ אֶל־בְּנֵ֣י יִשְׂרָאֵ֔ל',
     last: ': וְיִקְחוּ־לִ֖י תְּרוּמָ֑ה מֵאֵ֤ת כׇּל־אִישׁ֙ אֲשֶׁ֣ר יִדְּבֶ֣נּוּ לִבּ֔וֹ',
   })
 })
+
+test('keeps the same focal row on repeated updates inside a page gap', async () => {
+  const { before, after, gapStart, gapEnd, center } = await renderPageGap()
+
+  for (const [position, expected] of [
+    [gapEnd + 20, after],
+    [gapEnd - 60, after],
+    [gapStart - 20, before],
+    [gapStart + 60, before],
+  ] as const) {
+    root.scrollTop = position
+    for (let update = 0; update < 6; update += 1) {
+      await scrollRootBy(0)
+      expect(center()).toBe(expected)
+    }
+    tracker!.refresh()
+    expect(center()).toBe(expected)
+  }
+})
+
+test('crosses a page gap once in either direction with a consistent midpoint', async () => {
+  const { before, after, gapStart, gapEnd, center } = await renderPageGap()
+  const midpoint = (gapStart + gapEnd) / 2
+
+  for (const direction of [1, -1]) {
+    const start = direction === 1 ? gapStart - 20 : gapEnd + 20
+    const end = direction === 1 ? gapEnd + 20 : gapStart - 20
+    for (let position = start; direction * position <= direction * end; position += direction * 4) {
+      root.scrollTop = position
+      await scrollRootBy(0)
+      expect(center()).toBe(position < midpoint ? before : after)
+    }
+    root.scrollTop = midpoint
+    await scrollRootBy(0)
+    expect(center()).toBe(after)
+  }
+})
+
+test('uses the later source line when Reading rows overlap at the focal point', async () => {
+  const { after, gapStart, gapEnd, center } = await renderPageGap(-40)
+  for (const start of [gapEnd - 20, gapStart + 20]) {
+    root.scrollTop = start
+    await scrollRootBy(0)
+    root.scrollTop = (gapStart + gapEnd) / 2
+    for (let update = 0; update < 3; update += 1) {
+      await scrollRootBy(0)
+      expect(center()).toBe(after)
+    }
+    tracker!.refresh()
+    expect(center()).toBe(after)
+  }
+})
+
+async function renderPageGap(gap = 300) {
+  await page.viewport(800, 600)
+  root.style.cssText = 'position:fixed;inset:0;height:400px;padding:0;overflow:auto'
+  const run = generator.parseId('2024-10-25:shacharis,main')
+  if (!run) throw new Error('Simchat Torah run not found')
+  const lines: RenderedLineInfo[] = [2, 3].map((index) => ({
+    text: [[`row ${index + 1}`]],
+    verses: [run.aliyot[index].start],
+    focalRef: run.aliyot[index].start,
+    isPetucha: false,
+    labels: [],
+    aliyahStarts: [],
+    run,
+    aliyot: [run.aliyot[index]],
+  }))
+  const spacer = document.createElement('div')
+  spacer.style.height = '800px'
+  root.append(spacer)
+  const rows = lines.map((line, index) => {
+    const pageNode = document.createElement('div')
+    pageNode.className = 'tikkun-page'
+    pageNode.style.cssText = `margin:${index ? gap : 0}px 0 0;padding:0;border:0;min-height:0`
+    pageNode.tikkunPage = {
+      type: 'page', contentIndex: index, pageNumber: 244 + index, lines: [line],
+    }
+    const row = document.createElement('div')
+    row.dataset.class = 'line'
+    row.dataset.lineIndex = '0'
+    row.style.height = `${index ? 160 : 80}px`
+    row.textContent = line.text[0][0]
+    pageNode.append(row)
+    root.append(pageNode)
+    return row
+  })
+  root.append(spacer.cloneNode())
+  let current: RenderedLineInfo | null = null
+  tracker!.on('viewport-updated', (range) => { current = range.center })
+  const focal = getReaderFocalPointClientY(root)
+  return {
+    before: lines[0],
+    after: lines[1],
+    gapStart: rows[0].getBoundingClientRect().bottom - focal,
+    gapEnd: rows[1].getBoundingClientRect().top - focal,
+    center: () => current,
+  }
+}
 
 async function scrollRootBy(deltaY: number) {
   root.scrollBy(0, deltaY)

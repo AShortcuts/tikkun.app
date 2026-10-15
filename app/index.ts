@@ -4,6 +4,7 @@ import type { DownloadOwner } from './offline/download-owner.ts'
 import {
   startReaderRuntime,
   type ReaderRuntime,
+  type ReaderRuntimeOptions,
 } from './reader/reader-runtime.ts'
 
 let runtime: ReaderRuntime | null = null
@@ -11,6 +12,7 @@ let runtime: ReaderRuntime | null = null
 export interface ReaderAppOptions {
   downloadOwner?: DownloadOwner
   openAbout?: () => Promise<void>
+  onStartupProgress?: ReaderRuntimeOptions['onStartupProgress']
 }
 
 export function startApp(options: ReaderAppOptions = {}) {

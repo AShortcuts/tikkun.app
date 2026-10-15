@@ -1,6 +1,7 @@
 """Durable serial work queue. Restarting never silently resumes acoustic work."""
 
 from copy import deepcopy
+from datetime import datetime
 import fcntl
 import subprocess
 import threading
@@ -48,11 +49,30 @@ class BatchQueue:
                 item.update(status="interrupted", error="The service stopped during this recording. Retry when ready.")
             if item["status"] == "ready" and item["resultId"] not in store.entries:
                 item.update(status="failed", error="Saved result is missing. Preserve the queue and retry this recording.")
+        for path in (store.root / "generated").glob("*.json"):
+            registration = load_json(path)
+            if registration["id"] in store.entries and registration.get("createdAt"):
+                self.resolve_failures(registration["id"], registration["createdAt"])
         self.state["paused"] = True
         self.persist()
 
     def persist(self):
         write_json(self.path, self.state, replace=True)
+
+    def resolve_failures(self, result_id, completed_at):
+        entry = self.store.get(result_id)
+        recording = entry["recording"]
+        if entry["bundle"]["textPagesSha256"] != self.library.text_hash:
+            return
+        completed = datetime.fromisoformat(completed_at)
+        for item in self.state["items"]:
+            if (item["status"] not in {"failed", "interrupted"}
+                    or item["mediaIdentity"] != recording["mediaIdentity"]
+                    or completed <= datetime.fromisoformat(item.get("finishedAt") or item["createdAt"])):
+                continue
+            source = self.library.sources.get(item["sourceId"])
+            if source and (source["readingId"], source["aliyah"]) == (recording["readingId"], recording["aliyah"]):
+                item["resolvedBy"] = result_id
 
     def reusable(self, selection):
         matches = []
@@ -111,12 +131,41 @@ class BatchQueue:
         with self.lock:
             result = deepcopy(self.state)
         result.pop("requests", None)
+        result["clearDownloadsSupported"] = True
         result["remainingTestingSeconds"] = max(0, self.budget(0))
         result["running"] = any(item["status"] == "running" for item in result["items"])
         for item in result["items"]:
+            if item.get("resolvedBy") in self.store.entries:
+                item.update(status="resolved", phase="Resolved by a later alignment", error=None,
+                            resultId=item["resolvedBy"])
             if item["status"] == "ready":
                 item["review"] = review_status(self.store, item["resultId"])
         return result
+
+    def clear_downloads(self, item_ids):
+        if (not isinstance(item_ids, list) or not 1 <= len(item_ids) <= 2000
+                or any(not isinstance(value, str) or not value for value in item_ids)
+                or len(set(item_ids)) != len(item_ids)):
+            raise AlignmentError("Choose completed queue entries to clear.")
+        with self.lock:
+            selected = set(item_ids)
+            removed = [item for item in self.state["items"] if item["id"] in selected]
+            if any(item["status"] != "ready" for item in removed):
+                raise RevisionConflict("Only completed downloads can be cleared. Refresh the queue and try again.")
+            if not removed:
+                return 0
+            remaining = [item for item in self.state["items"] if item["id"] not in selected]
+            retained_ids = {item["id"] for item in remaining}
+            requests = {}
+            for identifier, request in self.state["requests"].items():
+                retained = [item_id for item_id in request["itemIds"] if item_id in retained_ids]
+                if retained:
+                    requests[identifier] = {**request, "itemIds": retained}
+            updated = {**self.state, "items": remaining, "requests": requests}
+            # Keep live worker rows and saved results intact; publish only after the queue is saved.
+            write_json(self.path, updated, replace=True)
+            self.state = updated
+            return len(removed)
 
     def control(self, action, item_id=None, minutes=10):
         with self.lock:
@@ -184,6 +233,7 @@ class BatchQueue:
                 with self.lock:
                     item.update(status="ready", resultId=result_id, phase="Ready to review", finishedAt=now(),
                                 elapsedSeconds=round(time.monotonic() - started, 2))
+                    self.resolve_failures(result_id, item["finishedAt"])
             except (AlignmentError, OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
                 traceback.print_exc()
                 with self.lock:

@@ -2,6 +2,7 @@ import type { LineType } from '../components/Page.ts'
 import { activeContent } from '../updates/content-runtime.ts'
 import type { Ref, RefWithScroll, ScrollName } from '../ref.ts'
 import { LeiningGenerator } from '../calendar-model/generator.ts'
+import { canonicalParshaReadings, resolveReadingRun } from './navigation/parsha-routes.ts'
 import type {
   LeiningAliyah,
   LeiningRun,
@@ -9,6 +10,7 @@ import type {
 import {
   LeiningInstanceId,
   LeiningRunType,
+  readingTitle,
 } from '../calendar-model/model-types.ts'
 import { HDate } from '@hebcal/hdate'
 import { compareRefs, containsRef } from '../calendar-model/ref-utils.ts'
@@ -19,6 +21,7 @@ import {
   toISODateString,
 } from '../calendar-model/utils.ts'
 import { AliyahLabeller } from './aliyah-labeller.ts'
+import { verseEndLocation } from '../reading/verse-end-location.ts'
 import {
   hasScrollData,
   loadScroll,
@@ -120,6 +123,7 @@ export type ScrollContentSource =
  * Most of these properties come from the JSON files in pages/.
  */
 export interface RenderedLineInfo {
+  scroll?: ScrollName
   /**
    * Whitespace-separated spans of text.
    * The outer array has one entry per span in a שירה.
@@ -196,7 +200,7 @@ export abstract class ScrollViewModel {
   }
 
   displayTitleForRun(run: LeiningRun) {
-    return this.displayTitleByRunId[run.id] ?? run.leining.date.title.he
+    return this.displayTitleByRunId[run.id] ?? readingTitle(run.leining).he
   }
   private async loadAndConsumeScroll(
     initialRef: StartLocation,
@@ -233,7 +237,16 @@ export abstract class ScrollViewModel {
     initialRef?: StartLocation,
     options: { displayTitle?: string } = {}
   ): ScrollViewModel | null {
-    const run = generator.parseId(runId)
+    const run = resolveReadingRun(generator, runId)
+    return run ? ScrollViewModel.forRun(generator, run, initialRef, options) : null
+  }
+
+  static forRun(
+    generator: LeiningGenerator,
+    run: LeiningRun,
+    initialRef?: StartLocation,
+    options: { displayTitle?: string } = {}
+  ): ScrollViewModel | null {
     if (!run || !hasScrollData(run.scroll)) return null
     const displayTitleByRunId = options.displayTitle
       ? { [run.id]: options.displayTitle }
@@ -242,7 +255,7 @@ export abstract class ScrollViewModel {
     if (run.type === LeiningRunType.Megillah)
       return new FullScrollViewModel(generator, run, initialRef, displayTitleByRunId)
     // For the פרשה itself, render all of חומש.
-    if (run.leining.isParsha && run.type === LeiningRunType.Main)
+    if (run.leining.kind === 'parsha')
       return new FullScrollViewModel(generator, run, initialRef, displayTitleByRunId)
     // For any part of יום טוב, special מפטיר, or הפתרה, only render relevant parts.
     return new HolidayViewModel(generator, run, initialRef, displayTitleByRunId)
@@ -279,7 +292,7 @@ export abstract class ScrollViewModel {
 
     let allRuns
     if (ref.scroll === 'torah') {
-      allRuns = getParshaRuns(generator, new Date())
+      allRuns = getParshaRuns()
     } else {
       allRuns = generator
         .forEntireChumash(new HDate(new Date()))
@@ -290,7 +303,7 @@ export abstract class ScrollViewModel {
       allRuns.find((r) => r.scroll === ref.scroll && containsRef(r, ref)) ??
       allRuns[0]
 
-    return ScrollViewModel.forId(generator, run.id, ref)
+    return ScrollViewModel.forRun(generator, run, ref)
   }
 
   async fetchPreviousPage(): Promise<RenderedEntry | null> {
@@ -391,6 +404,7 @@ export abstract class ScrollViewModel {
 
       return {
         ...rawLine,
+        scroll: this.relevantRuns[0].scroll,
         verses,
         focalRef,
         run,
@@ -469,23 +483,25 @@ class FullScrollViewModel extends ScrollViewModel {
   }
 
   private static calculateRuns(
-    generator: LeiningGenerator,
+    _generator: LeiningGenerator,
     run: LeiningRun
   ): LeiningRun[] {
     // When used for a מגילה, just include this run.
     if (run.scroll !== 'torah') return [run]
-    return getParshaRuns(generator, run.leining.date.date)
+    const runs = getParshaRuns()
+    // A combined parsha replaces its constituent readings only in this view.
+    const first = runs.findIndex(candidate => containsRef(run, candidate.aliyot[0].start))
+    if (first >= 0) {
+      const count = runs.filter(candidate => containsRef(run, candidate.aliyot[0].start)).length
+      runs.splice(first, count, run)
+    }
+    return runs
   }
 }
 
 /** Gets all LeiningRuns that should appear in the חומש-only view. */
-function getParshaRuns(generator: LeiningGenerator, hdate: Date) {
-  // Ignore separate מפטיר runs so that we don't label them as מפטיר out of context.
-  return generator
-    .forEntireChumash(new HDate(hdate))
-    .flatMap((d) => d.leinings)
-    .filter((i) => i.isParsha || i.runs.some(isVezosHabracha))
-    .map((i) => i.runs[0])
+function getParshaRuns() {
+  return canonicalParshaReadings().map(reading => reading.runs[0])
 }
 
 export function isVezosHabracha(r: LeiningRun): boolean {
@@ -520,9 +536,16 @@ class HolidayViewModel extends ScrollViewModel {
   private async fetchPages(): Promise<ScrollContentSource[]> {
     let lastEndPage = 0
     const resolver = await this.resolver
-    return this.relevantRuns.flatMap((r) => {
+    const pageCache = new Map<number, Promise<LineType[]>>()
+    const loadPage = (page: number) => {
+      if (!pageCache.has(page)) pageCache.set(page, this.loadPageLines(page))
+      return pageCache.get(page)!
+    }
+    const endings = await Promise.all(this.relevantRuns.map(run =>
+      verseEndLocation(last(run.aliyot).end, resolver, loadPage)))
+    return this.relevantRuns.flatMap((r, index) => {
       const start = resolver.physicalLocationFromRef(r.aliyot[0].start)
-      const end = resolver.physicalLocationFromRef(last(r.aliyot).end)
+      const end = endings[index]
 
       const extraEntries: ScrollContentSource[] = []
       if (lastEndPage) {

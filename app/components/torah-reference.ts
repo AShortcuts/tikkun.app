@@ -30,5 +30,5 @@ export function generateTorahReferenceHash({
   chapter: number
   verse: number
 }) {
-  return `#/r/${book}-${chapter}-${verse}`
+  return `#/torah/${book}-${chapter}-${verse}`
 }

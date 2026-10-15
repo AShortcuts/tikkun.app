@@ -42,8 +42,8 @@ test(`ראש חודש חנוכה`, async () => {
   expect(await dumpAliyot('2024-12-31:shacharis,main')).toMatchSnapshot()
 })
 
-test(`שקלים / ראש חודש as פרשה`, async () => {
-  // Fetch the main run so that we get a FullScrollViewModel
+test(`שקלים / ראש חודש from the main service reading`, async () => {
+  // A dated main reading includes the other Torah scrolls in that service.
   expect(await dumpAliyot('2025-03-01:shacharis,main')).toMatchSnapshot()
 })
 

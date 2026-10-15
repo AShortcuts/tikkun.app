@@ -67,7 +67,7 @@
 </script>
 
 <svelte:head>
-  <title>Admin settings — Tikkun Korim</title>
+  <title>Admin settings — Tikkun Reader</title>
   <meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 

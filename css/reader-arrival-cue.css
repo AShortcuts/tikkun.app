@@ -1,0 +1,53 @@
+.tikkun-page.mod-arrival-cue {
+  position: relative;
+  isolation: isolate;
+}
+
+.reader-arrival-cue {
+  --arrival-fill: color-mix(in srgb, var(--text-color) 9%, transparent);
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  user-select: none;
+  animation: reader-arrival-fade 1600ms ease-out both;
+}
+
+.reader-arrival-cue > span {
+  position: absolute;
+  border-radius: 3px;
+  background: var(--arrival-fill);
+}
+
+html[data-reader-theme='sepia'] .reader-arrival-cue {
+  --arrival-fill: color-mix(in srgb, #286c8a 14%, transparent);
+}
+
+html[data-reader-theme='dark'] .reader-arrival-cue,
+html[data-reader-theme='custom'][data-reader-custom-scheme='dark'] .reader-arrival-cue {
+  --arrival-fill: color-mix(in srgb, #91bfd7 14%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  html[data-reader-theme='automatic'] .reader-arrival-cue {
+    --arrival-fill: color-mix(in srgb, #91bfd7 14%, transparent);
+  }
+}
+
+@keyframes reader-arrival-fade {
+  0% { opacity: 0; }
+  12.5%, 50% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+html[data-reader-reduced-motion='on'] .reader-arrival-cue {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-reader-reduced-motion='off']) .reader-arrival-cue { animation: none; }
+}
+
+@media print {
+  .reader-arrival-cue { display: none; }
+}

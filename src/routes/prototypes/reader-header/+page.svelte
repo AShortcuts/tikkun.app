@@ -44,7 +44,7 @@
 </script>
 
 <svelte:head>
-  <title>Reader header styles — Tikkun Korim</title>
+  <title>Reader header styles — Tikkun Reader</title>
   <meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 

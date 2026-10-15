@@ -4,7 +4,7 @@ import { publicReadingUrl, shareReadingLink } from './share-reading.ts'
 const hash = '#/torah/parsha/beresheet/1-4-19'
 const url = `https://tikkunreader.com/reader/${hash}`
 
-test.each([hash, '#/torah/page/12', '#/esther/megillah-esther/6-1-1', '#/run/2026-10-17:shacharis,main/1-6-9'])(
+test.each([hash, '#/torah/5-33-24', '#/r/5-33-24', '#/torah/page/12', '#/esther/megillah-esther/6-1-1', '#/run/2026-10-17:shacharis,main/1-6-9'])(
   'shares public reader route %s without deployment or query data', route => {
     expect(publicReadingUrl(`${route}?authoring=private&token=secret`)).toBe(`https://tikkunreader.com/reader/${route}`)
   })

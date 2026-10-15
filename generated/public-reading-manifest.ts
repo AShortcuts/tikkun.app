@@ -523,5 +523,56 @@ export const publicAliyotByParsha: Readonly<
       "expectedTokenCount": 124,
       "readerHash": "#/torah/parsha/haazinu/5-32-44"
     }
+  ],
+  "vezot-haberacha": [
+    {
+      "number": 1,
+      "audioId": "vezot-haberacha-1",
+      "cueStatus": "cued",
+      "expectedTokenCount": 74,
+      "readerHash": "#/torah/parsha/vezot-haberacha/5-33-1"
+    },
+    {
+      "number": 2,
+      "audioId": "vezot-haberacha-2",
+      "cueStatus": "cued",
+      "expectedTokenCount": 63,
+      "readerHash": "#/torah/parsha/vezot-haberacha/5-33-8"
+    },
+    {
+      "number": 3,
+      "audioId": "vezot-haberacha-3",
+      "cueStatus": "cued",
+      "expectedTokenCount": 52,
+      "readerHash": "#/torah/parsha/vezot-haberacha/5-33-13"
+    },
+    {
+      "number": 4,
+      "audioId": "vezot-haberacha-4",
+      "cueStatus": "cued",
+      "expectedTokenCount": 45,
+      "readerHash": "#/torah/parsha/vezot-haberacha/5-33-18"
+    },
+    {
+      "number": 5,
+      "audioId": "vezot-haberacha-5",
+      "cueStatus": "cued",
+      "expectedTokenCount": 42,
+      "readerHash": "#/torah/parsha/vezot-haberacha/5-33-22"
+    },
+    {
+      "number": 6,
+      "audioId": "vezot-haberacha-6",
+      "cueStatus": "cued",
+      "expectedTokenCount": 41,
+      "readerHash": "#/torah/parsha/vezot-haberacha/5-33-27"
+    },
+    {
+      "number": 7,
+      "audioId": "vezot-haberacha-7",
+      "cueStatus": "cued",
+      "expectedTokenCount": 149,
+      "readerHash": "#/torah/parsha/vezot-haberacha/5-34-1"
+    }
   ]
 }

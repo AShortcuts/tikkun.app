@@ -16,6 +16,8 @@ import haazinuSecondPageJson from '../../text/pages/torah/243.json' with { type:
 import { applyAnnotationMode } from './annotation-rendering.ts'
 import vayishlachPage36Json from '../../text/pages/torah/36.json' with { type: 'json' }
 import vayishlachPageJson from '../../text/pages/torah/37.json' with { type: 'json' }
+import achreiMotPage131Json from '../../text/pages/torah/131.json' with { type: 'json' }
+import achreiMotPage132Json from '../../text/pages/torah/132.json' with { type: 'json' }
 import '../../css/master.css'
 import '../../css/page.css'
 import '../../css/reader-enhancements.css'
@@ -244,7 +246,7 @@ test('reflows real verses for compact Reading without horizontal clipping', asyn
   expect(
     Number.parseFloat(readingSideStyle.lineHeight) /
       Number.parseFloat(readingPageStyle.fontSize),
-  ).toBeCloseTo(1.72, 2)
+  ).toBeCloseTo(1.85, 2)
   expect(requiredAll('.reader-pasuk-break').length).toBeGreaterThan(1)
   expect(requiredAll('.mod-shirah')).toHaveLength(0)
   expect(requiredAll('[data-shirah-kind]')).toHaveLength(0)
@@ -989,6 +991,139 @@ test.each(['one', 'two'] as const)(
     }
   },
 )
+
+test.each([
+  { width: 390, sides: 'one' as const },
+  { width: 1280, sides: 'one' as const },
+  { width: 844, sides: 'two' as const },
+])('scales Reading text without changing Match at $width px/$sides', async ({ width, sides }) => {
+  await page.viewport(width, 900)
+  document.documentElement.dataset.readerSideOrder = 'tikkun-right'
+  install(`<div class="tikkun-book" data-reader-layout="reading" data-reader-sides="${sides}">
+    <section class="tikkun-page">${Page(renderedPage(37, vayishlachPageJson), {
+      presentation: { layout: 'reading', sides },
+    })}</section></div>
+    <div class="tikkun-book" data-reader-layout="match" data-reader-sides="one">
+      <section class="tikkun-page">${Page(renderedPage(37, vayishlachPageJson), {
+        presentation: { layout: 'match', sides: 'one' },
+      })}</section></div>`)
+  await document.fonts.ready
+  const book = required<HTMLElement>('[data-reader-layout="reading"]')
+  const readingPage = required<HTMLElement>('[data-reader-layout="reading"] .tikkun-page')
+  const matchPage = required<HTMLElement>('[data-reader-layout="match"] .tikkun-page')
+  const baseline = parseFloat(getComputedStyle(readingPage).fontSize)
+  const matchSize = getComputedStyle(matchPage).fontSize
+  fixture!.style.setProperty('--reading-font-scale', '1.5')
+  applyReaderPageLayout(readingPage, { layout: 'reading', sides })
+  expect(parseFloat(getComputedStyle(readingPage).fontSize)).toBeCloseTo(baseline * 1.5, 2)
+  expect(getComputedStyle(matchPage).fontSize).toBe(matchSize)
+  const side = required<HTMLElement>('.reader-reading-page-side')
+  const style = getComputedStyle(side)
+  expect(parseFloat(style.lineHeight) / parseFloat(style.fontSize)).toBeCloseTo(sides === 'one' ? 1.85 : 1.75, 2)
+  const bounds = book.getBoundingClientRect()
+  for (const word of requiredAll<HTMLElement>('.word:not([hidden])', book)) {
+    if (!word.getClientRects().length) continue
+    const rect = word.getBoundingClientRect()
+    expect(rect.left).toBeGreaterThanOrEqual(bounds.left - 1)
+    expect(rect.right).toBeLessThanOrEqual(bounds.right + 1)
+  }
+  await page.screenshot({ path: `../../.vitest-attachments/reading-font-${width}-${sides}.png` })
+})
+
+test.each([
+  { width: 320, sides: 'one' as const },
+  { width: 390, sides: 'one' as const },
+  { width: 844, sides: 'two' as const },
+  { width: 1280, sides: 'one' as const },
+])('keeps Reading maqaf groups on one line at $width px/$sides', async ({ width, sides }) => {
+  await page.viewport(width, 900)
+  document.documentElement.dataset.readerSideOrder = 'tikkun-right'
+  const presentation = { layout: 'reading', sides } as const
+  install(`<div class="tikkun-book" data-reader-layout="reading" data-reader-sides="${sides}" dir="rtl">
+    <section class="tikkun-page">${Page(renderedPage(78, beshalachPageJson), {
+      presentation,
+    })}</section></div>`)
+  await document.fonts.ready
+  const book = required<HTMLElement>('.tikkun-book')
+  const readingPage = required<HTMLElement>('.tikkun-page')
+  const words = requiredAll<HTMLElement>('[data-reader-canonical="true"] .word', book)
+  const maqafWords = words.filter((word) => word.textContent?.includes('\u05be'))
+  const originalTokens = words.map((word) => [word.dataset.tokenKey, word.textContent])
+  expect(maqafWords.length).toBeGreaterThan(10)
+
+  for (const scale of [1, 1.5]) {
+    book.style.setProperty('--reading-font-scale', `${scale}`)
+    applyReaderPageLayout(readingPage, presentation)
+    for (const word of maqafWords) {
+      const range = document.createRange()
+      range.selectNodeContents(word)
+      const rects = [...range.getClientRects()]
+      expect(rects.length).toBeGreaterThan(0)
+      for (const rect of rects) {
+        expect(rect.top, `${word.textContent} at ${scale}x`).toBeCloseTo(rects[0].top, 0)
+        expect(rect.left).toBeGreaterThanOrEqual(book.getBoundingClientRect().left - 1)
+        expect(rect.right).toBeLessThanOrEqual(book.getBoundingClientRect().right + 1)
+      }
+    }
+    for (const side of requiredAll<HTMLElement>('.reader-reading-page-side')) {
+      const sideWords = requiredAll<HTMLElement>('.word:not([hidden])', side)
+      sideWords.forEach((word, index) => {
+        if (!word.textContent?.endsWith('\u05be') || !sideWords[index + 1]) return
+        expect(sideWords[index + 1].getBoundingClientRect().top, `${word.textContent} source boundary at ${scale}x`)
+          .toBeCloseTo(word.getBoundingClientRect().top, 0)
+      })
+    }
+  }
+
+  applyAnnotationMode(book, false)
+  applyReaderPageLayout(readingPage, presentation)
+  applyAnnotationMode(book, true)
+  applyReaderPageLayout(readingPage, presentation)
+  expect(words.map((word) => [word.dataset.tokenKey, word.textContent])).toEqual(originalTokens)
+})
+
+test('keeps Reading maqaf joins across mounted pages and restores annotation spacing', async () => {
+  await page.viewport(390, 900)
+  const presentation = { layout: 'reading', sides: 'one' } as const
+  install(`<div class="tikkun-book mod-annotations-on" data-reader-layout="reading" data-reader-sides="one" dir="rtl">
+    <section class="tikkun-page">${Page(renderedPage(131, achreiMotPage131Json), { presentation })}</section>
+    <section class="tikkun-page">${Page(renderedPage(132, achreiMotPage132Json), { presentation })}</section>
+  </div>`)
+  await document.fonts.ready
+  const book = required<HTMLElement>('.tikkun-book')
+  const pages = requiredAll<HTMLElement>('.tikkun-page')
+  const prefix = requiredAll<HTMLElement>('.word:not([hidden])', pages[0]).at(-1)!
+  const suffix = required<HTMLElement>('.word', pages[1])
+  const boundary = document.createRange()
+  boundary.setStartAfter(prefix)
+  boundary.setEndBefore(suffix)
+  const originalSpacing = boundary.toString()
+  expect(prefix.textContent).toBe('עַל־')
+  expect(suffix.textContent).toBe('שְׁנֵ֥י')
+
+  for (const width of [320, 390, 768]) {
+    await page.viewport(width, 900)
+    for (const scale of [1, 1.5]) {
+      book.style.setProperty('--reading-font-scale', `${scale}`)
+      pages.forEach((member) => applyReaderPageLayout(member, presentation))
+      expect(suffix.getBoundingClientRect().top).toBeCloseTo(prefix.getBoundingClientRect().top, 0)
+    }
+  }
+  applyAnnotationMode(book, false)
+  pages.forEach((member) => applyReaderPageLayout(member, presentation))
+  expect(boundary.toString()).toBe(originalSpacing)
+  applyAnnotationMode(book, true)
+  pages.forEach((member) => applyReaderPageLayout(member, presentation))
+  expect(suffix.getBoundingClientRect().top).toBeCloseTo(prefix.getBoundingClientRect().top, 0)
+
+  pages[1].remove()
+  applyReaderPageLayout(pages[0], presentation)
+  book.append(pages[1])
+  applyReaderPageLayout(pages[1], presentation)
+  expect(suffix.getBoundingClientRect().top).toBeCloseTo(prefix.getBoundingClientRect().top, 0)
+  expect(prefix.dataset.tokenKey).toBe('131:41:0:8')
+  expect(suffix.dataset.tokenKey).toBe('132:0:0:0')
+})
 
 test('joins one Reading pasuk across its physical JSON lines', async () => {
   await page.viewport(1800, 900)

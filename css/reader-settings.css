@@ -20,7 +20,7 @@
     overflow: hidden;
     z-index: 120;
     border-radius: 18px;
-    background: color-mix(in srgb, var(--paper-color) 97%, transparent);
+    background: color-mix(in srgb, var(--interface-surface-color) 97%, transparent);
     border: 1px solid color-mix(in srgb, var(--text-color) 14%, transparent);
     box-shadow: 0 18px 42px -32px color-mix(in srgb, black 42%, transparent);
     backdrop-filter: blur(14px) saturate(115%);
@@ -109,7 +109,8 @@
     gap: 0.35rem;
   }
 
-  .settings-header-action.toolbar-button.mod-icon-label {
+  .settings-header-action.toolbar-button.mod-icon-label,
+  .settings-print-button.toolbar-button.mod-icon-label {
     display: inline-grid;
     width: 2.35rem;
     min-width: 2.35rem;
@@ -275,6 +276,19 @@
     display: grid;
     gap: 0.18rem;
     min-width: 0;
+  }
+
+  .settings-section.settings-action-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .settings-print-button.toolbar-button.mod-icon-label {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    border-radius: 14px;
   }
 
   .settings-field-label {
@@ -510,7 +524,8 @@
     cursor: pointer;
   }
 
-  .settings-offline-button:disabled {
+  .settings-offline-button:disabled,
+  .settings-offline-button[aria-disabled='true'] {
     cursor: default;
     opacity: 0.62;
   }
@@ -696,6 +711,125 @@
     font-size: 1.12rem;
     line-height: 1.7;
     text-align: right;
+  }
+
+  .settings-saved-themes {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .settings-theme-circle {
+    display: grid;
+    place-items: center;
+    position: relative;
+    flex: 0 0 2.75rem;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-color);
+    cursor: pointer;
+  }
+
+  .settings-theme-circle::before {
+    content: '';
+    position: absolute;
+    inset: 0.375rem;
+    border: 1px solid color-mix(in srgb, var(--text-color) 28%, transparent);
+    border-radius: inherit;
+    background: var(--saved-theme-color, var(--paper-color));
+  }
+
+  .settings-theme-circle .ui-icon {
+    position: relative;
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .settings-theme-circle.is-active::before {
+    outline: 2px solid var(--reader-focus-color);
+    outline-offset: 2px;
+  }
+
+  .settings-theme-circle:focus-visible,
+  .settings-theme-delete:focus-visible,
+  .settings-theme-config textarea:focus-visible {
+    outline: 2px solid var(--reader-focus-color);
+    outline-offset: 2px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .settings-theme-circle:hover::before {
+      border-color: var(--text-color);
+    }
+
+    .settings-theme-delete:hover {
+      text-decoration: underline;
+    }
+  }
+
+  .settings-theme-editor-heading,
+  .settings-theme-transfer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .settings-theme-transfer .settings-secondary-action {
+    flex: 1;
+    min-height: 2.75rem;
+  }
+
+  .settings-theme-transfer button:disabled {
+    cursor: default;
+    opacity: 0.58;
+  }
+
+  .settings-theme-delete {
+    min-height: 2.75rem;
+    padding: 0.35rem 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-color);
+    font: inherit;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+
+  .settings-theme-transfer-status:empty {
+    display: none;
+  }
+
+  .settings-theme-config {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .settings-theme-config textarea {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    padding: 0.65rem;
+    resize: vertical;
+    border: 1px solid color-mix(in srgb, var(--text-color) 20%, transparent);
+    border-radius: 10px;
+    background: var(--paper-color);
+    color: var(--text-color);
+    font: inherit;
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+
+  @media (forced-colors: active) {
+    .settings-theme-circle.is-active::before {
+      outline-color: Highlight;
+    }
   }
 
   .settings-custom-color {
@@ -1085,7 +1219,7 @@
       transition-duration: 0.01ms;
     }
 
-    .settings-offline-button:not(:disabled):active,
+    .settings-offline-button:not(:disabled):not([aria-disabled='true']):active,
     .settings-category-tab:active,
     .settings-secondary-action:active,
     .settings-segmented-option:active,

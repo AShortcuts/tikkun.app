@@ -38,7 +38,7 @@ export class ViewportTracker extends EventEmitter<ViewportTrackerEvents> {
     this.book = book
     this.lineTrackers = {
       first: new LineViewportTracker(ElementSearchDirection.Down, book),
-      center: new LineViewportTracker(ElementSearchDirection.Down, book),
+      center: new LineViewportTracker(ElementSearchDirection.Down, book, 'nearest'),
       last: new LineViewportTracker(ElementSearchDirection.Up, book),
     }
     this.update()
@@ -132,7 +132,8 @@ class LineViewportTracker {
   private readonly walker: TreeWalker
   constructor(
     private readonly direction: ElementSearchDirection,
-    private readonly root: Element
+    private readonly root: Element,
+    private readonly selection: 'edge' | 'nearest' = 'edge'
   ) {
     this.walker = document.createTreeWalker(
       root,
@@ -140,6 +141,10 @@ class LineViewportTracker {
       (el) => {
         if (!(el instanceof HTMLElement)) return NodeFilter.FILTER_REJECT
         if (el.tagName === 'TD') return NodeFilter.FILTER_REJECT
+        if (this.selection === 'nearest') {
+          if (el.hasAttribute('data-reader-mirror')) return NodeFilter.FILTER_REJECT
+          if (el.dataset.class !== 'line') return NodeFilter.FILTER_SKIP
+        }
         if (el.dataset.lineIndex) return NodeFilter.FILTER_ACCEPT
         return NodeFilter.FILTER_SKIP
       }
@@ -156,7 +161,9 @@ class LineViewportTracker {
       document.documentElement.clientWidth / 2,
       targetY
     )
-    const line = target?.closest('[data-line-index]')
+    const line = target?.closest(this.selection === 'nearest'
+      ? '[data-class="line"][data-line-index]'
+      : '[data-line-index]')
     // Hidden pages and gaps can hit a container outside the reader. A TreeWalker
     // accepts that node but cannot reliably walk back into its own subtree.
     this.walker.currentNode = line && this.root.contains(line) ? line : this.root
@@ -179,11 +186,36 @@ class LineViewportTracker {
 
     let isFirstIteration = true
     let iterateDir = sign(0)
+    let previous: Element | null = null
+    let previousDelta = 0
     while (true) {
       const bounds = this.walker.currentNode.getBoundingClientRect()
-
-      const delta = targetY - bounds[this.direction.coordinate]
-      if (Math.abs(delta) < 0.8 * this.walker.currentNode.clientHeight) break
+      if (
+        this.selection === 'nearest' &&
+        targetY >= bounds.top && targetY < bounds.bottom
+      ) {
+        // Reading can wrap adjacent source lines onto the same visual row.
+        const containing = this.walker.currentNode
+        const next = this.walker.nextNode()
+        if (next instanceof Element) {
+          const nextBounds = next.getBoundingClientRect()
+          if (targetY >= nextBounds.top && targetY < nextBounds.bottom) {
+            isFirstIteration = false
+            continue
+          }
+        }
+        this.walker.currentNode = containing
+        break
+      }
+      const delta = this.selection === 'nearest'
+        ? targetY < bounds.top
+          ? targetY - bounds.top
+          : targetY - bounds.bottom
+        : targetY - bounds[this.direction.coordinate]
+      if (
+        this.selection === 'edge' &&
+        Math.abs(delta) < 0.8 * this.walker.currentNode.clientHeight
+      ) break
 
       // On the first iteration only, if we're too far, reset the search.
       if (isFirstIteration && Math.abs(delta) > 100) {
@@ -193,12 +225,25 @@ class LineViewportTracker {
       }
       isFirstIteration = false
 
-      // If we overshot, stop immediately.
-      if (iterateDir && iterateDir !== sign(delta)) break
-      iterateDir = sign(delta)
+      const nextDir = this.selection === 'nearest' && delta === 0 ? 1 : sign(delta)
+      if (iterateDir && iterateDir !== nextDir) {
+        // Across a gap, choose the nearest edge; exact ties belong to the next row.
+        if (
+          this.selection === 'nearest' && previous && (
+            Math.abs(previousDelta) < Math.abs(delta) ||
+            (Math.abs(previousDelta) === Math.abs(delta) && iterateDir < 0)
+          )
+        ) {
+          this.walker.currentNode = previous
+        }
+        break
+      }
+      iterateDir = nextDir
       if (!iterateDir) break
 
       const prev: Element = this.walker.currentNode
+      previous = prev
+      previousDelta = delta
       this.walker[IterateDirection[iterateDir].nextElement]()
       // If we ran out of nodes, stop.
       if (this.walker.currentNode === prev) break

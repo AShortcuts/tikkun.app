@@ -37,7 +37,7 @@ test('ships the required installable PNG icon sizes', () => {
 
 test('aligns installed-app branding and launch colors with Home', () => {
   expect(manifest).toMatchObject({
-    name: 'Tikkun Korim',
+    name: 'Tikkun Reader',
     background_color: '#06080b',
     theme_color: '#06080b',
   })

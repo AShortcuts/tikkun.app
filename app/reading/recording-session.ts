@@ -1,6 +1,6 @@
 import type { AudioRecording, WordCue } from '../audio/types.ts'
 import { isParshaAudioRecording } from '../audio/types.ts'
-import type { LeiningRun } from '../calendar-model/model-types.ts'
+import { readingTitle, type LeiningRun } from '../calendar-model/model-types.ts'
 import { compareRefs } from '../calendar-model/ref-utils.ts'
 import {
   AuthoringSessionTransition,
@@ -249,7 +249,7 @@ export function createRecordingSession(
       if (!portion || !isCurrent(lifetime)) return null
       passagePlan = passagePlaybackPlan(resolution, portion,
         { runId: target.runId, index: target.aliyahIndex },
-        run.leining.date.title.en.replace(/^Parshat\s+/i, ''))
+        readingTitle(run.leining).en.replace(/^Parshat\s+/i, ''))
       if (passagePlan.segments.length > 1) {
         const { loadRecordingDuration } = await import('./passage-audio-tools.ts')
         passagePlan.segments = await Promise.all(passagePlan.segments.map(async segment => ({

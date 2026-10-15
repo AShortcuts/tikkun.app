@@ -18,7 +18,7 @@ type MegillahRoute = {
 
 type VezosHaberachaRoute = {
   kind: 'vezos-haberacha'
-  canonicalSlug: 'vezos-haberacha'
+  canonicalSlug: 'vezot-haberacha'
   aliases: string[]
   displayTitle: 'וזאת הברכה'
 }
@@ -163,7 +163,7 @@ export const parshaRouteSpecs: ParshaRouteSpec[] = [
   // route labels the reader as וזאת הברכה.
   {
     kind: 'vezos-haberacha',
-    canonicalSlug: 'vezos-haberacha',
+    canonicalSlug: 'vezot-haberacha',
     aliases: [
       'vezos-haberacha',
       'vezot-haberacha',

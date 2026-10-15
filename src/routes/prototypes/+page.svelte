@@ -4,15 +4,15 @@
 </script>
 
 <svelte:head>
-  <title>Design prototypes | Tikkun Korim</title>
+  <title>Design prototypes | Tikkun Reader</title>
   <meta
     name="description"
-    content="Isolated Tikkun Korim design prototypes for review."
+    content="Isolated Tikkun Reader design prototypes for review."
   />
 </svelte:head>
 
 <main class="prototype-index">
-  <p class="prototype-index-kicker">Tikkun Korim</p>
+  <p class="prototype-index-kicker">Tikkun Reader</p>
   <h1>Design prototypes</h1>
   <p class="prototype-index-intro">
     Draft interfaces live here for review without changing the current public site or reader.

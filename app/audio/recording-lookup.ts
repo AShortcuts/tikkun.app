@@ -1,5 +1,9 @@
 import { HDate } from '@hebcal/hdate'
-import type { LeiningAliyah, LeiningRun } from '../calendar-model/model-types.ts'
+import {
+  readingTitle,
+  type LeiningAliyah,
+  type LeiningRun,
+} from '../calendar-model/model-types.ts'
 import { compareRefs } from '../calendar-model/ref-utils.ts'
 import { audioRecordings } from '../data/audio-catalog.ts'
 import { canonicalizeParshaSlug } from '../view-model/navigation/parsha-routes.ts'
@@ -25,9 +29,11 @@ export const roshChodeshReadingIdentity: RangeReadingIdentity = {
 }
 
 export function parshaSlugForRun(run: LeiningRun): string | null {
+  if (run.leining.kind === 'parsha') return run.leining.slug
+
   if (!run.leining.isParsha) return null
 
-  const titleSlug = slugify(run.leining.date.title.en.replace(/^Parshat\s+/i, ''))
+  const titleSlug = slugify(readingTitle(run.leining).en.replace(/^Parshat\s+/i, ''))
   const canonicalSlug = canonicalizeParshaSlug(titleSlug)
   if (canonicalSlug && audioRecordingSlugs.has(canonicalSlug)) return canonicalSlug
   if (audioRecordingSlugs.has(titleSlug)) return titleSlug
@@ -151,8 +157,9 @@ export function findAuthoringRecordingForRun({
   )
   const parshaName =
     relatedRecording?.parshaName ??
-    (run.leining.date.title.en.replace(/^Parshat\s+/i, '').trim() ||
-      parshaSlug)
+    (parshaSlug === 'vezot-haberacha'
+      ? 'Vezot Haberacha'
+      : readingTitle(run.leining).en.replace(/^Parshat\s+/i, '').trim() || parshaSlug)
   const mediaPath = `/audio/${narratorId}/${parshaSlug}/${normalizedAliyah}.m4a`
   const recording: ParshaAudioRecording = {
     id: `${parshaSlug}-${normalizedAliyah}`,
@@ -184,6 +191,7 @@ export function rangeReadingForAliyah(
   run: LeiningRun,
   aliyah: LeiningAliyah
 ): RangeReadingIdentity | null {
+  if (run.leining.kind === 'parsha') return null
   const hdate = new HDate(run.leining.date.date)
   const isRoshChodesh = hdate.getDate() === 1 || hdate.getDate() === 30
   const isRoshChodeshPassage =

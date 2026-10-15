@@ -91,7 +91,7 @@
   data-target-id="command-palette"
   role="dialog"
   aria-modal="true"
-  aria-label="Search readings and commands"
+  aria-label="Search readings and settings"
   aria-hidden={!openState}
   onpointerdown={handleBackdropPointer}
   onkeydown={handleDialogKeydown}

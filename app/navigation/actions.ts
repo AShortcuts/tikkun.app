@@ -1,4 +1,6 @@
 import type { LeiningAliyah, LeiningRun } from '../calendar-model/model-types.ts'
+import { readingTitle } from '../calendar-model/model-types.ts'
+import { aliyahLabel } from '../calendar-model/aliyah-label.ts'
 import { getScrollPageCount } from '../location.ts'
 import { createLastReadingHash } from '../reading/last-reading.ts'
 import type { ScrollName } from '../ref.ts'
@@ -97,7 +99,7 @@ export function createAliyahNavigationActions({
     title,
     ...getParshaSearchTermsForLeining(run.leining),
     ...(!run.leining.isParsha
-      ? holidayLeiningKeywords(run.leining.date.title, `${run.leining.id}`)
+      ? holidayLeiningKeywords(readingTitle(run.leining), `${run.leining.id}`)
       : []),
   ]
   return run.aliyot.flatMap((aliyah) => {
@@ -108,7 +110,7 @@ export function createAliyahNavigationActions({
       createNavigationAction({
         id: `reading.${run.id}.${aliyahIndex}`,
         group: 'reading',
-        label: `${title} ${englishAliyahLabel(aliyahIndex)}`,
+        label: `${title} ${aliyahLabel(aliyahIndex, run, 'en')}`,
         dedupeKey: `${dedupeKeyPrefix ?? `reading.${run.id}`}.${aliyahIndex}`,
         destinationId: href,
         searchConstraint: {

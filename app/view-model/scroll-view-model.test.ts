@@ -21,6 +21,19 @@ const testSettings: UserSettings = {
 
 const generator = new LeiningGenerator(testSettings)
 
+test.each([
+  ['2025-04-18:shacharis,main', 164, 'הָאָֽרֶץ׃'],
+  ['2024-12-07:shacharis,main', 37, 'מַֽחֲנָֽיִם׃'],
+  ['2025-08-03:shacharis,main', 208, 'הַיָּמִֽים׃'],
+])('includes the final verse continuation for %s', async (id, pageNumber, ending) => {
+  const model = ScrollViewModel.forId(generator, id)
+  if (!model) throw new Error(`Missing ${id}`)
+  const pages = (await fetchEveryEntry(model)).filter(entry => entry.type === 'page')
+  const page = pages.find(page => page.pageNumber === pageNumber)
+  expect(page).toBeDefined()
+  expect(page!.lines.flatMap(line => line.text.flat()).join(' ')).toContain(ending)
+})
+
 test('deduplicates concurrent page-data fetches', async () => {
   const model = ScrollViewModel.forId(generator, '2026-10-17:shacharis,main', {
     scroll: 'torah',
@@ -230,9 +243,8 @@ test('forDate before סוכות', async () => {
 })
 
 test('assigns a run and aliyah to every verse in full torah', async () => {
-  // Start from a random regular פרשה, in a Hebrew calendar year that does
-  // not contain וילך.
-  const model = ScrollViewModel.forId(generator, '2025-05-24:shacharis,main')
+  // Plain parsha browsing covers the Torah independently of this year's schedule.
+  const model = ScrollViewModel.forId(generator, 'parsha:behar-bechukotai,main')
 
   const pages = await fetchPages(model, {
     fetchPreviousPages: false,

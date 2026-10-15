@@ -8,6 +8,7 @@ import hashlib
 import importlib.metadata
 import importlib.util
 import json
+import math
 import os
 from pathlib import Path
 import resource
@@ -138,13 +139,29 @@ def probe(recording):
     info = json.loads(subprocess.check_output(command, timeout=15))
     if len(info.get("streams", [])) != 1:
         raise AlignmentError("Expected one selected audio stream")
-    for source in [info["format"], info["streams"][0]]:
-        if abs(float(source.get("start_time", 0))) > 0.000001:
-            raise AlignmentError("Nonzero presentation origin needs an explicit source mapping")
     duration = float(info["format"]["duration"])
-    if abs(duration - recording["durationSeconds"]) > 0.002:
+    if not math.isfinite(duration) or duration <= 0 or abs(duration - recording["durationSeconds"]) > 0.002:
         raise AlignmentError("Media duration differs from the prepared pilot")
+    for source in [info["format"], info["streams"][0]]:
+        origin = float(source.get("start_time", 0))
+        if not math.isfinite(origin) or abs(origin) > duration:
+            raise AlignmentError("Audio presentation origin falls outside the recording duration")
     return info
+
+
+def decode_audio(recording, waveform):
+    info = probe(recording)
+    # Keep media timestamps, padding positive starts or trimming encoder delay before time zero.
+    subprocess.run(["ffmpeg", "-v", "error", "-nostdin", "-n", "-threads", "1", "-copyts", "-i",
+                    str(REPO / recording["mediaPath"]), "-map", "0:a:0", "-vn", "-ac", "1",
+                    "-af", "aresample=16000:first_pts=0", "-ar", "16000", "-c:a", "pcm_s16le",
+                    str(waveform)], check=True, timeout=60)
+    return {"sourceOriginSeconds": 0, "presentationTimeMapping": {
+        "method": "preserve-pts-pad-or-trim-to-zero",
+        "formatStartSeconds": float(info["format"].get("start_time", 0)),
+        "audioStreamStartSeconds": float(info["streams"][0].get("start_time", 0)),
+        "sampleZeroPlaybackSeconds": 0,
+    }}
 
 
 def annotation_template(bundle):
@@ -285,18 +302,15 @@ def infer_worker(args):
     recording = recording_for(bundle, args.audio_id)
     verify_sources(bundle, recording)
     model_dir = verify_model()
-    probe(recording)
     waveform = directory / "analysis.wav"
-    subprocess.run(["ffmpeg", "-v", "error", "-nostdin", "-n", "-threads", "1", "-i",
-                    str(REPO / recording["mediaPath"]), "-map", "0:a:0", "-vn", "-ac", "1",
-                    "-ar", "16000", "-c:a", "pcm_s16le", str(waveform)], check=True, timeout=60)
+    timeline = decode_audio(recording, waveform)
     samples = read_wave(waveform)
     if abs(len(samples) / 16000 - recording["durationSeconds"]) > 0.1:
         raise AlignmentError("Decoded duration needs a more explicit presentation-time mapping")
     evidence, geometry = encode_samples(samples, load_encoder(model_dir, work_path("hf-cache")),
                                         CHECKPOINT, capture_features=True)
     metadata = {
-        **geometry,
+        **geometry, **timeline,
         "analysisWaveSha256": file_hash(waveform),
         "packages": {name: importlib.metadata.version(name) for name in ["numpy", "torch", "transformers", "safetensors"]},
         "inputSha256": digest_json(bundle), "mediaIdentity": recording["mediaIdentity"],
@@ -341,7 +355,9 @@ def align(args):
                                   "--input", str(input_dir / "input.json")], args.timeout)
         if process.returncode:
             write_json(directory / "failure.json", {"status": "failed", "stderr": process.stderr[-8000:]})
-            raise AlignmentError(f"Acoustic worker failed; details in {directory / 'failure.json'}")
+            reason = next((line.removeprefix("ERROR: ").strip() for line in reversed(process.stderr.splitlines())
+                           if line.startswith("ERROR: ")), None)
+            raise AlignmentError(f"{reason or 'Acoustic worker failed'}; details in {directory / 'failure.json'}")
     except subprocess.TimeoutExpired:
         write_json(directory / "failure.json", {"status": "timed-out", "timeoutSeconds": args.timeout})
         raise AlignmentError(f"Worker stopped at the wall-time limit; incomplete run retained at {directory}") from None

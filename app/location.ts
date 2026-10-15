@@ -3,6 +3,8 @@ import estherTOC from '../text/esther-toc.json' with { type: 'json' }
 import {
   getTorahPageCount,
   getTorahPageLine,
+  listTorahChapters,
+  listTorahVerses,
 } from './data/torah-index.ts'
 
 type AppleSauce = {
@@ -56,6 +58,14 @@ export function hasScrollData(name: string): name is ScrollName {
 
 export function getScrollPageCount(name: ScrollName) {
   return pageIndexes[name].getPageCount()
+}
+
+export function listScrollChapters(scroll: ScrollName, book: number) {
+  return scroll === 'torah' ? listTorahChapters(book) : Object.keys((estherTOC as TOC)[book] ?? {}).map(Number)
+}
+
+export function listScrollVerses(scroll: ScrollName, book: number, chapter: number) {
+  return scroll === 'torah' ? listTorahVerses(book, chapter) : Object.keys((estherTOC as TOC)[book]?.[chapter] ?? {}).map(Number)
 }
 
 export function isValidScrollPageNumber(

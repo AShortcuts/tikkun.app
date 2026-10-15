@@ -144,3 +144,24 @@ test('real Nitzavim-Vayelech maps available aliyot and missing opening from cano
   const maftir = await subject.resolve(run.aliyot.find(a => a.index === 'Maftir')!, 'yoni-davidov')
   expect(maftir.problem).toBe('timing-needed')
 })
+
+test('dated Simchat Torah joins the sixth and seventh Vezot recordings by passage', async () => {
+  const generator = new LeiningGenerator({ ashkenazi: true, israel: false, includeModernHolidays: false })
+  const resolved = resolveParshaRun(generator, 'vezot-haberacha', new Date('2026-01-01'))
+  const run = resolved && generator.parseId('2026-10-04:shacharis,main')
+  const aliyah = run?.aliyot.find(candidate => candidate.index === 6)
+  if (!aliyah) throw new Error('Missing Simchat Torah final aliyah')
+  const subject = new PassageAudioResolver({
+    recordings: audioRecordings,
+    rangeForRecording: createRecordingRangeResolver(),
+    loadTokens: loadPassageTokens,
+    loadCues: async () => [],
+  })
+
+  const result = await subject.resolve(aliyah, 'yoni-davidov')
+  expect(result).toMatchObject({ canPlay: true, problem: 'incomplete-cues', missing: [] })
+  expect(result.portions).toHaveLength(1)
+  expect(result.portions[0].segments.map(segment => segment.recording.id))
+    .toEqual(['vezot-haberacha-6', 'vezot-haberacha-7'])
+  expect(result.portions[0].tokenKeys).toEqual(result.tokenKeys)
+})

@@ -34,7 +34,7 @@
   display: flex;
   justify-content: center;
   font-family: ShlomosemiStam;
-  color: var(--page-ink-color);
+  color: var(--reader-ink-color, var(--page-ink-color));
 }
 
 .tikkun-page-number {
@@ -42,7 +42,7 @@
   height: 0;
   margin-block-start: -2.5em;
   margin-block-end: 2.5em;
-  color: color-mix(in srgb, var(--page-ink-color) 26%, transparent);
+  color: color-mix(in srgb, var(--reader-ink-color, var(--page-ink-color)) 26%, transparent);
   font-family: 'Lora', Georgia, serif;
   font-size: 1.15em;
   font-weight: 400;
@@ -198,7 +198,7 @@
 }
 
 .tikkun-message {
-  color: var(--page-ink-color);
+  color: var(--reader-ink-color, var(--page-ink-color));
   font-style: italic;
   text-align: center;
   margin-top: -0.7em;
@@ -477,7 +477,7 @@ html[data-reader-theme='dark'] .word[data-recording-issue] {
   inset-block: 0;
   left: calc(50% + var(--match-divider-offset));
   width: 1px;
-  background: color-mix(in srgb, var(--page-ink-color) 16%, transparent);
+  background: color-mix(in srgb, var(--reader-ink-color, var(--page-ink-color)) 16%, transparent);
   content: '';
   pointer-events: none;
 }
@@ -776,7 +776,7 @@ html[data-reader-side-order='torah-right']
   margin-inline: auto;
   padding-block: 0;
   border-bottom: 0;
-  font-size: 1.55rem;
+  font-size: calc(1.55rem * var(--reading-font-scale, 1));
 }
 
 .tikkun-book[data-reader-layout='reading'] .tikkun-page:not(:first-child),
@@ -798,13 +798,13 @@ html[data-reader-side-order='torah-right']
   position: relative;
   min-width: 0;
   direction: rtl;
-  line-height: 1.62;
+  line-height: 1.75;
   text-align: right;
 }
 
 .tikkun-book[data-reader-layout='reading'][data-reader-sides='one']
   .reader-reading-page-side {
-  line-height: 1.72;
+  line-height: 1.85;
 }
 
 .tikkun-book[data-reader-layout='reading'][data-reader-sides='one'] {
@@ -871,10 +871,15 @@ html[data-reader-side-order='torah-right']
   margin-block-end: 0.58em;
 }
 
+.tikkun-book[data-reader-layout='reading'] .word {
+  /* A token includes the whole maqaf-connected phrase. */
+  white-space: nowrap;
+}
+
 .tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
   .tikkun-page {
   width: min(100%, calc(76rem + 2 * var(--verse-column-width)));
-  font-size: clamp(1rem, 1.55vw, 1.35rem);
+  font-size: calc(clamp(1rem, 1.55vw, 1.35rem) * var(--reading-font-scale, 1));
 }
 
 .tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
@@ -894,7 +899,7 @@ html[data-reader-side-order='torah-right']
   inset-block: 0;
   left: 50%;
   width: 1px;
-  background: color-mix(in srgb, var(--page-ink-color) 16%, transparent);
+  background: color-mix(in srgb, var(--reader-ink-color, var(--page-ink-color)) 16%, transparent);
   content: '';
 }
 
@@ -956,6 +961,13 @@ html[data-reader-side-order='torah-right']
   box-sizing: border-box;
   display: inline-block;
   inline-size: var(--reader-paired-word-width, auto);
+}
+
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  .word.mod-maqaf-boundary {
+  /* Inline boxes honor the joiner across source rows; retain mirrored widths. */
+  display: inline;
+  margin-inline-end: var(--reader-paired-word-spacing, 0);
 }
 
 .tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
@@ -1025,7 +1037,7 @@ html[data-reader-side-order='torah-right']
   .tikkun-book[data-reader-layout='reading'] .tikkun-page {
     width: auto;
     padding-inline: 0;
-    font-size: clamp(1.3rem, 6.2vw, 1.55rem);
+    font-size: calc(clamp(1.3rem, 6.2vw, 1.55rem) * var(--reading-font-scale, 1));
   }
 }
 

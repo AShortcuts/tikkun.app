@@ -126,6 +126,9 @@ def batch_handler_for(app):
                     value = self.body()
                     app.queue.control(value.get("action"), value.get("itemId"), value.get("minutes", 10))
                     return self.json(app.queue.snapshot())
+                if path == "/api/batch/clear-downloads":
+                    cleared = app.queue.clear_downloads(self.body().get("itemIds"))
+                    return self.json({"cleared": cleared, "queue": app.queue.snapshot()})
                 if path == "/api/batch/export":
                     content = app.export_zip(self.body().get("selections"))
                     if params.get("prepare") == ["1"]:

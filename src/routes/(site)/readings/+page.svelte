@@ -26,7 +26,7 @@
     },
     {
       value: 'ready',
-      label: 'Word synced',
+      label: 'Done',
       count: readingCoverage.filter((reading) => reading.statusKind === 'ready').length,
     },
     {
@@ -56,10 +56,10 @@
 </script>
 
 <svelte:head>
-  <title>Readings & coverage — Tikkun Korim</title>
+  <title>Readings & coverage — Tikkun Reader</title>
   <meta
     name="description"
-    content="See which Torah readings and aliyot are available in the Tikkun Korim reader and how word-sync coverage is progressing."
+    content="See which Torah readings and aliyot are available in Tikkun Reader and how word-sync coverage is progressing."
   />
 </svelte:head>
 
@@ -90,9 +90,9 @@
       <p>Choose any bubble to open that aliyah directly in the reader.</p>
     </div>
     <ul class="aliyah-status-legend" aria-label="Aliyah timing status">
-      <li><span class="home-aliyah-bubble mod-cued" aria-hidden="true">א</span>Word synced</li>
+      <li><span class="home-aliyah-bubble mod-cued" aria-hidden="true">א</span>Done</li>
       <li><span class="home-aliyah-bubble mod-draft" aria-hidden="true">ב</span>Draft timing</li>
-      <li><span class="home-aliyah-bubble mod-missing" aria-hidden="true">ג</span>Timing not started</li>
+      <li><span class="home-aliyah-bubble mod-missing" aria-hidden="true">ג</span>Not synced yet</li>
       <li><span class="home-aliyah-bubble mod-empty" aria-hidden="true">ד</span>No audio</li>
     </ul>
     <div class="home-readings-grid">
@@ -105,7 +105,6 @@
   <section class="site-section" aria-labelledby="coverage-title">
     <div class="site-section-header">
       <h2 id="coverage-title">Full coverage</h2>
-      <p>Coverage reflects published audio and cue data; work labels reflect maintained plans.</p>
     </div>
     <div class="coverage-tools">
       <label class="coverage-search">

@@ -31,6 +31,7 @@ function createRunFixture(indexes: Array<1 | 2 | 3 | 7 | 'Maftir'>): LeiningRun 
     leinings: [],
   }
   const leining: LeiningInstance = {
+    kind: 'service',
     date,
     id: LeiningInstanceId.Shacharis,
     isParsha: false,

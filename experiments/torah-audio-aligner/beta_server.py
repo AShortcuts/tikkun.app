@@ -217,7 +217,7 @@ def handler_for(app):
                 if action == "revision":
                     return self.json(app.store.revision(identifier, params.get("id", [""])[0]))
                 if action == "audio":
-                    app.store.detail(identifier)
+                    app.store.verify_waveform(identifier)
                     return self.file(app.store.get(identifier)["wavePath"], "audio/wav", ranges=True)
             elif self.command == "POST":
                 value = self.body()

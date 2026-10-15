@@ -4,8 +4,8 @@
 </script>
 
 <svelte:head>
-  <title>Tidbits — Tikkun Korim</title>
-  <meta name="description" content="Short, practical notes from Tikkun Korim." />
+  <title>Tidbits — Tikkun Reader</title>
+  <meta name="description" content="Short, practical notes from Tikkun Reader." />
 </svelte:head>
 
 <main class="site-content-page">

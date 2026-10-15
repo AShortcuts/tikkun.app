@@ -6,9 +6,14 @@ const second = 'https://tikkunreader.com/reader/#/torah/parsha/noach/5-1-1'
 
 test.each([
   [first, '#/torah/parsha/beresheet/1-4-19'],
+  ['https://tikkunreader.com/reader/#/next', '#/next'],
+  ['tikkunreader://reader/#/next', '#/next'],
   [`${first}?recording=1`, '#/torah/parsha/beresheet/1-4-19'],
   ['https://tikkunreader.com/reader?utm_source=test#/esther/page/2', '#/esther/page/2'],
   ['https://tikkunreader.com/reader/#/r/1-1-1', '#/r/1-1-1'],
+  ['https://tikkunreader.com/reader/#/torah/5-33-24', '#/torah/5-33-24'],
+  ['tikkunreader://reader/#/torah/5-33-24', '#/torah/5-33-24'],
+  ['tikkunreader://reader/#/r/5-33-24', '#/r/5-33-24'],
   ['https://tikkunreader.com/reader/#/run/2026-09-12/1-1-1', '#/run/2026-09-12/1-1-1'],
 ])('maps only the reading portion of %s', (url, expected) => {
   expect(readingHashFromNativeUrl(url)).toBe(expected)
@@ -24,8 +29,9 @@ test.each([
   'https://tikkunreader.com/admin/#/torah/page/1',
   'https://tikkunreader.com/reader/extra/#/torah/page/1',
   'https://tikkunreader.com/reader/#/about',
-  'https://tikkunreader.com/reader/#/next',
   'https://tikkunreader.com/reader/#/torah/page/0',
+  'https://tikkunreader.com/reader/#/torah/5-33',
+  'https://tikkunreader.com/reader/#/torah/5-33-24/extra',
   'https://tikkunreader.com/reader/#/torah/page/1#extra',
   'https://tikkunreader.com/reader/',
 ])('rejects unsupported or untrusted URL %s', (url) => {

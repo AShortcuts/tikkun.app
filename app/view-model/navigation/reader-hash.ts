@@ -9,6 +9,7 @@ const estherParshaHashPattern = new RegExp(
 )
 const readerHashPatterns = [
   new RegExp(`^#/run/[^/?#\\s]+(?:/${referencePattern})?$`),
+  new RegExp(`^#/torah/${referencePattern}$`),
   new RegExp(`^#/r/${referencePattern}$`),
   torahParshaHashPattern,
   /^#\/torah\/page\/[1-9]\d*$/,

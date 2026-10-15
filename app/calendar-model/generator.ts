@@ -64,7 +64,7 @@ export class LeiningGenerator {
   constructor(readonly settings: UserSettings) {}
 
   /** Parses the `id` from a `LeiningRun` (eg, from a URL) into the `LeiningRun` that generated it. */
-  parseId(id: string): LeiningRun | null {
+  parseId(id: string): (LeiningRun & { leining: LeiningInstance }) | null {
     const [, date, rawInstanceId, rawRunType] =
       /^([-\d]+):(\w+),([\w-]+)$/.exec(id) ?? []
     const instanceId = urlParamToInstanceId[rawInstanceId as LeiningInstanceId]
@@ -77,7 +77,9 @@ export class LeiningGenerator {
     if (!leiningDate) return null
 
     const instance = leiningDate.leinings.find((i) => i.id === instanceId)
-    return instance?.runs.find((r) => r.type === runType) ?? null
+    return instance?.runs.find((r): r is LeiningRun & { leining: LeiningInstance } =>
+      r.type === runType && r.leining.kind !== 'parsha'
+    ) ?? null
   }
 
   /** Creates all leinings in a Hebrew year. */
@@ -152,7 +154,8 @@ export class LeiningGenerator {
       id: toISODateString(date.greg()),
       title: {
         en: leinings[0].name.en ?? 'TODO: unknown',
-        he: Locale.hebrewStripNikkud(leinings[0].name.he ?? 'TODO: unknown'),
+        he: Locale.hebrewStripNikkud(leinings[0].name.he ??
+          (leinings[0].name.en === 'Simchat Torah (on Shabbat)' ? 'שמחת תורה (בשבת)' : 'TODO: unknown')),
       },
       leinings: [],
     }
@@ -190,12 +193,21 @@ export class LeiningGenerator {
     // Used for Erev Simchat Torah only.
     // Also used for Erev Purim and Erev Tish'a B'Av, but those have no main leinings.
     if (o.name.en.includes('Erev')) id = LeiningInstanceId.Maariv
-    return this.createInstance({
+    const instance = this.createInstance({
       date: resultDate,
       isParsha: !!o.parsha,
       id,
       runs: this.runFromAliyot(o.fullkriyah),
     })
+    if (o.name.en === 'Simchat Torah' || o.name.en === 'Simchat Torah (on Shabbat)') {
+      for (const aliyah of instance.runs.flatMap(run => run.aliyot)) {
+        if (aliyah.end.b === 5 && aliyah.end.c === 34 && aliyah.end.v === 12)
+          aliyah.role = 'chatan-torah'
+        if (aliyah.start.b === 1 && aliyah.start.c === 1 && aliyah.start.v === 1)
+          aliyah.role = 'chatan-beresheet'
+      }
+    }
+    return instance
   }
 
   private runFromHaftara(
@@ -259,11 +271,11 @@ export class LeiningGenerator {
 
   /** Fills in the self-referential `instance` property of `runs`. */
   private createInstance(
-    parialInstance: Omit<LeiningInstance, 'runs'> & {
+    parialInstance: Omit<LeiningInstance, 'kind' | 'runs'> & {
       runs: PartialLeiningRun[]
     }
   ): LeiningInstance {
-    const leining: LeiningInstance = { ...parialInstance, runs: [] }
+    const leining: LeiningInstance = { ...parialInstance, kind: 'service', runs: [] }
     leining.runs = parialInstance.runs.map((r) =>
       this.createRun({ ...r, leining })
     )
@@ -271,7 +283,7 @@ export class LeiningGenerator {
   }
 
   /** Fills in inferrable properties of a `LeiningRun`. */
-  private createRun(run: Omit<LeiningRun, 'id' | 'scroll'>): LeiningRun {
+  private createRun(run: Omit<LeiningRun, 'id' | 'scroll' | 'leining'> & { leining: LeiningInstance }): LeiningRun {
     return {
       ...run,
       id: `${run.leining.date.id}:${instanceIdtoUrlParam[run.leining.id]},${

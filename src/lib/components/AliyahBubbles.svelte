@@ -24,7 +24,7 @@
   const statusLabels: Record<CueCoverageStatus, string> = {
     cued: 'word timing ready',
     draft: 'draft timing',
-    missing: 'audio available, timing not started',
+    missing: 'audio available, Not synced yet',
     empty: 'audio not yet available',
   }
   const localStatusLabels: Record<LocalCueDraftStatus, string> = {

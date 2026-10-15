@@ -51,7 +51,7 @@ describe('reading search adapter', () => {
     )
     expect(search.search('Genesis 6:9')[0]).toMatchObject({
       id: 'reference.1.6.9',
-      href: '#/r/1-6-9',
+      href: '#/torah/1-6-9',
       englishLabel: 'Genesis 6:9',
       detailLabel: 'בראשית 6:9',
     })
@@ -72,6 +72,16 @@ describe('reading search adapter', () => {
     const fastDay = search.search('Tishah B’Av 3')[0]
     expect(fastDay?.englishLabel).toMatch(/Tish.*B.*Av/i)
     expect(fastDay?.href).toMatch(/^#\/run\/.+\/\d+-\d+-\d+$/)
+  })
+
+  test('finds each single and combined parsha independently of the current calendar', () => {
+    for (const slug of ['matot', 'masei', 'matot-masei', 'vayakhel', 'pekudei', 'vayakhel-pekudei']) {
+      expect(search.search(`${slug} 3`)[0]?.href).toMatch(new RegExp(`^#/torah/parsha/${slug}/`))
+    }
+  })
+
+  test('uses the service honor label for Simchat Torah search results', () => {
+    expect(search.search('Simchat Torah 7')[0]?.detailLabel).toBe('Chatan Beresheet · שמחת תורה')
   })
 
   test('keeps routing metadata out of visible regular-reading labels', () => {

@@ -35,6 +35,7 @@ test('renders word metadata and an inline audio button for aliyah starts', () =>
         scroll: 'torah',
         aliyot: [],
         leining: {
+          kind: 'service',
           id: LeiningInstanceId.Shacharis,
           isParsha: true,
           runs: [],
@@ -81,6 +82,7 @@ test('renders an aliyah permalink beside aliyah start labels', () => {
         scroll: 'torah',
         aliyot: [],
         leining: {
+          kind: 'service',
           id: LeiningInstanceId.Shacharis,
           isParsha: true,
           runs: [],
@@ -99,7 +101,7 @@ test('renders an aliyah permalink beside aliyah start labels', () => {
     '[data-aliyah-link="true"]',
   )
   expect(link?.type).toBe('button')
-  expect(link?.dataset.aliyahUrl).toBe('#/torah/parsha/lech-lecha/1-12-14')
+  expect(link?.dataset.aliyahUrl).toBe('#/run/2024-11-09:shacharis,main/1-12-14')
   expect(link?.getAttribute('aria-label')).toBe('Copy link to שני')
   expect(link?.querySelector('.ui-icon')).not.toBeNull()
 })

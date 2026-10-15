@@ -1,0 +1,66 @@
+@font-face { font-family: ShlomosemiStam; src: url('/assets/fonts/ShlomosemiStam.ttf'); font-display: block; }
+@font-face { font-family: 'Noto Sans Hebrew UI'; src: url('/assets/fonts/NotoSansHebrew-Variable.ttf'); font-display: block; }
+:root { --paper-width: 816px; --paper-height: 1056px; --page-ink-color: #171a20; --hebrew-ui-font-family: 'Noto Sans Hebrew UI', sans-serif; --verses-color: #92959d; --medium-accent-color: transparent; --pull-translation: 0; --pull-transform: 0s; font-size: 16px; color-scheme: light; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: transparent; }
+.print-document { width: var(--paper-width); }
+.paper-sheet { width: var(--paper-width); height: var(--paper-height); padding: 36px 48px; background: white; margin: 0 0 28px; position: relative; overflow: hidden; }
+.paper-sheet:last-child { margin-bottom: 0; }
+.paper-invocation { position: absolute; top: 16px; right: 48px; font: 13px/1.4 Arial, 'Noto Sans Hebrew UI', sans-serif; color: #666b75; }
+.paper-heading { height: 45px; display: flex; align-items: baseline; justify-content: center; gap: 12px; text-align: center; font: 23px/1.4 Arial, 'Noto Sans Hebrew UI', sans-serif; color: #20232b; }
+.paper-heading [lang='en'] { font-size: 18px; }
+.paper-forms { position: relative; height: 31px; font: 13px/1.4 'Noto Sans Hebrew UI', sans-serif; color: #666b75; }
+.paper-forms > span { position: absolute; left: 50%; transform: translateX(-50%); text-align: center; }
+.paper-body { position: relative; overflow: hidden; width: 100%; }
+.paper-sheet[data-page-kind='details'] .paper-body { display: flex; justify-content: flex-end; }
+.paper-details-card { width: 168px; max-width: 100%; padding: 10px; border: 1px solid #cdd0d6; border-radius: 4px; text-align: center; direction: ltr; font: 13px/1.4 Arial, 'Noto Sans Hebrew UI', sans-serif; color: #20232b; }
+.paper-details-card.multiple-parshiot { width: 320px; }
+.paper-details-hebrew { font-size: 16px; }
+.paper-details-english { margin-top: 4px; font-size: 12px; color: #666b75; }
+.paper-details-card dl, .paper-details-section { margin: 8px 0 0; padding-top: 8px; border-top: 1px solid #cdd0d6; }
+.paper-details-card dt { font-size: 12px; color: #666b75; }
+.paper-details-card dd { margin: 4px 0 0; font-size: 20px; }
+.paper-details-aliyot { display: grid; gap: 8px; }
+.paper-details-card .paper-details-passage dd { font-size: 13px; }
+.paper-details-aliyot [lang='en'], .paper-details-passage [lang='en'] { margin-top: 4px; font-size: 12px; color: #666b75; }
+.paper-footer { position: absolute; left: 48px; bottom: 16px; width: calc(var(--paper-width) - 96px); transform-origin: bottom left; display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 16px; direction: ltr; color: #9699a2; font-family: 'Noto Sans Hebrew UI', sans-serif; }
+.paper-signature { grid-column: 1; display: flex; align-items: center; gap: 8px; }
+.paper-signature-text { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.paper-brand { font-size: 11px; line-height: 16px; }
+.paper-signature > img { flex: none; opacity: .42; }
+.paper-signature a { color: inherit; font-size: 10px; line-height: 12px; text-decoration: none; }
+.paper-signature a:hover { text-decoration: underline; }
+.paper-number { grid-column: 2; font-size: 11px; line-height: 12px; }
+.paper-sacred-notice { grid-column: 3; justify-self: end; max-width: 300px; margin: 0; color: #737782; text-align: right; font-size: 10px; line-height: 14px; }
+.print-book { transform-origin: top left; }
+.measurement-stage { position: absolute; left: 48px; top: 112px; visibility: hidden; pointer-events: none; }
+.print-book .tikkun-page { width: 100% !important; margin: 0 !important; padding: 0 !important; border: 0 !important; font-size: var(--print-font-size) !important; --match-line-height: 1.4em; --verse-column-width: 0px; --aliyah-column-width: 0px; --verse-gutter-text-gap: 0px; --aliyah-gutter-gap: 0px; --line-side-balance-width: 0px; --match-divider-offset: 0px; --reader-two-side-gap: 28px; --reading-verse-rail-width: 0px; }
+.print-book .tikkun-page table { width: 100%; table-layout: fixed; border-collapse: collapse; border-spacing: 0; }
+.print-book .tikkun-page .line { grid-template-columns: 0 minmax(0, 1fr) 0 0; padding: 0; }
+.print-book .line-gutter, .print-book .tikkun-page-number, .print-book .aliyah-start-marker { display: none !important; }
+.print-book .word { transition: none; }
+/* Keep the portrait divider gap independent of the preview viewport. */
+.print-book[data-reader-layout='match'][data-reader-sides='two'] .line-content { column-gap: 12.24px; }
+/* The justification spacer occupies a second, empty line in the screen layout. */
+.print-book[data-reader-layout='match'] .fragment { height: 1lh; }
+.print-book .print-context { color: #a8abb3; }
+.print-book .print-omitted { visibility: hidden; }
+.print-book[data-reader-layout='reading'] { padding: 0; overflow: visible; }
+.print-book[data-reader-layout='reading'] .reader-reading-page { padding: 0; }
+.print-book[data-reader-layout='reading'] .reader-reading-page-side { line-height: 1.8; }
+.print-book[data-reader-layout='reading'] .word[hidden] { display: none; }
+.print-book[data-print-sides='one'] .tikkun-page::after,
+.print-book[data-print-sides='one'] .reader-reading-page::after { display: none; }
+.print-book[data-print-sides='one'][data-print-form='tikkun'] .reader-text-side.mod-torah,
+.print-book[data-print-sides='one'][data-print-form='torah'] .reader-text-side.mod-tikkun { visibility: hidden; }
+.print-book[data-print-sides='one'][data-reader-layout='match'] .line-content { translate: var(--print-single-offset, 0px) 0; }
+.print-book[data-print-sides='one'][data-reader-layout='reading'] .reader-reading-page { grid-template-columns: minmax(0, 1fr); }
+.print-book[data-print-sides='one'][data-reader-layout='reading'] .reader-reading-page-side { grid-column: 1 !important; }
+.print-book[data-print-sides='one'][data-print-form='tikkun'] .reader-reading-page-side.mod-torah,
+.print-book[data-print-sides='one'][data-print-form='torah'] .reader-reading-page-side.mod-tikkun { display: none; }
+@media print {
+  html, body { background: white; }
+  .paper-sheet { margin: 0; break-after: page; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .paper-sheet:last-child { break-after: auto; }
+  .measurement-stage { display: none; }
+}

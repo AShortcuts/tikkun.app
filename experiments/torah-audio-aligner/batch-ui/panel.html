@@ -19,7 +19,7 @@
       <p id="queue-status" class="secondary" role="status"></p>
       <div class="queue-controls"><button id="queue-start" class="primary" disabled>Start queue</button><button id="queue-pause" disabled>Pause after current</button><button id="queue-cancel" class="quiet" disabled>Cancel waiting</button></div>
       <details><summary>Run limits</summary><div class="detail-body"><label for="run-minutes">Start new recordings for <span>minutes</span></label><input id="run-minutes" type="number" min="1" max="60" value="10"><p class="secondary">One recording at a time, four CPU threads. Each active recording finishes before a pause or time limit takes effect. Restarted queues wait for you to resume.</p><p id="queue-budget" class="secondary"></p></div></details>
-      <div class="library-selection"><button id="select-downloads">Select completed</button><button id="clear-downloads" class="quiet">Clear downloads</button></div>
+      <div class="library-selection"><button id="select-downloads" disabled>Select completed</button><button id="deselect-downloads" class="quiet" disabled>Deselect</button><button id="clear-downloads" class="quiet" title="Remove selected completed entries from the queue. Saved cues remain available." disabled>Clear downloads</button></div>
       <div id="queue-list" class="queue-list"><p class="secondary">No queued recordings. Select an aliyah to begin.</p></div>
       <div class="zip-actions"><button id="download-batch" disabled>Download cues (.zip)</button><p id="zip-help" class="secondary">Flags stay in each cue file until reviewed.</p><p id="batch-download-status" class="secondary" role="status"></p></div>
     </section>

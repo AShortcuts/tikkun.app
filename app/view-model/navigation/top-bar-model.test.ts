@@ -1,3 +1,4 @@
+import { readingTitle } from '../../calendar-model/model-types.ts'
 import { afterEach, expect, test } from 'vitest'
 import {
   type RenderedEntry,
@@ -175,7 +176,7 @@ test('renders from only one line', async () => {
 })
 
 test('picks primary run', async () => {
-  await createModel('2025-03-01:shacharis,main', {
+  await createModel('parsha:terumah,main', {
     count: 5,
     fetchPreviousPages: false,
   })
@@ -304,7 +305,7 @@ function renderResult(lines: Parameters<TopBarTracker['setLine']>[1]) {
     currentRun: cachedResult.currentRun && {
       id: cachedResult.currentRun?.id,
       title: [
-        cachedResult.currentRun.leining.date.title.he,
+        readingTitle(cachedResult.currentRun.leining).he,
         cachedResult.currentRun.leining.id,
         cachedResult.currentRun.type,
       ].join(' '),

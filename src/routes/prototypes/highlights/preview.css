@@ -1,0 +1,76 @@
+html:has(.highlight-study), body:has(.highlight-study) { overflow: auto; height: auto; }
+.highlight-study { max-width: 1260px; margin: auto; padding: 28px 34px 20px; color: var(--text-color); font: 14px/1.5 var(--hebrew-ui-font-family); --study-line: color-mix(in srgb, var(--text-color) 18%, transparent); --destination-color: #286c8a; --destination-fill: #298bb52b; }
+html[data-reader-theme='dark'] .highlight-study { --destination-color: #91bfd7; --destination-fill: #79b5d02b; }
+@media (prefers-color-scheme: dark) { html[data-reader-theme='automatic'] .highlight-study { --destination-color: #91bfd7; --destination-fill: #79b5d02b; } }
+.highlight-study * { box-sizing: border-box; }
+.study-header { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
+.study-kicker { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; opacity: .65; }
+.highlight-study h1 { font: 34px/1.15 Lora, Georgia, serif; letter-spacing: -.04em; margin: 7px 0 0; }
+.study-header p, .study-footnote { font-size: 12px; opacity: .6; }
+.study-controls { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
+.highlight-study button, .highlight-study select { font: inherit; color: inherit; background: transparent; border: 1px solid var(--study-line); border-radius: 8px; min-height: 40px; padding: 8px 12px; cursor: pointer; }
+.highlight-study button:active { transform: scale(.98); }
+.highlight-study button:focus-visible, .highlight-study select:focus-visible { outline: 2px solid var(--text-color); outline-offset: 3px; }
+.highlight-study option { background: var(--paper-color); color: var(--text-color); }
+.study-controls label { display: grid; gap: 5px; font-size: 12px; }
+.treatment-picker { display: flex; gap: 4px; margin-right: auto; }
+.treatment-picker button[aria-pressed='true'] { background: var(--text-color); color: var(--paper-color); border-color: var(--text-color); }
+.study-note { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0 18px; font-size: 12px; }
+.study-note p { margin: 0; }
+.study-note label { display: flex; align-items: center; gap: 6px; }
+.study-note small { opacity: .65; }
+.reader-sample { border: 1px solid var(--study-line); border-radius: 14px; overflow: hidden; background: var(--paper-color); }
+.sample-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 22px; border-bottom: 1px solid var(--study-line); }
+.sample-header > span:first-child { font-size: 19px; font-weight: 550; }
+.sample-header > span:nth-child(2) { margin-right: auto; font-size: 12px; opacity: .65; }
+.sample-header button { border: 0; font-size: 12px; }
+.sample-viewport { height: min(58svh, 590px); min-height: 330px; overflow: auto; padding: 48px 30px; position: relative; }
+.highlight-study .tikkun-book { width: 100%; height: auto; margin: 0; padding: 0; overflow: visible; font-size: 1.6rem; }
+.highlight-study .tikkun-page { margin: 0; padding: 0; width: 100%; }
+/* Decorative strips span inter-word space without changing Torah geometry. */
+.highlight-study .tikkun-book { position: relative; isolation: isolate; }
+.highlight-study .tikkun-page { position: relative; z-index: 1; }
+.highlight-strips { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+.highlight-strips > span { position: absolute; border-radius: 3px; }
+.reader-sample.cleared .destination-strip { visibility: hidden; }
+/* Composite against paper once so overlapping rows do not darken their joins. */
+.reader-sample[data-treatment='marker'] .destination-strip { background: linear-gradient(var(--destination-fill), var(--destination-fill)), var(--paper-color); }
+.reader-sample[data-treatment='outline'] .destination-strip { border: 1px solid var(--destination-color); }
+.reader-sample[data-treatment='underline'] .destination-strip { background: var(--destination-fill); border-bottom: 1.5px solid var(--destination-color); }
+.arrival-strip { visibility: hidden; background: linear-gradient(color-mix(in srgb, var(--destination-color) 14%, transparent), color-mix(in srgb, var(--destination-color) 14%, transparent)), var(--paper-color); }
+html[data-reader-theme='light'] .arrival-strip { background: color-mix(in srgb, var(--text-color) 9%, transparent); }
+@media (prefers-color-scheme: light) { html[data-reader-theme='automatic'] .arrival-strip { background: color-mix(in srgb, var(--text-color) 9%, transparent); } }
+.reader-sample.arrival .arrival-strip { visibility: visible; animation: reader-arrival-fade 1600ms ease-out both; }
+@media (prefers-reduced-motion: reduce) { .reader-sample.arrival .arrival-strip { animation: none; } }
+.sample-footer { display: flex; align-items: center; gap: 20px; padding: 10px 22px; border-top: 1px solid var(--study-line); font-size: 11px; }
+.sample-footer > span { display: flex; gap: 6px; align-items: center; }
+.sample-footer i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.destination-key { background: var(--destination-fill); border: 1px solid var(--destination-color); }
+.audio-key { background: var(--reader-highlight-fill-surface); border: 1px solid var(--reader-active-highlight-outline-color, #769cbe); }
+.sample-footer button { margin-left: auto; font-size: 12px; }
+.arrival-status { min-height: 20px; font-size: 12px; margin: 12px 0; opacity: .8; }
+.study-footnote { margin: 0; }
+.selection-actions { min-height: 58px; padding: 7px 22px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--study-line); }
+.selection-actions > span { font-size: 12px; opacity: .65; }
+.selection-actions button { font-size: 12px; border-color: transparent; color: var(--destination-color); }
+.selection-actions button:hover { background: var(--destination-fill); }
+.selection-actions [hidden] { display: none; }
+@media(max-width: 720px) {
+ .highlight-study { padding: 20px 14px; }
+ .study-header { display: block; margin-bottom: 18px; }
+ .highlight-study h1 { font-size: 28px; }
+ .study-controls { gap: 8px; }
+ .treatment-picker { width: 100%; }
+ .treatment-picker button { flex: 1; font-size: 12px; padding: 8px; }
+ .study-controls label { flex: 1 1 40%; }
+ .highlight-study select, .highlight-study button { min-height: 44px; }
+ .study-note { flex-wrap: wrap; }
+ .sample-header { gap: 8px; padding: 10px; flex-wrap: wrap; }
+ .sample-header > span:first-child { font-size: 16px; }
+ .sample-header > span:nth-child(2) { font-size: 10px; }
+ .sample-viewport { padding: 30px 8px; }
+ .highlight-study .tikkun-book { font-size: 1.25rem; }
+ .sample-footer { gap: 8px; flex-wrap: wrap; padding: 10px; }
+ .sample-footer button { width: 100%; margin: 0; }
+ .selection-actions { padding: 7px 10px; }
+}

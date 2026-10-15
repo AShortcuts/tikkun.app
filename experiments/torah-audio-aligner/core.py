@@ -67,7 +67,7 @@ def lexical_units(tokens, profile="orthographic"):
 
 
 def ctc_viterbi(log_probs, labels, blank_id, max_cells=200_000_000):
-    """CTC Viterbi baseline with explicit blanks and repeated-label constraints."""
+    """Exact CTC Viterbi with bounded traceback storage and repeated-label constraints."""
     emissions = np.asarray(log_probs, dtype=np.float32)
     if emissions.ndim != 2 or not emissions.shape[0] or not labels:
         raise AlignmentError("CTC needs nonempty frames and reference labels")
@@ -81,33 +81,52 @@ def ctc_viterbi(log_probs, labels, blank_id, max_cells=200_000_000):
     minimum_frames = len(labels) + sum(a == b for a, b in zip(labels, labels[1:]))
     if frames < minimum_frames:
         raise AlignmentError("Too few acoustic frames for the reference, including repeated letters")
+    if type(max_cells) is not int or max_cells < 1:
+        raise AlignmentError("Traceback memory budget must be a positive integer")
     states = len(labels) * 2 + 1
-    if frames * states > max_cells:
-        raise AlignmentError("Alignment exceeds the bounded trellis budget; use shorter anchored regions")
+    checkpointed = frames * states > max_cells
+    block_size = min(frames, math.ceil(math.sqrt(4 * frames))) if checkpointed else frames
+    checkpoint_count = math.ceil(frames / block_size) if checkpointed else 0
+    if max_cells < states * (block_size + 4 * checkpoint_count):
+        raise AlignmentError("Alignment exceeds the bounded traceback memory budget")
     expanded = np.full(states, blank_id, dtype=np.int32)
     expanded[1::2] = labels
     skip_allowed = np.zeros(states, dtype=bool)
     skip_allowed[2:] = (expanded[2:] != blank_id) & (expanded[2:] != expanded[:-2])
     previous = np.full(states, -np.inf, dtype=np.float32)
     previous[0] = 0
-    back = np.zeros((frames, states), dtype=np.uint8)
+    back = np.zeros((block_size, states), dtype=np.uint8)
+    checkpoints = []
     state_index = np.arange(states)
-    for frame_index, emission in enumerate(emissions):
+    def advance(previous, emission):
         candidates = np.full((3, states), -np.inf, dtype=np.float32)
         candidates[0] = previous
         candidates[1, 1:] = previous[:-1]
         candidates[2, 2:] = previous[:-2]
         candidates[2, ~skip_allowed] = -np.inf
         steps = np.argmax(candidates, axis=0)
-        previous = candidates[steps, state_index] + emission[expanded]
-        back[frame_index] = steps
+        return candidates[steps, state_index] + emission[expanded], steps
+    for frame_index, emission in enumerate(emissions):
+        if checkpointed and frame_index % block_size == 0:
+            checkpoints.append(previous.copy())
+        previous, steps = advance(previous, emission)
+        if not checkpointed:
+            back[frame_index] = steps
     state = states - 1 if previous[-1] >= previous[-2] else states - 2
     if not np.isfinite(previous[state]):
         raise AlignmentError("No acoustic path covers the supplied reference")
     path = np.empty(frames, dtype=np.int32)
-    for frame_index in range(frames - 1, -1, -1):
-        path[frame_index] = state
-        state -= int(back[frame_index, state])
+    for first in reversed(range(0, frames, block_size)):
+        end = min(first + block_size, frames)
+        if checkpointed:
+            # Recompute one block from its saved scores; ties and the global path stay identical.
+            previous = checkpoints[first // block_size]
+            for frame_index in range(first, end):
+                previous, steps = advance(previous, emissions[frame_index])
+                back[frame_index - first] = steps
+        for frame_index in range(end - 1, first - 1, -1):
+            path[frame_index] = state
+            state -= int(back[frame_index - first, state])
     spans = []
     for index, label in enumerate(labels):
         assigned = np.flatnonzero(path == 2 * index + 1)

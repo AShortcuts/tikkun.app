@@ -1,17 +1,20 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
-import { page } from 'vitest/browser'
+import { commands, page } from 'vitest/browser'
 import '../../css/master.css'
 import type {
   AudioNarrator,
   ParshaAudioRecording,
 } from '../audio/types.ts'
 import { createMount } from '../lifecycle/mount.ts'
+import { mountAudioButtonTooltip } from '../reading/audio-button-tooltip.ts'
 import { createDownloadLibrary } from '../offline/download-library.ts'
 import { descriptorForRecording } from '../offline/recording-download.ts'
 import { resolveRecordingAsset, type RecordingStorage } from '../offline/recording-storage.ts'
 import type { StoredRecording } from '../offline/recording-inventory.ts'
 import { hexToOklch, oklchToHex } from './oklch-color.ts'
+import { serializeReaderTheme } from '../reader-themes.ts'
 import {
+  applyReaderPreferences,
   defaultReaderPreferences,
   mergeReaderPreferences,
   colorContrastRatio,
@@ -26,8 +29,10 @@ import {
 
 let fixture: HTMLElement
 let destroy: (() => void) | null = null
+let clipboardDescriptor: PropertyDescriptor | undefined
 
 beforeEach(() => {
+  clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
   fixture = document.createElement('section')
   fixture.innerHTML = `
     <button data-target-id="settings-toggle" aria-expanded="false"></button>
@@ -47,8 +52,34 @@ afterEach(() => {
     '--reader-custom-background-color'
   )
   document.documentElement.style.removeProperty('--reader-custom-text-color')
+  document.documentElement.style.removeProperty('--reader-custom-ui-text-color')
+  document.documentElement.style.removeProperty('--reader-custom-ui-secondary-color')
+  delete document.documentElement.dataset.readerCustomScheme
   document.documentElement.style.colorScheme = ''
+  if (clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', clipboardDescriptor)
+  else Reflect.deleteProperty(navigator, 'clipboard')
   vi.restoreAllMocks()
+})
+
+test.each([390, 1280])('adjusts Reading font size and retains it across layout changes at %ipx', async (width) => {
+  await page.viewport(width, 900)
+  const state = createState()
+  let settings: ReaderSettings | null = null
+  destroy = createMount()((scope) => { settings = createReaderSettings(scope, createOptions(state)) })
+  settings!.open()
+  expect(fixture.querySelector('[data-target-id="settings-reading-font-scale"]')).toBeNull()
+  required<HTMLButtonElement>('[data-reader-text-layout="reading"]').click()
+  await vi.waitFor(() => expect(fixture.querySelector('[data-target-id="settings-reading-font-scale"]')).not.toBeNull())
+  const slider = required<HTMLInputElement>('[data-target-id="settings-reading-font-scale"]')
+  slider.value = '1.25'
+  slider.dispatchEvent(new Event('input', { bubbles: true }))
+  await vi.waitFor(() => expect(slider.getAttribute('aria-valuetext')).toBe('125%'))
+  expect(state.preferences.readingFontScale).toBe(1.25)
+  await page.screenshot({ path: `../../.vitest-attachments/reading-font-settings-${width}.png` })
+  required<HTMLButtonElement>('[data-reader-text-layout="match"]').click()
+  await vi.waitFor(() => expect(fixture.querySelector('[data-target-id="settings-reading-font-scale"]')).toBeNull())
+  required<HTMLButtonElement>('[data-reader-text-layout="reading"]').click()
+  await vi.waitFor(() => expect(required<HTMLInputElement>('[data-target-id="settings-reading-font-scale"]').value).toBe('1.25'))
 })
 
 test('replacement mounts keep one settings lifetime and preserve focus behavior', async () => {
@@ -103,6 +134,67 @@ test('replacement mounts keep one settings lifetime and preserve focus behavior'
   expect(pane.classList.contains('u-hidden')).toBe(true)
   narrator.dispatchEvent(new Event('change', { bubbles: true }))
   expect(second.updatePreferences).toHaveBeenCalledTimes(1)
+})
+
+test.each([390, 1280])('More keeps print in one row and explains unavailable storage at %ipx', async (width) => {
+  await page.viewport(width, 900)
+  const openPrint = vi.fn()
+  const openMedia = vi.fn()
+  let settings: ReaderSettings | null = null
+  destroy = createMount()((scope) => {
+    mountAudioButtonTooltip(scope, document)
+    settings = createReaderSettings(scope, { ...createOptions(createState()), openPrint, openMedia })
+  })
+  settings!.open()
+  required<HTMLButtonElement>('[data-settings-category="more"]').click()
+  await nextAnimationFrame()
+
+  const print = required<HTMLButtonElement>('button[aria-label="Print passage"]')
+  const label = required('.settings-action-row .settings-field-label')
+  const printRect = print.getBoundingClientRect()
+  const labelRect = label.getBoundingClientRect()
+  expect(Math.abs(printRect.top + printRect.height / 2 - labelRect.top - labelRect.height / 2)).toBeLessThan(1)
+  expect(printRect.width).toBeGreaterThanOrEqual(44)
+  expect(printRect.height).toBeGreaterThanOrEqual(44)
+
+  const media = page.getByRole('button', { name: 'Media & Storage', exact: true })
+  const mediaButton = media.element()
+  expect(mediaButton.getAttribute('aria-disabled')).toBe('true')
+  await media.click({ force: true })
+  const tip = document.querySelector<HTMLElement>('[role="tooltip"]')!
+  await vi.waitFor(() => expect(tip.hidden).toBe(false))
+  expect(tip.textContent).toBe('Offline downloads are unavailable in this browser.')
+  expect(mediaButton.getAttribute('aria-describedby')).toBe(tip.id)
+  expect(openMedia).not.toHaveBeenCalled()
+  expect(required('[data-target-id="settings-pane"]').classList.contains('u-hidden')).toBe(false)
+
+  await page.getByRole('button', { name: 'Print passage', exact: true }).click()
+  expect(openPrint).toHaveBeenCalledOnce()
+  expect(tip.hidden).toBe(true)
+  expect(required('[data-target-id="settings-pane"]').classList.contains('u-hidden')).toBe(true)
+})
+
+test.each(['browser', 'device'] as const)('supported %s storage opens even without a selected recording', async (location) => {
+  const library = createDownloadLibrary({
+    assets: [],
+    backend: { supported: true, location, inventory: async () => [],
+      download: vi.fn(), remove: vi.fn(), destroy: vi.fn() },
+    intent: { read: async () => [], update: async () => {} },
+  })
+  const openMedia = vi.fn()
+  let settings: ReaderSettings | null = null
+  destroy = createMount()((scope) => {
+    scope.own(() => library.destroy())
+    settings = createReaderSettings(scope, { ...createOptions(createState()), downloadLibrary: library, openMedia })
+  })
+  settings!.open()
+  required<HTMLButtonElement>('[data-settings-category="more"]').click()
+  const media = page.getByRole('button', { name: 'Media & Storage', exact: true })
+  await vi.waitFor(() => expect(media.element().getAttribute('aria-disabled')).toBe('false'))
+  expect(media.element().hasAttribute('data-reader-tooltip')).toBe(false)
+  await media.click()
+  expect(openMedia).toHaveBeenCalledOnce()
+  expect(required('[data-target-id="settings-pane"]').classList.contains('u-hidden')).toBe(true)
 })
 
 test('moves settings without changing preferences, keeps them reachable, and restores the mobile layout', async () => {
@@ -892,6 +984,248 @@ test('shows and removes stored recordings without an active recording', async ()
         .textContent
     ).toContain('2 offline recordings were removed')
   })
+})
+
+test.each([390, 1280])('custom themes keep strong themed controls independent of reader text lightness at %ipx', async (width) => {
+  await page.viewport(width, 900)
+  fixture.dataset.themeContrastFixture = ''
+  fixture.insertAdjacentHTML('beforeend', `
+    <style>[data-theme-contrast-fixture] * { transition: none !important; }</style>
+    <header class="app-toolbar"><button class="toolbar-button"><svg class="ui-icon"></svg></button></header>
+    <article class="tikkun-page"><span class="word">Reader text</span><div class="aliyah-start-popup">Reading menu</div></article>
+  `)
+  const state = createState()
+  state.preferences = {
+    ...state.preferences,
+    themeMode: 'custom',
+    savedThemes: Array.from({ length: 5 }, (_, index) => ({
+      id: `theme-${index}`,
+      background: ['#112233', '#e6ede5', '#777777', '#dcd3ea', '#382322'][index],
+      text: '#999999',
+    })),
+  }
+  state.updatePreferences.mockImplementation((updates) => {
+    state.preferences = mergeReaderPreferences(state.preferences, updates)
+    applyReaderPreferences(state.preferences)
+  })
+  applyReaderPreferences(state.preferences)
+  let settings: ReaderSettings | null = null
+  destroy = createMount()((scope) => {
+    settings = createReaderSettings(scope, { ...createOptions(state), animateThemeChanges: false })
+  })
+  settings!.open()
+  required<HTMLButtonElement>('[data-settings-category="appearance"]').click()
+  const controls = ['.app-toolbar', '.toolbar-button .ui-icon', '.settings-pane', '.settings-pane-title h2',
+    '[data-target-id="settings-close"]', '[data-settings-category="reading"]', '.aliyah-start-popup']
+  const readControls = () => controls.map((selector) => {
+    const style = getComputedStyle(required(selector))
+    return { background: style.backgroundColor, text: style.color, border: style.borderColor }
+  })
+  const themes = [
+    { selector: '[data-theme-mode="custom"]', background: state.preferences.customBackgroundColor },
+    ...state.preferences.savedThemes.map((theme) => ({ ...theme, selector: `[data-saved-theme-id="${theme.id}"]` })),
+  ]
+  for (const theme of themes) {
+    required<HTMLButtonElement>(theme.selector).click()
+    const baseline = readControls()
+    const root = document.documentElement
+    expect(getComputedStyle(root).getPropertyValue('--paper-color').trim()).toBe(theme.background)
+    const primary = root.style.getPropertyValue('--reader-custom-ui-text-color')
+    const secondary = root.style.getPropertyValue('--reader-custom-ui-secondary-color')
+    expect(colorContrastRatio(theme.background, primary)).toBeGreaterThanOrEqual(4.5)
+    expect(colorContrastRatio(theme.background, secondary)).toBeGreaterThanOrEqual(4.5)
+    for (const lightness of ['0', '100']) {
+      const input = required<HTMLInputElement>('[aria-label="Text lightness"]')
+      input.value = lightness
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+      expect(getComputedStyle(required('.word')).color).toBe(lightness === '0' ? 'rgb(0, 0, 0)' : 'rgb(255, 255, 255)')
+      expect(readControls(), `${theme.selector} at lightness ${lightness}`).toEqual(baseline)
+    }
+  }
+})
+
+test.each([390, 1280])('custom theme circles keep independent edits, enforce five slots, and free deleted slots at %ipx', async (width) => {
+  await page.viewport(width, 900)
+  const state = createState()
+  let settings: ReaderSettings | null = null
+  destroy = createMount()((scope) => { settings = createReaderSettings(scope, createOptions(state)) })
+  settings!.open()
+  required<HTMLButtonElement>('[data-settings-category="appearance"]').click()
+  expect(fixture.querySelectorAll('[data-saved-theme-id]')).toHaveLength(1)
+  required<HTMLButtonElement>('[data-saved-theme-id]').click()
+  const originalId = state.preferences.activeSavedThemeId
+  const background = required<HTMLInputElement>('[aria-label="Background color"]')
+  background.value = '#112233'
+  background.dispatchEvent(new Event('input', { bubbles: true }))
+  // Switching slots must commit an in-flight color preview to its original slot.
+  required<HTMLButtonElement>('[aria-label="Add custom theme"]').click()
+  expect(state.preferences.savedThemes[0].background).toBe('#112233')
+  expect(state.preferences.savedThemes[1].background).toBe('#112233')
+  expect(state.preferences.savedThemes[1].text).toBe(state.preferences.savedThemes[0].text)
+  expect(state.preferences.savedThemes[1].id).not.toBe(originalId)
+  expect(state.preferences.customBackgroundColor).toBe(defaultReaderPreferences.customBackgroundColor)
+  required<HTMLButtonElement>('[data-custom-theme-preset="sage"]').click()
+  expect(state.preferences.savedThemes[1].background).toBe('#e6ede5')
+  required<HTMLButtonElement>(`[data-saved-theme-id="${originalId}"]`).click()
+  expect(required<HTMLInputElement>('[aria-label="Background color"]').value).toBe('#112233')
+  for (let index = 2; index < 5; index += 1) required<HTMLButtonElement>('[aria-label="Add custom theme"]').click()
+  expect(fixture.querySelectorAll('[data-saved-theme-id]')).toHaveLength(5)
+  expect(fixture.querySelector('[aria-label="Add custom theme"]')).toBeNull()
+  const circle = required<HTMLElement>('[data-saved-theme-id]')
+  expect(circle.getBoundingClientRect().width).toBeGreaterThanOrEqual(44)
+  const row = required<HTMLElement>('.settings-saved-themes')
+  expect(row.scrollWidth).toBeLessThanOrEqual(row.clientWidth)
+  required<HTMLButtonElement>('.settings-theme-delete').click()
+  expect(state.preferences.savedThemes).toHaveLength(4)
+  expect(required('[aria-label="Add custom theme"]')).toBeTruthy()
+  expect(document.activeElement?.getAttribute('data-saved-theme-id')).toBe(originalId)
+  required<HTMLButtonElement>('[aria-label="Add custom theme"]').click()
+  expect(state.preferences.savedThemes).toHaveLength(5)
+  for (let index = 0; index < 5; index += 1) required<HTMLButtonElement>('.settings-theme-delete').click()
+  expect(state.preferences.savedThemes).toEqual([])
+  expect(state.preferences.activeSavedThemeId).toBeNull()
+  expect(document.activeElement?.getAttribute('data-theme-mode')).toBe('custom')
+  expect(fixture.querySelector('.settings-theme-delete')).toBeNull()
+})
+
+test.each([
+  { mode: 'light', system: 'dark', background: '#fafafa', text: '#323232' },
+  { mode: 'dark', system: 'light', background: '#222222', text: '#d3d3d3' },
+  { mode: 'sepia', system: 'light', background: '#efddab', text: '#302c22' },
+  { mode: 'automatic', system: 'light', background: '#fafafa', text: '#323232' },
+  { mode: 'automatic', system: 'dark', background: '#222222', text: '#d3d3d3' },
+  { mode: 'custom', system: 'light', background: '#123456', text: '#fedcba' },
+] as const)('new themes start from $mode with system $system', async ({ mode, system, background, text }) => {
+  await commands.emulateColorScheme(system)
+  try {
+    const state = createState()
+    state.preferences = mergeReaderPreferences(state.preferences, {
+      customBackgroundColor: '#123456', customTextColor: '#fedcba',
+    })
+    let settings: ReaderSettings | null = null
+    destroy = createMount()((scope) => { settings = createReaderSettings(scope, createOptions(state)) })
+    settings!.open()
+    required<HTMLButtonElement>('[data-settings-category="appearance"]').click()
+    required<HTMLButtonElement>(`[data-theme-mode="${mode}"]`).click()
+    applyReaderPreferences(state.preferences)
+    required<HTMLButtonElement>('[aria-label="Add custom theme"]').click()
+    expect(state.preferences.savedThemes[1]).toMatchObject({ background, text })
+    expect(state.preferences.activeSavedThemeId).toBe(state.preferences.savedThemes[1].id)
+    expect(state.preferences.customBackgroundColor).toBe('#123456')
+    expect(state.preferences.customTextColor).toBe('#fedcba')
+    expect(required<HTMLInputElement>('[aria-label="Background color"]').value).toBe(background)
+    expect(required<HTMLInputElement>('[aria-label="Text color"]').value).toBe(text)
+  } finally {
+    await commands.emulateColorScheme(null)
+  }
+})
+
+test('copies the latest custom colors and pastes only into the selected circle', async () => {
+  let clipboard = ''
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+    writeText: vi.fn(async (value: string) => { clipboard = value }),
+    readText: vi.fn(async () => clipboard),
+  } })
+  const state = createState()
+  let settings: ReaderSettings | null = null
+  destroy = createMount()((scope) => { settings = createReaderSettings(scope, createOptions(state)) })
+  settings!.open()
+  required<HTMLButtonElement>('[data-settings-category="appearance"]').click()
+  required<HTMLButtonElement>('[data-theme-mode="custom"]').click()
+  const background = required<HTMLInputElement>('[aria-label="Background color"]')
+  background.value = '#123456'
+  background.dispatchEvent(new Event('input', { bubbles: true }))
+  required<HTMLButtonElement>('.settings-theme-transfer button').click()
+  await vi.waitFor(() => expect(required('.settings-theme-transfer-status').textContent).toBe('Theme copied.'))
+  expect(JSON.parse(clipboard).background).toBe('#123456')
+  expect(JSON.parse(clipboard)).not.toHaveProperty('savedThemes')
+  required<HTMLButtonElement>('[data-saved-theme-id]').click()
+  required<HTMLButtonElement>('[data-target-id="settings-theme-paste"]').click()
+  await vi.waitFor(() => expect(required('.settings-theme-transfer-status').textContent).toBe('Theme pasted.'))
+  expect(state.preferences.savedThemes[0].background).toBe('#123456')
+  expect(state.preferences.narratorId).toBe(defaultReaderPreferences.narratorId)
+  required<HTMLButtonElement>('[data-custom-theme-preset="night"]').click()
+  required<HTMLButtonElement>('[data-theme-mode="custom"]').click()
+  expect(required<HTMLInputElement>('[aria-label="Background color"]').value).toBe('#123456')
+})
+
+test('rejects bad configs without changing colors and supports manual paste when clipboard access fails', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  const readText = vi.fn(async () => 'not a theme')
+  const writeText = vi.fn(async () => { throw new Error('denied') })
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { readText, writeText } })
+  const state = createState()
+  let settings: ReaderSettings | null = null
+  destroy = createMount()((scope) => { settings = createReaderSettings(scope, createOptions(state)) })
+  settings!.open()
+  required<HTMLButtonElement>('[data-settings-category="appearance"]').click()
+  required<HTMLButtonElement>('[data-saved-theme-id]').click()
+  const before = JSON.stringify(state.preferences)
+  required<HTMLButtonElement>('[data-target-id="settings-theme-paste"]').click()
+  await vi.waitFor(() => expect(required('.settings-theme-transfer-status').textContent).toContain('not a theme config'))
+  expect(JSON.stringify(state.preferences)).toBe(before)
+  readText.mockRejectedValue(new Error('denied'))
+  required<HTMLButtonElement>('[data-target-id="settings-theme-paste"]').click()
+  await vi.waitFor(() => expect(required('.settings-theme-transfer-status').textContent).toContain('Paste your theme config below'))
+  const input = required<HTMLTextAreaElement>('#reader-theme-config')
+  expect(document.activeElement).toBe(input)
+  input.value = serializeReaderTheme({ background: '#233344', text: '#e5edf4' })
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  await vi.waitFor(() => expect(required<HTMLButtonElement>('.settings-theme-config button').disabled).toBe(false))
+  required<HTMLButtonElement>('.settings-theme-config button').click()
+  expect(state.preferences.savedThemes[0].background).toBe('#233344')
+  await vi.waitFor(() => expect(fixture.querySelector('#reader-theme-config')).toBeNull())
+  required<HTMLButtonElement>('.settings-theme-transfer button').click()
+  await vi.waitFor(() => expect(required('.settings-theme-transfer-status').textContent).toContain('Copy the selected config below'))
+  const output = required<HTMLTextAreaElement>('#reader-theme-config')
+  expect(output.readOnly).toBe(true)
+  expect(JSON.parse(output.value).background).toBe('#233344')
+  expect(output.selectionEnd).toBe(output.value.length)
+  expect(log).toHaveBeenCalledTimes(2)
+})
+
+test('an outstanding clipboard read cannot overwrite a different selected theme', async () => {
+  let resolveRead!: (value: string) => void
+  const readText = vi.fn(() => new Promise<string>((resolve) => { resolveRead = resolve }))
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { readText } })
+  const state = createState()
+  let settings: ReaderSettings | null = null
+  destroy = createMount()((scope) => { settings = createReaderSettings(scope, createOptions(state)) })
+  settings!.open()
+  required<HTMLButtonElement>('[data-saved-theme-id]').click()
+  required<HTMLButtonElement>('[data-target-id="settings-theme-paste"]').click()
+  expect(required('#reader-theme-config')).toBeTruthy()
+  required<HTMLButtonElement>('[aria-label="Add custom theme"]').click()
+  const before = JSON.stringify(state.preferences)
+  resolveRead(serializeReaderTheme({ background: '#112233', text: '#ffffff' }))
+  await flushMessages()
+  expect(JSON.stringify(state.preferences)).toBe(before)
+  expect(required('.settings-theme-transfer-status').textContent).toBe('')
+})
+
+test('manual paste stays available while clipboard permission is pending and wins over a late read', async () => {
+  let resolveRead!: (value: string) => void
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+    readText: () => new Promise<string>((resolve) => { resolveRead = resolve }),
+  } })
+  const state = createState()
+  let settings: ReaderSettings | null = null
+  destroy = createMount()((scope) => { settings = createReaderSettings(scope, createOptions(state)) })
+  settings!.open()
+  required<HTMLButtonElement>('[data-settings-category="appearance"]').click()
+  required<HTMLButtonElement>('[data-saved-theme-id]').click()
+  required<HTMLButtonElement>('[data-target-id="settings-theme-paste"]').click()
+  const input = required<HTMLTextAreaElement>('#reader-theme-config')
+  input.value = serializeReaderTheme({ background: '#233344', text: '#e5edf4' })
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  await vi.waitFor(() => expect(required<HTMLButtonElement>('.settings-theme-config button').disabled).toBe(false))
+  required<HTMLButtonElement>('.settings-theme-config button').click()
+  expect(state.preferences.savedThemes[0].background).toBe('#233344')
+  resolveRead(serializeReaderTheme({ background: '#112233', text: '#ffffff' }))
+  await flushMessages()
+  expect(state.preferences.savedThemes[0].background).toBe('#233344')
+  expect(required('.settings-theme-transfer-status').textContent).toBe('Theme pasted.')
 })
 
 function createState() {

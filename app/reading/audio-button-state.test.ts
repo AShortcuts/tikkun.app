@@ -15,7 +15,7 @@ test.each([
   [state('partial-audio', { issue: 'cue', canPlay: true }), 'cue', false, false],
   [state('load-failed'), 'audio', true, false],
   [state('missing-audio', { recording: null }), 'empty', true, true],
-  [state('checking'), 'normal', true, true],
+  [state('checking'), 'cue', true, true],
 ] as const)('separates color, dimming and action availability for %j', (state, tone, dimmed, actionDisabled) => {
   expect(audioButtonState({ state, available: Boolean(state.recording) })).toMatchObject({ tone, dimmed, actionDisabled })
 })

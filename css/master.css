@@ -2,6 +2,7 @@
 @layer reset, tokens, shell, reader, feature, responsive, overrides;
 
 @import '../node_modules/normalize.css/normalize.css' layer(reset);
+@import './reader-theme.css';
 
 @import './app-layout.css' layer(shell);
 @import './reader-system-colors.css' layer(tokens);
@@ -11,6 +12,7 @@
 @import './toggle.css' layer(feature);
 @import './toolbar.css' layer(shell);
 @import './reader-enhancements.css' layer(feature);
+@import './reader-arrival-cue.css' layer(feature);
 @import './reader-navigation.css';
 @import './mobile-reader.css' layer(responsive);
 @import './reader-player.css';
@@ -61,7 +63,6 @@
   html,
   body {
     height: 100%;
-    background-color: var(--paper-color, white);
     overflow: hidden;
   }
 
@@ -195,15 +196,6 @@
      the screen), regardless of overflow */
     --header-height: 45px;
 
-    --paper-color: oklch(98.5% 0 0);
-    --page-ink-color: oklch(0% 0 0 / 0.8);
-    --annotations-toggle-active-color: black;
-    --verses-color: oklch(0% 0 0 / 0.35);
-    --light-accent-color: oklch(0% 0 0 / 0.05);
-    --medium-accent-color: oklch(0% 0 0 / 0.1);
-    --heavy-accent-color: oklch(0% 0 0 / 0.2);
-    --text-color: oklch(0% 0 0 / 0.7);
-    --light-text-color: oklch(0% 0 0 / 0.5);
     --button-border-radius: 8px;
     --reader-control-press-scale: 0.97;
     --reader-motion-fast: 140ms;
@@ -221,8 +213,6 @@
     --reader-highlight-radius: var(--reader-highlight-border-radius);
     --reader-highlight-glow: 3.5px;
     --reader-highlight-outline-offset: 3.5px;
-    --reader-custom-background-color: #eee6d6;
-    --reader-custom-text-color: #3b3026;
   }
 
   body {
@@ -234,87 +224,12 @@
     );
   }
 
-  html[data-reader-theme='light'] {
-    color-scheme: light;
-  }
-
   html[data-reader-theme='sepia'] body {
-    --paper-color: oklch(90% 17% 90deg);
     --reader-highlight-fill-surface: color-mix(
       in srgb,
       oklch(98.5% 0 0) var(--reader-highlight-fill-alpha-inverse-percent),
       var(--reader-highlight-fill) var(--reader-highlight-fill-alpha-percent)
     );
-  }
-
-  html[data-reader-theme='sepia'] {
-    color-scheme: light;
-  }
-
-  html[data-reader-theme='dark'] body {
-    --paper-color: oklch(25% 0 0);
-    --page-ink-color: oklch(100% 0 0 / 0.8);
-    --annotations-toggle-active-color: oklch(100% 0 0 / 0.8);
-    --verses-color: oklch(100% 0 0 / 0.35);
-    --light-accent-color: oklch(100% 0 0 / 0.05);
-    --medium-accent-color: oklch(100% 0 0 / 0.1);
-    --heavy-accent-color: oklch(100% 0 0 / 0.2);
-    --text-color: oklch(100% 0 0 / 0.7);
-    --light-text-color: oklch(100% 0 0 / 0.5);
-  }
-
-  html[data-reader-theme='dark'] {
-    color-scheme: dark;
-  }
-
-  html[data-reader-theme='custom'] body {
-    --paper-color: var(--reader-custom-background-color);
-    --page-ink-color: var(--reader-custom-text-color);
-    --annotations-toggle-active-color: var(--reader-custom-text-color);
-    --verses-color: color-mix(
-      in srgb,
-      var(--reader-custom-text-color) 42%,
-      transparent
-    );
-    --light-accent-color: color-mix(
-      in srgb,
-      var(--reader-custom-text-color) 6%,
-      transparent
-    );
-    --medium-accent-color: color-mix(
-      in srgb,
-      var(--reader-custom-text-color) 12%,
-      transparent
-    );
-    --heavy-accent-color: color-mix(
-      in srgb,
-      var(--reader-custom-text-color) 22%,
-      transparent
-    );
-    --text-color: var(--reader-custom-text-color);
-    --light-text-color: color-mix(
-      in srgb,
-      var(--reader-custom-text-color) 68%,
-      transparent
-    );
-  }
-
-  @media (prefers-color-scheme: dark) {
-    html[data-reader-theme='automatic'] body {
-      --paper-color: oklch(25% 0 0);
-      --page-ink-color: oklch(100% 0 0 / 0.8);
-      --annotations-toggle-active-color: oklch(100% 0 0 / 0.8);
-      --verses-color: oklch(100% 0 0 / 0.35);
-      --light-accent-color: oklch(100% 0 0 / 0.05);
-      --medium-accent-color: oklch(100% 0 0 / 0.1);
-      --heavy-accent-color: oklch(100% 0 0 / 0.2);
-      --text-color: oklch(100% 0 0 / 0.7);
-      --light-text-color: oklch(100% 0 0 / 0.5);
-    }
-
-    html[data-reader-theme='automatic'] {
-      color-scheme: dark;
-    }
   }
 }
 

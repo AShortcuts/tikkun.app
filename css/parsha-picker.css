@@ -273,19 +273,6 @@
     transform var(--reader-motion-fast) var(--reader-ease-out);
 }
 
-.parsha-aliyah-toggle::before {
-  content: '';
-  position: absolute;
-  inset-inline-start: 0;
-  top: 50%;
-  width: 1px;
-  height: 1.25rem;
-  transform: translateY(-50%);
-  background-color: color-mix(in srgb, var(--text-color) 22%, transparent);
-  opacity: 0;
-  pointer-events: none;
-}
-
 .parsha-aliyah-toggle .ui-icon {
   width: 0.875rem;
   height: 0.875rem;
@@ -311,10 +298,6 @@
 @media (hover: hover) and (pointer: fine) {
   .parsha-row:hover {
     background-color: var(--light-accent-color);
-  }
-
-  .parsha-row:hover .parsha-aliyah-toggle::before {
-    opacity: 1;
   }
 
   .parsha:hover,

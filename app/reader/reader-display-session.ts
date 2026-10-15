@@ -128,6 +128,7 @@ export interface ReaderDisplaySessionEffects {
   resetDisplayResources(): void
   afterDisplayReplacementReset(): void
   displayCreated(display: ScrollDisplay): void
+  displayPositioned?(): void
   displayDeactivating(): void
   resolveRun(runId: string): LeiningRun | null
   getPlaybackProtectedPageNumbers(forwardPageCount: number): readonly number[]
@@ -328,6 +329,8 @@ export function createReaderDisplaySession({
     const settled = display.scrolled.then(async () => {
       if (!isCurrent(display, lifetime)) return
       pageWindow.markReady(display)
+      // Complete startup feedback during the existing settling frames, before reveal.
+      effects.displayPositioned?.()
       await waitForAnimationFrames(2)
       if (!isCurrent(display, lifetime)) return
       root.style.visibility = ''

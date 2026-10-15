@@ -1,5 +1,6 @@
 <script lang="ts">
   import { flushSync, onMount } from 'svelte'
+  import { trackAnalytics } from '../analytics/client.ts'
   import UiIcon from '../components/UiIcon.svelte'
   import type { NavigationActionGroup } from '../navigation/actions.ts'
   import type { SearchRange } from './index.ts'
@@ -38,6 +39,14 @@
   let focusWithin = $state(false)
   let search: ReaderSearch | null = null
   let input: HTMLInputElement
+  let analyticsTimer: ReturnType<typeof setTimeout> | undefined
+  let reportedQuery = ''
+  function reportSearch() {
+    clearTimeout(analyticsTimer)
+    if (!query.trim() || reportedQuery === query) return
+    reportedQuery = query
+    trackAnalytics('search_results', { surface: presentation, results: matches.length === 0 ? 'none' : matches.length <= 5 ? '1-5' : '6-12' })
+  }
   const resultsVisible = $derived(Boolean(query) || focusWithin)
 
   function runSearch(nextQuery: string) {
@@ -46,6 +55,7 @@
   }
 
   function setQuery(nextQuery: string) {
+    clearTimeout(analyticsTimer)
     const nextMatches = runSearch(nextQuery)
     flushSync(() => {
       query = nextQuery
@@ -53,6 +63,8 @@
       activeIndex = 0
     })
     queryChanged(nextQuery)
+    if (nextQuery.trim()) analyticsTimer = setTimeout(reportSearch, 800)
+    else reportedQuery = ''
   }
 
   function reset() {
@@ -87,6 +99,8 @@
   }
 
   function activate(result: ReaderSearchResult) {
+    reportSearch()
+    if (result.group !== 'admin') trackAnalytics('search_select', { surface: presentation, group: result.group, position: matches.indexOf(result) + 1 })
     resultActivated()
     if (result.action) {
       void result.action.run()
@@ -185,7 +199,7 @@
       reset()
       focus()
     }
-    return () => connect(null)
+    return () => { clearTimeout(analyticsTimer); connect(null) }
   })
 </script>
 
@@ -210,12 +224,12 @@
       data-target-id="reader-search-input"
       type="search"
       role="combobox"
-      aria-label="Search readings and commands"
+      aria-label="Search readings and settings"
       aria-autocomplete="list"
       aria-expanded={resultsVisible}
       aria-controls={listboxId}
       aria-activedescendant={activeDescendant()}
-      placeholder="Search readings or run a command…"
+      placeholder="Search readings or settings…"
       autocomplete="off"
       autocorrect="off"
       autocapitalize="off"
@@ -334,7 +348,7 @@
         </ol>
       {:else}
         <div id={listboxId} class="reader-search-empty" role="listbox">
-          {query ? 'No matching reading or command' : 'No quick actions available'}
+          {query ? 'No matching readings or settings' : 'No quick actions available'}
         </div>
       {/if}
     </div>

@@ -5,8 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script>
       if (window.parent !== window) {
-        globalThis.__vitest_browser_runner__ =
-          window.parent.__vitest_browser_runner__
+        // Real app frames use native imports. Keep their promises in this frame
+        // so removing an iframe cannot reject an import owned by the test runner.
+        globalThis.__vitest_browser_runner__ = {
+          wrapDynamicImport: (load) => load(),
+        }
       }
     </script>
     %sveltekit.head%

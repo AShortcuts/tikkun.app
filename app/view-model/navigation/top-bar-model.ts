@@ -1,8 +1,9 @@
 import { isSameLeiningDate } from '../../calendar-model/generator.ts'
-import type {
-  LeiningAliyah,
-  LeiningInstance,
-  LeiningRun,
+import {
+  readingTitle,
+  type LeiningAliyah,
+  type LeiningInstance,
+  type LeiningRun,
 } from '../../calendar-model/model-types.ts'
 import { aliyahName } from '../aliyah-labeller.ts'
 import type { RenderedLineInfo, ScrollViewModel } from '../scroll-view-model.ts'
@@ -115,29 +116,38 @@ export class TopBarTracker {
           targetRun: run,
         }))
 
-      const currentDate = newInfo.currentRun.leining.date
-      const allInstances = model.generator
-        .aroundDate(currentDate.date)
-        .filter(
-          // Skip the other day of ראש חודש.
-          // Include the current day for indexOf().
-          (d) => d.id === currentDate.id || !isSameLeiningDate(d, currentDate)
+      if (run.leining.kind === 'parsha') {
+        const index = model.relevantRuns.findIndex(candidate => candidate.id === run.id)
+        const link = (targetRun: LeiningRun | undefined): Link | null => targetRun
+          ? { targetRun, label: readingTitle(targetRun.leining).he }
+          : null
+        newInfo.previousLink = link(model.relevantRuns[index - 1])
+        newInfo.nextLink = link(model.relevantRuns[index + 1])
+      } else {
+        const currentDate = run.leining.date
+        const allInstances = model.generator
+          .aroundDate(currentDate.date)
+          .filter(
+            // Skip the other day of ראש חודש.
+            // Include the current day for indexOf().
+            (d) => d.id === currentDate.id || !isSameLeiningDate(d, currentDate)
+          )
+          .flatMap((d) => d.leinings)
+          .filter((leining) => leining.runs.some((run) => hasScrollData(run.scroll)))
+        const instanceIndex = allInstances.findIndex(
+          (o) =>
+            o.date.id === currentDate.id &&
+            o.id === newInfo.currentRun?.leining.id
         )
-        .flatMap((d) => d.leinings)
-        .filter((leining) => leining.runs.some((run) => hasScrollData(run.scroll)))
-      const instanceIndex = allInstances.findIndex(
-        (o) =>
-          o.date.id === currentDate.id &&
-          o.id === newInfo.currentRun?.leining.id
-      )
-      newInfo.previousLink = createInstanceLink(
-        allInstances[instanceIndex - 1],
-        newInfo.currentRun
-      )
-      newInfo.nextLink = createInstanceLink(
-        allInstances[instanceIndex + 1],
-        newInfo.currentRun
-      )
+        newInfo.previousLink = createInstanceLink(
+          allInstances[instanceIndex - 1],
+          newInfo.currentRun
+        )
+        newInfo.nextLink = createInstanceLink(
+          allInstances[instanceIndex + 1],
+          newInfo.currentRun
+        )
+      }
     }
 
     if (newInfo.currentRun?.scroll !== 'torah') {
@@ -184,7 +194,7 @@ export class TopBarTracker {
         const label = aliyahName(a.aliyah.index, a.run, { isEnd: true })
         return a.run === currentRun
           ? label
-          : `${a.run.leining.date.title.he} ${label}`
+          : `${readingTitle(a.run.leining).he} ${label}`
       })
   }
 }
@@ -199,7 +209,7 @@ function createInstanceLink(
   return {
     targetRun,
     label: [
-      target.date.id === currentRun.leining.date.id ? '' : target.date.title.he,
+      target.date.id === currentRun.leining.date?.id ? '' : target.date.title.he,
       target.id,
     ]
       .join(' ')

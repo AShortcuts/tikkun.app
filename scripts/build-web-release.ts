@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { updateConfig } from './update-config.mjs'
+import { assertNativeTarget, readNativeTarget, targetFromArchive } from './native-update-target.ts'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const args = process.argv.slice(2)
@@ -12,7 +13,7 @@ const nativeBuild = args.includes('--native-build') ? option('--native-build') :
 const rollout = Number(args.includes('--rollout') ? option('--rollout') : 0)
 if (!/^\d+$/.test(nativeBuild) || !Number.isInteger(rollout) || rollout < 0 || rollout > 100) throw new Error('Use --native-build NUMBER [--rollout 0..100]')
 if (!args.includes('--approve-web-only')) throw new Error('Review changes for native compatibility and store eligibility, then pass --approve-web-only')
-if (!args.includes('--target-archive')) throw new Error('Supply --target-archive pointing to the distributed native archive')
+if (args.includes('--target-archive') === args.includes('--target-record')) throw new Error('Supply exactly one --target-archive or --target-record from the distributed native archive')
 const keyFile = process.env.TIKKUN_UPDATE_PRIVATE_KEY_FILE
 if (!keyFile) throw new Error('Set TIKKUN_UPDATE_PRIVATE_KEY_FILE outside the public web tree')
 const config = updateConfig()
@@ -21,16 +22,10 @@ const key = createPrivateKey(await readFile(keyFile))
 if (createPublicKey(key).export({ type: 'spki', format: 'pem' }).toString().trim() !== config.publicKey) throw new Error('Update signing keys do not match')
 const source = path.join(root, 'dist-native')
 await readFile(path.join(source, 'reader/index.html'))
-const targetApp = path.join(path.resolve(option('--target-archive')), 'Products/Applications/App.app')
-const version = spawnSync('/usr/bin/plutil', ['-extract', 'CFBundleVersion', 'raw', '-o', '-', path.join(targetApp, 'Info.plist')], { encoding: 'utf8' })
-if (version.status !== 0 || version.stdout.trim() !== nativeBuild) throw new Error('Target archive does not match the selected native build')
-const platform = spawnSync('/usr/bin/plutil', ['-extract', 'CFBundleSupportedPlatforms.0', 'raw', '-o', '-', path.join(targetApp, 'Info.plist')], { encoding: 'utf8' })
-if (platform.status !== 0 || platform.stdout.trim() !== 'iPhoneOS') throw new Error('Target must be a device archive, not a Simulator app')
-const sourceContract = await readFile(path.join(source, 'native-update-contract.json'), 'utf8')
-const targetContract = await readFile(path.join(targetApp, 'public/native-update-contract.json'), 'utf8')
-if (sourceContract !== targetContract) throw new Error('Native code, configuration or signing key differs from the target archive; ship an App Store build')
-const targetConfig = JSON.parse(await readFile(path.join(targetApp, 'capacitor.config.json'), 'utf8'))
-if (targetConfig.plugins?.LiveUpdate?.publicKey !== config.publicKey) throw new Error('Signing key is not installed in the target archive')
+const target = args.includes('--target-record')
+  ? await readNativeTarget(path.resolve(option('--target-record')), config.publicKey)
+  : await targetFromArchive(path.resolve(option('--target-archive')), nativeBuild, config.publicKey)
+assertNativeTarget(target, JSON.parse(await readFile(path.join(source, 'native-update-contract.json'), 'utf8')), config.publicKey, nativeBuild)
 let total = 0
 async function inspect(directory: string) {
   for (const entry of await readdir(directory)) {

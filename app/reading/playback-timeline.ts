@@ -39,6 +39,7 @@ export type PlaybackCommand =
   | { type: 'set-cue-index'; index: number | null }
 
 export interface PlaybackTimelineOptions {
+  resolveRun?(id: string): LeiningRun | null
   document: Document
   view: Window
   audioController: PlaybackController
@@ -236,7 +237,7 @@ export function createPlaybackTimeline(
           'partial-passage': `Available portion: ${session.passage ? passageRangeLabel(session.passage.range) : ''}${session.passage?.cueComplete ? '' : ' · Word highlighting incomplete'}`,
         }[session.status]
     const readingLabel = session.readingLabel ?? session.recording.reading.name
-    const aliyahLabel = formatAliyahLabel(session.aliyahIndex)
+    const aliyahLabel = formatAliyahLabel(session.aliyahIndex, options.resolveRun?.(session.runId) ?? undefined)
 
     player.sync({
       desktopTitle: `${readingLabel} · ${aliyahLabel}${session.status === 'partial-passage' ? ' · available portion' : ''}`,
@@ -832,3 +833,4 @@ export function createPlaybackTimeline(
     },
   }
 }
+import type { LeiningRun } from '../calendar-model/model-types.ts'

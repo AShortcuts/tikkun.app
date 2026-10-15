@@ -25,6 +25,7 @@ class Library:
     def __init__(self, recording, bundle):
         self.text_hash = bundle["textPagesSha256"]
         self.recording = recording
+        self.sources = {identifier: recording for identifier in ("first", "second", "third")}
 
     def get(self, identifier):
         if identifier not in {"first", "second", "third"}:
@@ -118,6 +119,79 @@ class BatchTests(unittest.TestCase):
             self.wait(lambda: queue.thread is None)
             self.assertEqual(calls, ["first", "second"])
 
+    def test_clear_downloads_persists_and_saved_cues_can_be_reused(self):
+        queue = self.queue()
+        request_id = uuid.uuid4().hex
+        saved = self.store.save("fixture-1", initial_state(self.proposal), None)
+        archive = self.store.root / "exports/batches/download.zip"
+        archive.parent.mkdir(parents=True)
+        archive.write_bytes(b"existing download")
+        with patch.object(self.store, "detail", return_value={}):
+            ready = self.add(queue, "first", "second", force=False, request_id=request_id)["itemIds"]
+        waiting = self.add(queue, "third")["itemIds"][0]
+        self.assertEqual(queue.clear_downloads([ready[0]]), 1)
+        self.assertEqual(queue.clear_downloads([ready[0]]), 0)
+        self.assertEqual(queue.state["requests"][request_id]["itemIds"], [ready[1]])
+        self.assertEqual(self.store.saved("fixture-1"), saved)
+        self.assertEqual(archive.read_bytes(), b"existing download")
+        recovered = self.queue()
+        self.assertEqual([row["id"] for row in recovered.snapshot()["items"]], [ready[1], waiting])
+        self.assertTrue(recovered.snapshot()["clearDownloadsSupported"])
+        with patch.object(self.store, "detail", return_value={}):
+            restored = self.add(recovered, "first", force=False)["itemIds"][0]
+        self.assertNotEqual(restored, ready[0])
+        self.assertEqual(recovered.state["items"][-1]["resultId"], "fixture-1")
+        self.assertTrue(recovered.state["items"][-1]["reused"])
+        recovered.clear_downloads([ready[1], restored])
+        self.assertNotIn(request_id, recovered.state["requests"])
+
+    def test_clear_downloads_rejects_invalid_or_unfinished_selections_without_partial_changes(self):
+        queue = self.queue()
+        with patch.object(self.store, "detail", return_value={}):
+            ready = self.add(queue, "first", force=False)["itemIds"][0]
+        waiting = self.add(queue, "second")["itemIds"][0]
+        for selection in (None, [], "all", [None], [[]], [""], [ready, ready], [str(i) for i in range(2001)]):
+            with self.subTest(selection=str(selection)[:60]), self.assertRaises(AlignmentError):
+                queue.clear_downloads(selection)
+        for status in ("queued", "running", "failed", "interrupted", "cancelled"):
+            queue.state["items"][1]["status"] = status
+            before = deepcopy(queue.state)
+            with self.subTest(status=status), self.assertRaises(RevisionConflict):
+                queue.clear_downloads([ready, waiting])
+            self.assertEqual(queue.state, before)
+
+    def test_clear_downloads_write_failure_keeps_in_memory_and_saved_queue(self):
+        queue = self.queue()
+        with patch.object(self.store, "detail", return_value={}):
+            identifier = self.add(queue, "first", force=False)["itemIds"][0]
+        before = deepcopy(queue.state)
+        with patch("batch_queue.write_json", side_effect=OSError("Disk write failed")):
+            with self.assertRaisesRegex(OSError, "Disk write failed"):
+                queue.clear_downloads([identifier])
+        self.assertEqual(queue.state, before)
+        self.assertEqual(load_json(queue.path), before)
+
+    def test_clear_downloads_preserves_active_worker_and_newly_finished_result(self):
+        entered, release = threading.Event(), threading.Event()
+        def runner(item, phase):
+            entered.set(); release.wait(2)
+            return "fixture-1"
+        queue = self.queue(runner)
+        with patch.object(self.store, "detail", return_value={}):
+            completed = self.add(queue, "first", force=False)["itemIds"][0]
+            active = self.add(queue, "second")["itemIds"][0]
+            queue.control("start")
+            try:
+                self.assertTrue(entered.wait(1))
+                live_row = queue.state["items"][1]
+                self.assertEqual(queue.clear_downloads([completed]), 1)
+                self.assertIs(queue.state["items"][0], live_row)
+                self.assertEqual(live_row["status"], "running")
+            finally:
+                release.set()
+            self.wait(lambda: queue.thread is None)
+        self.assertEqual([(row["id"], row["status"]) for row in load_json(queue.path)["items"]], [(active, "ready")])
+
     def test_restart_preserves_completed_work_and_requires_explicit_retry(self):
         queue = self.queue()
         self.add(queue, "first", "second")
@@ -132,6 +206,33 @@ class BatchTests(unittest.TestCase):
         recovered.control("retry", old_id)
         self.assertEqual(recovered.state["items"][-1]["retryOf"], old_id)
         self.assertEqual(recovered.state["items"][0]["status"], "interrupted")
+
+    def test_later_success_resolves_old_failure_even_after_completed_queue_row_is_cleared(self):
+        queue = self.queue()
+        self.add(queue, "first")
+        failed = queue.state["items"][0]
+        failed.update(status="failed", phase="Needs attention", error="Original failure",
+                      createdAt="2026-09-01T00:00:00+00:00", finishedAt="2026-09-01T00:01:00+00:00")
+        queue.persist()
+        write_json(self.store.root / "generated/fixture-1.json", {
+            "id": "fixture-1", "createdAt": "2026-09-02T00:00:00+00:00"})
+        recovered = self.queue()
+        visible = recovered.snapshot()["items"][0]
+        self.assertEqual(visible["status"], "resolved")
+        self.assertEqual(visible["resultId"], "fixture-1")
+        self.assertIsNone(visible["error"])
+        self.assertEqual(recovered.state["items"][0]["error"], "Original failure")
+
+    def test_existing_older_or_different_audio_result_does_not_hide_a_new_failure(self):
+        queue = self.queue()
+        self.add(queue, "first")
+        failed = queue.state["items"][0]
+        failed.update(status="failed", finishedAt="2026-09-03T00:00:00+00:00")
+        queue.resolve_failures("fixture-1", "2026-09-02T00:00:00+00:00")
+        self.assertEqual(queue.snapshot()["items"][0]["status"], "failed")
+        failed["mediaIdentity"] = {**failed["mediaIdentity"], "digest": "c" * 64}
+        queue.resolve_failures("fixture-1", "2026-09-04T00:00:00+00:00")
+        self.assertEqual(queue.snapshot()["items"][0]["status"], "failed")
 
     def test_one_failure_does_not_lose_following_recording(self):
         def runner(item, phase):

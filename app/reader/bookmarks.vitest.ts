@@ -57,9 +57,10 @@ test('loads only valid bookmarks from storage', () => {
   ])
 })
 
-test('reads current bookmark JSON without rewriting it', () => {
+test.each(['#/torah/parsha/noach', '#/torah/5-33-24', '#/r/5-33-24'])(
+  'reads bookmark %s without rewriting it', (hash) => {
   const bookmark = createBookmark({
-    hash: '#/torah/parsha/noach',
+    hash,
     label: 'Current',
     tokenKey: '1:0:0:0',
     createdAt: 1,

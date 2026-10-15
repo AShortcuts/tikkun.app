@@ -5,6 +5,7 @@ export type IconName =
   | 'next'
   | 'replay'
   | 'download'
+  | 'printer'
   | 'settings2'
   | 'cog'
   | 'bookText'
@@ -73,6 +74,11 @@ const iconPaths: Record<IconName, string> = {
     <path d="M12 17V3" />
     <path d="m6 11 6 6 6-6" />
     <path d="M19 21H5" />
+  `,
+  printer: `
+    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+    <path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6" />
+    <rect x="6" y="14" width="12" height="8" rx="1" />
   `,
   settings2: `
     <path d="M14 17H5" />
@@ -185,7 +191,7 @@ const iconPaths: Record<IconName, string> = {
     <path d="M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z" />
   `,
   bookmarkFilled: `
-    <path d="M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z" fill="currentColor" stroke="none" />
+    <path d="M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z" fill="currentColor" />
   `,
   houseFilled: `
     <path d="M4.5 10.25 12 3.75l7.5 6.5V20a1 1 0 0 1-1 1h-4v-5.5a2.5 2.5 0 0 0-5 0V21h-4a1 1 0 0 1-1-1Z" fill="currentColor" stroke="none" />

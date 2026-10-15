@@ -4,6 +4,7 @@ from copy import deepcopy
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from aligner import WORK, load_json, write_json
 from beta_server import byte_range
@@ -14,6 +15,20 @@ from test_core import fixture
 
 
 class PrivateReviewTests(unittest.TestCase):
+    def test_completed_result_opens_and_exports_without_compiler_or_waveform(self):
+        with tempfile.TemporaryDirectory(prefix="beta-test-", dir=WORK) as directory:
+            entry = {"proposal": self.proposal, "recording": self.recording, "bundle": self.bundle}
+            store = BetaStore(directory, {"fixture-1": entry})
+            with patch("aligner.verify_sources", side_effect=AssertionError("Old compiler must not be loaded")):
+                detail = store.detail("fixture-1")
+                self.assertEqual(detail["recording"]["tokens"], self.recording["tokens"])
+                state = self.reviewed()
+                saved = store.save("fixture-1", state, None)
+                package = store.export("fixture-1", saved["revision"], "review")
+                self.assertEqual(package["originalProposal"], self.proposal)
+                cues = store.export("fixture-1", saved["revision"], "cues")
+                self.assertEqual(len(cues["cues"]), 2)
+
     def setUp(self):
         self.bundle, self.recording, self.proposal, _ = fixture()
         self.state = initial_state(self.proposal)

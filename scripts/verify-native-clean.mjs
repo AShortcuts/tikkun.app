@@ -10,10 +10,14 @@ import { includeNativeAsset } from './native-build-config.mjs'
 const source = fileURLToPath(new URL('..', import.meta.url))
 const root = await mkdtemp(path.join(tmpdir(), 'tikkun-native-clean-'))
 try {
-  for (const name of ['app', 'src', 'css', 'text', 'audio-cues', 'generated', 'scripts', 'functions', 'package.json', 'package-lock.json', 'tsconfig.json', 'svelte.config.js', 'vite.config.ts', 'vitest.config.ts', 'capacitor.config.ts']) {
+  for (const name of ['app', 'src', 'css', 'text', 'audio-cues', 'generated', 'scripts', 'functions', 'config', 'package.json', 'package-lock.json', 'tsconfig.json', 'svelte.config.js', 'vite.config.ts', 'vitest.config.ts', 'capacitor.config.ts']) {
     await cp(path.join(source, name), path.join(root, name), { recursive: true,
       filter: (file) => !file.includes('__screenshots__') })
   }
+  const ios = path.join(source, 'ios')
+  await cp(ios, path.join(root, 'ios'), { recursive: true, filter: (file) => file === ios ||
+    !path.relative(ios, file).split(path.sep).some(part => part.startsWith('.') ||
+      ['public', 'build', 'Pods', 'DerivedData', 'xcuserdata'].includes(part)) })
   const site = path.join(source, 'site')
   await cp(site, path.join(root, 'site'), { recursive: true, filter: (file) => file === site || includeNativeAsset(path.relative(site, file)) })
   await symlink(path.join(source, 'node_modules'), path.join(root, 'node_modules'))

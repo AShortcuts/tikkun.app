@@ -1,6 +1,6 @@
 # Native Development
 
-Updated: 2026-09-10
+Release guidance consolidated: 2026-09-30. Implementation checkpoints retain their original dates.
 
 ## Current Target
 
@@ -13,8 +13,51 @@ installation and its data are separate and have not been removed or migrated.
 Use the repository-pinned Node 22.23.2 and npm 11.19.0. Initial verification used
 Xcode 26.6 and an iPhone 17 Pro simulator running iOS 26.5.
 
-Current remaining work: [iOS release checklist](ios-release-checklist.md).
+Release decisions: [canonical release checklist](release-checklist.md).
 The dated checkpoints below preserve history, not the current task list.
+
+## Release Preparation
+
+Use the [canonical checklist](release-checklist.md) for the release decision. With pinned Node/npm and the approved resource budget, run the native checks in addition to the web release gate:
+
+```sh
+npm run check
+npm run native:sync
+npm run verify:native-clean
+swift test --package-path ios/TikkunMedia --jobs 2
+swift test --package-path ios/TikkunPlayback --jobs 2
+swift test --package-path ios/TikkunSystem --jobs 2
+npm run native:open
+```
+
+Compare the packaged resource hashes across `dist-native`, the synced project and the built app/archive. In Xcode choose App, confirm signing/team, use a physical device for acceptance, then Any iOS Device for Product > Archive. Validate the archive before an authorized upload. `npm run native:branding` regenerates native assets from `site/favicon.svg` using installed Playwright/Chromium; no new dependency or asset service is needed.
+
+### Private Install Link Preflight (2026-09-10 Checkpoint)
+
+The owner selected direct installation through the established `sqim` skill. The earlier `asc-ad-hoc-distribution` preflight chose the wrong workflow: Sqim uses local development signing and provides hosting. Missing ASC API credentials, a distribution certificate, or a caller-owned S3 bucket are not prerequisites for this Sqim route. Do not request them again unless switching distribution workflows.
+
+- Sqim browser sign-in was renewed successfully after the stored session expired.
+- Both target configurations use automatic signing, team `5D862AQ8GV`, and bundle ID `com.adamn.tikkunreader`.
+- A connected iPhone 16 Pro was identified. Its private inventory remains ignored under `.asc/distribution`; preparing that file did not register a device with Apple.
+- The initial device archive failed because the wildcard provisioning profile lacked Associated Domains. A retry with `--allow-provisioning-updates` cleared that signing error. Device archive, development-signed IPA export, and Sqim upload all succeeded (exit 0); the final HTTPS install link was delivered to the owner. Log: `/tmp/tikkun-sqim-device-upload-provisioning.log`.
+
+Historical raw command: `sqim upload --device ios/App --build --allow-provisioning-updates`. For fresh delivery use `npm run native:share`, which rebuilds and syncs first; Sqim alone does not refresh copied web assets. See [fresh phone builds](app-updates.md#fresh-phone-builds). Use only the final HTTPS install URL from a successful command exit. Do not offer a Simulator artifact as an iPhone install. Device installation, acceptance tests, and public-release gates remain separate from successful build publication.
+
+## Signed-Device Acceptance
+
+At the 2026-09-11 checkpoint, the owner deferred phone acceptance pending a separate newer native publication. The currently published native build and completion of those acceptance checks remain unverified; retain these scenarios for acceptance against the intended signed build.
+
+Use the final signed build. Simulator and browser results do not establish signed-device acceptance.
+
+- Download a never-opened reading, force-quit, enable airplane mode, relaunch; verify text, cues, playback and seeking.
+- Verify lock-screen controls, background segment changes, speed, interruptions, headphones and foreground highlighting.
+- Cancel a partial batch, force-quit and retry; partial files must not appear Downloaded.
+- Remove one saved aliyah: Downloaded -> 6/7 -> Downloaded after re-download; verify storage decreases and personal data remains.
+- Install an update without uninstalling; verify settings, bookmarks and downloads survive.
+- Test low-space/write failures, microphone permission denial and user-triggered recording.
+- Test iPad layouts if shipping the existing universal iOS target.
+
+Also complete [widget and Shortcuts scenarios](ios-system-integration.md#remaining-acceptance), cold/warm external HTTPS reading-link handoff, and the applicable signed-update download, activation, rollback and data-preservation scenarios in [update delivery](app-updates.md#verification-and-remaining-gates).
 
 ## Consolidated Local Verification (2026-09-10)
 
@@ -965,3 +1008,69 @@ Lock semantics reference: [Web Locks request and lifetime](https://developer.moz
   protections, not durable pending-batch quota reservations; cross-tab space
   accounting, device/system-audio acceptance, signing/links and store release
   remain open.
+
+## UI And Browser Verification (2026-09-10-11)
+
+These historical package/test checkpoints were consolidated from the former iOS checklist. They do not establish current release readiness; temporary log paths are retained as recorded and may no longer exist. Build-3 theme and signing evidence remains in the [listing history](../metadata/README.md#packaged-theme-repair).
+
+### UI Package Verification
+
+2026-09-10: 20 focused Media/Storage tests passed in Chromium and WebKit across 320, 390, 768 and 1280px layouts, including dark-mode accessibility and keyboard tab navigation. TypeScript, Svelte and ESLint passed. `npm run native:sync` packaged 441 web resources / 6,060,431 bytes without the audio library; Xcode's Simulator build succeeded with no diagnostics. SHA-256 comparison confirmed all 441 resources in the built App.app match `dist-native`.
+
+This verifies the updated native package, not installation or native UI acceptance. The shared Simulator was not relaunched or replaced during this UI packaging pass. Physical-device and distribution gates remain in the [canonical checklist](release-checklist.md).
+
+### Nekud And Edge-to-Edge Reader
+
+2026-09-10: verse numbers remain visible when vowels/cantillation are hidden. Annotation changes now use the display's existing focal-token anchor, preserve that word through repeated toggles, and refresh page/gutter measurements. Match and Reading keep their separate layout contracts.
+
+The native web view fills its host bounds, with `viewport-fit=cover` and CSS safe-area padding for the header and Reader sides. The themed web surface now extends under system chrome instead of exposing a separate native bezel.
+
+- 236 Chromium/WebKit layout, display and responsive tests passed, including eight real-route toggle regressions at 390 and 1000px across both layouts.
+- Six display-session Node tests, TypeScript, Svelte and ESLint passed.
+- Native sync: 441 resources / 6,062,238 bytes, with no audio library.
+- iPhone 17 Pro Simulator build/run passed with zero build diagnostics; dark inset continuity was visually checked. The Simulator retained an explicit dark app theme when system appearance changed, so this does not establish native light/custom-theme acceptance. System appearance was restored.
+- Device archive, development export and Sqim upload succeeded; an updated install link was delivered. Physical-device installation remains unverified.
+
+Logs: `/tmp/tikkun-reader-insets-browser.log`, `/tmp/tikkun-reader-insets-check.log`, `/tmp/tikkun-reader-insets-node.log`, `/tmp/tikkun-reader-insets-native.log`, and `/tmp/tikkun-reader-insets-sqim.log`.
+
+Follow-up: compact One Side tap-to-toggle now covers the whole scrolling reading body, including blank margins and gaps, rather than only `.reader-text-side`. The existing drag, long-press, text-selection, interactive-control and audio-word seeking guards remain in place. Eight focused Chromium/WebKit cases passed with real blank-margin clicks plus drag/exclusion regressions; type/lint checks passed. Native sync, device archive/export and Sqim upload succeeded. Logs: `/tmp/tikkun-gap-tap-tests.log`, `/tmp/tikkun-gap-tap-check.log`, and `/tmp/tikkun-gap-tap-sqim.log`. A new install link was delivered to the owner.
+
+### Browser Repairs And Verification
+
+2026-09-10: corrected the mobile title's RTL text measurement, empty Match aliyah gutter overflow, and Safari verse-label overhang after shared-frame alignment. Reading paired-word sizing now batches measurements before style writes; the WebKit side-switch test improved from a 15-second timeout to about 2 seconds. Development builds expose recording downloads as unsupported without a production worker, and unsupported backends do not receive automatic refresh requests.
+
+Browser harness fixes preserve coverage: tests await hydration and embedded Reader readiness in a visible desktop viewport, match the promoted homepage and current unlock copy, destroy ScrollDisplay fixtures, and avoid redundant history writes. Chromium now uses sequential files like WebKit. The Match corpus reuses a Range per page check and yields between pages instead of accumulating live ranges in one long task. Neither corpus coverage nor geometry assertions were relaxed.
+
+Verification was split to avoid repeating the expensive, unchanged Match sweep:
+
+- 86 Match corpus cases passed across Chromium and WebKit in the complete run.
+- The final rerun of every other configured browser file passed: **928 tests in 114 project/file combinations**, 117.78 seconds, no failures or unhandled errors.
+- Together these cover all **1,014 configured browser cases**. This is split-run evidence, not a claim that the earlier single complete invocation was green.
+- Live 320px Reader inspection confirmed the full Hebrew title and no console errors.
+- `npm run check` passed: TypeScript, Svelte (zero errors/warnings) and ESLint.
+- All 38 focused download-owner, download-library and selected-download Node tests passed.
+- Browser repairs are now included in the refreshed iOS package: `native:sync` produced 441 resources / 6,061,476 logical bytes, including 332 bundled content records and no audio library. Media origin remains `https://tikkunreader.com`.
+- The compile-only iPhone 17 Pro Simulator build passed with zero diagnostics. SHA-256 comparisons matched all 441 resources against both the synced project and built App.app. The built bundle ID is `com.adamn.tikkunreader`.
+- No Simulator installation or launch, signed-device verification, or deployment was performed during this browser-repair packaging pass.
+
+Logs: `/tmp/tikkun-browser-final.log` (complete run, including the 86 corpus passes and three subsequently repaired failures) and `/tmp/tikkun-browser-final-regressions.log` (all 928 remaining cases passed). Explicit positive file paths were used for the final rerun because this Vitest project configuration did not apply the CLI exclusion to its browser projects. Installed-PWA, production-build and physical-device gates remain separate.
+
+Native packaging log: `/tmp/tikkun-browser-fixes-native-sync.log`. Xcode build log: `~/Library/Developer/XcodeBuildMCP/workspaces/Tikkun-with-Highlighted-Audio-e334a9ef50c6/logs/build_sim_2026-09-11T02-11-01-302Z_pid19582_558f2543.log`. The build emitted SvelteKit's existing root-tsconfig extension advisory; the isolated native TypeScript check passed. The earlier UI-package byte count above is historical and is superseded by this refreshed package.
+
+### Historical Failed Attempt
+
+2026-09-10: owner approved the configured full Chromium/WebKit matrix. Ran `npm exec vitest run -- --project=browser --project=webkit --maxWorkers=2`. The run reported six failures before ceasing to report new progress, remained live at very low CPU, and was explicitly interrupted after more than six minutes (exit 130). It did not produce final totals; this is failed/incomplete verification, not a release pass. The browser repairs and later verification above supersede it.
+
+Originally observed failures:
+
+- Chromium: `app/admin/cue-authoring-access-dialog.vitest.ts`, local gate/success clearing.
+- Chromium: `src/routes/prototype-isolation.vitest.ts`, public/prototype isolation.
+- Chromium and WebKit: `app/reader/reader-responsive-layout.vitest.ts`, responsive/theme/accessibility reachability.
+- Chromium: `app/components/page-layout.vitest.ts`, identical Sea tracks at 1280px.
+- WebKit: `src/routes/public-routes-real-url.vitest.ts`, Reader/About/Reading Index navigation; module-import rejections were also logged.
+
+Local diagnostic log: `/tmp/tikkun-full-browser-approved.log`. These observations did not distinguish product regressions from test isolation or runner failures. All six originally observed cases now pass; the later full run also exposed the corpus Range cost, Reading layout thrashing and redundant history writes repaired in the browser checkpoint above.
+
+### Deliberate Limits
+
+Browser capacity reservations deduplicate physical URLs but conservatively retain full missing-file and staging bytes until a batch ends. They coordinate participating tabs, not old clients, other origins or the OS; quota remains advisory. Dead-owner reservations are reclaimed through Web Lock liveness on the next batch. Downloads do not promise continuation while suspended or force-quit; retry intent survives. Native text/cues are bundled, not removable add-on products. Web dependency cleanup and large-inventory optimization remain follow-ups; shared dependencies are not evicted. Native builds seed root/web framework types only if missing, then use a separate generated `tsconfig.native.json` for native type checking. SvelteKit's root-config extension warning remains informational; clean-checkout native builds are verified. Android remains milestone 7, after iOS acceptance; no Android binary is delivered here.

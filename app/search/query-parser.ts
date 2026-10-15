@@ -45,6 +45,7 @@ const hebrewAliyahNumbers = new Map([
   ['ה', 5],
   ['ו', 6],
   ['ז', 7],
+  ['ח', 8],
 ])
 
 function positiveInteger(value: string) {
@@ -104,7 +105,7 @@ export function parseStructuredSearchQuery(
   }
 
   const aliyah = query.match(
-    /^(?:(.+?)\s+)?(?:aliyah\s+)?(maftir|מפטיר|[1-7]|[א-ז]['׳]?)$/u
+    /^(?:(.+?)\s+)?(?:aliyah\s+)?(maftir|מפטיר|[1-8]|[א-ח]['׳]?)$/u
   )
   if (!aliyah) return null
 

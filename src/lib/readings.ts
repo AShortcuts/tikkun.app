@@ -74,7 +74,7 @@ function publicStatus(
   )
 
   if (wordSyncReady) {
-    return { statusKind: 'ready', statusLabel: 'Word sync ready' } as const
+    return { statusKind: 'ready', statusLabel: 'Done' } as const
   }
   if (workStatus === 'Needs review') {
     return { statusKind: 'review', statusLabel: 'Recording review' } as const

@@ -1,9 +1,9 @@
 import type { LeiningRun } from '../calendar-model/model-types.ts'
 import { publishNativePractice } from '../platform/native-practice.ts'
 import type { RefWithScroll } from '../ref.ts'
-import { semanticParshaUrlForLeining } from '../view-model/navigation/parsha-routes.ts'
 import { isReaderHash } from '../view-model/navigation/reader-hash.ts'
 import { generateUrl } from '../view-model/navigation/url-parser.ts'
+import { semanticParshaUrlForLeining } from '../view-model/navigation/parsha-routes.ts'
 import {
   createPersistedJsonStore,
   isPlausiblePersistedTimestamp,
@@ -24,8 +24,10 @@ export interface LastReading {
 export type LastReadingInput = Omit<LastReading, 'savedAt'>
 
 export function createLastReadingHash(run: LeiningRun, initialRef?: RefWithScroll) {
-  return semanticParshaUrlForLeining(run.leining, initialRef) ??
-    generateUrl(run, initialRef)
+  if (run.scroll === 'esther') {
+    return semanticParshaUrlForLeining(run.leining, initialRef) ?? generateUrl(run, initialRef)
+  }
+  return generateUrl(run, initialRef)
 }
 
 function isValidLastReading(value: unknown, now: number): value is LastReading {

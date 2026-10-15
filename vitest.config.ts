@@ -23,6 +23,10 @@ const emulateAccessibilityMedia = defineBrowserCommand<
   await page.emulateMedia(options)
 })
 
+const emulateColorScheme = defineBrowserCommand<['light' | 'dark' | null]>(async ({ page }, colorScheme) => {
+  await page.emulateMedia({ colorScheme })
+})
+
 export default mergeConfig(
   viteConfig,
   defineConfig({
@@ -54,7 +58,7 @@ export default mergeConfig(
               enabled: true,
               headless: true,
               provider: playwright(),
-              commands: { emulateAccessibilityMedia },
+              commands: { emulateAccessibilityMedia, emulateColorScheme },
               instances: [{ browser: 'chromium' }],
             },
           },
@@ -65,6 +69,8 @@ export default mergeConfig(
             name: 'webkit',
             fileParallelism: false,
             include: [
+              'src/reader-theme.vitest.ts',
+              'app/analytics/client.vitest.ts',
               'app/app-accessibility.vitest.ts',
               'app/app-smoke.vitest.ts',
               'app/updates/content-runtime.vitest.ts',
@@ -75,24 +81,30 @@ export default mergeConfig(
               'app/components/interactive-styles.vitest.ts',
               'app/components/match-corpus.vitest.ts',
               'app/components/page-layout.vitest.ts',
+              'app/printing/print-esther.vitest.ts',
               'app/navigation/command-palette.vitest.ts',
               'app/reader/bookmarks.vitest.ts',
               'app/reader/aliyah-permalink.vitest.ts',
               'app/reader/last-reading-prompt.vitest.ts',
               'app/reader/reader-cue-status.vitest.ts',
+              'app/reader/reader-admin-audio.vitest.ts',
               'app/reader/reader-initial-position.vitest.ts',
+              'app/reader/reader-aliyah-scroll.vitest.ts',
               'app/reader/reader-keyboard-journey.vitest.ts',
               'app/reader/reader-responsive-layout.vitest.ts',
               'app/reader/reader-controls.vitest.ts',
               'app/reader/reader-route.vitest.ts',
+              'app/reader/arrival-cue.vitest.ts',
               'app/reader/reader-settings.vitest.ts',
               'app/reader/media-panel.vitest.ts',
               'app/reader/reader-shell.vitest.ts',
+              'app/reader/reader-swipe-back.vitest.ts',
               'app/reading/aliyah-navigation/aliyah-navigation.vitest.ts',
               'app/reading/floating-player.vitest.ts',
               'app/reading/last-reading.vitest.ts',
               'app/reading/reader-playback.vitest.ts',
               'app/reading/native-audio-controller.vitest.ts',
+              'app/viewport-tracker.vitest.ts',
               'src/lib/components/ReaderApp.vitest.ts',
               'src/lib/components/ServiceWorkerUpdate.vitest.ts',
               'scripts/offline-transfer-queue.vitest.ts',
@@ -108,7 +120,7 @@ export default mergeConfig(
               enabled: true,
               headless: true,
               provider: playwright(),
-              commands: { emulateAccessibilityMedia },
+              commands: { emulateAccessibilityMedia, emulateColorScheme },
               instances: [{ browser: 'webkit' }],
             },
           },

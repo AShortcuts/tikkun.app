@@ -25,7 +25,7 @@ export function isSameAliyahIdentity(
 export function parseAliyahIndex(value: string | null | undefined): AliyahIndex | null {
   if (value === 'Maftir') return 'Maftir'
   const index = Number(value)
-  return Number.isInteger(index) && index >= 1 && index <= 7 ? index : null
+  return Number.isInteger(index) && index >= 1 && index <= 8 ? index : null
 }
 
 export function aliyahMembershipsAtRef(runs: LeiningRun[], ref: Ref) {

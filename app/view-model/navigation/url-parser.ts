@@ -1,6 +1,7 @@
 import { LeiningGenerator } from '../../calendar-model/generator.ts'
 import type { LeiningRun } from '../../calendar-model/model-types.ts'
 import { containsRef } from '../../calendar-model/ref-utils.ts'
+import { generateTorahReferenceHash } from '../../components/torah-reference.ts'
 import type { RefWithScroll, ScrollName } from '../../ref.ts'
 import {
   hasScrollData,
@@ -32,6 +33,7 @@ export type ParseUrlOptions = {
 
 /** Generates a URL that points to the beginning of a specific run. */
 export function generateUrl(run: LeiningRun, initialRef?: RefWithScroll) {
+  if (run.leining.kind === 'parsha') return generateParshaUrl(run.leining.slug, initialRef)
   if (!initialRef) return `#/run/${run.id}`
 
   return `#/run/${run.id}/${initialRef.b}-${initialRef.c}-${initialRef.v}`
@@ -72,14 +74,9 @@ const pathHandlers: Record<
     const model = ScrollViewModel.forId(generator, run.id, initialRef ?? undefined)
     return model ? { view: 'reader', model } : null
   },
-  /** Opens a specific Torah reference. */
+  /** Keeps legacy Torah reference links working. */
   r(generator, [ref]) {
-    if (!ref) return null
-    const initialRef = refFromPath(ref, 'torah')
-    if (!initialRef) return missingReferenceRoute(ref)
-
-    const model = ScrollViewModel.forRef(generator, initialRef)
-    return model ? { view: 'reader', model } : null
+    return parseTorahReferenceRoute(generator, ref)
   },
   /** Opens the current calendar reading. */
   next(generator, _pathParts, options) {
@@ -122,10 +119,13 @@ function parseTorahRoute(
 
     const initialRef = refFromPath(ref, resolved.run.scroll)
     if (ref && !initialRef) return missingReferenceRoute(ref)
+    // Earlier parsha links could point at the holiday's other scrolls.
+    if (initialRef && !refBelongsToRun(initialRef, resolved.run))
+      return parseTorahReferenceRoute(generator, ref)
 
-    const model = ScrollViewModel.forId(
+    const model = ScrollViewModel.forRun(
       generator,
-      resolved.run.id,
+      resolved.run,
       initialRef ?? undefined,
       { displayTitle: resolved.displayTitle }
     )
@@ -145,7 +145,31 @@ function parseTorahRoute(
     return parsePageRoute(generator, 'torah', pathParts, options)
   }
 
-  return null
+  return pathParts.length === 0
+    ? parseTorahReferenceRoute(generator, routeType)
+    : null
+}
+
+function parseTorahReferenceRoute(
+  generator: LeiningGenerator,
+  ref: string | undefined
+): AppRoute | null {
+  if (!ref) return null
+  const initialRef = refFromPath(ref, 'torah')
+  if (!initialRef) return missingReferenceRoute(ref)
+
+  const model = ScrollViewModel.forRef(generator, initialRef)
+  return model
+    ? {
+        view: 'reader',
+        model,
+        canonicalHash: generateTorahReferenceHash({
+          book: initialRef.b,
+          chapter: initialRef.c,
+          verse: initialRef.v,
+        }),
+      }
+    : null
 }
 
 function parseEstherRoute(
@@ -170,9 +194,9 @@ function parseEstherRoute(
     return { view: 'not-found' }
   }
 
-  const model = ScrollViewModel.forId(
+  const model = ScrollViewModel.forRun(
     generator,
-    resolved.run.id,
+    resolved.run,
     initialRef ?? undefined,
     { displayTitle: resolved.displayTitle }
   )
@@ -204,9 +228,9 @@ function parsePageRoute(
   const resolved = resolveParshaRun(generator, slug, options?.now)
   if (!resolved) return null
 
-  const model = ScrollViewModel.forId(
+  const model = ScrollViewModel.forRun(
     generator,
-    resolved.run.id,
+    resolved.run,
     {
       scroll,
       pageNumber,

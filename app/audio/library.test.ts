@@ -2,6 +2,7 @@ import { expect, test } from 'vitest'
 import { LeiningGenerator } from '../calendar-model/generator.ts'
 import type { UserSettings } from '../calendar-model/user-settings.ts'
 import type { LeiningRun } from '../calendar-model/model-types.ts'
+import { resolveParshaRun } from '../view-model/navigation/parsha-routes.ts'
 import type { RangeAudioRecording } from './types.ts'
 import {
   findAuthoringRecordingForRun,
@@ -84,6 +85,49 @@ test('audio lookup finds Vayetzei recordings through the canonical route slug', 
       run,
       aliyahIndex: 1,
     })?.id).toBe('vayetzei-1')
+})
+
+test.each(['vezot-haberacha', 'vezos-haberacha'])(
+  'audio lookup and authoring find all seven Vezot recordings through %s',
+  (slug) => {
+    const resolved = resolveParshaRun(generator, slug, new Date('2026-01-01'))
+    if (!resolved) throw new Error('Missing Vezot Haberacha run')
+    const { run } = resolved
+
+    expect(run.leining.kind).toBe('parsha')
+    expect(run.aliyot).toHaveLength(7)
+    expect(parshaSlugForRun(run)).toBe('vezot-haberacha')
+    for (const aliyah of run.aliyot) {
+      const input = { narratorId: 'yoni-davidov', run, aliyahIndex: aliyah.index }
+      const recording = findRecordingForRun(input)
+      expect(recording).toMatchObject({
+        id: `vezot-haberacha-${aliyah.index}`,
+        status: 'available',
+      })
+      expect(recording?.playSrc.split('?')[0])
+        .toBe(`/audio/yoni-davidov/vezot-haberacha/${aliyah.index}.m4a`)
+      expect(findAuthoringRecordingForRun(input)).toBe(recording)
+    }
+
+    expect(findAuthoringRecordingForRun({
+      narratorId: 'new-reader', run, aliyahIndex: 7, recordings: [],
+    })).toMatchObject({
+      id: 'vezot-haberacha-7',
+      title: 'Vezot Haberacha Aliyah 7',
+      status: 'missing',
+    })
+  }
+)
+
+test('the dated Simchat Torah divisions do not reuse parsha recording numbers', () => {
+  const resolved = resolveParshaRun(generator, 'vezot-haberacha', new Date('2026-01-01'))
+  const run = resolved && generator.parseId('2026-10-04:shacharis,main')
+  if (!run) throw new Error('Missing Simchat Torah run')
+
+  expect(run.aliyot).toHaveLength(6)
+  expect(parshaSlugForRun(run)).toBeNull()
+  expect(findRecordingForRun({ narratorId: 'yoni-davidov', run, aliyahIndex: 6 })).toBeNull()
+  expect(findAuthoringRecordingForRun({ narratorId: 'yoni-davidov', run, aliyahIndex: 6 })).toBeNull()
 })
 
 test('audio lookup resolves maftir to the seventh aliyah recording', () => {

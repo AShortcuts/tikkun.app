@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest'
 import { HDate } from '@hebcal/hdate'
+import { readingTitle, type ReadingInstance } from '../calendar-model/model-types.ts'
 import { LeiningGenerator } from '../calendar-model/generator.ts'
 import type { UserSettings } from '../calendar-model/user-settings.ts'
 import {
@@ -108,15 +109,11 @@ test('builds submenu choices for a double parsha', () => {
     ])
 })
 
-test('finds standalone Matot and Masei within the 20-year source window', () => {
+test('finds standalone Matot and Masei without searching future calendar years', () => {
   const baseLeinings = generator
     .forEntireChumash(new HDate())
     .flatMap((date) => date.leinings)
-  const sourceLeinings = collectParshaChoiceSourceLeinings(
-    generator,
-    baseLeinings,
-    5786
-  )
+  const sourceLeinings = collectParshaChoiceSourceLeinings(baseLeinings)
   const matotMasei = findParsha('Matot-Masei', sourceLeinings)
 
   expect(
@@ -138,7 +135,7 @@ test('does not treat single parshiyot with a maqaf as double parshiyot', () => {
   ])
 })
 
-test('labels Vezos Haberacha as a parsha in the parsha list', () => {
+test('labels Vezot Haberacha as a parsha and exposes the seventh recording division', () => {
   const simchatTorah = generator
     .forHebrewYear(5786)
     .find((date) => date.title.he === 'שמחת תורה')
@@ -147,13 +144,16 @@ test('labels Vezos Haberacha as a parsha in the parsha list', () => {
   if (!simchatTorah) throw new Error('Missing Simchat Torah')
 
   expect(parshaListTitleForLeining(simchatTorah)).toBe('וזאת הברכה')
+  expect(buildParshaAliyahChoices(simchatTorah).some(choice =>
+    choice.href === '#/torah/parsha/vezot-haberacha/5-34-1')).toBe(true)
+  expect(simchatTorah.runs[0].aliyot).toHaveLength(6)
 })
 
 test('finds Beresheet by its canonical route spelling', () => {
   const result = buildParshaPickerModel(generator).search('beresheet')[0]
 
   expect(result?.href).toBe('#/torah/parsha/beresheet')
-  expect(result?.englishLabel).toContain('Bereshit')
+  expect(result?.englishLabel).toBe('Parshat Beresheet')
 })
 
 test('describes holiday and Megillah destinations with their English ranges', () => {
@@ -221,13 +221,13 @@ function parshiyotForYears(startYear: number, endYear: number) {
 
 function findParsha(
   englishName: string,
-  leinings = generator
+  leinings: ReadingInstance[] = generator
     .forEntireChumash(new HDate())
     .flatMap((date) => date.leinings)
 ) {
   const match = leinings.find(
     (leining) =>
-      leining.isParsha && leining.date.title.en.includes(englishName)
+      leining.isParsha && readingTitle(leining).en.includes(englishName)
   )
 
   if (!match) throw new Error(`Could not find parsha ${englishName}`)

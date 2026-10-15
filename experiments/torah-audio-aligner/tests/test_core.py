@@ -79,6 +79,24 @@ class AcousticDecoderTests(unittest.TestCase):
     def test_greedy_decode_does_not_use_reference(self):
         self.assertEqual(greedy_text(emissions([3, 1, 1, 3, 1, 0, 2, 3]), {"|": 0, "א": 1, "ב": 2}, 3), "אא ב")
 
+    def test_checkpointed_traceback_matches_full_path_including_ties_and_repeats(self):
+        rng = np.random.default_rng(147)
+        labels = [1, 1, 2, 0, 2, 2, 1]
+        for frames in (200, 219, 400):
+            probabilities = rng.uniform(.001, 1, (frames, 4)).astype(np.float32)
+            probabilities /= probabilities.sum(axis=1, keepdims=True)
+            for matrix in (np.log(probabilities), np.full((frames, 4), -np.log(4), dtype=np.float32)):
+                with self.subTest(frames=frames, tied=bool(np.all(matrix == matrix[0, 0]))):
+                    full = ctc_viterbi(matrix, labels, 3)
+                    checkpointed = ctc_viterbi(matrix, labels, 3, max_cells=1500)
+                    self.assertEqual(checkpointed, full)
+
+    def test_checkpointed_traceback_still_rejects_no_acoustic_path(self):
+        matrix = np.full((200, 4), -np.inf, dtype=np.float32)
+        matrix[:, 0] = 0
+        with self.assertRaisesRegex(AlignmentError, "No acoustic path"):
+            ctc_viterbi(matrix, [1, 2], 0, max_cells=400)
+
     def test_known_geometry_uses_stride_not_duration_divided_by_frames(self):
         self.assertEqual(frame_geometry([10, 3, 3, 3, 3, 2, 2], [5, 2, 2, 2, 2, 2, 2]), (320, 400))
 

@@ -14,7 +14,7 @@
 </script>
 
 <svelte:head>
-  <title>TOC chevron studies — Tikkun Korim</title>
+  <title>TOC chevron studies — Tikkun Reader</title>
   <meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 

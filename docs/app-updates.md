@@ -1,9 +1,11 @@
 # Tikkun Update Delivery
 
-Implementation checkpoint: 2026-09-11. Native build `1.0 (6)` is archived and
+Preparation checkpoint: 2026-10-07. Automatic Pages preparation and the local manual backup are implemented. Native archive `1.0 (7)` was built and its signature, native contract and 492 bundled files were verified; its signed public record is `config/native-update-target.json`. The real production preparation flow passed locally, producing a 1,873,823-byte web ZIP and a separate 3,950,716-byte content snapshot while retaining older downloads. Cloudflare still uses `npm run build`; activation awaits explicit approval to store the signing key in its production environment and change the build settings. Git publication, native distribution and physical-device acceptance remain separate.
+
+Historical implementation checkpoint: 2026-09-11. Native build `1.0 (6)` is archived and
 uploaded through Sqim with manual update controls. Signed build-6 web and content
 feeds are included in `site/updates/` for the existing GitHub-triggered deployment.
-Do not deploy directly with Wrangler or change Cloudflare configuration.
+Keep publication on the Git-triggered Pages deployment. Do not upload directly with Wrangler.
 The App Store Connect build remains separate from this development distribution;
 the owner will publish a newer native app separately. Build 5 is not a web-feed
 target for this release. No compatibility override is enabled.
@@ -167,57 +169,79 @@ will not be retried; fix it and publish a new ZIP digest.
 
 ## Stage And Deploy
 
-### One Local Release Command
+### Automatic Preparation On Push
+
+Cloudflare Pages uses `node scripts/build-pages.mjs` with output directory `dist`. This dependency-free bootstrap enforces the pinned Node version, installs the pinned npm if needed, runs `npm ci` without the signing secret, and then invokes the same preparation used by `npm run build:pages`. On a production push to `develop`, the command restores previously published update files, runs `verify:quick`, builds native web assets, prepares and signs the separate content and interface feeds, verifies them, then builds and checks the website containing both feeds. A failure exits nonzero and prevents the new deployment. The existing read-only GitHub verification workflow continues to run its full release/browser checks separately; Pages does not wait for that workflow. Review those checks when deciding what to merge/push. Local builds and preview branches run the ordinary website build without preparing updates or passing the signing key to build subprocesses.
+
+One-time production configuration:
+
+- Build command: `node scripts/build-pages.mjs`; output: `dist`; production branch: `develop`. Set `SKIP_DEPENDENCY_INSTALL=1` and `NODE_VERSION=22.23.2` in production and preview so the bootstrap owns installation.
+- Production-only encrypted secret `TIKKUN_UPDATE_PRIVATE_KEY`: the PEM contents of the existing `.asc/update-signing/private.pem`, matching `config/update-public-key.pem`. Never add this secret to Git, previews, logs, frontend variables or downloaded files.
+- Production `TIKKUN_UPDATE_MODE=automatic`; optional `TIKKUN_UPDATE_ROLLOUT=100` (integer 0–100).
+- Use the repository-pinned Node/npm for the build. Production has a required signing secret; missing keys or target records fail the build instead of silently publishing stale updates.
+
+The bootstrap installs build/test tools explicitly with `npm ci --include=dev`, including when the hosting environment sets `NODE_ENV=production`.
+
+The signing key is written to an owner-only temporary file only for the two signing subprocesses and deleted even on failure. Dependency installation, frontend builds, tests, and the staging verifier receive neither the PEM environment variable nor its file path. Pages also exposes production variables to production Functions; keep Functions trusted and never return their environment. Preview variables must not contain the key.
+
+### Export The Native Compatibility Record
+
+After creating the intended iOS device archive, export its signed public record:
 
 ```sh
-npm run updates:release -- --native-build 6
+npm run updates:target -- --native-build BUILD_NUMBER --target-archive .asc/artifacts/Tikkun-1.0-BUILD_NUMBER.xcarchive
 ```
 
-This is an interactive local release workflow, not a background deployment or an
-App Store upload. It uses the repository-pinned Node/npm, `gh` authentication, and
-the existing private update key. The key stays outside Git. Set
-`TIKKUN_UPDATE_PRIVATE_KEY_FILE` for an externally stored key; the default is the
-ignored `.asc/update-signing/private.pem`, with owner-only permissions.
-The default archive is `.asc/artifacts/Tikkun-1.0-BUILD_NUMBER.xcarchive`; pass
-`--target-archive /absolute/path/to/distributed.xcarchive` for other versions or
-locations. Changing the native build number never bypasses archive compatibility.
+This reads the archive's actual build number, device platform, embedded native contract and pinned verification key. It writes `config/native-update-target.json`, signed with the existing update key. The record contains only the build number and contract fingerprints; no account details, private key, archive path or signing certificates. Review and commit that file with the matching source. Export from the archive intended for distribution, never reconstruct the record from current source. Exporting does not upload or distribute the native app.
 
-Use `--dry-run` for read-only preflight and a command preview, or `--help` for all
-options. A real run needs an interactive terminal and a clean `develop` checkout.
-Review and commit intended source changes first. Unpushed source commits are
-allowed only when local `develop` includes the current remote revision; all such
-commits appear in the final publication preview. The command never switches
-branches, stashes edits, discards files, force-pushes, or stages source changes.
+Every production preparation verifies the record's signature and compares its contract with the current native source both before and after `build:native`. Changed native code, Capacitor settings, plugins, generated native calendar resources or verification key require a new matching iOS archive and target record. The portable schema-2 contract excludes machine-local Xcode state and generated Capacitor JSON, while including the plugin package and resolved native dependencies. Old schema-1 archives can still be inspected; they cannot authorize schema-2 bundles. Initial automation therefore requires a fresh native build. Web changes can subsequently publish from pushes without another archive.
 
-The command runs `verify:release`, builds native web assets, generates/signs both
-feeds, stages the public files into the website, and builds the complete site.
-It does not run Capacitor sync: an OTA release must preserve the distributed
-native project, not regenerate it for a different binary. Existing compatibility
-checks remain mandatory. Generator drift outside the release assets stops the
-workflow for review. Checks/builds may take 10-20 minutes and several GB of local
-output; this command does not install dependencies or browsers automatically.
+### Retaining Existing Downloads
 
-Before any Git staging/commit/push, the command shows the exact public release
-files, sizes, source commits and rollout. Type `publish` only after reviewing the
-web-only release. Rollout defaults to 100%, reaching every compatible installation;
-use `--rollout 10` only when a limited rollout is wanted. Declining leaves generated
-files unstaged for inspection. Review
-those files before rerunning, since a dirty tree is intentionally rejected.
+The deployment includes a signed `/updates/index.json` describing exact public update paths, byte counts and SHA-256 digests. Before building the next deployment, preparation fetches that index from `https://tikkunreader.com` and restores its verified files into `site/updates/`. It retains older native-build feeds and immutable bundles, then replaces the current target's latest manifests. Download, signature, hash and output-parity failures stop publication. The first deployment permits a genuine index 404 and bootstraps from the verified public feeds already committed to Git. This initial rollout requires those existing feeds to remain in the checkout.
 
-Packages are verified again before the preview. After confirmation, the command
-rechecks the branch, index, remote destinations and approved file bytes,
-commits only the release paths, and pushes the exact new commit to `develop`.
-It waits up to 20 minutes for that commit's Cloudflare Pages GitHub check
-(`--deployment-timeout MIN` adjusts this), then verifies the live signatures and
-requires the exact expected bundle digest, content digest and rollout. An older
-valid signed feed is not treated as success. No Wrangler command is involved.
+The index is served with `no-store`, like latest manifests. Hash-named bundles remain immutable; service-worker precaching and native packaging still exclude all update files. No new storage service, artifact download token or generated Git commit is involved. Accumulated files count against Pages limits and should be reviewed before a future retention policy is introduced. Rollback to a deployment predating this index also restores that deployment's older feed history; retain the newer deployment as a recovery artifact when rolling back.
 
-Failures stop the workflow. Once created, a release commit is retained even if
-push, deployment or live verification fails. Check `origin/develop` before
-retrying a push; no automatic retries or rollbacks run. After a deployment
-recovers, run `npm run updates:verify -- --native-build BUILD_NUMBER` and compare
-the reported digests/rollout with the retained release. Never create another
-release merely to retry a slow deployment.
+### Manual Preparation As A Backup
+
+The original local command remains available unchanged. To publish its prepared manifests through the configured Pages build, set the production variable `TIKKUN_UPDATE_MODE=manual`, then prepare, review, commit and push the public feed files yourself. In manual mode the build skips native generation and signing, restores remote downloads without overwriting local latest manifests, verifies the feeds, signs the retention index and builds the website. It still needs the production secret for that index. Return the variable to `automatic` to resume preparation from source on push.
+
+### One Local Preparation Command
+
+```sh
+npm run updates:release -- --native-build 7
+```
+
+Despite its historical name, this command only prepares local artifacts. It runs
+`verify:release`, builds native web assets, generates and signs the separate web
+and content feeds under `.asc/updates/`, verifies and copies them into
+`site/updates/`, then builds the website and verifies the prepared artifacts.
+Reruns replace each `latest.json` with the newest signed manifest and retain older
+hash-named downloads for clients already using them. It prints artifact paths for
+review. It does not stage Git files, commit, push, publish, wait for deployment,
+or contact GitHub. Those actions belong to the user.
+
+Use the repository-pinned Node/npm, macOS, a clean `develop` checkout, and the
+existing private update key. GitHub authentication and an interactive terminal
+are not required. Use `--dry-run` for read-only preflight and a command preview.
+The command requires clean source files and a clean Git index; unstaged changes
+to generated public feed files are allowed so you can rerun before committing.
+Review and commit source changes yourself before preparing a release. It never switches branches or
+stashes/discards edits. It does not require the source to have been pushed.
+
+Set `TIKKUN_UPDATE_PRIVATE_KEY_FILE` for an external signing key; the default is
+`.asc/update-signing/private.pem`, with owner-only permissions. The default target
+archive is `.asc/artifacts/Tikkun-1.0-BUILD_NUMBER.xcarchive`; override it with
+`--target-archive PATH`. Archive compatibility remains mandatory. No Capacitor
+sync or native compatibility override runs. Rollout defaults to 100%; use
+`--rollout 10` for a limited rollout when the artifacts are eventually published.
+Checks/builds may take 10-20 minutes and several GB of local output. Dependencies
+and browsers are not installed automatically.
+
+Preparation failures stop the command without publishing. Review any generated
+local files before retrying. When ready, review, stage and commit the public
+files yourself, then push to publish through the existing GitHub integration. After deployment, run `npm run updates:verify -- --native-build 7`
+and compare the live digests and rollout with the prepared artifacts.
 
 ### Individual Steps
 
@@ -225,7 +249,7 @@ The existing Cloudflare Pages project is **tikkun**, serving `tikkun.pages.dev`
 and `tikkunreader.com`. After creating both releases, run:
 
 ```sh
-npm run updates:stage -- --native-build 6
+npm run updates:stage -- --native-build 7
 npm run build
 ```
 
@@ -237,14 +261,13 @@ this directory. Retain its prior immutable artifacts on subsequent deployments.
 
 Review the public artifacts, commit the release files and routing code, and push
 to **develop**. The existing Git integration builds and deploys the complete site,
-including `site/updates/` and the repository's Pages Functions. No Cloudflare login,
-new deployment configuration, direct upload, or private CI signing key is needed.
+including `site/updates/` and the repository's Pages Functions. With the automatic preparation configured, select manual mode for this backup path so the build keeps your locally prepared manifests. The production secret is still required to sign the retention index.
 Never commit `.asc/`, signing keys, credentials, or phone installation links.
 
 After the GitHub deployment succeeds, verify the actual public bytes:
 
 ```sh
-npm run updates:verify -- --native-build 6
+npm run updates:verify -- --native-build 7
 ```
 
 Verification checks manifest and ZIP signatures, exact byte counts and hashes,
@@ -252,8 +275,7 @@ content compatibility, JSON/ZIP responses, native CORS, caching, and an absent-f
 404. Build 6 is the first web-feed target; do not copy its manifest into build 5.
 Future native builds use the same updater but require their own signed
 `/updates/web/BUILD_NUMBER/` release. A newer build does not blindly install an
-older build's package. A GitHub push alone does not generate native update files;
-sign and stage approved web/content revisions locally before committing them.
+older build's package. With `build:pages` configured, production pushes generate compatible native update files automatically. The local backup command signs and copies approved web/content revisions for your review and commit.
 
 ## Fresh Phone Builds
 
@@ -262,11 +284,11 @@ npm run native:share
 ```
 
 This rebuilds and syncs web assets **before** asking Sqim to archive and upload.
-Running Sqim alone does not refresh Capacitor's copied web files. A web deployment
-also does not automatically create a signed native update: eligible fixes still
-need the signing, staging and publishing steps above.
+Running Sqim alone does not refresh Capacitor's copied web files. The configured production Pages build prepares eligible signed updates automatically, but it does not build or distribute a new iOS binary. New native releases still need their own archive, distribution and exported compatibility record.
 
 ## Verification And Remaining Gates
+
+- Automatic-preparation checkpoint (2026-10-07): the real production preparation flow passed locally, including `verify:quick` (1,151 Node tests), native packaging, separate signing, old-feed retention and exact deployment-output comparison. The clean native build and 30 Swift tests passed; one optional network test was skipped. Archive 7 passed signature, resource-parity and native-contract checks. Release validation also exposed outdated navigation/calendar/theme test fixtures and shared iframe import state; those fixtures were corrected, then all affected iframe tests passed in Chromium (77) and WebKit (66), and the media-theme checks passed. Full browser runs covered 788 Chromium and 523 WebKit assertions; their initial failures were resolved by those focused follow-ups. The first hosted automatic deployment and physical-device update acceptance still require the owner's publication steps.
 
 - Shared prompt follow-up: 21 Node tests and 48 Chromium/WebKit tests pass,
   including Cancel/retry, Reader teardown, Settings, and unchanged PWA behavior.

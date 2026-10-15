@@ -37,6 +37,19 @@ test('aliyah inference rejects filenames with conflicting signals', () => {
   expect(() => inferAliyah('Beresheet 1st 2.m4a')).toThrow(/Ambiguous aliyah/)
 })
 
+test.each(['54 Vezot Haberacha', '54 Vezos Haberacha'])('imports %s with the canonical Vezot spelling', async (folder) => {
+  const root = await temporaryRoot()
+  const source = path.join(root, 'source', folder)
+  await mkdir(source, { recursive: true })
+  await writeFile(path.join(source, '1.m4a'), 'synthetic audio')
+  const recordings = await syncAudioCatalog({
+    sourceRoot: path.join(root, 'source'),
+    targetAudioRoot: path.join(root, 'audio'),
+    targetFile: path.join(root, 'manifest.ts'),
+  })
+  expect(recordings[0]).toMatchObject({ id: 'vezot-haberacha-1', parshaSlug: 'vezot-haberacha', parshaName: 'Vezot Haberacha', parshaNumber: 54 })
+})
+
 test('selection rejects equally preferred files for the same aliyah', () => {
   expect(() =>
     selectAliyahFiles(['take-a 1.m4a', 'take-b 1.m4a'], '01 Beresheet')

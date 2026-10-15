@@ -60,6 +60,7 @@ exports[`generates the full LeiningDate object for יום כיפור 1`] = `
       "date": [Circular],
       "id": "שחרית",
       "isParsha": false,
+      "kind": "service",
       "runs": [
         {
           "aliyot": [
@@ -211,6 +212,7 @@ exports[`generates the full LeiningDate object for יום כיפור 1`] = `
       "date": [Circular],
       "id": "מנחה",
       "isParsha": false,
+      "kind": "service",
       "runs": [
         {
           "aliyot": [

@@ -1,5 +1,11 @@
 import { setReaderFocalPointMode, type ReaderFocalPointMode } from './reader-scroll.ts'
 import {
+  blankReaderThemeColors,
+  normalizeSavedReaderThemes,
+  type ReaderThemeColors,
+  type SavedReaderTheme,
+} from './reader-themes.ts'
+import {
   createPersistedJsonStore,
   getBrowserStorage,
   requirePersistedJsonMutation,
@@ -15,6 +21,7 @@ import {
 } from './reader-presentation.ts'
 
 const STORAGE_KEY = 'tikkun.reader-preferences'
+export const readingFontScaleRange = { min: 0.8, max: 1.5, step: 0.05 } as const
 
 export const themeModes = [
   'automatic',
@@ -57,7 +64,10 @@ export interface ReaderPreferences {
   themeMode: ThemeMode
   customBackgroundColor: string
   customTextColor: string
+  savedThemes: SavedReaderTheme[]
+  activeSavedThemeId: string | null
   readerTextLayout: ReaderTextLayout
+  readingFontScale: number
   readerSideMode: ReaderSideMode
   readerSideOrder: ReaderSideOrder
 }
@@ -84,7 +94,10 @@ export const defaultReaderPreferences: ReaderPreferences = {
   themeMode: 'automatic',
   customBackgroundColor: defaultCustomThemeColors.background,
   customTextColor: defaultCustomThemeColors.text,
+  savedThemes: [{ id: 'custom-theme-1', ...blankReaderThemeColors }],
+  activeSavedThemeId: null,
   readerTextLayout: 'match',
+  readingFontScale: 1,
   readerSideMode: 'one',
   readerSideOrder: 'tikkun-right',
 }
@@ -115,6 +128,7 @@ function rootCssColor(name: string, fallback: string) {
 export function getDefaultReaderPreferences(): ReaderPreferences {
   return {
     ...defaultReaderPreferences,
+    savedThemes: defaultReaderPreferences.savedThemes.map((theme) => ({ ...theme })),
     readerTextLayout: defaultReaderTextLayout(),
     highlightFill: rootCssColor(
       '--reader-highlight-fill',
@@ -196,6 +210,7 @@ function normalizeReaderPreferences(
   defaults: ReaderPreferences
 ): ReaderPreferences {
   const candidate = isRecord(value) ? value : {}
+  const savedThemes = normalizeSavedReaderThemes(candidate.savedThemes, defaults.savedThemes)
   return {
     reducedMotion: candidate.reducedMotion === 'on' || candidate.reducedMotion === 'off'
       || candidate.reducedMotion === 'automatic' ? candidate.reducedMotion : defaults.reducedMotion,
@@ -249,9 +264,16 @@ function normalizeReaderPreferences(
       candidate.customTextColor,
       defaults.customTextColor
     ),
+    savedThemes,
+    activeSavedThemeId: savedThemes.find((theme) => theme.id === candidate.activeSavedThemeId)?.id ?? null,
     readerTextLayout: isReaderTextLayout(candidate.readerTextLayout)
       ? candidate.readerTextLayout
       : defaults.readerTextLayout,
+    readingFontScale: normalizedNumber(
+      candidate.readingFontScale,
+      defaults.readingFontScale,
+      readingFontScaleRange
+    ),
     readerSideMode: isReaderSideMode(candidate.readerSideMode)
       ? candidate.readerSideMode
       : defaults.readerSideMode,
@@ -347,6 +369,8 @@ export function mergeReaderPreferences(
 
 export function applyReaderPreferences(preferences: ReaderPreferences) {
   const root = document.documentElement
+  const colors = getCustomThemeColors(preferences)
+  const interfaceColors = customThemeInterfaceColors(colors.background)
   root.dataset.readerReducedMotion = preferences.reducedMotion
   const fillTint = toRgba(preferences.highlightFill, preferences.highlightOpacity)
   const fillAlphaPercent = `${preferences.highlightOpacity * 100}%`
@@ -354,21 +378,20 @@ export function applyReaderPreferences(preferences: ReaderPreferences) {
 
   root.dataset.readerTheme = preferences.themeMode
   root.dataset.readerTextLayout = preferences.readerTextLayout
+  root.style.setProperty('--reading-font-scale', String(preferences.readingFontScale))
   root.dataset.readerSideMode = preferences.readerSideMode
   root.dataset.readerSideOrder = preferences.readerSideOrder
   root.style.setProperty(
     '--reader-custom-background-color',
-    preferences.customBackgroundColor
+    colors.background
   )
   root.style.setProperty(
     '--reader-custom-text-color',
-    preferences.customTextColor
+    colors.text
   )
-  root.style.colorScheme = preferences.themeMode === 'custom'
-    ? relativeLuminance(preferences.customBackgroundColor) < 0.32
-      ? 'dark'
-      : 'light'
-    : ''
+  root.style.setProperty('--reader-custom-ui-text-color', interfaceColors.text)
+  root.style.setProperty('--reader-custom-ui-secondary-color', interfaceColors.secondary)
+  root.style.colorScheme = preferences.themeMode === 'custom' ? interfaceColors.scheme : ''
   root.dataset.readerCustomScheme = root.style.colorScheme
   setReaderFocalPointMode(preferences.focalPointMode)
 
@@ -402,6 +425,30 @@ export function applyReaderPreferences(preferences: ReaderPreferences) {
   )
 }
 
+export function getCustomThemeColors(preferences: ReaderPreferences): ReaderThemeColors {
+  return preferences.savedThemes.find((theme) => theme.id === preferences.activeSavedThemeId)
+    ?? { background: preferences.customBackgroundColor, text: preferences.customTextColor }
+}
+
+export function customThemeColorUpdates(
+  preferences: ReaderPreferences,
+  colors: Partial<ReaderThemeColors>
+): Partial<ReaderPreferences> {
+  if (preferences.activeSavedThemeId) {
+    return {
+      themeMode: 'custom',
+      savedThemes: preferences.savedThemes.map((theme) => theme.id === preferences.activeSavedThemeId
+        ? { ...theme, ...colors }
+        : theme),
+    }
+  }
+  return {
+    themeMode: 'custom',
+    customBackgroundColor: colors.background ?? preferences.customBackgroundColor,
+    customTextColor: colors.text ?? preferences.customTextColor,
+  }
+}
+
 export function colorContrastRatio(background: string, text: string) {
   const lighter = Math.max(
     relativeLuminance(background),
@@ -421,6 +468,23 @@ export function recommendedThemeTextColor(background: string) {
     colorContrastRatio(background, light)
     ? dark
     : light
+}
+
+export function customThemeInterfaceColors(background: string) {
+  const darkInk = colorContrastRatio(background, '#000000') >= colorContrastRatio(background, '#ffffff')
+  const ink = darkInk ? '#000000' : '#ffffff'
+  const tintedInk = (weight: number) => {
+    const color = '#' + hexChannels(background).map((channel) =>
+      Math.round(channel * (1 - weight) + (darkInk ? 0 : 255) * weight)
+        .toString(16).padStart(2, '0')
+    ).join('')
+    return colorContrastRatio(background, color) >= 4.5 ? color : ink
+  }
+  return {
+    scheme: darkInk ? 'light' : 'dark',
+    text: tintedInk(0.9),
+    secondary: tintedInk(0.72),
+  }
 }
 
 function relativeLuminance(color: string) {

@@ -23,6 +23,7 @@
       href="%sveltekit.assets%/assets/images/safari-pinned-tab.svg"
       color="#000000"
     />
+    %sveltekit.head%
     <script>
       ;(() => {
         const storageKey = 'tikkun.reader-preferences'
@@ -49,16 +50,32 @@
 
         try {
           const raw = window.localStorage.getItem(storageKey)
-          if (!raw) return
-          const preferences = JSON.parse(raw)
+          const preferences = JSON.parse(raw ?? 'null')
+          document.documentElement.dataset.readerReducedMotion =
+            preferences?.reducedMotion === 'on' || preferences?.reducedMotion === 'off'
+              ? preferences.reducedMotion : 'automatic'
           const themeMode = preferences?.themeMode
+          const savedThemes = []
+          const candidates = Array.isArray(preferences?.savedThemes)
+            ? preferences.savedThemes
+            : [{ id: 'custom-theme-1', background: '#e5e5e5', text: '#191c22' }]
+          for (const theme of candidates) {
+            if (!theme || typeof theme !== 'object' || Array.isArray(theme)
+              || typeof theme.id !== 'string' || !theme.id.trim()
+              || savedThemes.some((saved) => saved.id === theme.id)
+              || typeof theme.background !== 'string' || !validColor.test(theme.background)
+              || typeof theme.text !== 'string' || !validColor.test(theme.text)) continue
+            savedThemes.push(theme)
+            if (savedThemes.length === 5) break
+          }
+          const savedTheme = savedThemes.find((theme) => theme.id === preferences?.activeSavedThemeId)
           const customBackground = validColor.test(
-            preferences?.customBackgroundColor
+            savedTheme?.background ?? preferences?.customBackgroundColor
           )
-            ? preferences.customBackgroundColor
+            ? savedTheme?.background ?? preferences.customBackgroundColor
             : defaultCustomBackground
-          const customText = validColor.test(preferences?.customTextColor)
-            ? preferences.customTextColor
+          const customText = validColor.test(savedTheme?.text ?? preferences?.customTextColor)
+            ? savedTheme?.text ?? preferences.customTextColor
             : defaultCustomText
           document.documentElement.style.setProperty(
             '--reader-custom-background-color',
@@ -68,19 +85,40 @@
             '--reader-custom-text-color',
             customText
           )
+          // Match customThemeInterfaceColors before the app can hydrate.
+          const backgroundLuminance = luminance(customBackground)
+          const darkInk = (backgroundLuminance + 0.05) / 0.05 >= 1.05 / (backgroundLuminance + 0.05)
+          const tintedInk = (weight) => {
+            const color = '#' + [1, 3, 5].map((offset) =>
+              Math.round(Number.parseInt(customBackground.slice(offset, offset + 2), 16) * (1 - weight)
+                + (darkInk ? 0 : 255) * weight).toString(16).padStart(2, '0')
+            ).join('')
+            const inkLuminance = luminance(color)
+            const contrast = (Math.max(backgroundLuminance, inkLuminance) + 0.05)
+              / (Math.min(backgroundLuminance, inkLuminance) + 0.05)
+            return contrast >= 4.5 ? color : darkInk ? '#000000' : '#ffffff'
+          }
+          document.documentElement.style.setProperty('--reader-custom-ui-text-color', tintedInk(0.9))
+          document.documentElement.style.setProperty('--reader-custom-ui-secondary-color', tintedInk(0.72))
           if (validThemes.has(themeMode)) {
             document.documentElement.dataset.readerTheme = themeMode
             if (themeMode === 'custom') {
               document.documentElement.style.colorScheme =
-                luminance(customBackground) < 0.32 ? 'dark' : 'light'
+                darkInk ? 'light' : 'dark'
+              document.documentElement.dataset.readerCustomScheme =
+                document.documentElement.style.colorScheme
             }
           }
         } catch {
           document.documentElement.dataset.readerTheme = 'automatic'
         }
+        const themeColor = document.getElementById('reader-theme-color')
+        if (themeColor) {
+          themeColor.content = getComputedStyle(document.documentElement)
+            .getPropertyValue('--paper-color').trim()
+        }
       })()
     </script>
-    %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">
     <div style="display: contents">%sveltekit.body%</div>

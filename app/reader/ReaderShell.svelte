@@ -1,6 +1,8 @@
 <script lang="ts">
   import { flushSync, onMount } from 'svelte'
   import UiIcon from '../components/UiIcon.svelte'
+  import { nativeControlHaptic } from '../platform/native-haptics.ts'
+  import { isNativeApp } from '../platform/native.ts'
   import type {
     ReaderShell,
     ReaderShellComponentProps,
@@ -36,6 +38,9 @@
   let annotationsEnabled = $state(readInitialAnnotationsEnabled())
   let titleButton: HTMLButtonElement
   let headerPointer = $state(false)
+  let annotationsPointer = $state(false)
+  let annotationsPressed = $state(false)
+  const nativeApp = isNativeApp()
 
   const mobileTitleQuery = '(max-width: 550px)'
   const mobileTitleFontProperty = '--mobile-parsha-title-font-size'
@@ -144,6 +149,15 @@
     const resizeObserver = new ownerWindow.ResizeObserver(fitMobileTitle)
     resizeObserver.observe(toolbar)
     let connected = true
+    const handleControlClick = (event: MouseEvent) => {
+      if (!(event.target instanceof ownerWindow.Element)) return
+      const button = event.target.closest<HTMLButtonElement>('.app-toolbar button')
+      if (!button || button.disabled || button.getAttribute('aria-disabled') === 'true') return
+      if ('pointerType' in event && typeof event.pointerType === 'string') {
+        nativeControlHaptic(event.pointerType)
+      }
+    }
+    ownerDocument.addEventListener('click', handleControlClick, true)
 
     fitMobileTitle()
     void ownerDocument.fonts.ready.then(() => {
@@ -154,6 +168,7 @@
     return () => {
       connected = false
       resizeObserver.disconnect()
+      ownerDocument.removeEventListener('click', handleControlClick, true)
     }
   })
 </script>
@@ -175,18 +190,19 @@
           type="button"
           onclick={onAboutClick}
         >
-          About
+          {nativeApp ? 'Readings' : 'About'}
         </button>
         <button
           class="mobile-library-button"
           data-target-id="mobile-library"
           type="button"
-          title="Home"
-          aria-label="Open main page"
+          title={nativeApp ? 'Readings' : 'Home'}
+          aria-label={nativeApp ? 'Open reading index' : 'Open main page'}
+          aria-expanded={nativeApp ? pickerOpen : undefined}
           onclick={onAboutClick}
         >
           <span class="mobile-library-icon" data-target-id="mobile-library-icon">
-            <UiIcon name="houseFilled" />
+            <UiIcon name={nativeApp ? 'chevronLeft' : 'houseFilled'} />
           </span>
         </button>
       </div>
@@ -389,7 +405,24 @@
       ? 'Hide nekudot and cantillation marks'
       : 'Show nekudot and cantillation marks'}
     aria-pressed={annotationsEnabled}
-    onclick={() => onAnnotationsChange(!annotationsEnabled)}
+    data-pointer-press={annotationsPointer || undefined}
+    data-press-active={annotationsPressed || undefined}
+    onpointerdown={(event) => {
+      if (!event.isPrimary || event.button !== 0) return
+      annotationsPointer = true
+      annotationsPressed = true
+    }}
+    onpointerup={() => { annotationsPressed = false }}
+    onpointercancel={() => { annotationsPressed = false }}
+    onpointerleave={() => { annotationsPressed = false }}
+    onlostpointercapture={() => { annotationsPressed = false }}
+    onkeydown={() => { annotationsPointer = false; annotationsPressed = false }}
+    onclick={(event) => {
+      if ('pointerType' in event && typeof event.pointerType === 'string') {
+        nativeControlHaptic(event.pointerType)
+      }
+      onAnnotationsChange(!annotationsEnabled)
+    }}
   >
     <span class="toggle" aria-hidden="true">
       <span class="shadowed-circle">

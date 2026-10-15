@@ -14,7 +14,7 @@
 </script>
 
 <svelte:head>
-  <title>Tikkun Korim — Torah reading practice in sync</title>
+  <title>Tikkun Reader — Torah reading practice in sync</title>
   <meta
     name="description"
     content="Practice Torah reading with aliyah recordings, word highlighting, and the original Torah layout kept in sync."

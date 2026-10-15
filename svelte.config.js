@@ -18,7 +18,8 @@ if (basePath && !basePath.startsWith('/')) {
 export default {
   preprocess: vitePreprocess(),
   kit: {
-    outDir: native.enabled ? '.svelte-kit-native' : '.svelte-kit',
+    // A running dev server must not replace the browser tests' app template.
+    outDir: native.enabled ? '.svelte-kit-native' : process.env.VITEST ? '.svelte-kit-test' : '.svelte-kit',
     adapter: adapter({
       pages: native.enabled ? 'dist-native' : 'dist',
       assets: native.enabled ? 'dist-native' : 'dist',

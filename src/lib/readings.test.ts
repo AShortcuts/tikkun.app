@@ -38,8 +38,8 @@ vi.mock('../../generated/public-reading-manifest.ts', async (importOriginal) => 
 test('builds public coverage from generated recordings and cue data', () => {
   expect(readingCoverage).toHaveLength(56)
   expect(coverageSummary).toEqual({
-    readingsWithAudio: 10,
-    availableAliyot: 70,
+    readingsWithAudio: 11,
+    availableAliyot: 77,
     syncedReadings: 6,
   })
   expect(availableReadings.every((reading) => reading.availableAliyot.length > 0)).toBe(
@@ -94,8 +94,8 @@ test('filters coverage by practical status and English or Hebrew name', () => {
 })
 
 test('uses manual rows only for active work while generated cues decide readiness', () => {
-  expect(getRequiredReading('beresheet').statusLabel).toBe('Word sync ready')
-  expect(getRequiredReading('vayetzei').statusLabel).toBe('Word sync ready')
+  expect(getRequiredReading('beresheet').statusLabel).toBe('Done')
+  expect(getRequiredReading('vayetzei').statusLabel).toBe('Done')
   expect(getRequiredReading('nasso').statusLabel).toBe('Recording review')
   expect(getRequiredReading('behalotecha').statusLabel).toBe('Sync in progress')
   expect(getRequiredReading('vayelech').statusLabel).toBe('Audio available')

@@ -42,6 +42,12 @@ http://localhost:5176/reader/#/torah/parsha/noach
 http://localhost:5176/reader/#/torah/parsha/noach/1-6-9
 ```
 
+These open a date-independent parsha for study. Aliyot come from Hebcal's full
+parsha divisions, and previous/next navigation follows Torah order. Vezot
+Haberacha has seven aliyot ending at Devarim 34:12; it does not include the
+Simchat Torah readings from Beresheet or Bamidbar. References outside the named
+parsha canonicalize to a plain Torah reference while preserving the verse.
+
 ## Torah Page Routes
 
 ```text
@@ -59,7 +65,7 @@ Valid page range: `1-245`.
 /reader/#/esther/page/{page}
 ```
 
-Valid Esther page range: `1-17`.
+Valid Esther page range: `1-16`.
 
 ## Specific Run Routes
 
@@ -68,11 +74,22 @@ Valid Esther page range: `1-17`.
 /reader/#/run/{date}:{service},{run-type}/{book}-{chapter}-{verse}
 ```
 
-## Torah Ref Route
+These open the actual service for that date and calendar location, including
+its additional Torah scrolls and special aliyah labels. Upcoming and Holiday
+entries use this context; `#/next` selects the next dated service. Saving or
+resuming a service preserves its date. Simchat Torah can therefore have a
+different division from Vezot Haberacha in the parsha list, including an eighth
+aliyah when Simchat Torah falls on Shabbat in Israel.
+
+## Torah Reference Routes
 
 ```text
-/reader/#/r/{book}-{chapter}-{verse}
+/reader/#/torah/{book}-{chapter}-{verse}
 ```
+
+Opens a specific Torah verse, with books numbered 1 (Beresheet) through 5 (Devarim). For example, `/reader/#/torah/5-33-24` opens Devarim 33:24. Reference and page routes use the date-independent parsha divisions, matching parsha browsing.
+
+Legacy `/reader/#/r/{book}-{chapter}-{verse}` links remain supported and canonicalize to `/reader/#/torah/{book}-{chapter}-{verse}` without adding a browser history entry. Picker and search links use the canonical route.
 
 ## Reader Tools
 

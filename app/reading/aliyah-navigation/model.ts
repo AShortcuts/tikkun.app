@@ -1,4 +1,5 @@
 import type { PassageAudioState } from '../passage-audio.ts'
+import { aliyahLabel } from '../../calendar-model/aliyah-label.ts'
 import {
   LeiningRunType,
   type LeiningAliyah,
@@ -47,11 +48,8 @@ export type AliyahNavigationSnapshot = Readonly<{
   playback: AliyahNavigationPlayback
 }>
 
-export function formatAliyahLabel(aliyahIndex: AliyahIndex) {
-  if (aliyahIndex === 'Maftir') return 'מפטיר'
-  return ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'ששי', 'שביעי'][
-    aliyahIndex - 1
-  ]
+export function formatAliyahLabel(aliyahIndex: AliyahIndex, run?: LeiningRun) {
+  return aliyahLabel(aliyahIndex, run)
 }
 
 export function isSameAliyahNavigationTarget(
@@ -117,7 +115,7 @@ export function createAliyahNavigationSnapshot({
     return {
       key: aliyahNavigationEntryKey(entry),
       target,
-      label: formatAliyahLabel(aliyah.index),
+      label: formatAliyahLabel(aliyah.index, run),
       compactLabel: aliyah.index === 'Maftir' ? 'M' : `${aliyah.index}`,
       audioKey: audio.playbackKey,
       recordingKey: audio.recordingKey,

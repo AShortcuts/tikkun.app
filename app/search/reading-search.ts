@@ -1,5 +1,6 @@
-import type { LeiningAliyah, LeiningInstance, LeiningRun } from '../calendar-model/model-types.ts'
+import { readingTitle, type LeiningAliyah, type ReadingInstance, type LeiningRun } from '../calendar-model/model-types.ts'
 import renderLeiningTitle from '../components/render-leining-title.ts'
+import { aliyahLabel } from '../calendar-model/aliyah-label.ts'
 import {
   generateTorahReferenceHash,
   listTorahBooks,
@@ -10,6 +11,8 @@ import { holidayLeiningKeywords } from '../navigation/holiday-actions.ts'
 import { generateUrl } from '../view-model/navigation/url-parser.ts'
 import {
   getParshaSearchTermsForLeining,
+  canonicalParshaReadings,
+  parshaReadingForLeining,
   semanticParshaUrlForLeining,
 } from '../view-model/navigation/parsha-routes.ts'
 import {
@@ -28,7 +31,7 @@ export type ReadingSearchEntry = {
   hebrewLabel: string
   englishLabel: string
   aliases: readonly string[]
-  leining: LeiningInstance
+  leining: ReadingInstance
 }
 
 export type ReadingSearchResult = {
@@ -42,26 +45,25 @@ export type ReadingSearchResult = {
   match: SearchMatch<ReadingSearchEntry> | null
 }
 
-function firstRunOf(leining: LeiningInstance) {
+function firstRunOf(leining: ReadingInstance) {
   const run = leining.runs[0]
   if (!run) {
     throw new Error(
-      `Leining ${leining.date.title.en || leining.id} has no reading runs`
+      `Leining ${readingTitle(leining).en || leining.id} has no reading runs`
     )
   }
   return run
 }
 
-function leiningKey(leining: LeiningInstance) {
-  return [
-    leining.date.date.getTime(),
-    leining.id,
-    firstRunOf(leining).id,
-  ].join(':')
+function leiningKey(leining: ReadingInstance) {
+  return firstRunOf(leining).id
 }
 
-function navigationHrefForLeining(leining: LeiningInstance) {
-  return semanticParshaUrlForLeining(leining) ?? generateUrl(firstRunOf(leining))
+function navigationHrefForLeining(leining: ReadingInstance) {
+  if (firstRunOf(leining).scroll === 'esther') {
+    return semanticParshaUrlForLeining(leining) ?? generateUrl(firstRunOf(leining))
+  }
+  return generateUrl(firstRunOf(leining))
 }
 
 function uniqueValues(values: readonly string[]) {
@@ -74,9 +76,9 @@ function uniqueValues(values: readonly string[]) {
   })
 }
 
-function entryForLeining(leining: LeiningInstance): ReadingSearchEntry {
+function entryForLeining(leining: ReadingInstance): ReadingSearchEntry {
   const aliases = uniqueValues([
-    leining.date.title.he,
+    readingTitle(leining).he,
     renderLeiningTitle(leining),
     ...getParshaSearchTermsForLeining(leining),
   ])
@@ -86,7 +88,7 @@ function entryForLeining(leining: LeiningInstance): ReadingSearchEntry {
     destinationId: href,
     href,
     hebrewLabel: renderLeiningTitle(leining),
-    englishLabel: leining.date.title.en,
+    englishLabel: readingTitle(leining).en,
     aliases,
     leining,
   }
@@ -94,20 +96,19 @@ function entryForLeining(leining: LeiningInstance): ReadingSearchEntry {
 
 function aliyahDetailLabel(
   aliyah: number | 'Maftir',
-  hebrewLabel: string
+  entry: ReadingSearchEntry
 ) {
-  const destination = aliyah === 'Maftir' ? 'Maftir' : `Aliyah ${aliyah}`
-  return `${destination} · ${hebrewLabel}`
+  const target = findReadingAliyah(entry.leining, aliyah)
+  return `${aliyahLabel(aliyah, target?.run, 'en')} · ${entry.hebrewLabel}`
 }
 
 function aliyahHref(
-  leining: LeiningInstance,
+  leining: ReadingInstance,
   aliyahIndex: number | 'Maftir'
 ) {
   const target = findReadingAliyah(leining, aliyahIndex)
   return target
-    ? semanticParshaUrlForLeining(leining, target.aliyah.start) ??
-        generateUrl(target.run, target.aliyah.start)
+    ? generateUrl(target.run, target.aliyah.start)
     : null
 }
 
@@ -163,8 +164,16 @@ function referenceResult(
 export class ReadingSearch {
   readonly #index
 
-  constructor(leinings: readonly LeiningInstance[]) {
-    const entries = leinings.map(entryForLeining)
+  constructor(leinings: readonly ReadingInstance[]) {
+    const readings = leinings.flatMap((leining): ReadingInstance[] => {
+      const parsha = parshaReadingForLeining(leining)
+      return parsha ? leining.isParsha ? [parsha] : [parsha, leining] : [leining]
+    })
+    const unique = new Map([
+      ...canonicalParshaReadings({ includeCombined: true }),
+      ...readings,
+    ].map(reading => [leiningKey(reading), reading]))
+    const entries = [...unique.values()].map(entryForLeining)
     this.#index = createSearchIndex(
       entries.map((entry) => ({
         id: entry.id,
@@ -174,7 +183,7 @@ export class ReadingSearch {
         keywords: entry.leining.isParsha
           ? ['parsha', 'weekly reading']
           : holidayLeiningKeywords(
-              entry.leining.date.title,
+              readingTitle(entry.leining),
               `${entry.leining.id}`
             ),
         item: entry,
@@ -215,7 +224,7 @@ export class ReadingSearch {
           englishLabel: entry.englishLabel,
           detailLabel:
             targetAliyah && intent?.kind === 'aliyah'
-              ? aliyahDetailLabel(intent.aliyah, entry.hebrewLabel)
+              ? aliyahDetailLabel(intent.aliyah, entry)
               : entry.hebrewLabel,
           matchedAlias:
             match.matchedField?.kind === 'alias' ||
@@ -228,12 +237,12 @@ export class ReadingSearch {
   }
 }
 
-export function createReadingSearch(leinings: readonly LeiningInstance[]) {
+export function createReadingSearch(leinings: readonly ReadingInstance[]) {
   return new ReadingSearch(leinings)
 }
 
 export function findReadingAliyah(
-  leining: LeiningInstance,
+  leining: ReadingInstance,
   index: LeiningAliyah['index']
 ): { run: LeiningRun; aliyah: LeiningAliyah } | null {
   for (const run of leining.runs) {

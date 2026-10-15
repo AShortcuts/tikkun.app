@@ -88,13 +88,15 @@
     target: Parameters<AliyahToolbar['setCueStatus']>[0],
     status: AliyahCueStatus
   ) {
-    if (!isSameAliyahNavigationTarget(toolbarState.current.target, target)) {
-      return
-    }
     flushSync(() => {
       toolbarState = {
         ...toolbarState,
-        current: { ...toolbarState.current, cueStatus: status },
+        current: isSameAliyahNavigationTarget(toolbarState.current.target, target)
+          ? { ...toolbarState.current, cueStatus: status }
+          : toolbarState.current,
+        compact: isSameAliyahNavigationTarget(toolbarState.compact.target, target)
+          ? { ...toolbarState.compact, cueIncomplete: isAliyahCueStatusUnfinished(status) }
+          : toolbarState.compact,
       }
     })
   }
@@ -104,6 +106,7 @@
       toolbarState = {
         ...toolbarState,
         current: { ...toolbarState.current, cueStatus: null },
+        compact: { ...toolbarState.compact, cueIncomplete: true },
       }
     })
   }
@@ -113,8 +116,7 @@
     if (toolbarState.current.audioState) return toolbarState.current.audioState.problem === 'incomplete-cues'
     return Boolean(
       toolbarState.current.audioAvailable &&
-        status &&
-        isAliyahCueStatusUnfinished(status)
+        status !== 'published'
     )
   }
 

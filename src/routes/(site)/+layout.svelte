@@ -46,7 +46,7 @@
   style={`background-image: url("${asset('/assets/images/home-ambient.jpg')}")`}
 >
   <header class="home-header" aria-label="Site navigation">
-    <a class="home-brand site-brand-link" href={resolve('/')} aria-label="Tikkun Korim home">
+    <a class="home-brand site-brand-link" href={resolve('/')} aria-label="Tikkun Reader home">
       <span class="home-brand-mark" aria-hidden="true">
         <img
           src={asset('/assets/images/safari-pinned-tab.svg')}
@@ -55,7 +55,7 @@
           height="24"
         />
       </span>
-      <span>Tikkun Korim</span>
+      <span>Tikkun Reader</span>
     </a>
 
     <nav class="home-nav" aria-label="Primary navigation">

@@ -48,7 +48,7 @@ describe('unified reader search', () => {
     })
     expect(search.search('Genesis 6:9')[0]).toMatchObject({
       source: 'reading',
-      href: '#/r/1-6-9',
+      href: '#/torah/1-6-9',
       band: 'intent',
     })
     expect(search.search('Torah page 246')).toEqual([])

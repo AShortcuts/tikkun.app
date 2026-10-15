@@ -6,8 +6,10 @@ The earlier service on 8769 keeps its original storage. Continue new work in
 the cue-flag preview; edits in the two copies are independent. To start it again:
 
 ```sh
-"/Users/adambh/Documents/HTML Projects/Tikkun with Highlighted Audio/experiments/torah-audio-aligner/batch"
+npm run dev:aligner
 ```
+
+Run this command from the Tikkun project root. Run `npm run dev` in another terminal for the website and its `/settings/` admin hub. Stop a newly started aligner with Ctrl+C; saved work stays on disk. Starting the server does not start queued alignment jobs.
 
 With the preserved cue-flag snapshot present, the launcher defaults to port
 8768 and reuses its running server. Explicit command-line options still take
@@ -70,6 +72,12 @@ revision IDs, cue counts, pending flags, and unreviewed cue counts.
 **Download ZIP again** links to the same immutable
 prepared archive. Individual cue export remains available in the reader.
 
+**Clear downloads** removes the selected completed entries from the saved queue, including after a refresh or server restart. **Deselect** only unchecks them. Clearing keeps saved alignments, edits, audio, and downloaded files; add a recording again to reuse its saved cues. Waiting, running, and failed entries stay in the queue.
+
+An older failure shows **Resolved by a later alignment** with an **Open** button when a newer saved result matches the same audio, passage, and text version. Its original error remains in the saved queue record. A failure from a newer attempt remains visible.
+
+Audio decoding preserves presentation timestamps and pads or trims to playback time zero, including AAC encoder-delay offsets. Long recordings use checkpointed traceback to keep the exact full-passage alignment within the existing memory allowance; they do not require a larger alignment matrix or guessed passage splits.
+
 Use **Back to batch** from a recording to return with library filters and
 checkbox selections intact. Saving conflicts block navigation until resolved.
 
@@ -98,8 +106,7 @@ reviewed-export API remains available for workflows that require full review.
 - Immutable uploaded bytes: `work/imported-audio/`.
 - Generated-result registrations: `work/private-batch-cue-flags/generated/`.
 - Cue copies and prepared ZIPs: `work/private-batch-cue-flags/exports/`.
-- Historical compiler files: `work/compiler-history/`, checked against their
-  original hashes; audio and canonical text continue to be verified live.
+- Historical compiler files: `work/compiler-history/`, used for generation provenance only. Opening, editing, and downloading completed results use their saved text and timings, regardless of later compiler or canonical-text changes. Waveform integrity is checked when playback or the waveform is requested, so a missing playback cache does not block cue downloads.
 
 Keep the experiment's `work/` directory when backing up this beta; results refer
 to their immutable inputs and model evidence there. QA reviews under

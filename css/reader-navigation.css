@@ -9,7 +9,6 @@
     --header-control-shadow:
       inset 0 1px 0 color-mix(in srgb, var(--text-color) 8%, transparent),
       0 2px 3px #00000010;
-    --header-bookmark-color: color-mix(in srgb, #d84f5b 76%, var(--text-color));
     --header-audio-surface: color-mix(in srgb, var(--paper-color) 84%, #0a84ff);
     border-bottom: 1px solid transparent;
     flex-shrink: 0;
@@ -18,7 +17,7 @@
       env(safe-area-inset-right, 0px) 10px env(safe-area-inset-left, 0px);
     position: sticky;
     top: 0;
-    background: color-mix(in srgb, var(--paper-color) 94%, transparent);
+    background: color-mix(in srgb, var(--interface-surface-color) 94%, transparent);
     backdrop-filter: blur(18px);
     z-index: 100;
   }
@@ -298,7 +297,7 @@
     border: 1px solid color-mix(in srgb, var(--text-color) 14%, transparent);
     border-radius: 8px;
     padding: 0.28rem;
-    background: var(--paper-color);
+    background: var(--interface-surface-color);
     color: var(--text-color);
     box-shadow: 0 14px 42px color-mix(in srgb, black 22%, transparent);
   }
@@ -472,7 +471,7 @@
     right: 1.5em;
     z-index: 40;
     backface-visibility: hidden;
-    contain: layout paint;
+    contain: layout;
     transform: translate3d(0, var(--corner-controls-raise-y), 0);
     will-change: transform;
   }
@@ -497,7 +496,7 @@
   @media screen and (max-width: 715px) {
     .reader-corner-controls {
       bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
-      right: 0.85rem;
+      right: calc(0.85rem + env(safe-area-inset-right, 0px));
     }
     @media screen and (max-width: 450px) {
       .reader-corner-controls.mod-raised {
@@ -562,14 +561,15 @@
     body {
       --mobile-aliyah-playing-text: #111;
     }
-    html[data-reader-theme='dark'] body {
+    html[data-reader-theme='dark'] body,
+    html[data-reader-theme='custom'][data-reader-custom-scheme='dark'] body {
       --mobile-aliyah-playing-text: #fff;
     }
     .app-toolbar {
       padding: calc(12px + env(safe-area-inset-top, 0px))
         env(safe-area-inset-right, 0px) 12px env(safe-area-inset-left, 0px);
       border-bottom: none;
-      background: color-mix(in srgb, var(--paper-color) 96%, transparent);
+      background: color-mix(in srgb, var(--interface-surface-color) 96%, transparent);
       box-shadow: none;
       backdrop-filter: blur(24px) saturate(135%);
     }
@@ -614,9 +614,6 @@
     .toolbar-current-aliyah-label,
     .toolbar-current-aliyah-audio {
       display: none !important;
-    }
-    .reader-corner-controls {
-      display: none;
     }
     .aliyah-rail {
       display: none !important;
@@ -1234,12 +1231,18 @@
       }
     }
     .reader-corner-controls.mod-raised {
-      --corner-controls-raise-y: -10.5rem;
+      --corner-controls-raise-y: 0px;
+      bottom: var(--corner-controls-player-bottom, calc(13rem + env(safe-area-inset-bottom, 0px)));
     }
 
     html[data-mobile-player-minimized]
       .reader-corner-controls.mod-raised {
-      --corner-controls-raise-y: -5.25rem;
+      --corner-controls-raise-y: 0px;
+      bottom: var(--corner-controls-player-bottom, calc(6rem + env(safe-area-inset-bottom, 0px)));
+    }
+
+    html[data-mobile-player-expanded] .reader-corner-controls {
+      visibility: hidden;
     }
   }
 
@@ -1406,23 +1409,33 @@
 
 @layer overrides {
   .app-toolbar :is(.toolbar-button, .parsha-title, .mobile-library-button,
-    .mobile-aliyah-play-toggle, .mobile-aliyah-picker-toggle) {
-    transition: transform var(--reader-motion-fast) var(--reader-ease-out);
+    .mobile-aliyah-play-toggle, .mobile-aliyah-picker-toggle, .toolbar-overflow-item) {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      transform 140ms var(--reader-ease-out),
+      background-color 140ms var(--reader-ease-out);
   }
   .app-toolbar :is(.toolbar-button, .parsha-title, .mobile-library-button):active {
     box-shadow: var(--header-control-shadow);
     opacity: 1;
   }
   .app-toolbar:not([data-header-pointer]) :is(.toolbar-button, .parsha-title,
-    .mobile-library-button, .mobile-aliyah-play-toggle, .mobile-aliyah-picker-toggle):active {
+    .mobile-library-button, .mobile-aliyah-play-toggle, .mobile-aliyah-picker-toggle, .toolbar-overflow-item) {
+    transition: none;
+  }
+  .app-toolbar:not([data-header-pointer]) :is(.toolbar-button, .parsha-title,
+    .mobile-library-button, .mobile-aliyah-play-toggle, .mobile-aliyah-picker-toggle, .toolbar-overflow-item):active {
     transform: none;
   }
   .app-toolbar[data-header-pointer] :is(.toolbar-button, .parsha-title,
-    .mobile-library-button, .mobile-aliyah-play-toggle, .mobile-aliyah-picker-toggle):not(:disabled):not([aria-disabled='true']):active {
-    transform: scale(var(--reader-control-press-scale));
+    .mobile-library-button, .mobile-aliyah-play-toggle, .mobile-aliyah-picker-toggle, .toolbar-overflow-item):not(:disabled):not([aria-disabled='true']):active {
+    transform: scale(0.96);
+    background-color: var(--heavy-accent-color);
+    transition-duration: 100ms;
   }
   .app-toolbar [data-target-id='bookmark-current'][aria-pressed='true'] {
-    color: var(--header-bookmark-color);
+    color: var(--text-color);
   }
   .app-toolbar :is(.toolbar-button, .parsha-title, .mobile-library-button):focus-visible {
     outline: 2px solid var(--reader-focus-color);
@@ -1439,13 +1452,20 @@
   }
   @media (prefers-reduced-motion: reduce) {
     .app-toolbar :is(.toolbar-button, .parsha-title, .mobile-library-button,
-      .mobile-aliyah-play-toggle, .mobile-aliyah-picker-toggle) {
+      .mobile-aliyah-play-toggle, .mobile-aliyah-picker-toggle, .toolbar-overflow-item) {
       transition: none;
     }
     .app-toolbar[data-header-pointer] :is(.toolbar-button, .parsha-title,
-      .mobile-library-button, .mobile-aliyah-play-toggle, .mobile-aliyah-picker-toggle):not(:disabled):not([aria-disabled='true']):active {
+      .mobile-library-button, .mobile-aliyah-play-toggle, .mobile-aliyah-picker-toggle, .toolbar-overflow-item):not(:disabled):not([aria-disabled='true']):active {
       transform: none;
     }
+  }
+
+  html[data-reader-reduced-motion='on'] .app-toolbar[data-header-pointer] :is(.toolbar-button,
+    .parsha-title, .mobile-library-button, .mobile-aliyah-play-toggle,
+    .mobile-aliyah-picker-toggle, .toolbar-overflow-item):active {
+    transform: none;
+    transition: none;
   }
 
   :where(.aliyah-audio-button, .mobile-aliyah-play, .mobile-aliyah-play-toggle)[data-audio-tone='normal'] {

@@ -9,6 +9,7 @@ test.each([
   '#/run/2026-10-17:shacharis,main',
   '#/torah/parsha/noach',
   '#/esther/megillah-esther',
+  '#/torah/5-33-24',
   '#/r/1-1-1',
 ])('accepts reader hash %s', (hash) => {
   expect(isReaderHash(hash)).toBe(true)
@@ -19,6 +20,9 @@ test.each([
   '#/torah/parsha/',
   '#/torah/parsha/noach/not-a-ref',
   '#/torah/page/0',
+  '#/torah/5-33',
+  '#/torah/0-1-1',
+  '#/torah/5-33-24/extra',
   '#/esther/page/-1',
   '#/run/id/1-2',
   '#/r/1-2-3/extra',
@@ -43,6 +47,7 @@ test.each([
 test.each([
   '#/run/2026-09-05:shacharis,main/5-31-20',
   '#/r/5-31-20',
+  '#/torah/5-31-20',
   '#/torah/page/242',
   '#/esther/page/1',
 ])('does not treat non-parsha reader hash %s as semantic', (hash) => {

@@ -1,4 +1,6 @@
 import { expect, test } from 'vitest'
+import { LeiningGenerator } from '../../calendar-model/generator.ts'
+import { resolveParshaRun } from '../../view-model/navigation/parsha-routes.ts'
 import {
   LeiningInstanceId,
   LeiningRunType,
@@ -45,6 +47,21 @@ test('builds one shared navigation sequence across main and maftir runs', () => 
     { runId: mainRun.id, aliyahIndex: 7 },
     { runId: maftirRun.id, aliyahIndex: 'Maftir' },
   ])
+})
+
+test('Vezot parsha navigation uses the displayed seven divisions and leaves the dated holiday intact', () => {
+  const generator = new LeiningGenerator({ ashkenazi: true, israel: false, includeModernHolidays: false })
+  const resolved = resolveParshaRun(generator, 'vezot-haberacha', new Date('2026-01-01'))
+  if (!resolved) throw new Error('Missing Vezot Haberacha fixture')
+  const { run } = resolved
+  const entries = getAliyahNavigationEntriesForRun(run)
+  expect(entries.map(entry => entry.aliyah.index)).toEqual([1, 2, 3, 4, 5, 6, 7])
+  expect(entries.every(entry => entry.run === run)).toBe(true)
+  expect(entries[6].aliyah.start).toMatchObject({ b: 5, c: 34, v: 1 })
+  const dated = generator.parseId('2026-10-04:shacharis,main')
+  if (!dated) throw new Error('Missing dated Simchat Torah fixture')
+  expect(dated.aliyot).toHaveLength(6)
+  expect(getAliyahNavigationEntriesForRun(dated).at(-1)?.aliyah.index).toBe('Maftir')
 })
 
 test('creates presentation items and a stable signature behind one model interface', () => {
@@ -139,6 +156,7 @@ function createLeiningFixture(runs: LeiningRun[]): LeiningInstance {
     leinings: [],
   }
   const leining: LeiningInstance = {
+    kind: 'service',
     date,
     id: LeiningInstanceId.Shacharis,
     isParsha: true,

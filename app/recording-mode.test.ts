@@ -22,9 +22,12 @@ const preferences: ReaderPreferences = {
   focalPointMode: 'browser',
   disableShiftNekudotHide: true,
   themeMode: 'dark',
+  savedThemes: [],
+  activeSavedThemeId: null,
   customBackgroundColor: '#eee6d6',
   customTextColor: '#3b3026',
   readerTextLayout: 'match',
+  readingFontScale: 1,
   readerSideMode: 'one',
   readerSideOrder: 'tikkun-right',
 }

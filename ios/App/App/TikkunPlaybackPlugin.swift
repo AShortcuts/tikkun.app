@@ -52,6 +52,11 @@ public class TikkunPlaybackPlugin: CAPPlugin, CAPBridgedPlugin {
             guard let self else { return }
             self.publish(self.engine.snapshot)
         })
+        for notification in [UIApplication.willResignActiveNotification, UIApplication.didEnterBackgroundNotification] {
+            observers.append(center.addObserver(forName: notification, object: nil, queue: .main) { _ in
+                UIApplication.shared.isIdleTimerDisabled = false
+            })
+        }
         observers.append(center.addObserver(forName: AVAudioSession.interruptionNotification,
                                              object: nil, queue: .main) { [weak self] note in
             self?.interrupted(note)
@@ -110,6 +115,7 @@ public class TikkunPlaybackPlugin: CAPPlugin, CAPBridgedPlugin {
     deinit {
         observers.forEach { NotificationCenter.default.removeObserver($0) }
         commands.forEach { $0.0.removeTarget($0.1) }
+        DispatchQueue.main.async { UIApplication.shared.isIdleTimerDisabled = false }
     }
 
     private struct SessionRequest: Decodable {
@@ -258,6 +264,7 @@ public class TikkunPlaybackPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func publish(_ state: PlaybackSnapshot) {
+        updateIdleTimer(state)
         if state.ended || state.phase == "error" { deactivateAudioSession() }
         if UIApplication.shared.applicationState == .active {
             notifyListeners("stateChanged", data: payload(state))
@@ -278,6 +285,16 @@ public class TikkunPlaybackPlugin: CAPPlugin, CAPBridgedPlugin {
         ]
         if let duration = state.duration { info[MPMediaItemPropertyPlaybackDuration] = duration }
         infoCenter.nowPlayingInfo = info
+    }
+
+    private func updateIdleTimer(_ state: PlaybackSnapshot) {
+        let application = UIApplication.shared
+        // Keep the visible Reader awake only while native playback is ready and running.
+        let keepAwake = application.applicationState == .active && state.sessionID != nil
+            && !state.paused && !state.ended && state.phase == "ready"
+        if application.isIdleTimerDisabled != keepAwake {
+            application.isIdleTimerDisabled = keepAwake
+        }
     }
 
     private func payload(_ state: PlaybackSnapshot) -> [String: Any] {

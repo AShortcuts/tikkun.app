@@ -9,10 +9,10 @@
 </script>
 
 <svelte:head>
-  <title>About — Tikkun Korim</title>
+  <title>About — Tikkun Reader</title>
   <meta
     name="description"
-    content="About the Tikkun Korim Torah practice reader, its recordings, and its open-source project."
+    content="About Tikkun Reader, its Torah recordings, and its open-source project."
   />
 </svelte:head>
 
@@ -23,7 +23,7 @@
     </div>
     <div class="site-page-summary">
       <p class="site-page-intro">
-        Tikkun Korim keeps Torah text, aliyah boundaries, audio, and word highlighting in one browser-based reader.
+        Tikkun Reader keeps Torah text, aliyah boundaries, audio, and word highlighting in one browser-based reader.
       </p>
       <div class="site-action-row">
         <a class="site-primary-action" href={resolve('/reader/#/next')}>
@@ -45,7 +45,7 @@
     </article>
     <article>
       <h2>Word timing</h2>
-      <p>Recordings are aligned to the Torah text by hand. “Word sync ready” means every published aliyah has complete Cue Data.</p>
+      <p>Recordings are aligned to the Torah text by hand. “Done” means every published aliyah has complete Cue Data.</p>
     </article>
     <article>
       <h2>Open source</h2>

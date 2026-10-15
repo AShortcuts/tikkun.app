@@ -1,4 +1,6 @@
 import type { Ref } from '../ref.ts'
+import { readingTitle } from '../calendar-model/model-types.ts'
+import { aliyahLabel } from '../calendar-model/aliyah-label.ts'
 import { compareRefs } from '../calendar-model/ref-utils.ts'
 import type {
   LeiningRun,
@@ -9,7 +11,7 @@ import { findLastIndex } from '../calendar-model/utils.ts'
 export class AliyahLabeller {
   constructor(
     private readonly titleForRun: (run: LeiningRun) => string = (run) =>
-      run.leining.date.title.he
+      readingTitle(run.leining).he
   ) {}
 
   /**
@@ -89,34 +91,17 @@ export class AliyahLabeller {
   }
 }
 
-const aliyahStrings = [
-  'ראשון',
-  'שני',
-  'שלישי',
-  'רביעי',
-  'חמישי',
-  'ששי',
-  'שביעי',
-]
-
 export function aliyahName(
   index: LeiningAliyah['index'],
   run: LeiningRun,
   {
     isEnd,
-    title = run.leining.date.title.he,
+    title = readingTitle(run.leining).he,
   }: { isEnd?: boolean; title?: string } = {}
 ) {
   if (!index) return ''
-  if (index === 'Maftir') return 'מפטיר'
-  if (index < 1 || index > aliyahStrings.length) return ''
-
   if (!isEnd && index === 1) return title.replace(/^פרשת /, '')
-  if (title === 'שמחת תורה') {
-    if (index === 6) return `חתן תורה`
-    if (index === 7) return `חתן בראשית`
-  }
-  return aliyahStrings[index - 1]
+  return aliyahLabel(index, run)
 }
 
 function refEquals(a: Ref, b: Ref): boolean {

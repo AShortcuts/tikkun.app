@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount, setContext } from 'svelte'
-  import { goto } from '$app/navigation'
+  import { afterNavigate, goto } from '$app/navigation'
   import { resolve } from '$app/paths'
   import { isNativeApp } from '../../app/platform/native.ts'
   import { publishNativePractice } from '../../app/platform/native-practice.ts'
@@ -8,6 +8,19 @@
   import { createNativeReadingLinks, NATIVE_READING_LINKS_CONTEXT } from '../../app/platform/native-reading-links.ts'
   import { createDownloadOwner, DOWNLOAD_OWNER_CONTEXT } from '../../app/offline/download-owner.ts'
   import ServiceWorkerUpdate from '$lib/components/ServiceWorkerUpdate.svelte'
+  import { createAnalyticsClient, installAnalytics, type AnalyticsClient } from '../../app/analytics/client.ts'
+  import { analyticsTransport } from '../../app/analytics/transport.ts'
+  import { currentAnalyticsConfig } from '../../app/analytics/config.ts'
+
+  let analytics: AnalyticsClient | undefined
+  afterNavigate(() => {
+    analytics?.page()
+    if (isNativeApp() && window.location.pathname === resolve('/')) {
+      void goto(resolve('/reader/'), { replaceState: true }).catch(error => {
+        console.error('Could not return to the native reader', error)
+      })
+    }
+  })
 
   const downloads = setContext(DOWNLOAD_OWNER_CONTEXT, createDownloadOwner())
   const nativeLinks = setContext(NATIVE_READING_LINKS_CONTEXT,
@@ -30,10 +43,19 @@
       })
       : null)
   onMount(() => {
+    const native = isNativeApp()
+    const config = currentAnalyticsConfig()
+    analytics = createAnalyticsClient({ view: window, config, native,
+      enabled: !import.meta.env.DEV && window.top === window && !navigator.webdriver,
+      send: analyticsTransport(config, native) })
+    const stopAnalytics = installAnalytics(analytics)
+    analytics.page()
     publishNativePractice({ israel: loadCalendarSettings().israel })
     document.documentElement.dataset.appHydrated = 'true'
     void nativeLinks?.start()
     return () => {
+      stopAnalytics()
+      analytics = undefined
       delete document.documentElement.dataset.appHydrated
       nativeLinks?.destroy()
     }

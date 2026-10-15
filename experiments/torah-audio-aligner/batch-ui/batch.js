@@ -93,7 +93,7 @@ function renderQueue() {
   $('queue-start').textContent = queue.items.some(item => item.status === 'interrupted') ? 'Resume queue' : 'Start queue';
   $('queue-pause').disabled = busy || queue.paused;
   $('queue-cancel').disabled = busy || !waiting;
-  $('review-next').disabled = !remaining;
+  $('review-next').disabled = busy || !remaining;
   const eligible = new Set(results.filter(item => generatedCueExport || item.review.exportReady).map(item => item.resultId));
   for (const id of zipSelection) if (!eligible.has(id)) zipSelection.delete(id);
   for (const id of eligible) if (!seenReady.has(id)) { zipSelection.add(id); seenReady.add(id); }
@@ -105,7 +105,7 @@ function renderQueue() {
     const row = element('div', undefined, 'queue-row');
     row.dataset.itemId = item.id;
     if (item.status === 'ready' && (generatedCueExport || item.review.exportReady)) {
-      const check = element('input'); check.type = 'checkbox'; check.checked = zipSelection.has(item.resultId);
+      const check = element('input'); check.type = 'checkbox'; check.checked = zipSelection.has(item.resultId); check.disabled = busy;
       check.setAttribute('aria-label', `Include ${item.title} in cue ZIP`);
       check.addEventListener('change', () => { if (check.checked) zipSelection.add(item.resultId); else zipSelection.delete(item.resultId); renderQueue(); });
       row.append(check);
@@ -118,9 +118,10 @@ function renderQueue() {
     copy.append(element('p', status, 'secondary'));
     if (item.error) copy.append(element('p', item.error, 'secondary queue-error'));
     row.append(copy);
-    if (item.status === 'ready') {
-      const review = element('button', item.review.exportReady ? 'Open' : 'Review');
-      review.setAttribute('aria-label', `${item.review.exportReady ? 'Open' : 'Review'} ${item.title}`);
+    if (item.status === 'ready' || item.status === 'resolved') {
+      const label = item.status === 'resolved' || item.review.exportReady ? 'Open' : 'Review';
+      const review = element('button', label);
+      review.setAttribute('aria-label', `${label} ${item.title}`);
       review.addEventListener('click', action(() => openResult(item.resultId))); row.append(review);
     } else if (['failed', 'interrupted', 'cancelled'].includes(item.status)) {
       const retry = element('button', 'Retry'); retry.disabled = busy;
@@ -136,6 +137,8 @@ function renderQueue() {
 }
 
 function updateZip() {
+  $('select-downloads').disabled = busy || !readyResults().some(item => generatedCueExport || item.review.exportReady);
+  $('deselect-downloads').disabled = $('clear-downloads').disabled = busy || !zipSelection.size;
   $('download-batch').disabled = busy || !zipSelection.size || zipSelection.size > 100;
   $('download-batch').textContent = zipSelection.size ? `Download ${zipSelection.size} cue ${zipSelection.size === 1 ? 'file' : 'files'} (.zip)` : 'Download cues (.zip)';
   $('zip-help').textContent = generatedCueExport ? 'No review required. Unzip, then use Import cues in the matching recording’s admin panel. Flags stay in each file until reviewed.' : 'This running service supports reviewed exports. Open the updated private preview for downloads before review.';
@@ -153,7 +156,21 @@ $('select-visible').addEventListener('click', () => { for (const row of visibleS
 $('select-new').addEventListener('click', () => { for (const row of visibleSources()) if (row.available && !existing(row)) selected.add(row.id); renderLibrary(); });
 $('clear-selection').addEventListener('click', () => { selected.clear(); renderLibrary(); });
 $('select-downloads').addEventListener('click', () => { for (const item of readyResults()) if (generatedCueExport || item.review.exportReady) zipSelection.add(item.resultId); renderQueue(); });
-$('clear-downloads').addEventListener('click', () => { zipSelection.clear(); renderQueue(); });
+$('deselect-downloads').addEventListener('click', () => { zipSelection.clear(); renderQueue(); });
+$('clear-downloads').addEventListener('click', action(async () => {
+  if (!queue.clearDownloadsSupported) throw new Error('Restart the aligner with Ctrl+C, then npm run dev:aligner, and reload this page to clear downloads.');
+  const resultIds = new Set(zipSelection);
+  const itemIds = queue.items.filter(item => item.status === 'ready' && resultIds.has(item.resultId)).map(item => item.id);
+  busy = true; renderQueue(); renderSelection();
+  try {
+    await save();
+    if (polling) await polling;
+    const result = await api('/api/batch/clear-downloads', { itemIds });
+    queue = result.queue;
+    for (const id of resultIds) { zipSelection.delete(id); seenReady.delete(id); }
+    $('batch-download-status').textContent = `Cleared ${result.cleared} completed ${result.cleared === 1 ? 'entry' : 'entries'} from the queue. Add a recording again to reuse its saved cues.`;
+  } finally { busy = false; renderQueue(); renderSelection(); }
+}));
 $('add-selected').addEventListener('click', action(async () => {
   busy = true; renderSelection();
   try { await enqueue([...selected].map(sourceId => ({ sourceId })), $('force-alignment').checked); selected.clear(); await refreshQueue(true); }
@@ -294,5 +311,5 @@ try {
   $('library-parsha').value = options.has('behalotecha') ? 'behalotecha' : '';
   $('library-parsha').disabled = false;
   renderLibrary(); await refreshQueue(); showBatch(true);
-  setInterval(() => { if (!document.hidden) refreshQueue().catch(showError); }, 3000);
+  setInterval(() => { if (!document.hidden && !busy) refreshQueue().catch(showError); }, 3000);
 } catch (error) { showError(error); }

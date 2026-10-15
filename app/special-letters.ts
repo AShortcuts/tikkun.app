@@ -1,7 +1,7 @@
 import specialLettersJson from '../text/special-letters.json' with {
   type: 'json',
 }
-import type { Ref } from './ref.ts'
+import type { Ref, ScrollName } from './ref.ts'
 
 export type SpecialLetterForm = {
   type: 'small' | 'inverted'
@@ -9,6 +9,7 @@ export type SpecialLetterForm = {
 
 export type SpecialLetterEntry = {
   id: string
+  scroll: ScrollName
   verse: {
     book: number
     chapter: number
@@ -48,7 +49,8 @@ const parseEntry = (value: unknown, index: number): SpecialLetterEntry => {
   const label = `Special-letter entry ${index + 1}`
   if (!isRecord(value)) throw new Error(`${label} must be an object`)
 
-  const { id, verse, word, letter, form } = value
+  const { id, scroll, verse, word, letter, form } = value
+  if (scroll !== 'torah' && scroll !== 'esther') throw new Error(`${label} has an invalid scroll`)
   if (typeof id !== 'string' || !/^[a-z0-9-]+$/.test(id)) {
     throw new Error(`${label} has an invalid id`)
   }
@@ -87,6 +89,7 @@ const parseEntry = (value: unknown, index: number): SpecialLetterEntry => {
 
   return {
     id,
+    scroll,
     verse: {
       book: verse.book,
       chapter: verse.chapter,
@@ -127,6 +130,7 @@ export const parseSpecialLetterCatalog = (
     ids.add(entry.id)
 
     const target = [
+      entry.scroll,
       entry.verse.book,
       entry.verse.chapter,
       entry.verse.verse,
@@ -149,9 +153,9 @@ export const parseSpecialLetterCatalog = (
 
 export const specialLetterCatalog = parseSpecialLetterCatalog(specialLettersJson)
 
-const verseKey = ({ b, c, v }: Ref) => `${b}:${c}:${v}`
-const entryVerseKey = ({ verse }: SpecialLetterEntry) =>
-  `${verse.book}:${verse.chapter}:${verse.verse}`
+const verseKey = ({ b, c, v }: Ref, scroll: ScrollName) => `${scroll}:${b}:${c}:${v}`
+const entryVerseKey = ({ verse, scroll }: SpecialLetterEntry) =>
+  `${scroll}:${verse.book}:${verse.chapter}:${verse.verse}`
 
 const entriesByVerse = specialLetterCatalog.entries.reduce(
   (entries, entry) => {
@@ -200,10 +204,11 @@ const renderTargetedWord = (
  * the selected grapheme inside it.
  */
 export const createSpecialLetterRenderer = (
-  references: readonly (Ref | undefined)[]
+  references: readonly (Ref | undefined)[],
+  scroll: ScrollName = 'torah',
 ) => {
   const referenceKeys = new Set(
-    references.filter((ref): ref is Ref => Boolean(ref)).map(verseKey)
+    references.filter((ref): ref is Ref => Boolean(ref)).map(ref => verseKey(ref, scroll))
   )
   const candidates = [...referenceKeys].flatMap(
     (key) => entriesByVerse.get(key) ?? []

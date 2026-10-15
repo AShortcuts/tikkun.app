@@ -7,6 +7,7 @@ import {
   getParshaSearchTermsForLeining,
   getParshaSearchTermsForSlug,
   semanticParshaUrlForLeining,
+  resolveParshaRun,
 } from './parsha-routes.ts'
 
 const testSettings: UserSettings = {
@@ -16,6 +17,22 @@ const testSettings: UserSettings = {
 }
 
 const generator = new LeiningGenerator(testSettings)
+
+test('Vezot Haberacha is canonical and Vezos remains a working alias', () => {
+  expect(canonicalizeParshaSlug('vezot-haberacha')).toBe('vezot-haberacha')
+  expect(canonicalizeParshaSlug('vezos-haberacha')).toBe('vezot-haberacha')
+  expect(canonicalizeParshaSlug('vezot-habracha')).toBe('vezot-haberacha')
+})
+
+test('Vezot parsha has seven recorded divisions without changing the dated holiday', () => {
+  const resolved = resolveParshaRun(generator, 'vezot-haberacha', new Date('2026-01-01'))
+  expect(resolved?.run.aliyot).toHaveLength(7)
+  expect(resolved?.run.aliyot.at(-2)).toMatchObject({ index: 6, start: { b: 5, c: 33, v: 27 }, end: { b: 5, c: 33, v: 29 } })
+  expect(resolved?.run.aliyot.at(-1)).toMatchObject({ index: 7, start: { b: 5, c: 34, v: 1 }, end: { b: 5, c: 34, v: 12 } })
+  const original = resolved && generator.parseId('2026-10-04:shacharis,main')
+  expect(original?.aliyot).toHaveLength(6)
+  expect(original?.aliyot.at(-1)?.end).toMatchObject({ b: 5, c: 34, v: 12 })
+})
 
 function findLeining(date: string, predicate: (title: string) => boolean) {
   const leiningDate = generator

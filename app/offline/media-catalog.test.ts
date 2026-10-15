@@ -27,7 +27,7 @@ describe('Media catalog', () => {
     const result = listMediaReadings(new LeiningGenerator(userSettingsFromCalendarSettings({ israel: false })), audioRecordings)
     expect(result).toHaveLength(54)
     expect(result[0]).toMatchObject({ id: 'beresheet', group: 'Genesis', aliyot: [1, 2, 3, 4, 5, 6, 7] })
-    expect(result.at(-1)?.id).toBe('vezos-haberacha')
+    expect(result.at(-1)?.id).toBe('vezot-haberacha')
     expect(result.every((item) => item.aliyot.length > 0 && item.group)).toBe(true)
     expect(new Set(result.map((item) => item.group)).size).toBe(5)
   })

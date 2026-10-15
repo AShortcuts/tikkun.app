@@ -1,0 +1,107 @@
+@font-face { font-family: 'Noto Sans Hebrew UI'; src: url('/assets/fonts/NotoSansHebrew-Variable.ttf'); font-display: swap; }
+.print-workspace {
+  --print-surface: var(--paper-color, #fcfcfd);
+  --print-ink: var(--text-color, #202532);
+  --print-accent: var(--header-audio-ink, #006bc7);
+  --print-muted: color-mix(in srgb, var(--print-ink) 85%, var(--print-surface));
+  --print-rule: color-mix(in srgb, var(--print-ink) 24%, var(--print-surface));
+  --print-canvas: color-mix(in srgb, var(--print-ink) 8%, var(--print-surface));
+  --print-control: color-mix(in srgb, var(--print-ink) 3%, var(--print-surface));
+  --print-hover: color-mix(in srgb, var(--print-ink) 7%, var(--print-surface));
+  --print-selected: color-mix(in srgb, var(--print-accent) 13%, var(--print-surface));
+}
+.print-workspace { font-family: 'Noto Sans Hebrew UI', sans-serif; color: var(--print-ink); background: var(--print-canvas); min-height: 100svh; padding: 20px 28px; box-sizing: border-box; font-size: 14px; color-scheme: inherit; }
+.print-workspace *, .print-workspace *::before, .print-workspace *::after { box-sizing: border-box; }
+.print-workspace button, .print-workspace select, .print-workspace input { font: inherit; }
+.print-workspace button { cursor: pointer; }
+.print-workspace button:focus-visible, .print-workspace input:focus-visible, .print-workspace select:focus-visible { outline: 3px solid var(--reader-focus-color, #1475ee); outline-offset: 3px; }
+.print-workspace .print-dialog { display: grid; grid-template-rows: 64px minmax(0, 1fr) 80px; height: calc(100svh - 40px); max-width: 1440px; margin: 0 auto; background: var(--print-surface); border: 1px solid var(--print-rule); border-radius: 12px; box-shadow: 0 10px 32px #293b6112; overflow: hidden; }
+.print-workspace .dialog-header { display: flex; justify-content: space-between; align-items: center; padding: 0 24px; border-bottom: 1px solid var(--print-rule); }
+.print-workspace .dialog-header h1 { margin: 0; font-size: 27px; letter-spacing: -0.8px; font-weight: 650; }
+.print-workspace .icon-button { display: grid; place-items: center; width: 40px; height: 40px; border: 0; background: transparent; color: inherit; border-radius: 7px; }
+.print-workspace .icon-button svg { width: 22px; height: 22px; }
+.print-workspace .ui-icon { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.print-workspace .dialog-body { display: grid; grid-template-columns: minmax(0, 1fr) 475px; min-height: 0; }
+.print-workspace .preview-region { min-width: 0; min-height: 0; background: var(--print-canvas); overflow: hidden; }
+.print-workspace .preview-scroll { width: 100%; height: 100%; overflow: auto; padding: 0 0 22px; scrollbar-gutter: stable both-edges; }
+.print-workspace .preview-status { min-height: 35px; padding: 9px 18px; color: var(--print-muted); font-size: 11px; text-align: center; }
+.print-workspace .preview-status [role='alert'] { color: var(--media-danger, #a82830); font-size: 13px; }
+.print-workspace .document-wrap { position: relative; margin: 0 auto; filter: drop-shadow(0 3px 8px #2230491a); }
+.print-workspace .document-wrap.unavailable { visibility: hidden; }
+.print-workspace .document-wrap iframe { display: block; border: 0; transform-origin: top left; background: transparent; }
+.print-workspace .print-settings-pane { overflow-y: auto; border-left: 1px solid var(--print-rule); padding: 0 20px; scrollbar-gutter: stable; }
+.print-workspace .settings-group { padding: 14px 0 16px; border-bottom: 1px solid var(--print-rule); }
+.print-workspace .settings-group:last-child { border-bottom: 0; }
+.print-workspace .group-title { display: flex; align-items: center; justify-content: space-between; width: 100%; margin: 0; padding: 0; border: 0; background: transparent; font-size: 17px !important; font-weight: 650 !important; letter-spacing: -0.35px; text-align: left; color: var(--print-ink); }
+.print-workspace .group-title svg { width: 19px; height: 19px; stroke-width: 1.6; }
+.print-workspace .segmented { display: flex; width: 100%; border: 1px solid var(--print-rule); border-radius: 9px; background: var(--print-control); }
+.print-workspace .segmented button { flex: 1; min-width: 0; min-height: 36px; padding: 7px 6px; border: 0; background: transparent; color: inherit; font-size: 14px; line-height: 1.35; border-radius: 8px; position: relative; }
+.print-workspace .segmented button + button { border-left: 1px solid var(--print-rule); border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.print-workspace .segmented button[aria-pressed='true'] { background: var(--print-selected); color: var(--print-accent); outline: 1px solid var(--print-accent); z-index: 1; border-radius: 8px; }
+.print-workspace .segmented small { display: block; font-size: 12px; margin-top: 1px; font-style: italic; opacity: 0.75; }
+.print-workspace .scope-controls { margin-top: 12px; }
+.print-workspace .upcoming-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; margin-top: 12px; min-height: 36px; padding: 7px 10px; color: var(--print-accent); background: var(--print-control); border: 1px solid var(--print-rule); border-radius: 8px; text-align: left; }
+.print-workspace .upcoming-toggle svg { width: 18px; height: 18px; flex: none; }
+.print-workspace .upcoming-readings { display: grid; gap: 6px; max-height: 300px; overflow-y: auto; padding: 5px; margin: 7px -5px 0; }
+.print-workspace .reading-choice { display: grid; gap: 3px; width: 100%; padding: 9px 10px; border: 1px solid var(--print-rule); border-radius: 8px; background: var(--print-surface); color: inherit; text-align: start; }
+.print-workspace .reading-choice > span { font-size: 16px; }
+.print-workspace .reading-choice small, .print-workspace .reading-choice time { color: var(--print-muted); font-size: 12px; line-height: 1.65; }
+.print-workspace .reading-choice[aria-pressed='true'] { background: var(--print-selected); border-color: var(--print-accent); }
+.print-workspace .scope-controls button { font-size: 13px; padding: 7px 6px; }
+.print-workspace .field { display: flex; flex-direction: column; gap: 6px; margin-top: 13px; }
+.print-workspace select { appearance: none; width: 100%; padding: 7px 36px 7px 10px; min-height: 36px; background: var(--print-surface); color: var(--print-ink); border: 1px solid var(--print-rule); border-radius: 8px; }
+.print-workspace .range-fields { display: flex; gap: 16px; margin-top: 13px; }
+.print-workspace .range-fields fieldset { min-width: 0; flex: 1; border: 0; padding: 0; margin: 0; }
+.print-workspace .range-fields legend { padding: 0; margin-bottom: 6px; }
+.print-workspace .range-fields fieldset > div { display: flex; gap: 6px; align-items: center; }
+.print-workspace .range-fields select { min-width: 0; }
+.print-workspace .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 32px; margin-top: 13px; cursor: pointer; }
+.print-workspace .toggle-row input { appearance: none; width: 40px; height: 24px; border-radius: 20px; background: var(--print-rule); margin: 0; position: relative; cursor: pointer; flex: 0 0 auto; }
+.print-workspace .toggle-row input::after { content: ''; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: var(--print-surface); left: 3px; top: 3px; box-shadow: 0 1px 3px #0002; transition: transform 130ms; }
+.print-workspace .toggle-row input:checked { background: var(--print-accent); }
+.print-workspace .toggle-row input:checked::after { transform: translateX(16px); }
+.print-workspace .hint, .print-workspace .page-summary { font-size: 13px; color: var(--print-muted); line-height: 1.45; margin: 5px 0 0; }
+.print-workspace .page-summary { font-size: 13px; margin-top: 4px; }
+.print-workspace .scaling-control { display: flex; gap: 12px; align-items: center; }
+.print-workspace .scaling-control input { flex: 1; width: 100%; accent-color: var(--print-accent); }
+.print-workspace .scaling-control output { min-width: 44px; text-align: right; }
+.print-workspace .scaling-range { flex: 1; min-width: 0; }
+.print-workspace .scaling-stops { display: flex; justify-content: space-between; color: var(--print-muted); font-size: 11px; padding: 3px 2px 0; }
+.print-workspace .sample-reading { margin: 12px 0 0; display: grid; gap: 4px; }
+.print-workspace .sample-reading > span { font-size: 18px; }
+.print-workspace .sample-reading small { color: var(--print-muted); }
+.print-workspace .aliyah-choices { display: flex; gap: 6px; margin-top: 10px; }
+.print-workspace .aliyah-choices button { border: 1px solid var(--print-rule); border-radius: 7px; background: var(--print-control); flex: 1; height: 36px; color: inherit; }
+.print-workspace .aliyah-choices button[aria-pressed='true'] { color: var(--print-accent); background: var(--print-selected); border-color: var(--print-accent); }
+.print-workspace .dialog-footer { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 0 24px; border-top: 1px solid var(--print-rule); }
+.print-workspace .dialog-footer p { font-size: 13px; color: var(--print-muted); }
+.print-workspace .dialog-footer > div { display: flex; gap: 15px; }
+.print-workspace .dialog-footer button { min-width: 140px; padding: 12px 22px; border: 1px solid var(--print-rule); border-radius: 8px; background: var(--print-surface); color: inherit; font-size: 15px; }
+.print-workspace button.primary { color: var(--print-surface); background: var(--print-accent); border-color: var(--print-accent); }
+.print-workspace button:disabled { opacity: 0.45; cursor: default; }
+@media (hover: hover) { .print-workspace .icon-button:hover, .print-workspace .group-title:hover { background: var(--print-hover); } .print-workspace .segmented button:not([aria-pressed='true']):hover { background: var(--print-hover); } .print-workspace .primary:not(:disabled):hover { background: color-mix(in srgb, var(--print-accent) 88%, var(--print-ink)); } }
+@media (max-width: 1100px) { .print-workspace .dialog-body { grid-template-columns: minmax(0, 1fr) 360px; } .print-workspace .print-settings-pane { padding: 0 20px; } .print-workspace .range-fields { gap: 16px; } }
+@media (max-width: 720px) {
+  .print-workspace { padding: 0; }
+  .print-workspace .print-dialog { height: 100svh; border-radius: 0; border: 0; grid-template-rows: 57px minmax(0, 1fr) 85px; }
+  .print-workspace .dialog-header { padding: 0 16px; }
+  .print-workspace .dialog-header h1 { font-size: 23px; }
+  .print-workspace .dialog-body { display: flex; flex-direction: column; overflow-y: auto; }
+  .print-workspace .preview-region { flex: 0 0 43svh; min-height: 240px; }
+  .print-workspace .print-settings-pane { overflow: visible; border-left: 0; padding: 0 20px; }
+  .print-workspace .dialog-footer { padding: 10px 16px; gap: 8px; flex-wrap: wrap; }
+  .print-workspace .dialog-footer p { order: 2; margin: 0; width: 100%; text-align: center; font-size: 10px; }
+  .print-workspace .dialog-footer > div { width: 100%; gap: 10px; }
+  .print-workspace .dialog-footer button { flex: 1; min-width: 0; padding: 9px 14px; }
+}
+@media (prefers-reduced-motion: reduce) { .print-workspace .toggle-row input::after { transition: none; } }
+.print-workspace { position: fixed; inset: 0; margin: auto; border: 0; width: 100%; max-width: none; height: 100svh; max-height: none; overflow: hidden; direction: ltr; text-align: left; }
+.print-workspace::backdrop { background: var(--print-canvas); }
+.print-workspace .aliyah-choices { flex-wrap: wrap; }
+.print-workspace .aliyah-choices button { flex-basis: 45px; }
+
+.print-workspace .credits-option { margin: 0; padding: 12px 0; }
+@media (max-width: 720px), (pointer: coarse) {
+  .print-workspace .segmented button, .print-workspace select, .print-workspace .upcoming-toggle, .print-workspace .group-title, .print-workspace .toggle-row { min-height: 44px; }
+  .print-workspace .aliyah-choices button, .print-workspace .icon-button { min-width: 44px; height: 44px; }
+}

@@ -10,7 +10,7 @@ export function readingHashFromNativeUrl(value: string): string | null {
   const widget = url.protocol === 'tikkunreader:' && url.hostname === 'reader' && url.pathname === '/' && !url.port
   if ((!web && !widget) || url.username || url.password) return null
   const hash = url.hash.split('?')[0]
-  return isReaderHash(hash) ? hash : null
+  return hash === '#/next' || isReaderHash(hash) ? hash : null
 }
 
 type ListenerHandle = { remove(): Promise<void> }

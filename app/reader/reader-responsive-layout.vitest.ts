@@ -143,7 +143,7 @@ test.each([
   localStorage.clear()
   localStorage.setItem('tikkun.reader-preferences', JSON.stringify({
     readerTextLayout: layout,
-    readerSideMode: 'one',
+    readerSideMode: width === 390 ? 'two' : 'one',
   }))
   frame = document.createElement('iframe')
   frame.title = 'Reader nekud position regression'
@@ -157,6 +157,8 @@ test.each([
   const view = requiredFrameWindow(frame)
   const book = required<HTMLElement>(doc, '[data-target-id="tikkun-book"]')
   const toggle = required<HTMLButtonElement>(doc, '[data-test-id="annotations-toggle"]')
+  expect(view.getComputedStyle(book).touchAction).toBe('pan-y pinch-zoom')
+  expect(isRendered(view, toggle), 'nekudot button remains available on mobile and desktop').toBe(true)
   errorCapture = captureFrameErrors(view)
   await doc.fonts.ready
   await settle(view)
@@ -189,7 +191,8 @@ test.each([
   }
   if (width === 390) {
     const bookRect = book.getBoundingClientRect()
-    const x = bookRect.left + 12
+    // Stay beyond WebKit's overlay scrollbar when targeting the reading margin.
+    const x = bookRect.left + book.clientLeft + 20
     const y = bookRect.top + book.clientHeight / 2
     const gap = doc.elementFromPoint(x, y)!
     expect(book.contains(gap)).toBe(true)
@@ -589,7 +592,7 @@ async function exerciseReadingIndex(
   )
   search.focus()
   if (assertFocus) expect(document.activeElement).toBe(search)
-  search.value = 'Vezos Haberacha'
+  search.value = 'Vezot Haberacha'
   search.dispatchEvent(new InputEvent('input', { bubbles: true }))
   await vi.waitFor(
     () => {

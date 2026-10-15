@@ -29,5 +29,5 @@ test('lists verses from the torah table of contents', () => {
 })
 
 test('generates Torah reference hashes', () => {
-  expect(generateTorahReferenceHash({ book: 1, chapter: 1, verse: 1 })).toBe('#/r/1-1-1')
+  expect(generateTorahReferenceHash({ book: 1, chapter: 1, verse: 1 })).toBe('#/torah/1-1-1')
 })

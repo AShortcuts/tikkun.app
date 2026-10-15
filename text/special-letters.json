@@ -4,6 +4,7 @@
   "entries": [
     {
       "id": "genesis-2-4-small-he",
+      "scroll": "torah",
       "verse": { "book": 1, "chapter": 2, "verse": 4 },
       "word": { "text": "בהבראם", "occurrence": 1 },
       "letter": { "text": "ה", "position": 2 },
@@ -11,6 +12,7 @@
     },
     {
       "id": "genesis-23-2-small-kaf",
+      "scroll": "torah",
       "verse": { "book": 1, "chapter": 23, "verse": 2 },
       "word": { "text": "ולבכתה", "occurrence": 1 },
       "letter": { "text": "כ", "position": 4 },
@@ -18,6 +20,7 @@
     },
     {
       "id": "genesis-27-46-small-qof",
+      "scroll": "torah",
       "verse": { "book": 1, "chapter": 27, "verse": 46 },
       "word": { "text": "קצתי", "occurrence": 1 },
       "letter": { "text": "ק", "position": 1 },
@@ -25,6 +28,7 @@
     },
     {
       "id": "leviticus-1-1-small-alef",
+      "scroll": "torah",
       "verse": { "book": 3, "chapter": 1, "verse": 1 },
       "word": { "text": "ויקרא", "occurrence": 1 },
       "letter": { "text": "א", "position": 5 },
@@ -32,6 +36,7 @@
     },
     {
       "id": "leviticus-6-2-small-mem",
+      "scroll": "torah",
       "verse": { "book": 3, "chapter": 6, "verse": 2 },
       "word": { "text": "מוקדה", "occurrence": 1 },
       "letter": { "text": "מ", "position": 1 },
@@ -39,6 +44,7 @@
     },
     {
       "id": "numbers-10-35-inverted-nun",
+      "scroll": "torah",
       "verse": { "book": 4, "chapter": 10, "verse": 35 },
       "word": { "text": "׆", "occurrence": 1 },
       "letter": { "text": "׆", "position": 1 },
@@ -46,6 +52,7 @@
     },
     {
       "id": "numbers-10-36-inverted-nun",
+      "scroll": "torah",
       "verse": { "book": 4, "chapter": 10, "verse": 36 },
       "word": { "text": "׆", "occurrence": 1 },
       "letter": { "text": "׆", "position": 1 },
@@ -53,6 +60,7 @@
     },
     {
       "id": "numbers-25-11-small-yod",
+      "scroll": "torah",
       "verse": { "book": 4, "chapter": 25, "verse": 11 },
       "word": { "text": "פינחס", "occurrence": 1 },
       "letter": { "text": "י", "position": 2 },
@@ -60,9 +68,34 @@
     },
     {
       "id": "deuteronomy-32-18-small-yod",
+      "scroll": "torah",
       "verse": { "book": 5, "chapter": 32, "verse": 18 },
       "word": { "text": "תשי", "occurrence": 1 },
       "letter": { "text": "י", "position": 3 },
+      "form": { "type": "small" }
+    },
+    {
+      "id": "esther-9-7-small-tav",
+      "scroll": "esther",
+      "verse": { "book": 1, "chapter": 9, "verse": 7 },
+      "word": { "text": "פרשנדתא", "occurrence": 1 },
+      "letter": { "text": "ת", "position": 6 },
+      "form": { "type": "small" }
+    },
+    {
+      "id": "esther-9-9-small-shin",
+      "scroll": "esther",
+      "verse": { "book": 1, "chapter": 9, "verse": 9 },
+      "word": { "text": "פרמשתא", "occurrence": 1 },
+      "letter": { "text": "ש", "position": 4 },
+      "form": { "type": "small" }
+    },
+    {
+      "id": "esther-9-9-small-zayin",
+      "scroll": "esther",
+      "verse": { "book": 1, "chapter": 9, "verse": 9 },
+      "word": { "text": "ויזתא", "occurrence": 1 },
+      "letter": { "text": "ז", "position": 3 },
       "form": { "type": "small" }
     }
   ]

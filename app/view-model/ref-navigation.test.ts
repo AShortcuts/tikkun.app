@@ -12,8 +12,8 @@ const testSettings: UserSettings = {
 
 const generator = new LeiningGenerator(testSettings)
 
-test('Torah reference URLs start at the requested verse, not the start of the run', async () => {
-  const route = parseUrl(generator, '/r/1-1-10')
+test.each(['/torah/1-1-10', '/r/1-1-10'])('Torah reference %s starts at the requested verse, not the start of the run', async (path) => {
+  const route = parseUrl(generator, path)
   if (!route || route.view !== 'reader') throw new Error('URL did not parse.')
 
   const { page, lineNumber } = await route.model.startingLocation

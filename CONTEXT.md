@@ -175,6 +175,22 @@ _Avoid_: Cue Data, Cue Draft, Playback Timeline
 The focused TypeScript Module that owns Cue Authoring's waveform summary loading, visible time window, bars, cue and issue markers, playhead, lane seeking, retry state, and browser lifetime. Cue Authoring supplies the current session snapshot and keeps timing workflow rules.
 _Avoid_: Cue Authoring workflow, Playback Timeline, audio controller
 
+**Print Passage**:
+The Torah text selected for printing: one or more aliyot, a whole parsha, or a custom range with explicit starting and ending pesukim. Surrounding text retained for orientation is outside the Print Passage.
+_Avoid_: Required text, paper page range
+
+**Surrounding Text**:
+The text outside the Print Passage in the complete Torah columns containing that passage, shown faded for orientation in Match Torah Lines. The print option is labeled "Show surrounding text"; "fade" is conversational shorthand, and this option does not apply to Reading Layout.
+_Avoid_: Fade as a UI label, extra selected pesukim
+
+**Print Form**:
+The presentation of the printed Torah text: Tikkun includes nekudot and taamim, while Torah omits them. One Sided printing offers either form, with Tikkun as the default; Two Sided printing pairs both forms.
+_Avoid_: Line layout, printer duplex setting
+
+**Tikkun Print Dialog**:
+The print preparation view for selecting a Print Passage and its presentation, with a live preview of the prepared pages. It precedes the system print dialog, which handles printer selection, duplex printing, and the actual print job.
+_Avoid_: System print dialog, printer settings
+
 **Optional Feature**:
 A route or tool that is not needed for the core reader and is loaded only when requested, such as About, Cue Analytics, or Cue Authoring.
 _Avoid_: Reader Settings, Command Palette, Parsha Picker, deferred data

@@ -19,8 +19,9 @@ function setup() {
   return document.querySelector<HTMLElement>('.audio-button-tooltip')!
 }
 
-test('hover waits briefly, stays in viewport, and Escape dismisses', async () => {
+test('audio hover opens below the button, stays in viewport, and Escape dismisses', async () => {
   const tip = setup()
+  button.style.cssText = 'position:fixed;top:160px;left:40px;width:44px;height:44px'
   button.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' }))
   await vi.advanceTimersByTimeAsync(349)
   expect(tip.hidden).toBe(true)
@@ -28,6 +29,7 @@ test('hover waits briefly, stays in viewport, and Escape dismisses', async () =>
   expect(tip.hidden).toBe(false)
   expect(tip.textContent).toBe(button.dataset.audioTooltip)
   const rect = tip.getBoundingClientRect()
+  expect(rect.top).toBe(button.getBoundingClientRect().bottom + 8)
   expect(rect.left).toBeGreaterThanOrEqual(8)
   expect(rect.right).toBeLessThanOrEqual(window.innerWidth - 8)
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
@@ -44,6 +46,48 @@ test('unplayable buttons remain focusable with accessible descriptions and clean
   destroy?.()
   expect(tip.isConnected).toBe(false)
   expect(button.hasAttribute('aria-describedby')).toBe(false)
+})
+
+test('audio tooltip clears the range popup when it also falls below a top-edge button', async () => {
+  const tip = setup()
+  controls = document.createElement('div')
+  controls.dataset.aliyahMarker = 'true'
+  button.style.cssText = 'position:fixed;top:8px;left:40px;width:44px;height:44px'
+  const range = document.createElement('div')
+  range.className = 'aliyah-start-popup'
+  range.style.cssText = 'top:60px;left:40px;height:76px'
+  range.textContent = 'Genesis 1:1-2:3'
+  controls.append(button, range)
+  document.body.append(controls)
+  button.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' }))
+  await vi.advanceTimersByTimeAsync(350)
+  expect(tip.getBoundingClientRect().top).toBe(range.getBoundingClientRect().bottom + 8)
+})
+
+test('reader explanations work on touch, focus, and repeat presses while preserving other descriptions', async () => {
+  const tip = setup()
+  delete button.dataset.audioTooltip
+  button.style.cssText = 'position:fixed;top:160px;left:40px;width:44px;height:44px'
+  button.dataset.readerTooltip = 'Offline downloads are unavailable in this browser.'
+  button.dataset.tooltipOnPress = ''
+  button.setAttribute('aria-describedby', 'existing-description')
+  button.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, pointerType: 'touch' }))
+  await vi.advanceTimersByTimeAsync(350)
+  expect(tip.hidden).toBe(true)
+  button.click()
+  await vi.advanceTimersByTimeAsync(0)
+  expect(tip.hidden).toBe(false)
+  expect(tip.textContent).toBe(button.dataset.readerTooltip)
+  expect(tip.getBoundingClientRect().bottom).toBeCloseTo(button.getBoundingClientRect().top - 8, 0)
+  button.click()
+  await vi.advanceTimersByTimeAsync(0)
+  expect(button.getAttribute('aria-describedby')).toBe(`existing-description ${tip.id}`)
+  document.body.click()
+  expect(tip.hidden).toBe(true)
+  expect(button.getAttribute('aria-describedby')).toBe('existing-description')
+  button.focus()
+  await vi.advanceTimersByTimeAsync(0)
+  expect(tip.hidden).toBe(false)
 })
 
 test.each(['light', 'dark'] as const)('desktop and mobile preserve issue colors and independent dimming in %s mode', async theme => {

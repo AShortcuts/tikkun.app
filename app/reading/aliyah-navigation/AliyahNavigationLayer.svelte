@@ -7,7 +7,6 @@
     ALIYAH_RAIL_AUTO_HIDE_MS,
     aliyahCueAuthoringActionLabel,
     aliyahCueStatusLabel,
-    isAliyahCueStatusUnfinished,
     type AliyahCueStatus,
     type AliyahNavigationLayer,
     type AliyahNavigationLayerComponentProps,
@@ -419,7 +418,7 @@
     if (item.audioState) return item.audioState.problem === 'incomplete-cues'
     const status = resolvedCueStatus(item)
     return Boolean(
-      item.recordingKey && status && isAliyahCueStatusUnfinished(status)
+      item.recordingKey && status !== 'published'
     )
   }
 

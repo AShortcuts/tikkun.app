@@ -6,6 +6,8 @@ import {
   LeiningRunType,
   type LeiningAliyah,
   type LeiningInstance,
+  type ReadingInstance,
+  readingTitle,
   type LeiningRun,
 } from '../calendar-model/model-types.ts'
 import { listReadingSearchLeinings } from '../search/reading-catalog.ts'
@@ -13,6 +15,8 @@ import { createReadingSearch } from '../search/reading-search.ts'
 import { isVezosHabracha } from '../view-model/scroll-view-model.ts'
 import { generateUrl } from '../view-model/navigation/url-parser.ts'
 import {
+  canonicalParshaReadings,
+  parshaReadingForLeining,
   semanticParshaUrlForLeining,
 } from '../view-model/navigation/parsha-routes.ts'
 import renderLeiningTitle from './render-leining-title.ts'
@@ -23,8 +27,6 @@ export const ALIYAH_HOVER_FLYOUT_QUERY =
 export const POPUP_VIEWPORT_MARGIN = 12
 
 const POPUP_ANCHOR_GAP = 6
-const PARSHA_CHOICE_SOURCE_LOOKBACK_YEARS = 3
-const PARSHA_CHOICE_SOURCE_WINDOW_YEARS = 20
 const ordinalDayByRoman = new Map([
   ['I', '1st day'],
   ['II', '2nd day'],
@@ -163,11 +165,11 @@ export type ParshaPickerModel = {
   search(query: string): ParshaPickerSearchResult[]
 }
 
-function firstRunOf(leining: LeiningInstance): LeiningRun {
+function firstRunOf(leining: ReadingInstance): LeiningRun {
   const run = leining.runs[0]
   if (!run) {
     throw new Error(
-      `Leining ${leining.date.title.en || leining.id} has no reading runs`
+      `Leining ${readingTitle(leining).en || leining.id} has no reading runs`
     )
   }
   return run
@@ -184,8 +186,8 @@ function englishBookLabel(ref: LeiningAliyah['start']) {
   return getBookName(ref)
 }
 
-function englishLeiningTitle(leining: LeiningInstance) {
-  let title = leining.date.title.en
+function englishLeiningTitle(leining: ReadingInstance) {
+  let title = readingTitle(leining).en
     .replace(/\b(VIII|VII|II|I)\b/, (day) => ordinalDayByRoman.get(day) ?? day)
     .replace(/\s+\((on [^)]+)\)$/i, ' $1')
 
@@ -194,13 +196,13 @@ function englishLeiningTitle(leining: LeiningInstance) {
   return title
 }
 
-function englishReadingLabel(leining: LeiningInstance) {
+function englishReadingLabel(leining: ReadingInstance) {
   const run = firstRunOf(leining)
   const firstAliyah = run.aliyot[0]
   const lastAliyah = run.aliyot.at(-1)
   if (!firstAliyah || !lastAliyah) {
     throw new Error(
-      `Leining ${leining.date.title.en || leining.id} has no reading range`
+      `Leining ${readingTitle(leining).en || leining.id} has no reading range`
     )
   }
 
@@ -220,20 +222,15 @@ function englishReadingLabel(leining: LeiningInstance) {
   return `${englishLeiningTitle(leining)} (${range})`
 }
 
-function parshaTitle(leining: LeiningInstance) {
+function parshaTitle(leining: ReadingInstance) {
   return renderLeiningTitle(leining)
 }
 
-function leiningKey(leining: LeiningInstance) {
-  return [
-    leining.date.date.getTime(),
-    leining.id,
-    firstRunOf(leining).id,
-  ].join(':')
+function leiningKey(leining: ReadingInstance) {
+  return firstRunOf(leining).id
 }
 
-const navigationHrefForLeining = (leining: LeiningInstance) =>
-  semanticParshaUrlForLeining(leining) ?? generateUrl(firstRunOf(leining))
+const navigationHrefForLeining = (leining: ReadingInstance) => generateUrl(firstRunOf(leining))
 
 export function calculateAnchoredPopupMaxHeight(
   triggerRect: AnchorRect,
@@ -320,15 +317,15 @@ export function calculateFlyoutPopupPosition({
   }
 }
 
-export function parshaListTitleForLeining(leining: LeiningInstance) {
+export function parshaListTitleForLeining(leining: ReadingInstance) {
   if (isVezosHabracha(firstRunOf(leining))) return 'וזאת הברכה'
   return renderLeiningTitle(leining)
 }
 
 export function buildParshaAliyahChoices(
-  leining: LeiningInstance
+  leining: ReadingInstance
 ): ParshaAliyahChoice[] {
-  return leining.runs
+  return (parshaReadingForLeining(leining) ?? leining).runs
     .filter(
       (run) =>
         run.scroll === 'torah' &&
@@ -340,16 +337,14 @@ export function buildParshaAliyahChoices(
         .filter((aliyah) => aliyah.index)
         .map((aliyah) => ({
           label: aliyahLabels.get(aliyah.index) ?? String(aliyah.index),
-          href:
-            semanticParshaUrlForLeining(leining, aliyah.start) ??
-            generateUrl(run, aliyah.start),
+          href: generateUrl(run, aliyah.start),
         }))
     )
 }
 
 export function buildParshaAliyahChoiceGroups(
-  leining: LeiningInstance,
-  sourceLeinings: LeiningInstance[]
+  leining: ReadingInstance,
+  sourceLeinings: ReadingInstance[]
 ): ParshaAliyahChoiceGroup[] {
   const label = parshaTitle(leining)
   const choices = buildParshaAliyahChoices(leining)
@@ -369,25 +364,8 @@ export function buildParshaAliyahChoiceGroups(
   return [{ label, choices }, ...singleParshaGroups]
 }
 
-export function collectParshaChoiceSourceLeinings(
-  generator: LeiningGenerator,
-  baseLeinings: LeiningInstance[],
-  currentYear = new HDate().getFullYear()
-) {
-  const firstYear = currentYear - PARSHA_CHOICE_SOURCE_LOOKBACK_YEARS
-  const lastYearExclusive = firstYear + PARSHA_CHOICE_SOURCE_WINDOW_YEARS
-  const extraLeinings = []
-
-  for (let year = firstYear; year < lastYearExclusive; year += 1) {
-    extraLeinings.push(
-      ...generator
-        .forHebrewYear(year)
-        .flatMap((date) => date.leinings)
-        .filter((leining) => leining.isParsha)
-    )
-  }
-
-  return [...baseLeinings, ...extraLeinings]
+export function collectParshaChoiceSourceLeinings(baseLeinings: LeiningInstance[]) {
+  return [...baseLeinings.flatMap(leining => parshaReadingForLeining(leining) ?? []), ...canonicalParshaReadings()]
 }
 
 function holidayColumnFor(leining: LeiningInstance) {
@@ -457,15 +435,11 @@ export function buildParshaPickerModel(
 ): ParshaPickerModel {
   const leinings = listReadingSearchLeinings(generator, now)
   const readingSearch = createReadingSearch(leinings)
-  const choiceSources = collectParshaChoiceSourceLeinings(
-    generator,
-    leinings,
-    now.getFullYear()
-  )
+  const choiceSources = collectParshaChoiceSourceLeinings(leinings)
   let choiceId = 0
 
   const entryFor = (
-    leining: LeiningInstance,
+    leining: ReadingInstance,
     {
       label = renderLeiningTitle(leining),
       includeAliyot = false,
@@ -483,7 +457,7 @@ export function buildParshaPickerModel(
       label,
       englishLabel: includeAliyot
         ? isVezosHabracha(firstRunOf(leining))
-          ? 'Vezos Haberacha'
+          ? 'Vezot Haberacha'
           : englishLeiningTitle(leining).replace(/^Parshat\s+/, '')
         : englishReadingLabel(leining),
       href: navigationHrefForLeining(leining),
@@ -492,14 +466,16 @@ export function buildParshaPickerModel(
   }
 
   const parshaBooks: ParshaPickerEntry[][] = []
-  for (const leining of leinings.filter(
+  for (const source of leinings.filter(
     (candidate) =>
       candidate.isParsha || isVezosHabracha(firstRunOf(candidate))
   )) {
+    const leining = parshaReadingForLeining(source)
+    if (!leining) throw new Error(`Missing parsha reading for ${source.date.title.en}`)
     const firstAliyah = firstRunOf(leining).aliyot[0]
     if (!firstAliyah) {
       throw new Error(
-        `Leining ${leining.date.title.en || leining.id} has no aliyot`
+        `Leining ${readingTitle(leining).en || leining.id} has no aliyot`
       )
     }
     const book = firstAliyah.start.b
@@ -532,7 +508,10 @@ export function buildParshaPickerModel(
     ),
     megillot: leinings
       .filter((leining) => leining.id === LeiningInstanceId.Megillah)
-      .map((leining) => entryFor(leining)),
+      .map((leining) => ({
+        ...entryFor(leining),
+        href: semanticParshaUrlForLeining(leining) ?? navigationHrefForLeining(leining),
+      })),
     comingUp,
     search(query) {
       return readingSearch.search(query, 5).map((result) => ({

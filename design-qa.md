@@ -40,6 +40,46 @@ The homepage follows the selected desktop-first direction: concise practical cop
 
 final result: passed
 
+## Optional print details page — 2026-10-15
+
+Source visual truth: `/Users/adambh/.codex/generated_images/01a10e83-3e6e-7462-b05f-30cd74220119/exec-bf6688a3-a707-47f6-bec7-884f73e423d8.png`. The user selected the compact outlined card on a separate information page and requested an optional toggle.
+
+Implementation: `http://localhost:5176/prototypes/print/`, custom Beresheet 1:6–13, Match, Two Sided, surrounding text enabled, Portrait, Scaling 100%, details and page numbers enabled. Desktop capture: `prototypes/print-dialog/qa/optional-details-final.png` at 1280 × 720 CSS pixels. Mobile control capture: `prototypes/print-dialog/qa/optional-details-mobile.png` at 390 × 844 CSS pixels; no horizontal overflow, both actions remain reachable.
+
+Comparison evidence: `prototypes/print-dialog/qa/optional-details-comparison-final.png` shows the approved and rendered information sheets together, normalized to 730 × 946 pixels. The source is 1536 × 1024 pixels, with its right sheet cropped from (777, 12) to (1507, 1009). The live page is 816 × 1056 CSS pixels, fitted to about 365 × 473 screen pixels; `optional-details-sheet-final.png` captures that region at 1460 × 1892 pixels, then normalizes it for comparison. `optional-details-card-comparison-final.png` compares the actual card regions at a readable size.
+
+Findings and iteration: the first comparison found the card wider than the approved compact form. Reduced its width from 128 to 104 pixels and tightened padding and divider spacing. The final full-sheet and focused comparisons show no remaining actionable P0/P1/P2 differences. Multiple parshiot intentionally expand the card to fit their real names.
+
+- Fonts and typography: the card uses the established standard Hebrew/header font family. Existing sheet heading and footer sizes remain unchanged, despite the generated mockup making them larger.
+- Spacing and layout: the outlined card sits at the upper right, inset with the existing content margin. It appears only on the appended details page. Browser coverage checks that enabling it does not move the reading text, and verifies totals for one and multiple reading pages.
+- Colors and tokens: white printable paper, dark text, muted secondary labels, and a light gray outline follow the current printable document.
+- Assets: the existing approved SVG logo and footer are reused; no new graphic approximation was introduced.
+- Copy and content: parsha names come from the canonical reading catalog, using the repository’s canonical English spelling "Beresheet". Source column numbers come from the actual selected passage. Esther uses its own name and Megillah columns. The existing bilingual reference heading supplies the verse range.
+
+Interaction checks: details and page numbers default off; toggling either updates the preview independently; reopening resets them; credits removal applies to the information page without removing the sacred notice; multi-column, Reader, Match, one-sided, landscape, and Esther paths pass. At 0% Scaling the information page is absent and Print is disabled. The native print call remains attached to the prepared document. Physical printing and printer-specific margins were not tested.
+
+Validation: 35 print tests passed across Node, Chromium, and WebKit, plus a final targeted layout check after the compact-card adjustment. Type checks and lint passed. The production build passes with the existing service-worker precache-size warning.
+
+Console check: the previously recorded browser-startup MutationObserver error recurred. Captured exception frames end in an anonymous script and `node:electron/js2c/sandbox_bundle`, with no project source URL; no print-render error or failed interaction appeared. This remains a browser-environment diagnostic, not a claim of a completely clean console.
+
+### Verse range and aliyah follow-up — 2026-10-15
+
+The user requested verse ranges and applicable aliyah names inside the details box. The box now uses a 168-pixel width to accommodate those additional bilingual fields, retaining its outline, right inset, typography, and separate-page position. It reuses `passageTitle` and the canonical `aliyahLabel` formatter; selected service identities preserve Maftir and special honor names. Custom ranges contained within an aliyah receive its label; whole readings, ranges spanning aliyot, and Esther omit it. Multiple explicitly selected aliyot keep each selected name.
+
+Desktop evidence: `prototypes/print-dialog/qa/details-with-range-desktop.png`. Mobile evidence: `prototypes/print-dialog/qa/details-with-range-mobile.png`, 390 × 844 CSS pixels with no horizontal overflow. Captures used the built preview at `http://localhost:4176/prototypes/print/` because concurrent development reloads interrupted the shared dev page. The card measures 168 × 264 CSS pixels for the sample passage and has no internal horizontal overflow. The existing header, footer, and reading-page geometry remain intact.
+
+Validation: 31 Node tests and 6 Chromium/WebKit print tests pass, including live range updates, current/several aliyot, Maftir, special honors, whole readings, and Esther. Type checking, lint, and the scoped Impeccable detector pass. Production build passes with the existing service-worker precache-size warning. Physical printer output remains untested.
+
+### Canonical spelling and Advanced credits follow-up — 2026-10-15
+
+The shared parsha reading title now uses the existing `torah-reference.ts` book label for Beresheet, keeping the details title and verse range consistent. Hebcal lookup names and search aliases remain unchanged. Remove Credits now appears inside Advanced, collapsed by default; its switch still starts off each time the print dialog opens.
+
+Desktop evidence: `prototypes/print-dialog/qa/canonical-name-advanced-desktop.png`. Mobile evidence: `prototypes/print-dialog/qa/canonical-name-advanced-mobile.png`, verified at 390 × 844 CSS pixels without horizontal overflow. The controls retain their original styling and accessible labels. The live details card reads Beresheet in both fields.
+
+Validation: all 115 selected tests passed across the initial run and targeted rerun, covering print, the parsha picker, routes, and URL parsing. One browser test timed out in the initial combined run and passed on rerun; the picker expectation was corrected to retain its existing “Parshat” prefix. Type checking, lint, and the design detector pass. Production build passes with the existing service-worker precache-size warning.
+
+final result: passed
+
 ---
 
 # Reader Settings Option 1 Design QA

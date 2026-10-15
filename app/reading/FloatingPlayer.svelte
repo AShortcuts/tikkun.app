@@ -503,7 +503,17 @@
       if (target instanceof Node && speedControl?.contains(target)) return
       closeSpeedPopover()
     }
-    const onLayout = () => send({ type: 'layout' })
+    const cornerControls = document.querySelector<HTMLElement>('.reader-corner-controls')
+    const onLayout = () => {
+      send({ type: 'layout' })
+      if (!cornerControls) return
+      if (!snapshot.visible || view.innerWidth > 550) {
+        cornerControls.style.removeProperty('--corner-controls-player-bottom')
+        return
+      }
+      const top = requireElement(playerElement, 'its player element').getBoundingClientRect().top
+      cornerControls.style.setProperty('--corner-controls-player-bottom', `${Math.max(0, view.innerHeight - top) + 12}px`)
+    }
 
     view.addEventListener('pointermove', onPointerMove)
     view.addEventListener('pointerup', onPointerFinish)
@@ -517,6 +527,7 @@
     return () => {
       cancelMinimizeTimer()
       resizeObserver.disconnect()
+      cornerControls?.style.removeProperty('--corner-controls-player-bottom')
       document.removeEventListener('pointerdown', onDocumentPointerDown)
       view.removeEventListener('resize', onLayout)
       view.removeEventListener('blur', onWindowBlur)

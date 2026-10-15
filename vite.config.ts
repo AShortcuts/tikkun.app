@@ -8,6 +8,8 @@ import { nativeBuildConfig } from './scripts/native-build-config.mjs'
 import { contentInventoryPlugin } from './scripts/content-inventory-plugin.ts'
 import contentContract from './generated/native-content-contract.json' with { type: 'json' }
 import { updateConfig } from './scripts/update-config.mjs'
+import { analyticsConfig } from './app/analytics/config.ts'
+import analyticsPublic from './config/analytics-public.json' with { type: 'json' }
 
 const projectRoot = fileURLToPath(new URL('.', import.meta.url))
 export const defaultViteHost = '127.0.0.1'
@@ -20,6 +22,7 @@ export const viteConfig = {
   plugins: [publicReadingCoveragePlugin(), sveltekit(), contentInventoryPlugin(contentVersion)],
   define: {
     __TIKKUN_BUILD_ID__: JSON.stringify(buildIdentifier),
+    __TIKKUN_ANALYTICS_CONFIG__: JSON.stringify(analyticsConfig({ ...analyticsPublic, ...process.env })),
     'import.meta.env.TIKKUN_NATIVE_MEDIA_ORIGIN': JSON.stringify(native.mediaOrigin),
     'import.meta.env.TIKKUN_CONTENT_VERSION': JSON.stringify(contentVersion),
     'import.meta.env.TIKKUN_CONTENT_COMPATIBILITY': JSON.stringify(contentContract.compatibility),

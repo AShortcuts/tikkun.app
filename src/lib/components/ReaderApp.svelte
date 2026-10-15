@@ -6,9 +6,14 @@
   import { NATIVE_READING_LINKS_CONTEXT, type NativeReadingLinks } from '../../../app/platform/native-reading-links.ts'
   import type { ReaderAppOptions } from '../../../app/index.ts'
   import '../../../css/master.css'
+  import readerTheme from '../../../css/reader-theme.css?raw'
   import { prepareNativeContent, nativeContentReady } from '../../../app/updates/content-runtime.ts'
   import { nativeWebReady } from '../../../app/updates/web-runtime.ts'
   import { checkNativeUpdates } from '../../../app/updates/native-updates.ts'
+  import { isNativeApp } from '../../../app/platform/native.ts'
+  import ReaderLoadingMark from './ReaderLoadingMark.svelte'
+  import ReaderLoadingDoors from './ReaderLoadingDoors.svelte'
+  import { READER_LOADING_ANIMATION, type ReaderLoadingAnimation } from './reader-loading.ts'
 
   type ReaderAppModule = {
     startApp(options?: ReaderAppOptions): { readonly ready: Promise<void> }
@@ -17,6 +22,8 @@
 
   type ReaderBootState = 'loading' | 'ready' | 'failed'
 
+  const documentProgress = 0.2
+  const readerThemeStyle = `<style data-reader-theme-critical>${readerTheme}</style>`
   const loadDefaultReaderApp = () => import('../../../app/index.ts')
   const downloadOwner = getContext<DownloadOwner | undefined>(DOWNLOAD_OWNER_CONTEXT)
   const nativeLinks = getContext<NativeReadingLinks | null>(NATIVE_READING_LINKS_CONTEXT)
@@ -25,14 +32,19 @@
     aboutHref,
     loadApp = loadDefaultReaderApp,
     reloadPage = () => window.location.reload(),
+    loadingAnimation = READER_LOADING_ANIMATION,
   }: {
     aboutHref: string
     loadApp?: () => Promise<ReaderAppModule>
     reloadPage?: () => void
+    loadingAnimation?: ReaderLoadingAnimation
   } = $props()
 
   let bootState = $state<ReaderBootState>('loading')
-  let themeColor = $state('oklch(98.5% 0 0)')
+  let bootProgress = $state(documentProgress)
+  let doorsVisible = $state(true)
+  let themeColor = $state(typeof document === 'undefined' ? ''
+    : getComputedStyle(document.documentElement).getPropertyValue('--paper-color').trim())
   let disposed = false
   let bootRevision = 0
   let stopApp: (() => void) | null = null
@@ -55,19 +67,39 @@
   async function bootReader() {
     const revision = ++bootRevision
     bootState = 'loading'
+    bootProgress = documentProgress
+    doorsVisible = true
     reloadOnRetry = false
+
+    const hasNativeContent = Boolean(import.meta.env.TIKKUN_NATIVE_MEDIA_ORIGIN && isNativeApp())
+    // The rendered document is the first completed step, before hydration or app import.
+    const totalSteps = 4 + Number(Boolean(nativeLinks)) + Number(hasNativeContent)
+    const completedSteps: string[] = []
+    const completeStep = (step: string) => {
+      if (disposed || revision !== bootRevision || bootState !== 'loading' || completedSteps.includes(step)) return
+      completedSteps.push(step)
+      bootProgress = documentProgress + (1 - documentProgress) * completedSteps.length / totalSteps
+    }
 
     let app: ReaderAppModule | null = null
     try {
       await nativeLinks?.ready
+      if (disposed || revision !== bootRevision) return
+      if (nativeLinks) completeStep('launch')
       await prepareNativeContent()
       if (disposed || revision !== bootRevision) return
+      if (hasNativeContent) completeStep('content')
       app = await loadApp()
       if (disposed || revision !== bootRevision) return
+      completeStep('module')
 
-      // aboutHref is already base-path resolved by the owning route.
-      // eslint-disable-next-line svelte/no-navigation-without-resolve
-      const reader = app.startApp({ downloadOwner, openAbout: () => goto(aboutHref) })
+      const reader = app.startApp({
+        downloadOwner,
+        // aboutHref is already base-path resolved by the owning route.
+        // eslint-disable-next-line svelte/no-navigation-without-resolve
+        openAbout: () => goto(aboutHref),
+        onStartupProgress: completeStep,
+      })
       if (disposed || revision !== bootRevision) {
         app.stopApp()
         return
@@ -77,6 +109,7 @@
       reloadOnRetry = true
       await reader.ready
       if (disposed || revision !== bootRevision) return
+      bootProgress = 1
       bootState = 'ready'
       void nativeContentReady()
       void nativeWebReady()
@@ -99,7 +132,7 @@
   }
 
   onMount(() => {
-    if (window.location.hash.split('?', 1)[0] === '#/about') {
+    if (!isNativeApp() && window.location.hash.split('?', 1)[0] === '#/about') {
       window.location.replace(aboutHref)
       return
     }
@@ -115,7 +148,7 @@
     const themeObserver = new MutationObserver(syncThemeColor)
     themeObserver.observe(root, {
       attributes: true,
-      attributeFilter: ['data-reader-theme'],
+      attributeFilter: ['data-reader-theme', 'style'],
     })
     colorScheme.addEventListener('change', syncThemeColor)
     syncThemeColor()
@@ -139,7 +172,9 @@
 </script>
 
 <svelte:head>
-  <meta name="theme-color" content={themeColor} />
+  <!-- eslint-disable-next-line svelte/no-at-html-tags -- Trusted local CSS must paint before the reader bundle loads. -->
+  {@html readerThemeStyle}
+  <meta id="reader-theme-color" name="theme-color" content={themeColor} />
 </svelte:head>
 
 <div
@@ -147,6 +182,7 @@
   data-target-id="app-root"
   data-about-href={aboutHref}
   data-reader-boot-state={bootState}
+  data-reader-boot-progress={bootProgress}
   aria-busy={bootState === 'loading'}
 >
   <div data-target-id="reader-shell-anchor" hidden></div>
@@ -191,7 +227,9 @@
     >OK</button>
   </div>
 
-  {#if bootState !== 'ready'}
+  {#if loadingAnimation === 'doors' && doorsVisible && bootState !== 'failed'}
+    <ReaderLoadingDoors open={bootState === 'ready'} oncomplete={() => { doorsVisible = false }} />
+  {:else if bootState !== 'ready'}
     <section
       class="reader-boot-state"
       data-target-id="reader-boot-state"
@@ -200,7 +238,10 @@
       aria-live={bootState === 'failed' ? 'assertive' : 'polite'}
     >
       {#if bootState === 'loading'}
-        <p>Opening Reader…</p>
+        <div class="reader-boot-loading">
+          <ReaderLoadingMark progress={bootProgress} />
+          <p>Opening your reading…</p>
+        </div>
       {:else}
         <div class="reader-boot-panel">
           <h1>Reader couldn’t start</h1>
@@ -241,13 +282,25 @@
     width: min(28rem, 100%);
   }
 
+  .reader-boot-loading {
+    display: grid;
+    justify-items: center;
+    gap: 1.7rem;
+  }
+
+  .reader-boot-loading p {
+    margin: 0;
+    color: var(--light-text-color);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+  }
+
   .reader-boot-panel h1 {
     font-size: clamp(1.35rem, 5vw, 1.8rem);
     line-height: 1.15;
   }
 
-  .reader-boot-panel p,
-  .reader-boot-state > p {
+  .reader-boot-panel p {
     color: var(--light-text-color);
     line-height: 1.5;
   }

@@ -2,6 +2,7 @@
   import { resolve } from '$app/paths'
   import InformationPage from '$lib/components/InformationPage.svelte'
   import { supportEmail } from '$lib/support-contact'
+  import AnalyticsPreference from '../../../../app/analytics/AnalyticsPreference.svelte'
 </script>
 
 <svelte:head>
@@ -10,7 +11,7 @@
 </svelte:head>
 
 <InformationPage title="Privacy policy" current="privacy" introduction="Your practice is personal. Here is what stays on your device, and what happens when you connect.">
-  <p class="information-date">Last updated <time datetime="2026-09-11">September 11, 2026</time></p>
+  <p class="information-date">Last updated <time datetime="2026-09-30">September 30, 2026</time></p>
   <section aria-labelledby="privacy-overview">
     <h2 id="privacy-overview">A reader without an account</h2>
     <p>Tikkun Reader lets you read and practice without signing up. This policy covers the Tikkun Reader website and app.</p>
@@ -25,6 +26,13 @@
     <h2 id="privacy-network">When you connect</h2>
     <p>The website and app request pages, Torah text, recordings, and updates needed to work. Our hosting and delivery provider, Cloudflare, may process technical request information such as your IP address, browser details, requested files, and request times to deliver and protect the service.</p>
     <p>Local storage does not mean that network requests are anonymous. See <a href="https://www.cloudflare.com/privacypolicy/" rel="noreferrer">Cloudflare's privacy policy</a> for its handling of this information. External sites and services you choose to open have their own privacy policies.</p>
+  </section>
+  <section aria-labelledby="privacy-analytics">
+    <h2 id="privacy-analytics">Privacy-preserving analytics</h2>
+    <p>When enabled for this release, our self-hosted Melytics service receives page categories, feature actions, playback and visible-page time, and error categories. Website and app statistics are kept separate. We do not send search text, exact passages, bookmarks, recordings, full referrer URLs, or error messages in analytics.</p>
+    <p>The service processes your IP address and browser or app information to estimate daily visitors and report device and country statistics. It uses a daily salted hash instead of storing the raw IP address in analytics. We do not create a persistent analytics identifier or use analytics cookies. Raw analytics records are retained for 90 days; daily summaries are kept longer.</p>
+    <p>You can turn collection off on this device here or in Reader Settings under More. Offline activity is not queued for later delivery.</p>
+    <AnalyticsPreference />
   </section>
   <section aria-labelledby="privacy-permissions">
     <h2 id="privacy-permissions">Optional permissions and sharing</h2>

@@ -1,73 +1,22 @@
 # Release Checklist
 
-Use this checklist for a public release. `npm run verify:release` is necessary,
-but a local build cannot prove CDN, installed-PWA, or real-device behavior.
+Canonical checklist for web, iOS and compatible update releases. Use the applicable steps for the exact candidate and record `Not applicable`, `Not run` or `Failed` explicitly. Historical checkpoints do not establish current App Store Connect (ASC), deployed-feed or device state.
 
-Support tiers, preview validation, rollback steps, dependency cadence, and
-generated-file ownership live in `docs/release-operations.md`. Start each release
-from `docs/release-evidence-template.md`; do not infer evidence from an earlier
-build.
+- [ ] Record the commit, build/artifact, release owner, target channel and previous known-good artifact in a copy of the [evidence template](release-evidence-template.md). Reconcile live ASC state before choosing an iOS build; preserve owner-entered metadata.
+- [ ] Use pinned Node/npm and run `npm ci` and `npm run verify:release` within the approved resource budget. Review generated changes, complete browser coverage and artifact budgets; follow the [web verification procedures](release-operations.md#web-release-procedures).
+- [ ] Confirm public reading/media coverage, keyboard and accessibility journeys, responsive layouts and the documented contrast waiver using those procedures. Local cue drafts do not establish public readiness.
+- [ ] For iOS, rebuild/sync current assets, verify bundle parity, signing and the final archive, and follow [native release preparation](native-development.md#release-preparation). A web deployment or Swift-only rebuild does not refresh the native bundle.
+- [ ] For iOS, approve final store name/copy, support contact/URL, real Reader/Media/Storage screenshots, age rating and review details in the [listing source](../metadata/README.md). Resolve the [dependency and content-rights gate](release-attribution-audit.md), verify the public privacy policy serves the approved content, and review App Privacy answers against the final app, SDKs and hosting; update/publish them if needed. API validation and a privacy manifest do not clear these gates.
+- [ ] For iOS, verify the signed provisioning profile's App ID prefix matches the association file at `https://tikkunreader.com/.well-known/apple-app-site-association`; after authorized deployment it must serve JSON, not homepage HTML. Test external HTTPS reading links cold and warm on the signed device.
+- [ ] After an authorized GitHub-triggered website deployment, verify exact deployed audio ranges, headers/CSP, offline relaunch and installed-PWA upgrade/recovery using [release operations](release-operations.md#web-release-procedures). Retain the matching static artifact and Functions source for rollback.
+- [ ] For signed content/web updates, follow [update delivery](app-updates.md#stage-and-deploy): use the production `build:pages` integration and a signed record from the matching iOS archive, or use `updates:release` as the local preparation backup. Preserve the separate feeds and retained downloads, then verify the published bytes after deployment. Git staging, commit and push belong to the user.
+- [ ] Complete [signed-device acceptance](native-development.md#signed-device-acceptance), [widget/Shortcuts acceptance](ios-system-integration.md#remaining-acceptance), and applicable real-device update/rollback checks. At the 2026-09-11 checkpoint, the owner deferred phone acceptance pending a separate newer native publication. The currently published native build and completion of those acceptance checks remain unverified; browser/Simulator results do not establish them. After separately authorized TestFlight access, run a small cohort through download, practice, removal and re-download.
+- [ ] Record pass/fail evidence, known limitations, any waiver's owner/impact/follow-up date and the release/hold/rollback decision. Archive/validate and complete ASC metadata/beta details for the intended build before any authorized upload. Tester/group changes, App Store submission and publication require separate authorization; this checklist does not grant it. Use the existing GitHub deployment workflow, not direct Cloudflare deployment.
 
-## Automated Gate
+## Historical Checkpoints
 
-- Run `npm ci` with the repository's pinned npm version.
-- Run `npm run verify:release`; do not publish with skipped or retried failures.
-- The command runs deterministic `npm run verify`, rejects generator-owned
-  outputs whose bytes changed during verification, checks
-  whitespace with `git diff --check HEAD --`, and runs the live production audit
-  through `npm audit --omit=dev`.
-- Preexisting unrelated working-tree changes do not fail the generated-output
-  check. Any generated diff created by verification must be reviewed and
-  committed before rerunning the release gate.
-- Confirm `dist/_headers` and `dist/service-worker.js` exist in the exact artifact being deployed.
-- Confirm the Cloudflare deployment includes `functions/audio/`; a dist-only upload does not satisfy the media gate.
-- Review the printed JavaScript, CSS, service-worker, and largest-static-asset sizes. Raise a budget only with contributing filenames and a documented product reason.
+- Build **1.0 (3)**: theme repair, Sqim delivery and ASC processing were recorded on 2026-09-11; [listing evidence](../metadata/README.md#packaged-theme-repair) retains the build ID, archive and logs. It predates later privacy/support changes and the updater.
+- Build **1.0 (5)**: the [2026-09-11 listing checkpoint](../metadata/README.md#identity) records it as ASC `VALID` and attached to version 1.0. This has not been rechecked live.
+- Build **1.0 (6)**: the [updater checkpoint](app-updates.md) records an archive and Sqim delivery, with signed feeds prepared for GitHub deployment. That work did not upload build 6 to ASC; its Sqim binary predates the shared-prompt revision. Native publication and phone acceptance remain separate.
 
-## Content Truth
-
-- Confirm Readings & Coverage matches the generated public manifest and the actual published media.
-- Treat browser-local Cue Drafts as authoring state only. They must never upgrade or downgrade public readiness.
-- Open one available, one planned, and one needs-review reading. Verify the labels describe what a visitor can actually use.
-- Regenerate twice when Cue Data changes and confirm the second run produces no diff.
-
-## Deployed Media
-
-- Run `npm run audio:verify-delivery -- https://tikkunreader.com` after the GitHub-triggered Pages deployment succeeds. This checks every published recording's beginning, middle, suffix, and invalid ranges against the local audio bytes. An optional recording path limits diagnosis to one file.
-- On the deployed origin, request an available recording with `HEAD`; verify a valid media type and length.
-- Request `Range: bytes=0-1023`; verify `206`, an exact `Content-Range`, and `Content-Length: 1024`. The Function advertises `Accept-Ranges: bytes`; cached responses can omit this advisory header, so the live verifier reports its absence without accepting incorrect status, length, or bytes.
-- Request a suffix range and an unsatisfiable range; verify a correct suffix response and `416` with `Content-Range: bytes */<length>`.
-- Test `If-Range` with both a current and stale validator. Confirm playback seeks from the beginning, middle, and near the end.
-- Do not infer proportional origin bandwidth from app tests. Confirm the CDN or storage origin itself serves native range responses before claiming that benefit.
-- Pages currently ignores Range and can omit Content-Length inside its asset binding. The audio Function uses the existing generated recording sizes when needed, requests the cacheable full asset, and streams only the requested portion with bounded memory and cancellation. FixedLengthStream preserves the response length on the wire. A late seek still reads the preceding bytes internally; no separate media service or cache is involved.
-- Range reads use Cloudflare's native `readAtLeast` with a maximum 1 MiB buffer. This avoids exhausting the Function CPU allowance on tiny upstream chunks. Check deployment logs for `exceededCpu` when diagnosing aborted audio transfers.
-
-## Security Headers
-
-- Inspect `/`, `/reader/`, and a media response on the deployed host. Confirm HSTS, `nosniff`, referrer policy, permissions policy, and the intended frame policy are present.
-- Keep CSP in `Content-Security-Policy-Report-Only` while auditing Home, Reader, search, settings, Cue Authoring, audio, video links, and the live prototype iframe.
-- Review browser CSP reports or console violations on a staging deployment. Enforce CSP only after every required source is explicit and the same build passes this checklist.
-- Confirm every inline script hash from the deployed HTML appears in the deployed `_headers` policy and the CSP line remains within the host limit.
-- Remember that a static host's `_headers` rules may not govern Function responses; inspect the deployed audio Function separately.
-
-## Product And Accessibility
-
-- Exercise desktop and touch layouts at 320, 390, 550, 551, 870, and 1280 CSS pixels without horizontal clipping or unreachable controls.
-- Test light and dark themes, 200% zoom, reduced motion, and forced colors.
-- Complete the Reader with keyboard only: choose a reading, search, change settings, select an aliyah, play/pause, seek, change speed, and dismiss every overlay.
-- When the release catalog has two narrators for the same reading, switch between them and confirm playback, highlighting, and the active recording identity all change together. Record `Not applicable` when no real catalog pair exists; do not invent demo media.
-- Verify visible focus, focus return, Escape behavior, progress announcements, loading, empty, offline, failure, and retry states.
-- Confirm typing or selecting text never triggers presentation shortcuts.
-- Record the incumbent contrast waiver from `docs/release-operations.md`; do not describe the exact automated exception inventory as full WCAG AA conformance.
-
-## PWA And Devices
-
-- Test first load, offline relaunch, and reconnect after the service worker has installed.
-- Start one recording Offline Download from Reader Settings, observe progress, relaunch offline, and verify playback plus beginning/middle/end seeks. Remove it and confirm offline playback fails honestly while network playback still works after reconnecting.
-- Deploy a second build over an installed copy. Confirm the update notice is understandable, reloads safely, and does not trap the user on a stale shell.
-- Corrupt each persisted preference payload once and confirm the app recovers to explicit defaults without blocking startup.
-- On a real iPhone, test portrait and landscape, the home indicator, notch or Dynamic Island safe areas, audio interruption, background/foreground return, and installed Home Screen mode.
-
-## Release Decision
-
-- Complete a copy of `docs/release-evidence-template.md` with the deployed URL, commit, build identifier, date, browser/device matrix, known limitations, and rollback artifact.
-- Publish only when automated and deployed gates pass. If a gate is intentionally waived, record the owner, user impact, and follow-up date.
+Detailed support, preview, rollback and generated-file ownership: [release operations](release-operations.md). Historical implementation evidence: [native development](native-development.md) and [iOS system integration](ios-system-integration.md).

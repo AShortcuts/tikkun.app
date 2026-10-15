@@ -49,6 +49,7 @@ export enum LeiningInstanceId {
  * A single instance may contain multiple ספרי תורה, and possibly also a הפטרה.
  */
 export interface LeiningInstance {
+  kind: 'service'
   /** The date that this is leined on. */
   date: LeiningDate
 
@@ -56,8 +57,8 @@ export interface LeiningInstance {
   id: LeiningInstanceId
 
   /**
-   * True if this is a regular פרשת השבוע.
-   * If true, the ספר תורה should scroll through all of חומש.
+   * True if this calendar service contains the regular פרשת השבוע.
+   * Reading context, rather than this flag, determines reader navigation.
    */
   isParsha: boolean
 
@@ -65,11 +66,28 @@ export interface LeiningInstance {
   runs: LeiningRun[]
 }
 
+/** A study reading has a stable identity and no calendar occurrence. */
+export interface ParshaReading {
+  kind: 'parsha'
+  slug: string
+  title: { en: string; he: string }
+  id: LeiningInstanceId.Shacharis
+  isParsha: true
+  date?: never
+  runs: LeiningRun[]
+}
+
+export type ReadingInstance = LeiningInstance | ParshaReading
+
+export function readingTitle(reading: ReadingInstance) {
+  return reading.kind === 'parsha' ? reading.title : reading.date.title
+}
+
 export function isLeiningInstance(obj: unknown): obj is LeiningInstance {
   if (typeof obj !== 'object' || !obj) return false
-  const { date, id, runs } = obj as LeiningInstance
+  const { kind, date, id, runs } = obj as LeiningInstance
   return (
-    typeof date === 'object' && typeof id === 'string' && Array.isArray(runs)
+    kind === 'service' && typeof date === 'object' && typeof id === 'string' && Array.isArray(runs)
   )
 }
 
@@ -91,11 +109,11 @@ export enum LeiningRunType {
 /** A near-contiguous group of עליות from a single ספר תורה (or קלף). */
 export interface LeiningRun {
   /** The leining containing this run. */
-  leining: LeiningInstance
+  leining: ReadingInstance
 
   type: LeiningRunType
 
-  /** The URL-safe string that uniquely identifies this instance, including date, minyan, and index. */
+  /** Stable reading identity: either a dated service run or a canonical parsha run. */
   id: string
 
   /** The ספר being leined from (either `torah` or a נביא). */
@@ -123,10 +141,11 @@ export function isLeiningRun(obj: unknown): obj is LeiningRun {
 
 export interface LeiningAliyah {
   /**
-   * The index of this Aliyah (1 through 7).
+   * The position in this reading (1 through 8, or Maftir).
    * Unset in leinings that consist of one Aliyah (הפטרה or מגילה).
    */
   index?: number | 'Maftir'
+  role?: 'chatan-torah' | 'chatan-beresheet'
   start: RefWithScroll
   end: RefWithScroll
 }

@@ -124,7 +124,7 @@ test('supports the critical Reader journey with only the keyboard', async () => 
   )
 
   const search = appFrame.getByRole('combobox', {
-    name: 'Search readings and commands',
+    name: 'Search readings and settings',
   })
   await pressTab(frameDocument)
   await expect.element(search).toHaveFocus()

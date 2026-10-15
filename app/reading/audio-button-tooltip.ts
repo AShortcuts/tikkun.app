@@ -27,18 +27,25 @@ export function mountAudioButtonTooltip(scope: MountScope, document: Document) {
     hide()
     target = element
     timer = view.setTimeout(() => {
-      if (!element.isConnected || !element.dataset.audioTooltip) { hide(); return }
-      tip.textContent = element.dataset.audioTooltip
+      const message = element.dataset.readerTooltip ?? element.dataset.audioTooltip
+      if (!element.isConnected || !message) { hide(); return }
+      tip.textContent = message
       tip.hidden = false
       const rect = element.getBoundingClientRect()
       const width = tip.offsetWidth
       const height = tip.offsetHeight
       tip.style.left = `${Math.max(8, Math.min(view.innerWidth - width - 8, rect.left + rect.width / 2 - width / 2))}px`
-      tip.style.top = `${rect.top >= height + 16 ? rect.top - height - 8 : rect.bottom + 8}px`
+      const rangePopup = element.closest('[data-aliyah-marker="true"]')
+        ? document.querySelector<HTMLElement>('.aliyah-start-popup:not(.u-hidden)')?.getBoundingClientRect()
+        : null
+      const below = Math.max(rect.bottom, rangePopup?.bottom ?? rect.bottom) + 8
+      const above = Math.min(rect.top, rangePopup?.top ?? rect.top) - height - 8
+      const preferBelow = element.hasAttribute('data-audio-tooltip') && below + height <= view.innerHeight - 8
+      tip.style.top = `${preferBelow || above < 8 ? below : above}px`
       element.setAttribute('aria-describedby', [element.getAttribute('aria-describedby'), tip.id].filter(Boolean).join(' '))
     }, delay)
   }
-  const button = (node: EventTarget | null) => node instanceof Element ? node.closest<HTMLElement>('[data-audio-tooltip]') : null
+  const button = (node: EventTarget | null) => node instanceof Element ? node.closest<HTMLElement>('[data-audio-tooltip], [data-reader-tooltip]') : null
   const listeners = { signal: scope.signal }
   document.addEventListener('pointerover', event => {
     const element = button(event.target)
@@ -58,7 +65,11 @@ export function mountAudioButtonTooltip(scope: MountScope, document: Document) {
     if (element) show(element, 0)
   }, listeners)
   document.addEventListener('focusout', hide, listeners)
-  document.addEventListener('click', hide, listeners)
+  document.addEventListener('click', event => {
+    const element = button(event.target)
+    if (element?.hasAttribute('data-tooltip-on-press')) show(element, 0)
+    else hide()
+  }, listeners)
   document.addEventListener('keydown', event => { if (event.key === 'Escape') hide() }, listeners)
   document.addEventListener('scroll', hide, { ...listeners, capture: true })
   view.addEventListener('resize', hide, listeners)

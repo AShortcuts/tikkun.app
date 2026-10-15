@@ -662,6 +662,47 @@ test('refreshes cue status when entering authoring without a save', async () => 
   expect(required<HTMLElement>('.aliyah-rail-button').dataset.cueStatus).toBe('local-draft')
 })
 
+test('only published cue status makes admin play controls blue, including after invalidation', async () => {
+  const loads = [deferred<'local-draft'>(), deferred<'none'>(), deferred<'published'>()] as const
+  let loadIndex = 0
+  const navigation = mountNavigation({ loadCueStatus: () => loads[loadIndex++].promise })
+  const single = { ...snapshot, items: [snapshot.items[0]] }
+  navigation.syncToolbar({
+    current: {
+      labelVisible: true, label: 'ראשון', target: single.items[0].target,
+      audioAvailable: true, authoringAvailable: false, authoringEnabled: true,
+      cueStatus: null, playing: false,
+    },
+    compact: {
+      visible: true, label: 'ראשון', target: single.items[0].target,
+      playbackState: 'default', audioAvailable: true, cueIncomplete: true,
+    },
+  })
+  navigation.syncContent({ desktop: single, compact: single, authoringEnabled: true })
+  const expectTone = (tone: string) => {
+    for (const selector of ['.mobile-aliyah-play', '.toolbar-current-aliyah-audio', '.mobile-aliyah-play-toggle']) {
+      expect(required<HTMLElement>(selector).dataset.audioTone).toBe(tone)
+      expect(required<HTMLElement>(selector).getAttribute('aria-disabled')).toBe('false')
+    }
+  }
+  expectTone('cue')
+  loads[0].resolve('local-draft')
+  await flushPromises()
+  expect(required<HTMLElement>('.aliyah-rail-button').dataset.cueStatus).toBe('local-draft')
+  expectTone('cue')
+  navigation.invalidate()
+  expectTone('cue')
+  loads[1].resolve('none')
+  await flushPromises()
+  expect(required<HTMLElement>('.aliyah-rail-button').dataset.cueStatus).toBe('none')
+  expectTone('cue')
+  navigation.invalidate()
+  loads[2].resolve('published')
+  await flushPromises()
+  expect(required<HTMLElement>('.aliyah-rail-button').dataset.cueStatus).toBe('published')
+  expectTone('normal')
+})
+
 test('rejects late cue results after the current recording has changed', async () => {
   const previous = deferred<'local-draft'>()
   const onCueStatusChange = vi.fn()

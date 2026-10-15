@@ -10,12 +10,23 @@
   import {
     applyReaderPreferences,
     colorContrastRatio,
+    customThemeColorUpdates,
+    getCustomThemeColors,
     getDefaultHighlightPreferences,
     mergeReaderPreferences,
+    readingFontScaleRange,
     recommendedThemeTextColor,
     type ReaderPreferences,
+    type ThemeMode,
   } from '../reader-preferences.ts'
+  import {
+    maxSavedReaderThemes,
+    parseReaderTheme,
+    serializeReaderTheme,
+    type ReaderThemeColors,
+  } from '../reader-themes.ts'
   import SupportDiagnosticsActions from '../support/SupportDiagnosticsActions.svelte'
+  import AnalyticsPreference from '../analytics/AnalyticsPreference.svelte'
   import NativeUpdateSettings from '../updates/NativeUpdateSettings.svelte'
   import { isNativeApp } from '../platform/native.ts'
   import { COMPACT_READER_QUERY } from '../adaptive/reader-viewport.ts'
@@ -37,6 +48,7 @@
     offlineTorah,
     offlineRecording,
     openMedia,
+    openPrint,
     toggle,
     connect,
   }: ReaderSettingsComponentProps = $props()
@@ -77,6 +89,12 @@
   let themeTransitionTimer = 0
   let customThemeTimer = 0
   let pendingCustomThemeUpdates: Partial<ReaderPreferences> | null = null
+  let themeTransferBusy = $state(false)
+  let themeTransferMessage = $state('')
+  let themeTransferFallback = $state<'copy' | 'paste' | null>(null)
+  let themeConfigText = $state('')
+  let themeConfigInput = $state<HTMLTextAreaElement>()
+  let themeTransferId = 0
   let compactViewportMedia: MediaQueryList | null = null
   let compactViewport = $state(false)
   let paneElement: HTMLDivElement
@@ -197,19 +215,23 @@
     if (color.chroma === 0 && previous) color.hue = previous.color.hue
     return { hex, color }
   }
-  let backgroundEditor = $state(readColorEditor(readPreferences().customBackgroundColor))
-  let textEditor = $state(readColorEditor(readPreferences().customTextColor))
+  const customColors = $derived(getCustomThemeColors(preferences))
+  const selectedSavedThemeIndex = $derived(
+    preferences.savedThemes.findIndex((theme) => theme.id === preferences.activeSavedThemeId)
+  )
+  let backgroundEditor = $state(readColorEditor(getCustomThemeColors(readPreferences()).background))
+  let textEditor = $state(readColorEditor(getCustomThemeColors(readPreferences()).text))
   const customBackgroundOklch = $derived(backgroundEditor.color)
   const customTextOklch = $derived(textEditor.color)
 
   function syncColorEditors() {
-    backgroundEditor = readColorEditor(preferences.customBackgroundColor, backgroundEditor)
-    textEditor = readColorEditor(preferences.customTextColor, textEditor)
+    backgroundEditor = readColorEditor(customColors.background, backgroundEditor)
+    textEditor = readColorEditor(customColors.text, textEditor)
   }
   const customContrast = $derived(
     colorContrastRatio(
-      preferences.customBackgroundColor,
-      preferences.customTextColor
+      customColors.background,
+      customColors.text
     )
   )
   const customContrastMessage = $derived(
@@ -454,8 +476,8 @@
     refreshPreferences()
   }
 
-  function previewCustomTheme(updates: Partial<ReaderPreferences>) {
-    const nextUpdates = { themeMode: 'custom' as const, ...updates }
+  function previewCustomTheme(colors: Partial<ReaderThemeColors>) {
+    const nextUpdates = customThemeColorUpdates(preferences, colors)
     preferences = mergeReaderPreferences(preferences, nextUpdates)
     syncColorEditors()
     applyReaderPreferences(preferences)
@@ -501,17 +523,174 @@
     else textEditor = { hex, color }
     previewCustomTheme(
       target === 'background'
-        ? { customBackgroundColor: hex }
-        : { customTextColor: hex }
+        ? { background: hex }
+        : { text: hex }
     )
   }
 
   function applyCustomThemePreset(background: string, text: string) {
+    commitCustomThemeUpdates()
+    updatePreferences(customThemeColorUpdates(preferences, { background, text }))
+  }
+
+  function resetThemeTransfer() {
+    themeTransferId += 1
+    themeTransferBusy = false
+    themeTransferMessage = ''
+    themeTransferFallback = null
+    themeConfigText = ''
+  }
+
+  function selectTheme(themeMode: ThemeMode, activeSavedThemeId: string | null = null) {
+    resetThemeTransfer()
+    updatePreferences({ themeMode, activeSavedThemeId })
+  }
+
+  function getActiveThemeColors(): ReaderThemeColors {
+    if (preferences.themeMode === 'custom') return { background: customColors.background, text: customColors.text }
+    const style = view.getComputedStyle(ownerDocument.body)
+    const canvas = ownerDocument.createElement('canvas')
+    canvas.width = canvas.height = 1
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('Could not read the active theme colors')
+    const readHex = () => '#' + Array.from(context.getImageData(0, 0, 1, 1).data)
+      .slice(0, 3).map((channel) => channel.toString(16).padStart(2, '0')).join('')
+    // Read tokens to avoid capturing a theme transition halfway through.
+    context.fillStyle = style.getPropertyValue('--paper-color').trim()
+    context.fillRect(0, 0, 1, 1)
+    const background = readHex()
+    // Built-in text is translucent; preserve its appearance on the page.
+    context.fillStyle = style.getPropertyValue('--page-ink-color').trim()
+    context.fillRect(0, 0, 1, 1)
+    return { background, text: readHex() }
+  }
+
+  function addSavedTheme() {
+    commitCustomThemeUpdates()
+    if (preferences.savedThemes.length >= maxSavedReaderThemes) {
+      themeTransferMessage = 'Five themes are saved. Delete one to add another.'
+      return
+    }
+    let colors: ReaderThemeColors
+    try {
+      colors = getActiveThemeColors()
+    } catch (error) {
+      console.error('Failed to duplicate the active theme', error)
+      themeTransferMessage = 'The current theme could not be copied. Try again.'
+      return
+    }
+    const id = Array.from(view.crypto.getRandomValues(new Uint32Array(4)), (value) => value.toString(16)).join('-')
+    const theme = { id, ...colors }
+    resetThemeTransfer()
     updatePreferences({
       themeMode: 'custom',
-      customBackgroundColor: background,
-      customTextColor: text,
+      activeSavedThemeId: theme.id,
+      savedThemes: [...preferences.savedThemes, theme],
     })
+    paneElement.querySelector<HTMLButtonElement>(`[data-saved-theme-id="${theme.id}"]`)?.focus()
+  }
+
+  function deleteSavedTheme() {
+    commitCustomThemeUpdates()
+    const themeId = preferences.activeSavedThemeId
+    const nextTheme = preferences.savedThemes.find((theme) => theme.id !== themeId)
+    resetThemeTransfer()
+    updatePreferences({
+      activeSavedThemeId: nextTheme?.id ?? null,
+      savedThemes: preferences.savedThemes.filter((theme) => theme.id !== themeId),
+    })
+    themeTransferMessage = 'Theme deleted.'
+    const focusSelector = nextTheme ? `[data-saved-theme-id="${nextTheme.id}"]` : '[data-theme-mode="custom"]'
+    paneElement.querySelector<HTMLButtonElement>(focusSelector)?.focus()
+  }
+
+  function showThemeConfigFallback(mode: 'copy' | 'paste', message: string) {
+    flushSync(() => {
+      themeTransferFallback = mode
+      themeTransferMessage = message
+    })
+    themeConfigInput?.focus()
+    if (mode === 'copy') themeConfigInput?.select()
+  }
+
+  async function copyTheme() {
+    commitCustomThemeUpdates()
+    resetThemeTransfer()
+    const requestId = themeTransferId
+    const config = serializeReaderTheme(customColors)
+    themeTransferBusy = true
+    try {
+      if (isNativeApp()) {
+        const { Clipboard } = await import('@capacitor/clipboard')
+        await Clipboard.write({ string: config })
+      } else {
+        if (!view.navigator.clipboard?.writeText) throw new Error('Clipboard access is unavailable')
+        await view.navigator.clipboard.writeText(config)
+      }
+      if (requestId === themeTransferId) themeTransferMessage = 'Theme copied.'
+    } catch (error) {
+      console.error('Failed to copy theme config', error)
+      if (requestId === themeTransferId) {
+        themeConfigText = config
+        showThemeConfigFallback('copy', 'Clipboard access is unavailable. Copy the selected config below.')
+      }
+    } finally {
+      if (requestId === themeTransferId) themeTransferBusy = false
+    }
+  }
+
+  function applyThemeConfig(config: string) {
+    const colors = parseReaderTheme(config)
+    commitCustomThemeUpdates()
+    updatePreferences(customThemeColorUpdates(preferences, colors))
+    themeTransferFallback = null
+    themeConfigText = ''
+    themeTransferMessage = 'Theme pasted.'
+  }
+
+  function applyPastedTheme() {
+    themeTransferId += 1
+    themeTransferBusy = false
+    try {
+      applyThemeConfig(themeConfigText)
+      paneElement.querySelector<HTMLButtonElement>('[data-target-id="settings-theme-paste"]')?.focus()
+    } catch (error) {
+      themeTransferMessage = error instanceof Error ? error.message : 'The theme could not be pasted.'
+    }
+  }
+
+  async function pasteTheme() {
+    commitCustomThemeUpdates()
+    resetThemeTransfer()
+    const requestId = themeTransferId
+    themeTransferBusy = true
+    showThemeConfigFallback('paste', 'Paste your theme config below, or allow clipboard access.')
+    let config: string
+    try {
+      if (isNativeApp()) {
+        const { Clipboard } = await import('@capacitor/clipboard')
+        const result = await Clipboard.read()
+        config = result.type === 'text/plain' ? result.value : ''
+      } else {
+        if (!view.navigator.clipboard?.readText) throw new Error('Clipboard access is unavailable')
+        config = await view.navigator.clipboard.readText()
+      }
+    } catch (error) {
+      console.error('Failed to read theme config from clipboard', error)
+      if (requestId === themeTransferId) {
+        themeTransferBusy = false
+        showThemeConfigFallback('paste', 'Clipboard access is unavailable. Paste your theme config below.')
+      }
+      return
+    }
+    if (requestId !== themeTransferId) return
+    themeTransferBusy = false
+    if (themeConfigText.trim()) return
+    try {
+      applyThemeConfig(config)
+    } catch (error) {
+      showThemeConfigFallback('paste', error instanceof Error ? error.message : 'The theme could not be pasted.')
+    }
   }
 
   function updateFiniteNumber(
@@ -566,6 +745,7 @@
     paneDrag = null
     commitCustomThemeUpdates()
     cancelScheduledFocus()
+    resetThemeTransfer()
     flushSync(() => {
       isOpen = false
     })
@@ -676,6 +856,7 @@
       themeTransitionTimer = 0
       customThemeTimer = 0
       pendingCustomThemeUpdates = null
+      resetThemeTransfer()
       ownerDocument.documentElement.classList.remove('mod-theme-transition')
       returnFocus = null
       toggle.setAttribute('aria-expanded', 'false')
@@ -810,6 +991,27 @@
           </div>
             </div>
 
+            {#if preferences.readerTextLayout === 'reading'}
+              <label class="settings-field">
+                <span class="settings-field-label">Font size</span>
+                <span class="settings-number-input">
+                  <input
+                    data-target-id="settings-reading-font-scale"
+                    type="range"
+                    min={readingFontScaleRange.min}
+                    max={readingFontScaleRange.max}
+                    step={readingFontScaleRange.step}
+                    value={preferences.readingFontScale}
+                    aria-valuetext={`${Math.round(preferences.readingFontScale * 100)}%`}
+                    oninput={(event) =>
+                      updateFiniteNumber(event.currentTarget.value, (readingFontScale) =>
+                        updatePreferences({ readingFontScale }))}
+                  />
+                  <span aria-hidden="true">{Math.round(preferences.readingFontScale * 100)}%</span>
+                </span>
+              </label>
+            {/if}
+
             <div class="settings-reader-choice">
               <span class="settings-field-label">Sides</span>
           <div
@@ -930,10 +1132,39 @@
       >
         <h3 class="settings-panel-title">More</h3>
 
+        {#if openPrint}
+          <section class="settings-section settings-action-row">
+            <span class="settings-field-label">Print passage</span>
+            <button
+              class="toolbar-button mod-icon-label settings-print-button"
+              type="button"
+              aria-label="Print passage"
+              title="Print passage"
+              onclick={() => { close({ restoreFocus: false }); openPrint?.() }}
+            >
+              <UiIcon name="printer" />
+            </button>
+          </section>
+        {/if}
+
         <section class="settings-section">
       <h4 class="settings-section-title">Offline</h4>
       {#if openMedia}
-        <button class="settings-offline-button" type="button" onclick={() => { close({ restoreFocus: false }); openMedia?.() }}>Media &amp; Storage</button>
+        <button
+          class="settings-offline-button"
+          type="button"
+          aria-disabled={!offlineRecordingSnapshot.supported}
+          data-reader-tooltip={!offlineRecordingSnapshot.supported
+            ? `Offline downloads are unavailable ${deviceDownloads ? 'on this device' : 'in this browser'}.`
+            : undefined}
+          data-tooltip-on-press={!offlineRecordingSnapshot.supported ? '' : undefined}
+          onclick={() => {
+            if (offlineRecordingSnapshot.supported) {
+              close({ restoreFocus: false })
+              openMedia?.()
+            }
+          }}
+        >Media &amp; Storage</button>
       {/if}
       <div class="settings-field settings-offline-field">
         <span class="settings-field-copy">
@@ -1079,7 +1310,7 @@
             type="button"
             data-theme-mode="automatic"
             aria-pressed={preferences.themeMode === 'automatic'}
-            onclick={() => updatePreferences({ themeMode: 'automatic' })}
+            onclick={() => selectTheme('automatic')}
           >
             <span lang="he" dir="rtl" aria-hidden="true">אָב</span>
             <small>System</small>
@@ -1091,7 +1322,7 @@
             type="button"
             data-theme-mode="light"
             aria-pressed={preferences.themeMode === 'light'}
-            onclick={() => updatePreferences({ themeMode: 'light' })}
+            onclick={() => selectTheme('light')}
           >
             <span lang="he" dir="rtl" aria-hidden="true">אָב</span>
             <small>Light</small>
@@ -1103,7 +1334,7 @@
             type="button"
             data-theme-mode="sepia"
             aria-pressed={preferences.themeMode === 'sepia'}
-            onclick={() => updatePreferences({ themeMode: 'sepia' })}
+            onclick={() => selectTheme('sepia')}
           >
             <span lang="he" dir="rtl" aria-hidden="true">אָב</span>
             <small>Sepia</small>
@@ -1115,7 +1346,7 @@
             type="button"
             data-theme-mode="dark"
             aria-pressed={preferences.themeMode === 'dark'}
-            onclick={() => updatePreferences({ themeMode: 'dark' })}
+            onclick={() => selectTheme('dark')}
           >
             <span lang="he" dir="rtl" aria-hidden="true">אָב</span>
             <small>Dark</small>
@@ -1123,29 +1354,90 @@
           >
           <button
             class="settings-segmented-option"
-            class:is-active={preferences.themeMode === 'custom'}
+            class:is-active={preferences.themeMode === 'custom' && !preferences.activeSavedThemeId}
             type="button"
             data-theme-mode="custom"
-            aria-pressed={preferences.themeMode === 'custom'}
+            aria-pressed={preferences.themeMode === 'custom' && !preferences.activeSavedThemeId}
             style:background-color={preferences.customBackgroundColor}
             style:color={preferences.customTextColor}
-            onclick={() => updatePreferences({ themeMode: 'custom' })}
+            onclick={() => selectTheme('custom')}
           >
             <span lang="he" dir="rtl" aria-hidden="true">אָב</span>
             <small style:color={recommendedThemeTextColor(preferences.customBackgroundColor)}>Custom</small>
           </button
           >
         </div>
+        <div class="settings-saved-themes" role="group" aria-label="Saved custom themes">
+          {#each preferences.savedThemes as theme, index (theme.id)}
+            <button
+              class="settings-theme-circle"
+              class:is-active={preferences.themeMode === 'custom' && preferences.activeSavedThemeId === theme.id}
+              type="button"
+              data-saved-theme-id={theme.id}
+              aria-label={`Custom theme ${index + 1}`}
+              title={`Custom theme ${index + 1}`}
+              aria-pressed={preferences.themeMode === 'custom' && preferences.activeSavedThemeId === theme.id}
+              style:--saved-theme-color={theme.background}
+              onclick={() => selectTheme('custom', theme.id)}
+            ></button>
+          {/each}
+          {#if preferences.savedThemes.length < maxSavedReaderThemes}
+            <button
+              class="settings-theme-circle mod-add"
+              type="button"
+              aria-label="Add custom theme"
+              title="Duplicate current theme"
+              onclick={addSavedTheme}
+            ><UiIcon name="plus" /></button>
+          {/if}
+        </div>
+        {#if preferences.themeMode !== 'custom' && themeTransferMessage}
+          <div class="settings-theme-transfer-status settings-field-helper" role="status" aria-live="polite">{themeTransferMessage}</div>
+        {/if}
         {#if preferences.themeMode === 'custom'}
           <div
             class="settings-custom-theme"
             data-target-id="settings-custom-theme"
           >
+            <div class="settings-theme-editor-heading">
+              <span class="settings-field-label">{selectedSavedThemeIndex >= 0 ? `Custom theme ${selectedSavedThemeIndex + 1}` : 'Custom theme'}</span>
+              {#if selectedSavedThemeIndex >= 0}
+                <button class="settings-theme-delete" type="button" onclick={deleteSavedTheme}>Delete theme</button>
+              {/if}
+            </div>
+            <div class="settings-theme-transfer">
+              <button class="settings-secondary-action" type="button" disabled={themeTransferBusy} onclick={copyTheme}>Copy theme</button>
+              <button class="settings-secondary-action" type="button" data-target-id="settings-theme-paste" disabled={themeTransferBusy} onclick={pasteTheme}>Paste theme</button>
+            </div>
+            <div class="settings-theme-transfer-status settings-field-helper" role="status" aria-live="polite">{themeTransferMessage}</div>
+            {#if themeTransferFallback}
+              <div class="settings-theme-config">
+                <label class="settings-field-label" for="reader-theme-config">Theme config</label>
+                <textarea
+                  bind:this={themeConfigInput}
+                  bind:value={themeConfigText}
+                  id="reader-theme-config"
+                  rows="5"
+                  spellcheck="false"
+                  autocapitalize="off"
+                  readonly={themeTransferFallback === 'copy'}
+                ></textarea>
+                <div class="settings-theme-transfer">
+                  {#if themeTransferFallback === 'paste'}
+                    <button class="settings-secondary-action" type="button" disabled={!themeConfigText.trim()} onclick={applyPastedTheme}>Apply theme</button>
+                  {/if}
+                  <button class="settings-secondary-action" type="button" onclick={() => {
+                    resetThemeTransfer()
+                    paneElement.querySelector<HTMLButtonElement>('[data-target-id="settings-theme-paste"]')?.focus()
+                  }}>Cancel</button>
+                </div>
+              </div>
+            {/if}
             <div
               class="settings-custom-theme-preview"
               dir="rtl"
-              style:background-color={preferences.customBackgroundColor}
-              style:color={preferences.customTextColor}
+              style:background-color={customColors.background}
+              style:color={customColors.text}
               aria-label="Custom theme preview"
             >
               בְּרֵאשִׁית בָּרָא אֱלֹהִים
@@ -1158,12 +1450,12 @@
               <div class="settings-custom-color-heading">
                 <span>Background</span>
                 <div class="settings-custom-color-value">
-                  <output>{preferences.customBackgroundColor.toUpperCase()}</output>
+                  <output>{customColors.background.toUpperCase()}</output>
                   <input
                     type="color"
                     aria-label="Background color"
-                    value={preferences.customBackgroundColor}
-                    oninput={(event) => previewCustomTheme({ customBackgroundColor: event.currentTarget.value })}
+                    value={customColors.background}
+                    oninput={(event) => previewCustomTheme({ background: event.currentTarget.value })}
                     onchange={commitCustomThemeUpdates}
                   />
                 </div>
@@ -1225,12 +1517,12 @@
               <div class="settings-custom-color-heading">
                 <span>Text</span>
                 <div class="settings-custom-color-value">
-                  <output>{preferences.customTextColor.toUpperCase()}</output>
+                  <output>{customColors.text.toUpperCase()}</output>
                   <input
                     type="color"
                     aria-label="Text color"
-                    value={preferences.customTextColor}
-                    oninput={(event) => previewCustomTheme({ customTextColor: event.currentTarget.value })}
+                    value={customColors.text}
+                    oninput={(event) => previewCustomTheme({ text: event.currentTarget.value })}
                     onchange={commitCustomThemeUpdates}
                   />
                 </div>
@@ -1291,9 +1583,9 @@
             <div class="settings-custom-presets" aria-label="Theme patterns">
               {#each customThemePresets as preset (preset.label)}
                 <button
-                  class:is-active={preferences.customBackgroundColor ===
+                  class:is-active={customColors.background ===
                     preset.background &&
-                    preferences.customTextColor === preset.text}
+                    customColors.text === preset.text}
                   type="button"
                   data-custom-theme-preset={preset.label.toLowerCase()}
                   style:background-color={preset.background}
@@ -1318,11 +1610,7 @@
                 <button
                   type="button"
                   onclick={() =>
-                    updatePreferences({
-                      customTextColor: recommendedThemeTextColor(
-                        preferences.customBackgroundColor
-                      ),
-                    })}
+                    applyCustomThemePreset(customColors.background, recommendedThemeTextColor(customColors.background))}
                 >Adjust text</button>
               {/if}
             </div>
@@ -1657,6 +1945,10 @@
         {#if isNativeApp()}
           <NativeUpdateSettings />
         {/if}
+        <section class="settings-section">
+          <h4 class="settings-section-title">Privacy</h4>
+          <AnalyticsPreference variant="reader" />
+        </section>
         <section class="settings-section">
       <h4 class="settings-section-title">Support</h4>
       <div class="settings-field">

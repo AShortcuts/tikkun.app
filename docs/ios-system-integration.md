@@ -2,15 +2,9 @@
 
 Updated: 2026-09-11. Editable implementation and acceptance reference.
 
-Latest packaging checkpoint: app and widget are now **1.0 (5)**. The theme repair,
-Simulator verification and Sqim delivery succeeded. Private installation links
-belong in ignored local release records, not this public repository.
-Build 5 is now uploaded to TestFlight, processed `VALID`, and attached to version
-1.0 (`940f7701-1e72-462b-98ee-7d01bc58fe1f`). Xcode GUI cloud signing succeeded for
-Adam Niyazov (`5D862AQ8GV`) despite the CLI account-lookup failure. English test
-notes and export compliance are set; no tester access or review submission changed.
-See [listing handoff](../metadata/README.md) for delivery evidence and remaining
-gates. The initial feature-verification record below is historical.
+Historical packaging checkpoint (2026-09-11): app and widget **1.0 (5)** passed theme repair/Simulator verification and Sqim delivery. The recorded ASC state was TestFlight `VALID`, attached to version 1.0 (`940f7701-1e72-462b-98ee-7d01bc58fe1f`); it has not been rechecked live. Xcode GUI cloud signing succeeded for Adam Niyazov (`5D862AQ8GV`) despite the CLI account-lookup failure. English test notes and export compliance were set; no tester access or review submission changed. Private installation links belong in ignored local records.
+
+See the [listing history](../metadata/README.md) for delivery evidence and the [canonical release checklist](release-checklist.md) for release gates and the later build-6 updater checkpoint. The initial feature-verification record below is historical.
 
 ## User Behavior
 
@@ -108,5 +102,5 @@ npm run native:share
   been created at this checkpoint.
 - Public App Store submission is not authorized. Licensing, privacy, metadata,
   Universal Links deployment and device-media gates remain in the
-  [release checklist](ios-release-checklist.md); successful compilation and
+  [canonical release checklist](release-checklist.md); successful compilation and
   private build hosting do not clear them.

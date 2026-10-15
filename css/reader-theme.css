@@ -1,0 +1,78 @@
+@layer reset, tokens, shell, reader, feature, responsive, overrides;
+
+@layer tokens {
+  :root {
+    color-scheme: light;
+    --paper-color: oklch(98.5% 0 0);
+    --page-ink-color: oklch(0% 0 0 / 0.8);
+    --annotations-toggle-active-color: black;
+    --verses-color: oklch(0% 0 0 / 0.35);
+    --light-accent-color: oklch(0% 0 0 / 0.05);
+    --medium-accent-color: oklch(0% 0 0 / 0.1);
+    --heavy-accent-color: oklch(0% 0 0 / 0.2);
+    --text-color: oklch(0% 0 0 / 0.7);
+    --light-text-color: oklch(0% 0 0 / 0.5);
+    --reader-custom-background-color: #eee6d6;
+    --reader-custom-text-color: #3b3026;
+    --reader-ink-color: var(--page-ink-color);
+    --interface-surface-color: var(--paper-color);
+  }
+
+  html[data-reader-theme='sepia'] {
+    --paper-color: oklch(90% 17% 90deg);
+  }
+
+  html[data-reader-theme='dark'] {
+    color-scheme: dark;
+    --paper-color: oklch(25% 0 0);
+    --page-ink-color: oklch(100% 0 0 / 0.8);
+    --annotations-toggle-active-color: oklch(100% 0 0 / 0.8);
+    --verses-color: oklch(100% 0 0 / 0.35);
+    --light-accent-color: oklch(100% 0 0 / 0.05);
+    --medium-accent-color: oklch(100% 0 0 / 0.1);
+    --heavy-accent-color: oklch(100% 0 0 / 0.2);
+    --text-color: oklch(100% 0 0 / 0.7);
+    --light-text-color: oklch(100% 0 0 / 0.5);
+  }
+
+  html[data-reader-theme='custom'] {
+    --paper-color: var(--reader-custom-background-color);
+    --reader-ink-color: var(--reader-custom-text-color);
+    --page-ink-color: var(--reader-custom-ui-text-color, #191c22);
+    --annotations-toggle-active-color: var(--text-color);
+    --verses-color: color-mix(in srgb, var(--reader-custom-text-color) 42%, transparent);
+    --light-accent-color: color-mix(in srgb, var(--text-color) 8%, transparent);
+    --medium-accent-color: color-mix(in srgb, var(--text-color) 16%, transparent);
+    --heavy-accent-color: color-mix(in srgb, var(--text-color) 28%, transparent);
+    --text-color: var(--reader-custom-ui-text-color, #191c22);
+    --light-text-color: var(--reader-custom-ui-secondary-color, #51504b);
+    --interface-surface-color: color-mix(in srgb, var(--paper-color) 88%, white);
+  }
+
+  html[data-reader-theme='custom'][data-reader-custom-scheme='dark'] {
+    --interface-surface-color: color-mix(in srgb, var(--paper-color) 88%, black);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    html[data-reader-theme='automatic'] {
+      color-scheme: dark;
+      --paper-color: oklch(25% 0 0);
+      --page-ink-color: oklch(100% 0 0 / 0.8);
+      --annotations-toggle-active-color: oklch(100% 0 0 / 0.8);
+      --verses-color: oklch(100% 0 0 / 0.35);
+      --light-accent-color: oklch(100% 0 0 / 0.05);
+      --medium-accent-color: oklch(100% 0 0 / 0.1);
+      --heavy-accent-color: oklch(100% 0 0 / 0.2);
+      --text-color: oklch(100% 0 0 / 0.7);
+      --light-text-color: oklch(100% 0 0 / 0.5);
+    }
+  }
+}
+
+@layer shell {
+  html,
+  body {
+    background-color: var(--paper-color);
+    color: var(--text-color);
+  }
+}

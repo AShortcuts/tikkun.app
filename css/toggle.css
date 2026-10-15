@@ -104,13 +104,15 @@
   color: white;
 }
 
-html[data-reader-theme='dark'] .annotations-toggle .toggle {
+html[data-reader-theme='dark'] .annotations-toggle .toggle,
+html[data-reader-theme='custom'][data-reader-custom-scheme='dark'] .annotations-toggle .toggle {
   --annotations-toggle-active-color: black;
   --annotations-toggle-inactive-color: oklch(0% 0 0 / 0.5);
   --annotations-toggle-hover-color: oklch(50% 0.24 260deg);
 }
 
-html[data-reader-theme='dark'] .annotations-toggle .shadowed-circle {
+html[data-reader-theme='dark'] .annotations-toggle .shadowed-circle,
+html[data-reader-theme='custom'][data-reader-custom-scheme='dark'] .annotations-toggle .shadowed-circle {
   background: white;
   color: black;
 }

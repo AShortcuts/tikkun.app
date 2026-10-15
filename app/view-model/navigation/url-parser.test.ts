@@ -159,14 +159,14 @@ test('Parsha slug can start at a specific ref', async () => {
   ))
 })
 
-test('Parsha slug stays contextual while its reference controls position', async () => {
+test('a reference outside the named parsha opens the containing Torah reading', async () => {
   const route = toReaderRoute(
     parseUrl(generator, '/torah/parsha/haazinu/5-31-28', {
       now: new Date('2026-01-01'),
     })
   )
 
-  expect(route?.canonicalHash).toBe('#/torah/parsha/haazinu/5-31-28')
+  expect(route?.canonicalHash).toBe('#/torah/5-31-28')
   expect(await renderStartingLineForRoute(route)).toBe(
     await renderStartingLineForRoute(
       toReaderRoute(
@@ -201,7 +201,7 @@ test('dated run routes reject references outside their reading', () => {
   ).toEqual({ view: 'not-found' })
 })
 
-test('Vezos Haberacha has its own parsha route and display title', async () => {
+test('legacy Vezos Haberacha links resolve to canonical Vezot Haberacha', async () => {
   const route = toReaderRoute(
     parseUrl(generator, '/torah/parsha/vezos-haberacha/5-33-1', {
       now: new Date('2026-01-01'),
@@ -209,8 +209,10 @@ test('Vezos Haberacha has its own parsha route and display title', async () => {
   )
 
   expect(route).toBeTruthy()
-  expect(route?.canonicalHash).toBe('#/torah/parsha/vezos-haberacha/5-33-1')
-  expect(route?.model.displayTitleForRun(route.model.relevantRuns[0])).toBe('וזאת הברכה')
+  expect(route?.canonicalHash).toBe('#/torah/parsha/vezot-haberacha/5-33-1')
+  const run = route!.model.relevantRuns.find(run => run.id === 'parsha:vezot-haberacha,main')!
+  expect(route?.model.displayTitleForRun(run)).toBe('וזאת הברכה')
+  expect(run.aliyot).toHaveLength(7)
   expect(await renderStartingLineForRoute(route)).toMatch(/^וזאת הברכה:/)
 })
 
@@ -303,6 +305,47 @@ test('Page URLs reject unknown scrolls and out of range pages', () => {
 
 test('Nonexistent Torah references render the not-found route', () => {
   expect(parseUrl(generator, '/r/4-46-9')).toEqual({ view: 'not-found' })
+})
+
+test.each([1, 2, 3, 4, 5])('canonical and legacy references locate the same verse in book %s', async (book) => {
+  const path = `/torah/${book}-1-1`
+  const canonical = toReaderRoute(parseUrl(generator, path))
+  const legacy = toReaderRoute(parseUrl(generator, `/r/${book}-1-1`))
+
+  expect(canonical?.canonicalHash).toBe(`#${path}`)
+  expect(legacy?.canonicalHash).toBe(`#${path}`)
+  expect(await renderStartingLineForRoute(canonical)).toBe(
+    await renderStartingLineForRoute(legacy)
+  )
+  expect(canonical?.model.relevantRuns.map((run) => run.id)).toEqual(
+    legacy?.model.relevantRuns.map((run) => run.id)
+  )
+})
+
+test.each(['/torah/5-33-24', '/r/5-33-24'])('locates Devarim 33:24 from %s', async (path) => {
+  const route = toReaderRoute(parseUrl(generator, path))
+  expect(route?.canonicalHash).toBe('#/torah/5-33-24')
+  expect(await route?.model.startingLocation).toMatchObject({
+    page: { type: 'page', pageNumber: 245 },
+    lineNumber: 11,
+  })
+})
+
+test.each(['/torah/4-46-9', '/torah/6-1-1', '/torah/0-1-1'])(
+  'rejects nonexistent Torah reference %s', (path) => {
+    expect(parseUrl(generator, path)).toEqual({ view: 'not-found' })
+  }
+)
+
+test.each(['/torah/5-33', '/torah/foo-bar-baz', '/torah/5-33-24/extra'])(
+  'rejects malformed Torah reference route %s', (path) => {
+    expect(parseUrl(generator, path)).toBeNull()
+  }
+)
+
+test('canonical Torah references accept a trailing slash and ignore hash query parameters', () => {
+  expect(toReaderRoute(parseUrl(generator, '/torah/5-33-24/?aliyah=5'))?.canonicalHash)
+    .toBe('#/torah/5-33-24')
 })
 
 test('Old parsha and page URL families are not parsed', () => {

@@ -29,6 +29,7 @@ export interface ReaderSettingsOptions {
   getCurrentRecording(): OfflineDownloadRecording | null
   downloadLibrary?: DownloadLibrary
   openMedia?(): void
+  openPrint?(): void
 }
 
 export interface ReaderSettings {

@@ -7,13 +7,16 @@ export async function nativeUpdateContract(root, publicKey) {
   const files = []
   async function collect(directory) {
     for (const entry of await readdir(path.join(root, directory), { withFileTypes: true })) {
-      if (entry.name.startsWith('.') || ['public', 'build', 'CapApp-SPM'].includes(entry.name)) continue
+      if (entry.name.startsWith('.') || ['public', 'build', 'CapApp-SPM', 'xcuserdata', 'DerivedData', 'Pods', 'output', 'capacitor-cordova-ios-plugins'].includes(entry.name)) continue
       const relative = `${directory}/${entry.name}`
+      // cap sync and Xcode create machine-local files absent from a Pages checkout.
+      if (relative === 'ios/App/App/capacitor.config.json') continue
       if (entry.isDirectory()) await collect(relative)
-      else if (/\.(swift|plist|entitlements|pbxproj|xcprivacy|js|json|png|storyboard)$/.test(entry.name)) files.push(relative)
+      else if (/\.(swift|plist|entitlements|pbxproj|xcprivacy|js|json|png|storyboard|resolved)$/.test(entry.name)) files.push(relative)
     }
   }
   await collect('ios')
+  files.push('ios/App/CapApp-SPM/Package.swift')
   const hash = createHash('sha256')
   hash.update(await readFile(path.join(root, 'capacitor.config.ts')))
   hash.update(await readFile(path.join(root, 'scripts/update-config.mjs')))
@@ -21,5 +24,5 @@ export async function nativeUpdateContract(root, publicKey) {
   for (const file of files.sort()) { hash.update(file); hash.update(await readFile(path.join(root, file))) }
   const { dependencies } = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'))
   hash.update(JSON.stringify(Object.entries(dependencies).filter(([name]) => /capacitor/.test(name)).sort()))
-  return { schema: 1, nativeDigest: hash.digest('hex'), publicKeyDigest: createHash('sha256').update(publicKey.trim()).digest('hex') }
+  return { schema: 2, nativeDigest: hash.digest('hex'), publicKeyDigest: createHash('sha256').update(publicKey.trim()).digest('hex') }
 }

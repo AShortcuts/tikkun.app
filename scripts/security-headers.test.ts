@@ -56,7 +56,7 @@ test('keeps early theme setup non-fatal when browser storage is unavailable', ()
   const root = createThemeRoot()
   expect(() =>
     runInNewContext(source, {
-      document: { documentElement: root },
+      document: { documentElement: root, getElementById: () => null },
       window: {
         localStorage: {
           getItem() {
@@ -77,7 +77,7 @@ test('applies the saved theme before hydration', () => {
 
   const root = createThemeRoot()
   runInNewContext(source, {
-    document: { documentElement: root },
+    document: { documentElement: root, getElementById: () => null },
     window: {
       localStorage: {
         getItem: () => JSON.stringify({ themeMode: 'sepia' }),
@@ -88,7 +88,7 @@ test('applies the saved theme before hydration', () => {
   expect(root.dataset.readerTheme).toBe('sepia')
 })
 
-test('applies saved custom colors before hydration', () => {
+test.each([false, true])('applies saved custom colors before hydration (saved circle: %s)', (savedCircle) => {
   const source = [
     ...appTemplate.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi),
   ].find(([, attributes]) => !/\bsrc\s*=/i.test(attributes))?.[2]
@@ -100,13 +100,19 @@ test('applies saved custom colors before hydration', () => {
     properties.set(name, value)
   }
   runInNewContext(source, {
-    document: { documentElement: root },
+    document: { documentElement: root, getElementById: () => null },
     window: {
       localStorage: {
         getItem: () => JSON.stringify({
           themeMode: 'custom',
           customBackgroundColor: '#112233',
           customTextColor: '#f4f1e8',
+          ...(savedCircle ? {
+            customBackgroundColor: '#ffffff',
+            customTextColor: '#000000',
+            activeSavedThemeId: 'night',
+            savedThemes: [{ id: 'night', background: '#112233', text: '#f4f1e8' }],
+          } : {}),
         }),
       },
     },
@@ -131,7 +137,7 @@ test.each([
 
   const root = createThemeRoot()
   runInNewContext(source, {
-    document: { documentElement: root },
+    document: { documentElement: root, getElementById: () => null },
     window: {
       localStorage: { getItem: () => savedPreferences },
     },

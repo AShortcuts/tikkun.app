@@ -1,4 +1,11 @@
+import { resolveReadingRun } from '../view-model/navigation/parsha-routes.ts'
+import { readingTitle } from '../calendar-model/model-types.ts'
+import { trackAnalytics } from '../analytics/client.ts'
+import { capturePrintSelection, selectedPrintRange } from '../printing/print-selection.ts'
+import { createPlaybackAnalytics, trackPreferenceChanges } from '../analytics/observers.ts'
+import { readerRouteKind } from '../analytics/schema.ts'
 import { getWebServiceWorker, isNativeApp } from '../platform/native.ts'
+import { mountReaderSwipeBack } from './reader-swipe-back.ts'
 import { createNativeUpdatePrompt } from '../updates/native-update-prompt.ts'
 import { loadPassageTokens } from '../audio/passage-tokens.ts'
 import { audioButtonState } from '../reading/audio-button-state.ts'
@@ -24,6 +31,7 @@ import {
   type ReaderViewport,
 } from '../adaptive/reader-viewport.ts'
 import { TopBarTracker } from '../view-model/navigation/top-bar-model.ts'
+import { createPrintContext } from '../printing/print-context.ts'
 import {
   createAliyahNavigationActions,
   createNavigationAction,
@@ -94,7 +102,6 @@ import {
   aliyahCueAuthoringActionLabel,
   createAliyahNavigation,
   getMobileAliyahCapsuleState,
-  isAliyahCueStatusUnfinished,
   type AliyahCueStatus,
   type AliyahNavigation,
 } from '../reading/aliyah-navigation/aliyah-navigation.ts'
@@ -251,6 +258,7 @@ export interface ReaderRuntimeOptions {
   aboutHref: string
   downloadOwner?: DownloadOwner
   openAbout?: () => Promise<void>
+  onStartupProgress?: (step: 'text' | 'rendered' | 'positioned') => void
 }
 
 export function startReaderRuntime({
@@ -262,12 +270,14 @@ export function startReaderRuntime({
   aboutHref,
   downloadOwner,
   openAbout,
+  onStartupProgress,
 }: ReaderRuntimeOptions): ReaderRuntime {
   const window = view
   const location = view.location
   const navigator = view.navigator
   const requestAnimationFrame = view.requestAnimationFrame.bind(view)
   const cancelAnimationFrame = view.cancelAnimationFrame.bind(view)
+  let startupComplete = false
 
   const { whenKey } = utils
 
@@ -333,7 +343,7 @@ export function startReaderRuntime({
   function passageForTarget(target: AliyahNavigationTarget | null) {
     if (!target) return undefined
     const run = readerDisplaySessionGlobal?.capture()?.viewModel.relevantRuns.find(entry => entry.id === target.runId)
-      ?? createCalendarGenerator().parseId(target.runId)
+      ?? resolveReadingRun(createCalendarGenerator(), target.runId)
     return run ? passageState(run, target.aliyahIndex) : undefined
   }
 
@@ -345,6 +355,7 @@ export function startReaderRuntime({
   let readerControlsGlobal: ReaderControls | null = null
   let openMediaGlobal: ((returnFocus?: HTMLElement) => void) | null = null
   let readerShellGlobal: ReaderShell | null = null
+  let openPrintGlobal: (() => void) | null = null
   let readerRouteGlobal: ReaderRoute | null = null
   let lastReadingPromptGlobal: LastReadingPrompt | null = null
   let commandPaletteGlobal: LazyCommandPalette | null = null
@@ -413,7 +424,19 @@ export function startReaderRuntime({
   }
 
   function renderReaderModel(target: ScrollViewModel): ReaderRouteRendering {
-    return getReaderDisplaySession().render(target)
+    const rendering = getReaderDisplaySession().render(target)
+    if (startupComplete || !onStartupProgress) return rendering
+
+    const textReady = target.startingLocation.then(() => {
+      if (rendering.isCurrent()) onStartupProgress('text')
+    })
+    return {
+      ...rendering,
+      ready: Promise.all([textReady, rendering.ready]).then(([, line]) => {
+        if (rendering.isCurrent()) onStartupProgress('rendered')
+        return line
+      }),
+    }
   }
 
   function deactivateReaderRuntime() {
@@ -957,6 +980,7 @@ export function startReaderRuntime({
       const nextBookmarks = bookmarks.filter((bookmark) => bookmark.tokenKey !== tokenKey)
       if (!persistBookmarks(nextBookmarks)) return
       bookmarks = nextBookmarks
+      trackAnalytics('bookmark_change', { action: 'remove' })
       refreshReaderSearch()
       readerControlsGlobal?.sync()
       return
@@ -978,6 +1002,7 @@ export function startReaderRuntime({
     ]
     if (!persistBookmarks(nextBookmarks)) return
     bookmarks = nextBookmarks
+    trackAnalytics('bookmark_change', { action: 'add' })
     refreshReaderSearch()
     readerControlsGlobal?.sync()
   }
@@ -1068,7 +1093,7 @@ export function startReaderRuntime({
   function bookmarkReadingLabel(bookmark: ReaderBookmark) {
     const runId = /^#\/run\/([^/]+)/.exec(bookmark.hash)?.[1]
     if (runId) {
-      const run = createCalendarGenerator().parseId(runId)
+      const run = resolveReadingRun(createCalendarGenerator(), runId)
       return run ? displayTitleForLeiningRun(run) : null
     }
 
@@ -1203,7 +1228,7 @@ export function startReaderRuntime({
   }
 
   function displayTitleForLeiningRun(run: LeiningRun) {
-    return run.leining.date.title.he || run.leining.date.title.en
+    return readingTitle(run.leining).he || readingTitle(run.leining).en
   }
 
   function searchableParshaActions() {
@@ -1294,6 +1319,15 @@ export function startReaderRuntime({
 
   function createReaderSearchActions() {
     const actions: NavigationAction[] = [
+      createNavigationAction({
+        id: 'tools.print',
+        group: 'tools',
+        label: 'Print passage',
+        aliases: ['Print', 'Print preview'],
+        keywords: ['paper', 'pdf', 'aliyah'],
+        emptyPriority: 41,
+        run: () => openPrintGlobal?.(),
+      }),
       createNavigationAction({
         id: 'reading.current',
         group: 'reading',
@@ -1475,7 +1509,7 @@ export function startReaderRuntime({
 
   let aliyahStartPopup: HTMLElement | null = null
   let aliyahStartPopupLine: HTMLElement | null = null
-  let aliyahStartPopupMarker: HTMLButtonElement | null = null
+  let aliyahStartPopupMarker: HTMLElement | null = null
 
   function getAliyahStartPopup() {
     if (aliyahStartPopup) return aliyahStartPopup
@@ -1491,7 +1525,9 @@ export function startReaderRuntime({
 
   function closeAliyahStartPopup() {
     aliyahStartPopup?.classList.add('u-hidden')
-    aliyahStartPopupMarker?.setAttribute('aria-expanded', 'false')
+    if (aliyahStartPopupMarker?.matches('.aliyah-start-marker')) {
+      aliyahStartPopupMarker.setAttribute('aria-expanded', 'false')
+    }
     aliyahStartPopupLine = null
     aliyahStartPopupMarker = null
   }
@@ -1504,13 +1540,15 @@ export function startReaderRuntime({
   }
 
   function getAliyahStartMarkerAtPointer(event: Event, book: HTMLElement) {
-    const marker = (event.target as Element | null)?.closest<HTMLButtonElement>(
-      '.aliyah-start-marker'
+    const marker = (event.target as Element | null)?.closest<HTMLElement>(
+      isCompactReaderViewport()
+        ? '.aliyah-start-marker'
+        : '.aliyah-badge[data-aliyah-marker="true"]'
     )
     return marker && book.contains(marker) ? marker : null
   }
 
-  function getAliyahStartMarkerLine(marker: HTMLButtonElement) {
+  function getAliyahStartMarkerLine(marker: HTMLElement) {
     return marker.closest<HTMLElement>('[data-line-index][data-aliyah-starts]')
   }
 
@@ -1539,7 +1577,7 @@ export function startReaderRuntime({
   function positionAliyahStartPopup(
     popup: HTMLElement,
     line: HTMLElement,
-    marker: HTMLButtonElement | null = getVisibleAliyahStartMarker(line)
+    marker: HTMLElement | null = getVisibleAliyahStartMarker(line)
   ) {
     const content = line.querySelector<HTMLElement>('.line-content')
     if (!content) return
@@ -1565,7 +1603,7 @@ export function startReaderRuntime({
 
   function openAliyahStartPopup(
     line: HTMLElement,
-    marker: HTMLButtonElement | null = getVisibleAliyahStartMarker(line)
+    marker: HTMLElement | null = getVisibleAliyahStartMarker(line)
   ) {
     if (
       aliyahStartPopupLine === line &&
@@ -1577,10 +1615,14 @@ export function startReaderRuntime({
     }
 
     const popup = getAliyahStartPopup()
-    aliyahStartPopupMarker?.setAttribute('aria-expanded', 'false')
+    if (aliyahStartPopupMarker?.matches('.aliyah-start-marker')) {
+      aliyahStartPopupMarker.setAttribute('aria-expanded', 'false')
+    }
     aliyahStartPopupLine = line
     aliyahStartPopupMarker = marker
-    marker?.setAttribute('aria-expanded', 'true')
+    if (marker?.matches('.aliyah-start-marker')) {
+      marker.setAttribute('aria-expanded', 'true')
+    }
     popup.replaceChildren()
     appendAliyahStartPopupRow(popup, 'Parsha', line.dataset.aliyahStartTitle ?? '')
     appendAliyahStartPopupRow(
@@ -1588,7 +1630,11 @@ export function startReaderRuntime({
       'Aliyah',
       marker?.dataset.aliyahStartLabel ?? line.dataset.aliyahStartLabel ?? ''
     )
-    appendAliyahStartPopupRow(popup, 'Verses:', line.dataset.aliyahStartVerse ?? '')
+    appendAliyahStartPopupRow(
+      popup,
+      'Verses:',
+      marker?.dataset.aliyahStartVerse ?? line.dataset.aliyahStartVerse ?? ''
+    )
     popup.classList.remove('u-hidden')
     positionAliyahStartPopup(popup, line, marker)
   }
@@ -1621,7 +1667,7 @@ export function startReaderRuntime({
     book.addEventListener(
       'pointerover',
       (event) => {
-        if (!isCompactReaderViewport() || event.pointerType === 'touch') return
+        if (event.pointerType === 'touch') return
         const marker = getAliyahStartMarkerAtPointer(event, book)
         const line = marker ? getAliyahStartMarkerLine(marker) : null
         if (!line || !marker) return
@@ -1647,12 +1693,20 @@ export function startReaderRuntime({
     book.addEventListener(
       'focusin',
       (event) => {
-        if (!isCompactReaderViewport()) return
-        const marker = (event.target as Element | null)?.closest<HTMLButtonElement>(
-          '.aliyah-start-marker'
-        )
+        const marker = getAliyahStartMarkerAtPointer(event, book)
         const line = marker ? getAliyahStartMarkerLine(marker) : null
         if (line && marker) openAliyahStartPopup(line, marker)
+      },
+      { signal: scope.signal }
+    )
+
+    book.addEventListener(
+      'focusout',
+      (event) => {
+        const marker = getAliyahStartMarkerAtPointer(event, book)
+        if (!marker) return
+        if (event.relatedTarget instanceof Node && marker.contains(event.relatedTarget)) return
+        closeAliyahStartPopup()
       },
       { signal: scope.signal }
     )
@@ -1834,7 +1888,7 @@ export function startReaderRuntime({
     const run =
       activeDisplay?.viewModel.relevantRuns.find(
         (candidate) => candidate.id === target.runId
-      ) ?? createCalendarGenerator().parseId(target.runId)
+      ) ?? resolveReadingRun(createCalendarGenerator(), target.runId)
     if (!run) return null
     const recording = findRecordingForRun({
       narratorId: readerPreferences.narratorId,
@@ -1982,7 +2036,9 @@ export function startReaderRuntime({
         return getAliyahNavigationPlayback()
       },
       onAfterNavigate: focusReaderSurface,
-      onWideHidden: closeAliyahStartPopup,
+      onWideHidden: () => {
+        if (isCompactReaderViewport()) closeAliyahStartPopup()
+      },
       restoreFocus: focusOverlayReturnTarget,
       getReaderFocusTarget: getBook,
       loadCueStatus: async (item) => {
@@ -1991,7 +2047,7 @@ export function startReaderRuntime({
         }
         const run = readerDisplaySessionGlobal?.capture()?.viewModel.relevantRuns.find(
           (candidate) => candidate.id === item.target.runId
-        ) ?? createCalendarGenerator().parseId(item.target.runId)
+        ) ?? resolveReadingRun(createCalendarGenerator(), item.target.runId)
         const aliyah = run?.aliyot.find((candidate) => candidate.index === item.target.aliyahIndex)
         if (!aliyah) return 'none'
         // A pending coverage check is not evidence that cues are absent.
@@ -2357,7 +2413,7 @@ export function startReaderRuntime({
           const label = starts
             .map((aliyah) => parsePlaybackAliyahIndex(`${aliyah.index ?? ''}`))
             .filter((index): index is PlaybackAliyahIndex => Boolean(index))
-            .map(formatAliyahLabel)
+            .map(index => formatAliyahLabel(index, lineInfo?.run))
             .join(', ')
           if (!label) return
           const graphemeRect = [
@@ -2432,13 +2488,13 @@ export function startReaderRuntime({
     if (matchingAnchor) {
       return {
         ...matchingAnchor,
-        label: formatAliyahLabel(identity.index),
+        label: formatAliyahLabel(identity.index, activeRun),
       }
     }
 
     return {
       line: null,
-      label: formatAliyahLabel(identity.index),
+      label: formatAliyahLabel(identity.index, activeRun),
       run: activeRun,
       aliyahIndex: identity.index,
       position: getReaderFocalPointScrollTop(getBook()),
@@ -2578,7 +2634,7 @@ export function startReaderRuntime({
         (candidate) => candidate.id === runId
       ) ??
       (lineInfo?.run?.id === runId ? lineInfo.run : null) ??
-      (runId ? createCalendarGenerator().parseId(runId) : null)
+      (runId ? resolveReadingRun(createCalendarGenerator(), runId) : null)
     if (!run) return null
 
     const availability =
@@ -2639,8 +2695,7 @@ export function startReaderRuntime({
         : null
       const cueIsIncomplete = state?.audioState ? state.audioState.problem === 'incomplete-cues' : Boolean(
         state?.recording &&
-        cueStatus &&
-        isAliyahCueStatusUnfinished(cueStatus)
+        cueStatus !== 'published'
       )
       const isCurrentSession = isCurrentPlaybackTarget({
         recording: state?.recording,
@@ -2771,6 +2826,10 @@ export function startReaderRuntime({
         }) ||
           cueAuthoringGlobal?.isActive())
     )
+    const mobileRecording = mobileTarget ? getAliyahNavigationRecording(mobileTarget) : null
+    const mobileCueStatus = mobileTarget && mobileRecording
+      ? getResolvedAliyahCueStatus(mobileTarget.runId, mobileTarget.aliyahIndex, mobileRecording.id)
+      : null
 
     aliyahNavigationGlobal?.syncToolbar({
       current: {
@@ -2798,7 +2857,7 @@ export function startReaderRuntime({
         ),
         target: mobileTarget,
         label: mobileAliyahIndex
-          ? formatAliyahLabel(mobileAliyahIndex)
+          ? formatAliyahLabel(mobileAliyahIndex, preferredMobileRun ?? undefined)
           : '—',
         playbackState: getMobileAliyahCapsuleState({
           loaded: mobilePlaybackLoaded,
@@ -2807,7 +2866,7 @@ export function startReaderRuntime({
         audioAvailable: mobileAudioAvailable,
         audioState: passageForTarget(mobileTarget),
         authoringMissing: Boolean(authoringEnabled && mobileTarget && !getAliyahNavigationRecording(mobileTarget)),
-        cueIncomplete: Boolean(cueStatus && isAliyahCueStatusUnfinished(cueStatus) && current?.run?.id === mobileRunId && current?.aliyahIndex === mobileAliyahIndex),
+        cueIncomplete: Boolean(mobileRecording && mobileCueStatus !== 'published'),
       },
     })
   }
@@ -2826,7 +2885,7 @@ export function startReaderRuntime({
       activeDisplay.viewModel.relevantRuns.find(
         (candidate) => candidate.id === runId
       ) ??
-      createCalendarGenerator().parseId(runId)
+      resolveReadingRun(createCalendarGenerator(), runId)
     const aliyah = findAliyahInRun(run, aliyahIndex)
     if (!run || !aliyah) return []
 
@@ -2863,6 +2922,7 @@ export function startReaderRuntime({
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return null
       console.error('Could not prepare aliyah playback', error)
+      trackAnalytics('playback_error', { reason: 'prepare' })
       failedPassages.set(key, { problem: 'load-failed', issue: 'audio', canPlay: false,
         recording: getAliyahNavigationRecording(target), message: 'The recording could not load. Try again.' })
       syncReaderPlaybackChrome()
@@ -2933,7 +2993,7 @@ export function startReaderRuntime({
       activeDisplay?.viewModel.relevantRuns.find(
         (candidate) => candidate.id === runId
       ) ??
-      createCalendarGenerator().parseId(runId)
+      resolveReadingRun(createCalendarGenerator(), runId)
     if (!run) return
 
     const availability = readerPlayback.lookupRecording(
@@ -3116,6 +3176,10 @@ export function startReaderRuntime({
     const shouldSmoothRecenter =
       updates.focalPointMode !== undefined &&
       updates.focalPointMode !== readerPreferences.focalPointMode
+    const shouldResizeReadingText =
+      readerPreferences.readerTextLayout === 'reading' &&
+      updates.readingFontScale !== undefined &&
+      updates.readingFontScale !== readerPreferences.readingFontScale
     const scrollTarget = shouldSmoothRecenter
       ? getReaderFocalPointScrollTarget(getBook())
       : null
@@ -3162,11 +3226,20 @@ export function startReaderRuntime({
         showPersistenceNotice('Reader settings will apply now but could not be saved.')
       }
     }
+    trackPreferenceChanges(readerPreferences, nextPreferences)
     readerPreferences = nextPreferences
     if (shouldUpdatePagePresentation) {
       syncEffectiveReaderPagePresentation({
         beforeLayout: () => applyReaderPreferences(readerPreferences),
       })
+    } else if (shouldResizeReadingText && readerDisplaySessionGlobal) {
+      readerDisplaySessionGlobal.updateAnnotations(() => applyReaderPreferences(readerPreferences))
+      readerDisplaySessionGlobal.invalidateProgressAnchors('text-layout')
+      const activeSignal = readerDisplaySessionGlobal.capture()?.signal
+      if (activeSignal) scheduleSpecialLetterAlignment(getBook(), activeSignal)
+      scheduleAliyahStartMarkerLayout(getBook())
+      invalidateReaderPositionAfterLayout()
+      void readerPlaybackGlobal?.syncHighlight({ scroll: false })
     } else {
       applyReaderPreferences(readerPreferences)
     }
@@ -3232,6 +3305,43 @@ export function startReaderRuntime({
   const destroy = mountReaderRuntime((scope) => {
   const downloads = downloadOwner ?? createDownloadOwner()
   if (!downloadOwner) scope.own(() => downloads.destroy())
+  let closePrint: (() => void) | undefined
+  let printLoading = false
+  const openPrint = async () => {
+    if (closePrint || printLoading) return
+    printLoading = true
+    try {
+      const display = readerDisplaySessionGlobal?.capture()
+      const progress = readerDisplaySessionGlobal?.progressSnapshot()
+      const current = progress && (getCurrentAliyahFromViewportRange(
+        readerDisplaySessionGlobal?.viewportRange() ?? null, progress.anchors
+      ) ?? currentReadingAnchor())
+      const run = display?.viewModel.relevantRuns.find(run => run.scroll === 'esther') ?? current?.run
+      if (!display || !run || (run.scroll === 'torah' && !current?.aliyahIndex)) throw new Error('Open a reading before printing.')
+      const context = createPrintContext(run, current?.aliyahIndex ?? undefined, formatTopBarTitle(display.viewModel.displayTitleForRun(run)))
+      const selectedWords = capturePrintSelection(book)
+      commandPaletteGlobal?.close()
+      readerSettingsGlobal?.close({ restoreFocus: false })
+      aliyahNavigationGlobal?.closeCompact()
+      const { openPrintDialog } = await import('../printing/open-print-dialog.ts')
+      const selection = await selectedPrintRange(selectedWords, undefined, run.scroll)
+      if (!scope.signal.aborted) closePrint = openPrintDialog(context, () => { closePrint = undefined }, createCalendarGenerator(), selection)
+    } catch (error) {
+      console.error('Could not open print preview', error)
+      if (!scope.signal.aborted) showPersistenceNotice(error instanceof Error ? error.message : 'Print preview could not be opened. Try again.')
+    } finally {
+      printLoading = false
+    }
+  }
+  openPrintGlobal = openPrint
+  window.addEventListener('keydown', event => {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'p' && readerRouteGlobal?.snapshot().view === 'reader') {
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      void openPrint()
+    }
+  }, { capture: true, signal: scope.signal })
+  scope.own(() => { closePrint?.(); openPrintGlobal = null })
   void import('../reading/passage-audio-tools.ts').then(({ mountAudioButtonTooltip }) => {
     if (!scope.signal.aborted) mountAudioButtonTooltip(scope, document)
   }).catch(error => console.error('Could not load audio tooltips', error))
@@ -3239,13 +3349,13 @@ export function startReaderRuntime({
     document,
     initialTitle: INITIAL_READER_TITLE,
     initialAnnotationsEnabled: annotationsEnabled,
-    onTitleClick: () => {
+    onTitleClick: (event) => {
       commandPaletteGlobal?.close()
-      readerRouteGlobal?.togglePicker({ animate: true })
+      readerRouteGlobal?.togglePicker({ animate: event.detail > 0, focusSearch: false })
     },
-    onAboutClick: () => {
+    onAboutClick: (event) => {
       aliyahNavigationGlobal?.closeCompact()
-      readerRouteGlobal?.toggleAbout()
+      readerRouteGlobal?.toggleAbout({ animate: event.detail > 0 })
     },
     onAnnotationsChange: setAnnotationsEnabled,
     onSwapSides: () => {
@@ -3303,10 +3413,13 @@ export function startReaderRuntime({
       displayCreated(display) {
         readerPlaybackGlobal?.setDisplay(display)
       },
+      displayPositioned() {
+        if (!startupComplete) onStartupProgress?.('positioned')
+      },
       displayDeactivating() {
         offlineRecordingPromptGlobal?.clearPlaybackFailure()
       },
-      resolveRun: (runId) => createCalendarGenerator().parseId(runId),
+      resolveRun: (runId) => resolveReadingRun(createCalendarGenerator(), runId),
       getPlaybackProtectedPageNumbers: (forwardPageCount) =>
         readerPlaybackGlobal?.protectedCuePageNumbers(forwardPageCount) ?? [],
       isPlaybackActive,
@@ -3372,6 +3485,7 @@ export function startReaderRuntime({
     viewport: readerViewport,
     initialPlaybackRate: readerPreferences.playbackRate,
     timeline: {
+      resolveRun: (id) => resolveReadingRun(createCalendarGenerator(), id),
       getAutoScroll: () => readerPreferences.autoScrollWithPlayback,
       getPlaybackRate: () => readerPreferences.playbackRate,
       onPlaybackRateChange: (playbackRate) => {
@@ -3406,7 +3520,7 @@ export function startReaderRuntime({
           readerDisplaySession.capture()?.viewModel.relevantRuns.find(
             (candidate) => candidate.id === runId
           ) ??
-          createCalendarGenerator().parseId(runId),
+          resolveReadingRun(createCalendarGenerator(), runId),
         collectTokenKeys: collectAliyahTokenKeysFromData,
         waitUntilReady: () => readerDisplaySession.waitUntilReaderReady(),
         resolveRunForRecording: (recording) =>
@@ -3471,8 +3585,11 @@ export function startReaderRuntime({
   }
   openMediaGlobal = openMedia
   scope.own(() => { if (openMediaGlobal === openMedia) openMediaGlobal = null })
+  const playbackAnalytics = createPlaybackAnalytics()
+  scope.own(() => playbackAnalytics.flush())
   scope.own(
     readerPlayback.subscribe((change, snapshot) => {
+      if (!recordingMode.enabled && !cueAuthoringGlobal) playbackAnalytics.update(change, snapshot)
       if (change.type === 'session-loaded' || change.type === 'route-reset') {
         void playbackRetention.sync().catch((error: unknown) => console.error('Could not remove released recordings', error))
       }
@@ -3669,8 +3786,10 @@ export function startReaderRuntime({
             return Share.share(data)
           } : undefined,
         })
+        trackAnalytics('share_reading', { outcome: result })
         if (!scope.signal.aborted && result === 'copied') showReaderNotice('Reading link copied.')
       } catch (error) {
+        trackAnalytics('share_reading', { outcome: 'failed' })
         console.error('Could not share reading', error)
         if (!scope.signal.aborted) showReaderNotice('Reading could not be shared. Try again.', { assertive: true })
       }
@@ -3726,6 +3845,7 @@ export function startReaderRuntime({
         readerPlayback.snapshot().session?.activeRecording ?? null,
       downloadLibrary,
       openMedia: () => openMedia(document.querySelector<HTMLElement>('[data-target-id="settings-toggle"]') ?? undefined),
+      openPrint,
       onLoadError: (error) => {
         console.error('Failed to load Reader Settings', error)
         showPersistenceNotice(
@@ -4193,6 +4313,7 @@ export function startReaderRuntime({
         aliyahNavigationGlobal?.revealWide('peek')
       },
       readerReady: () => {
+        trackAnalytics('reader_open', { layout: readerPreferences.readerTextLayout, sides: readerPreferences.readerSideMode, route: readerRouteKind(location.hash) })
         const lifetime = readerDisplaySession.capture()
         refreshReaderChrome()
         // Before layout settles, the focal anchor can still belong to the previous aliyah.
@@ -4247,13 +4368,23 @@ export function startReaderRuntime({
     },
   })
   readerRouteGlobal = readerRoute
+  const swipeSurface = book.closest<HTMLElement>('.reader-main')
+  const swipeContainer = book.closest<HTMLElement>('.reader-shell')
+  if (!swipeSurface || !swipeContainer) throw new Error('Reader swipe requires the reader surface')
+  mountReaderSwipeBack(scope, {
+    surface: swipeSurface,
+    container: swipeContainer,
+    enabled: () => !recordingMode.enabled && !commandPaletteGlobal?.isOpen()
+      && readerRoute.snapshot().view === 'reader' && !readerRoute.snapshot().pickerOpen,
+    prepare: () => readerRoute.preparePickerSwipe(),
+  })
   scope.own(() => {
     if (readerRouteGlobal === readerRoute) readerRouteGlobal = null
   })
   const nativeLaunch = isNativeApp() && !recordingMode.enabled
   ready = readerRoute.start(nativeLaunch
     ? { resumeHash: launchLastReading?.hash ?? null }
-    : undefined)
+    : undefined).then(() => { startupComplete = true })
 
   scope.own(() => {
     if (readerNoticeTimer !== null) {

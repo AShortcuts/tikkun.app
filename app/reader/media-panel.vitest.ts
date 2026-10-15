@@ -139,13 +139,14 @@ test('Media remains opaque through automatic, explicit and custom theme changes'
   await setup()
   const panel = document.querySelector<HTMLElement>('.media-panel')!
   const root = document.documentElement
+  const systemBackground = matchMedia('(prefers-color-scheme: dark)').matches ? 'rgb(0, 0, 0)' : 'rgb(242, 242, 247)'
   const cases = [
     { themeMode: 'light', expected: 'rgb(242, 242, 247)' },
     { themeMode: 'sepia', expected: 'rgb(242, 242, 247)' },
     { themeMode: 'dark', expected: 'rgb(0, 0, 0)' },
-    { themeMode: 'custom', customBackgroundColor: '#112233', expected: 'rgb(0, 0, 0)' },
-    { themeMode: 'custom', customBackgroundColor: '#fafafa', expected: 'rgb(242, 242, 247)' },
-    { themeMode: 'automatic', expected: matchMedia('(prefers-color-scheme: dark)').matches ? 'rgb(0, 0, 0)' : 'rgb(242, 242, 247)' },
+    { themeMode: 'custom', customBackgroundColor: '#112233', expected: systemBackground },
+    { themeMode: 'custom', customBackgroundColor: '#fafafa', expected: systemBackground },
+    { themeMode: 'automatic', expected: systemBackground },
   ] as const
   for (const { expected, ...preferences } of cases) {
     applyReaderPreferences({ ...defaultReaderPreferences, ...preferences })
