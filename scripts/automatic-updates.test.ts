@@ -131,6 +131,7 @@ test('actual web packager creates a verifiable ZIP from a target record without 
   await symlink(path.join(repo, 'node_modules'), path.join(f.root, 'node_modules'), 'dir')
   await symlink(path.join(repo, 'app'), path.join(f.root, 'app'), 'dir')
   await f.put('dist-native/reader/index.html', '<!doctype html><title>Test reader</title>')
+  await f.put('dist-native/.well-known/test.json', '{"included":true}')
   await f.put('dist-native/native-update-contract.json', JSON.stringify(f.contract))
   await f.put('private.pem', secret)
   execFileSync(process.execPath, ['--import', 'tsx', 'scripts/build-web-release.ts', '--native-build', '7',
@@ -142,7 +143,12 @@ test('actual web packager creates a verifiable ZIP from a target record without 
   const zip = await readFile(path.join(f.root, `.asc/updates/web/7/${release.bundleId}.zip`))
   expect(hash(zip)).toBe(release.bundleId)
   expect(verify('sha256', zip, publicKey, Buffer.from(release.signature, 'base64'))).toBe(true)
-  expect(execFileSync('/usr/bin/unzip', ['-Z1', path.join(f.root, `.asc/updates/web/7/${release.bundleId}.zip`)], { encoding: 'utf8' })).toContain('reader/index.html')
+  const contents = JSON.parse(execFileSync('python3', ['-c',
+    'import json, sys, zipfile\nwith zipfile.ZipFile(sys.argv[1]) as archive:\n assert archive.testzip() is None\n print(json.dumps({name: archive.read(name).decode() for name in archive.namelist() if not name.endswith("/")}))',
+    path.join(f.root, `.asc/updates/web/7/${release.bundleId}.zip`)], { encoding: 'utf8' }))
+  expect(contents['reader/index.html']).toBe('<!doctype html><title>Test reader</title>')
+  expect(contents['.well-known/test.json']).toBe('{"included":true}')
+  expect(JSON.parse(contents['native-update-contract.json'])).toEqual(f.contract)
 })
 
 test.each([{ CF_PAGES: '1', CF_PAGES_BRANCH: 'feature' }, { CF_PAGES_BRANCH: 'develop' }])('preview and local builds never prepare or sign updates', async environment => {

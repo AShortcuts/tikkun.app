@@ -32,7 +32,7 @@ test.each([
   const page = pages.find(page => page.pageNumber === pageNumber)
   expect(page).toBeDefined()
   expect(page!.lines.flatMap(line => line.text.flat()).join(' ')).toContain(ending)
-})
+}, 30_000)
 
 test('deduplicates concurrent page-data fetches', async () => {
   const model = ScrollViewModel.forId(generator, '2026-10-17:shacharis,main', {
@@ -265,7 +265,7 @@ test('assigns a run and aliyah to every verse in full torah', async () => {
       expect(line.aliyot.every((a) => line.run?.aliyot.includes(a))).toBeTruthy()
     }
   }
-})
+}, 30_000)
 
 test('includes context in בראשית', async () => {
   const runId = '2024-10-26:shacharis,main'

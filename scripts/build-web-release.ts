@@ -41,7 +41,8 @@ if (total > 50 * 1024 * 1024) console.warn(`Web release is ${total} bytes unpack
 const output = path.join(root, '.asc/updates/web', nativeBuild)
 await mkdir(output, { recursive: true })
 const temporary = path.join(output, `package-${Date.now()}.zip`)
-const zip = spawnSync('/usr/bin/zip', ['-q', '-r', temporary, '.'], { cwd: source, stdio: 'inherit' })
+// Pages includes Python, but its build image does not include the zip executable.
+const zip = spawnSync('python3', ['-m', 'zipfile', '-c', temporary, ...(await readdir(source)).sort()], { cwd: source, stdio: 'inherit' })
 if (zip.error) throw zip.error
 if (zip.status !== 0) throw new Error('Could not package native web assets')
 const bytes = await readFile(temporary)
