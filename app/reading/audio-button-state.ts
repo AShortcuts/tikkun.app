@@ -19,7 +19,7 @@ export function audioButtonState({ state, available, cueIncomplete = false, admi
   else if (problem === 'load-failed') tooltip = state?.message || 'The recording could not load. Try again.'
   else if (problem === 'timing-needed') tooltip = 'Audio exists, but timing cues are needed to play this excerpt.'
   else if (problem === 'partial-audio') tooltip = `${(state?.message || 'Part of this aliyah is available').replace(/[.!?]$/, '')}. Select for an available portion to play.`
-  else if (tone === 'cue') tooltip = 'Full audio available. Some word highlighting is missing.'
+  else if (tone === 'cue') tooltip = 'Full audio available. Some highlighting is missing.'
   else if (problem === 'missing-audio') tooltip = state?.message || 'No playable audio available for this aliyah.'
   return { tone, dimmed: !canPlay, tooltip, actionDisabled: !adminMissing && (absent || problem === 'checking') }
 }

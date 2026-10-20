@@ -125,6 +125,16 @@ test('normalizes and persists Reading font size for existing and new preferences
   expect(styleProperties.get('--reading-font-scale')).toBe('1.25')
 })
 
+test('shows Reading pasuk numbers by default, including for preferences saved before the option', () => {
+  localStorage.setItem('tikkun.reader-preferences', JSON.stringify({ readerTextLayout: 'reading' }))
+  expect(loadReaderPreferences().verseNumbers).toBe(true)
+  saveReaderPreferences({ ...defaultReaderPreferences, verseNumbers: false })
+  const restored = loadReaderPreferences()
+  expect(restored.verseNumbers).toBe(false)
+  applyReaderPreferences(restored)
+  expect(document.documentElement.dataset.verseNumbers).toBe('off')
+})
+
 test('defaults a new compact reader to Reading without changing the desktop default', () => {
   vi.stubGlobal('window', {
     matchMedia: () => ({ matches: true }),

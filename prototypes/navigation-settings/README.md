@@ -25,6 +25,10 @@ The image boards are [A: Toolbar + side panel](./variant-a-toolbar-side-panel.pn
 
 Recommendation: start with A. Its labeled tabs and distinct utility destinations solve the current discovery issues with the least disruption. Consider B's compact View panel only if font/layout adjustments are frequent enough to justify a second level of settings.
 
+## Refined A
+
+On October 18, the selected toolbar and side-panel direction was refined into [a desktop image](./refined-a-desktop.png) and [a mobile reading/settings pair](./refined-a-mobile-final.png). The mobile header uses two compact rows; the settings sheet keeps common controls first and uses the same font-size slider and rounded-square print action as desktop. [Generation notes and prompts](./refined-a-image-brief.md) record the image-only scope and the ChatGPT subscription route through OpenCodex.
+
 ## Shared behavior to preserve
 
 - Keep Reading Layout versus Match Torah Lines independent of One Side versus Two Sided. Two Sided remains available on desktop; mobile portrait explains that landscape is required.

@@ -17,6 +17,7 @@ import { updateReaderAppBanner } from '../platform/smart-app-banner.ts'
 import { createArrivalCue } from './arrival-cue.ts'
 import { isNativeApp } from '../platform/native.ts'
 import type { ReaderSwipeDestination } from './reader-swipe-back.ts'
+import type { AliyahNavigationTarget } from '../reading/aliyah-navigation/model.ts'
 
 export const INITIAL_READER_TITLE = 'תיקון קוראים'
 
@@ -30,13 +31,15 @@ const OPTIONAL_ROUTE_TITLE = 'תיקון קוראים'
 export interface ReaderRouteRendering {
   readonly ready: Promise<unknown>
   readonly complete: Promise<unknown>
+  failureHandled?(): boolean
   isCurrent(): boolean
   getMountedPageNode(pageNumber: number): HTMLElement | null
 }
 
 export interface ReaderRouteHost {
   renderReader(
-    model: ScrollViewModel
+    model: ScrollViewModel,
+    context?: { hash: string; aliyahTarget?: AliyahNavigationTarget },
   ): ReaderRouteRendering
   leaveReader(): void
   openAbout(): void
@@ -68,6 +71,7 @@ export interface ReaderRoute {
       offerReturnToPreviousReading?: boolean
     }
   ): void
+  navigateAndWait(hash: string): Promise<boolean>
   syncScrolledReading(hash: string): boolean
   toggleAbout(options?: PickerOpenOptions): void
   togglePicker(options?: PickerOpenOptions): void
@@ -151,6 +155,7 @@ export function createReaderRoute(
   let pickerFocusSearchPending = false
   let pickerReturnView: 'not-found' | null = null
   let activeRendering: ReaderRouteRendering | null = null
+  let navigationWaitRevision = 0
   let currentReaderHash: string | null = null
   let lastReaderHash = DEFAULT_READER_HASH
   let currentTitle = INITIAL_READER_TITLE
@@ -223,6 +228,44 @@ export function createReaderRoute(
       return
     }
     view.location.hash = hash
+  }
+
+  const navigateAndWait = async (hash: string) => {
+    if (scope.signal.aborted) return false
+    const revision = ++navigationWaitRevision
+    const requested = parseHash(hash)
+    if (requested?.view !== 'reader') throw new Error('The requested reading is unavailable.')
+    const expectedHash = requested.canonicalHash ?? hashPath(hash)
+    if (view.location.hash !== hash) {
+      // The route's hashchange listener is registered first and installs the
+      // current rendering before this listener releases the navigation wait.
+      await new Promise<void>((resolve) => {
+        const settled = (event: Event) => {
+          if (obsoleteHashChange(event)) return
+          view.removeEventListener('hashchange', settled)
+          scope.signal.removeEventListener('abort', settled)
+          resolve()
+        }
+        view.addEventListener('hashchange', settled)
+        scope.signal.addEventListener('abort', settled, { once: true })
+        navigate(hash)
+      })
+    } else {
+      navigate(hash)
+    }
+    const rendering = activeRendering
+    if (scope.signal.aborted || revision !== navigationWaitRevision || !rendering || currentReaderHash !== expectedHash) return false
+    try {
+      await rendering.complete
+    } catch (error) {
+      if (activeRendering !== rendering || !rendering.isCurrent() || rendering.failureHandled?.()) return false
+      throw error
+    }
+    return !scope.signal.aborted && revision === navigationWaitRevision && activeRendering === rendering && rendering.isCurrent()
+  }
+
+  function obsoleteHashChange(event: Event) {
+    return 'newURL' in event && typeof event.newURL === 'string' && event.newURL !== view.location.href
   }
 
   const syncScrolledReading = (hash: string) => {
@@ -522,7 +565,10 @@ export function createReaderRoute(
     currentReaderHash = nextReaderHash
     lastReaderHash = nextReaderHash
 
-    const rendering = host.renderReader(route.model)
+    const rendering = host.renderReader(route.model, {
+      hash: nextReaderHash,
+      aliyahTarget: route.aliyahTarget,
+    })
     activeRendering = rendering
     const shouldSaveReading = saveReadingAfterRender
     saveReadingAfterRender = false
@@ -544,13 +590,17 @@ export function createReaderRoute(
         if (shouldSaveReading) host.saveReadingPosition()
         revealPageNumber(nextReaderHash, rendering)
         if (!pageNumberFromPageRouteHash(nextReaderHash) && line instanceof HTMLElement) {
-          arrivalCue.show(line)
+          arrivalCue.show(line, 'pageNumber' in route.model.initialLocation ? undefined : route.model.initialLocation)
         }
         finishStartup()
       })
       .catch((error) => {
         if (!isCurrent()) return
         console.error('Failed to render reader route', error)
+        if (rendering.failureHandled?.()) {
+          finishStartup()
+          return
+        }
         startup?.reject(error)
         startup = null
       })
@@ -598,7 +648,9 @@ export function createReaderRoute(
 
     view.addEventListener(
       'hashchange',
-      () => {
+      (event) => {
+        if (obsoleteHashChange(event)) return
+        if (currentReaderHash === hashPath() && activeRendering?.isCurrent() && shell.isReaderVisible()) return
         const route = parseCurrentRoute()
         if (route) renderRoute(route)
         else returnReadingAfterRender = null
@@ -638,6 +690,7 @@ export function createReaderRoute(
   return {
     start,
     navigate,
+    navigateAndWait,
     syncScrolledReading,
     toggleAbout,
     togglePicker,

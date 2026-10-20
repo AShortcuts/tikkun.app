@@ -11,6 +11,7 @@ Make Torah preparation clear, accessible, and focused: preserve the familiar tik
 ## Key features
 
 - **Flexible tikkun views:** Show text with or without vowels and cantillation, or compare both side by side. Choose a natural Reading layout or Match mode, which preserves Torah line breaks.
+- **Focused phone Reading:** Read one complete aliyah at a time, with the full aliyah rail and previous/next controls in portrait and landscape. See [mobile Reading](docs/mobile-reading.md).
 - **Audio that follows the text:** Aliyah recordings with synchronized word highlighting, automatic scrolling, adjustable playback speed, and word navigation where timing data is available.
 - **Find the right reading:** Weekly parshiot, holidays, aliyot, and Megillat Esther; Israel and Diaspora calendars; Hebrew and English search; direct verse links.
 - **Practice your way:** Bookmarks, resume your last reading, adjustable text size, and light, dark, sepia, and custom themes.
@@ -38,6 +39,8 @@ npm run dev
 ```
 
 Open [localhost:5176](http://localhost:5176). Run `npm run check` for types and lint, `npm test` for Node tests, and `npm run build` to generate the static site in `dist/`. `npm run verify` runs the full local verification suite.
+
+Running `npm run dev` again stops this checkout's previous Vite dev server and starts a fresh one on the same port. A port occupied by another project or process is left alone and reported as an error. Development listens on `0.0.0.0` for localhost, local-network, and Tailscale access. Vite options still work, including `npm run dev -- --host 127.0.0.1` to restrict it to this computer and `--port` to choose a different port.
 
 | Guide | Covers |
 | --- | --- |

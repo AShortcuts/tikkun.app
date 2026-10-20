@@ -6,6 +6,23 @@ public enum SystemIntegration {
 }
 
 public struct PracticeReading: Codable, Equatable {
+    // Keep syntax in step with app/view-model/navigation/reader-hash.ts.
+    private static let readerHashPattern: String = {
+        let reference = "[1-9][0-9]*-[1-9][0-9]*-[1-9][0-9]*"
+        let slug = "[a-z0-9]+(?:-[a-z0-9]+)*"
+        let referenceWithAliyah = "(?:/\(reference)(?:/aliyah/(?:[1-8]|Maftir))?)?"
+        let routes = [
+            "run/[^/?#\\s]+\(referenceWithAliyah)",
+            "torah/\(reference)",
+            "r/\(reference)",
+            "torah/parsha/\(slug)\(referenceWithAliyah)",
+            "torah/page/[1-9][0-9]*",
+            "esther/(?!(?:page|parsha)(?:/|$))\(slug)(?:/\(reference))?",
+            "esther/page/[1-9][0-9]*",
+        ]
+        return "\\A#/(?:\(routes.joined(separator: "|")))\\z"
+    }()
+
     public let hash: String
     public let parshaName: String
     public let aliyahLabel: String?
@@ -17,7 +34,7 @@ public struct PracticeReading: Codable, Equatable {
     public var url: URL { URL(string: "tikkunreader://reader/\(hash)")! }
     public var isValid: Bool {
         !parshaName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        hash.range(of: "^#/(run/[^/?#\\s]+(/[1-9][0-9]*-[1-9][0-9]*-[1-9][0-9]*)?|r/[1-9][0-9]*-[1-9][0-9]*-[1-9][0-9]*|torah/(parsha/[a-z0-9-]+(/[1-9][0-9]*-[1-9][0-9]*-[1-9][0-9]*)?|page/[1-9][0-9]*)|esther/([a-z0-9-]+(/[1-9][0-9]*-[1-9][0-9]*-[1-9][0-9]*)?|page/[1-9][0-9]*))$", options: .regularExpression) != nil
+        hash.range(of: Self.readerHashPattern, options: .regularExpression) != nil
     }
 }
 

@@ -1,6 +1,7 @@
 import type { LeiningRun } from '../calendar-model/model-types.ts'
 import type { PlaybackAliyahIndex } from '../reading/aliyah-dom-target.ts'
 import { parseAliyahIndex } from '../reading/aliyah-identity.ts'
+import { findReadingVerseStartWord } from './reading-verse-target.ts'
 
 const ALIYAH_PROGRESS_ANCHOR_SELECTOR =
   '[data-line-index][data-aliyah-starts]:not([data-reader-mirror])'
@@ -100,7 +101,6 @@ export function createReaderProgressAnchorIndex(
     const nextAnchorByLine = new Map<HTMLElement, ReaderProgressAnchor>()
     const anchors = lines
       .map((line, sourceIndex) => {
-        const rect = line.getBoundingClientRect()
         const label =
           line.querySelector('.aliyah-label-text')?.textContent?.trim() ?? '—'
         const aliyahStarts = (line.dataset.aliyahStarts ?? '').split(',')
@@ -108,6 +108,11 @@ export function createReaderProgressAnchorIndex(
           aliyahStarts[aliyahStarts.length - 1],
         )
         const lineInfo = getLineInfo(line)
+        const start = root.dataset.readerLayout === 'reading'
+          ? lineInfo?.aliyahStarts.find((aliyah) => aliyah.index === aliyahIndex)?.start
+          : undefined
+        const startWord = start ? findReadingVerseStartWord(root, line, start) : null
+        const rect = (startWord ?? line).getBoundingClientRect()
         const anchor: ReaderProgressAnchor = Object.freeze({
           line,
           label: aliyahStarts.includes('1') ? 'ראשון' : label,

@@ -2,6 +2,7 @@ import type { LeiningAliyah } from '../calendar-model/model-types.ts'
 import { readingTitle } from '../calendar-model/model-types.ts'
 import { aliyahLabel } from '../calendar-model/aliyah-label.ts'
 import type { RenderedLineInfo } from '../view-model/scroll-view-model.ts'
+import type { PassageWordSelection } from '../reading/passage-selection.ts'
 import type { ScrollName } from '../ref.ts'
 import displayRange from '../display-range.ts'
 import { verseRangeLabel } from './verse-range-label.ts'
@@ -38,6 +39,8 @@ const renderWords = ({
   renderAnnotatedSpecialLetters,
   renderUnannotatedSpecialLetters,
   readingLayout,
+  wordSelection,
+  pairedReading,
 }: {
   annotatedText: string
   unannotatedText: string
@@ -48,20 +51,31 @@ const renderWords = ({
   renderAnnotatedSpecialLetters: (text: string) => string
   renderUnannotatedSpecialLetters: (text: string) => string
   readingLayout: boolean
+  wordSelection?: PassageWordSelection
+  pairedReading: boolean
 }) => {
   const annotatedWords = tokenizeReaderWords(annotatedText)
   const unannotatedWords = tokenizeReaderWords(unannotatedText)
   const wordCount = Math.max(annotatedWords.length, unannotatedWords.length)
 
   return Array.from({ length: wordCount }, (_, wordIndex) => {
-    const annotatedWord = annotatedWords[wordIndex]
-    const unannotatedWord = unannotatedWords[wordIndex]
-    const annotatedMarkup = annotatedWord
-      ? renderAnnotatedSpecialLetters(annotatedWord.text)
+    const sourceAnnotatedWord = annotatedWords[wordIndex]
+    const sourceUnannotatedWord = unannotatedWords[wordIndex]
+    // Consume every source word before filtering so special-letter occurrence
+    // counters and all token coordinates remain aligned with the full line.
+    const sourceAnnotatedMarkup = sourceAnnotatedWord
+      ? renderAnnotatedSpecialLetters(sourceAnnotatedWord.text)
       : ''
-    const unannotatedMarkup = unannotatedWord
-      ? renderUnannotatedSpecialLetters(unannotatedWord.text)
+    const sourceUnannotatedMarkup = sourceUnannotatedWord
+      ? renderUnannotatedSpecialLetters(sourceUnannotatedWord.text)
       : ''
+    const tokenKey = `${pageNumber}:${lineIndex}:${fragmentIndex}:${wordIndex}`
+    const annotatedWord = !wordSelection || wordSelection.annotated.has(tokenKey) ? sourceAnnotatedWord : undefined
+    const unannotatedSelection = pairedReading ? wordSelection?.annotated : wordSelection?.unannotated
+    const unannotatedWord = !unannotatedSelection || unannotatedSelection.has(tokenKey) ? sourceUnannotatedWord : undefined
+    if (!annotatedWord && !unannotatedWord) return ''
+    const annotatedMarkup = annotatedWord ? sourceAnnotatedMarkup : ''
+    const unannotatedMarkup = unannotatedWord ? sourceUnannotatedMarkup : ''
     const activeWord = annotationsEnabled ? annotatedWord : unannotatedWord
     const activeMarkup = annotationsEnabled
       ? annotatedMarkup
@@ -69,11 +83,14 @@ const renderWords = ({
     const alternateMarkup = annotationsEnabled
       ? unannotatedMarkup
       : annotatedMarkup
-    const tokenKey = `${pageNumber}:${lineIndex}:${fragmentIndex}:${wordIndex}`
     const endsPasuk = Boolean(annotatedWord?.text.includes('׃'))
+    const plainEndsPasuk = pairedReading || !wordSelection ? endsPasuk : wordSelection.unannotatedVerseEnds.has(tokenKey)
+    const activeEndsPasuk = annotationsEnabled ? endsPasuk : plainEndsPasuk
+    const decorationOnly = isInvertedNun(sourceAnnotatedWord?.text ?? '') ||
+      Boolean(wordSelection && !annotatedWord && isInvertedNun(unannotatedWord?.text ?? ''))
     return `<span
         class="word ${activeWord?.isKri ? 'ktiv-kri' : ''}${endsPasuk ? ' mod-sof-pasuk' : ''}"
-        ${isInvertedNun(annotatedWord?.text ?? '') ? '' : `data-token-key="${tokenKey}"`}
+        ${decorationOnly ? '' : `data-token-key="${tokenKey}"`}
         data-page-number="${pageNumber}"
         data-line-index="${lineIndex}"
         data-fragment-index="${fragmentIndex}"
@@ -87,8 +104,8 @@ const renderWords = ({
         data-annotations-off-kri="${Boolean(unannotatedWord?.isKri)}"
         ${activeWord ? '' : 'hidden'}
       >${activeMarkup}</span>${
-        readingLayout && endsPasuk
-          ? '<br class="reader-pasuk-break" aria-hidden="true">'
+        readingLayout && (endsPasuk || wordSelection && plainEndsPasuk)
+          ? `<br class="reader-pasuk-break" aria-hidden="true"${wordSelection ? ` data-annotations-on-break="${endsPasuk}" data-annotations-off-break="${plainEndsPasuk}"${activeEndsPasuk ? '' : ' style="display:none"'}` : ''}>`
           : ''
       }`
   }).join(' ')
@@ -209,6 +226,7 @@ export const renderTextFlow = ({
   lineIndex,
   presentation,
   surface,
+  wordSelection,
 }: {
   text: string[][]
   scroll?: ScrollName
@@ -221,6 +239,7 @@ export const renderTextFlow = ({
   lineIndex: number
   presentation: ReaderPagePresentation
   surface: ReaderTextSurface
+  wordSelection?: PassageWordSelection
 }) => {
   const fixedAnnotations =
     surface === 'tikkun' ? true : surface === 'torah' ? false : null
@@ -263,6 +282,8 @@ export const renderTextFlow = ({
                 renderAnnotatedSpecialLetters,
                 renderUnannotatedSpecialLetters,
                 readingLayout: presentation.layout === 'reading',
+                pairedReading: presentation.layout === 'reading' && presentation.sides === 'two',
+                wordSelection,
               },
             )}</span>
           `
@@ -340,6 +361,7 @@ const Line = ({
   mirror = false,
   renderVerseGutter = true,
   pageReference,
+  wordSelection,
 }: {
   pageNumber: number
   lineIndex: number
@@ -349,6 +371,7 @@ const Line = ({
   mirror?: boolean
   renderVerseGutter?: boolean
   pageReference?: RenderedLineInfo['focalRef']
+  wordSelection?: PassageWordSelection
 } & RenderedLineInfo) => {
   const startLabel = aliyahStartLabel(aliyahStarts, run)
   const startTitle = aliyahStartTitle(run)
@@ -391,6 +414,7 @@ const Line = ({
               lineIndex,
               presentation,
               surface: side,
+              wordSelection,
             }),
           )
           .join('')
@@ -403,6 +427,7 @@ const Line = ({
           lineIndex,
           presentation,
           surface,
+          wordSelection,
         })
 
   if (presentation.layout === 'reading') {

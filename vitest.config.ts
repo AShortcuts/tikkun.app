@@ -27,6 +27,26 @@ const emulateColorScheme = defineBrowserCommand<['light' | 'dark' | null]>(async
   await page.emulateMedia({ colorScheme })
 })
 
+const emulatePhoneTouch = defineBrowserCommand<[]>(async ({ context }) => {
+  // Desktop WebKit leaves touch points and nested-frame screen sizes unemulated.
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, 'maxTouchPoints', { configurable: true, value: 1 })
+    Object.defineProperties(screen, {
+      width: { configurable: true, value: 390 },
+      height: { configurable: true, value: 844 },
+    })
+  })
+})
+
+const blockPhoneTextPage = defineBrowserCommand<[number | null]>(async ({ context }, pageNumber) => {
+  const pattern = '**/text/pages/torah/*.json*'
+  await context.unroute(pattern)
+  if (pageNumber !== null) {
+    await context.route(pattern, route => new URL(route.request().url()).pathname.endsWith(`/${pageNumber}.json`)
+      ? route.abort('failed') : route.continue())
+  }
+})
+
 export default mergeConfig(
   viteConfig,
   defineConfig({
@@ -34,6 +54,26 @@ export default mergeConfig(
       includeTaskLocation: true,
       mockReset: true,
       projects: [
+        {
+          extends: true,
+          test: {
+            name: 'phone',
+            fileParallelism: false,
+            include: ['app/reader/reader-isolated.phone.ts'],
+            browser: {
+              enabled: true,
+              headless: true,
+              commands: { emulatePhoneTouch, blockPhoneTextPage },
+              viewport: { width: 390, height: 844 },
+              provider: playwright({ contextOptions: {
+                hasTouch: true,
+                isMobile: true,
+                screen: { width: 390, height: 844 },
+              } }),
+              instances: [{ browser: 'chromium' }, { browser: 'webkit' }],
+            },
+          },
+        },
         {
           extends: true,
           test: {
@@ -73,7 +113,7 @@ export default mergeConfig(
               'app/analytics/client.vitest.ts',
               'app/app-accessibility.vitest.ts',
               'app/app-smoke.vitest.ts',
-              'app/updates/content-runtime.vitest.ts',
+              'app/updates/web-runtime.vitest.ts',
               'app/updates/NativeUpdateSettings.vitest.ts',
               'app/updates/NativeUpdatePrompt.vitest.ts',
               'app/components/ParshaPicker.vitest.ts',
@@ -106,6 +146,7 @@ export default mergeConfig(
               'app/reading/native-audio-controller.vitest.ts',
               'app/viewport-tracker.vitest.ts',
               'src/lib/components/ReaderApp.vitest.ts',
+              'src/lib/components/reader-loading-fill.vitest.ts',
               'src/lib/components/ServiceWorkerUpdate.vitest.ts',
               'scripts/offline-transfer-queue.vitest.ts',
               'scripts/recording-mutation-locks.vitest.ts',

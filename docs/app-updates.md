@@ -1,6 +1,8 @@
 # Tikkun Update Delivery
 
-Preparation checkpoint: 2026-10-07. Automatic Pages preparation and the local manual backup are implemented. Native archive `1.0 (7)` was built and its signature, native contract and 492 bundled files were verified; its signed public record is `config/native-update-target.json`. The real production preparation flow passed locally, producing a 1,873,823-byte web ZIP and a separate 3,950,716-byte content snapshot while retaining older downloads. Cloudflare still uses `npm run build`; activation awaits explicit approval to store the signing key in its production environment and change the build settings. Git publication, native distribution and physical-device acceptance remain separate.
+Single update path: 2026-10-20. Each signed app update now carries the Reader's text, cues and recording catalog inside its web bundle, so there is one feed per native build at `/updates/web/<build>/`. The separate content feed, its compatibility contract and the native content store were removed. Builds 6 and 7 still read their published content feeds; those files stay in `site/updates/content/` and are retained and re-verified by every Pages build, but no new content feed is produced. Build 8 deletes the unused saved snapshot (`Application Support/TikkunContent`) on first launch. This change includes native code, so the next eligible OTA target is a new native archive (build 8) and its exported target record; neither the current source nor the last commit matches build 7's native contract.
+
+Preparation checkpoint: 2026-10-07. Automatic Pages preparation and the local manual backup are implemented. Native archive `1.0 (7)` was built and its signature, native contract and 492 bundled files were verified; its signed public record is `config/native-update-target.json`. The real production preparation flow passed locally, producing a 1,873,823-byte web ZIP and a separate 3,950,716-byte content snapshot while retaining older downloads. Saved setup and activation records confirm that Cloudflare was configured at 2026-10-07T23:21Z to use `node scripts/build-pages.mjs`, production automatic mode, 100% rollout and a production-only encrypted signing secret. These records describe the verified configuration at that time, not a fresh live check. Git publication, native distribution and physical-device acceptance remain separate.
 
 Historical implementation checkpoint: 2026-09-11. Native build `1.0 (6)` is archived and
 uploaded through Sqim with manual update controls. Signed build-6 web and content
@@ -12,31 +14,28 @@ target for this release. No compatibility override is enabled.
 The shared-prompt revision is prepared as a signed web update for that unchanged
 build-6 native contract; the existing Sqim binary predates this UI revision.
 
-## Two Separate Paths
+## One Update Path
 
-**Content updates** change practice material, not application code. The native
-Reader checks a signed manifest after startup and when returning to the foreground
-or reconnecting, at most once per 15 minutes after a successful check. New content
-is validated and saved as a pending snapshot. The open document continues using
-one revision; a fresh launch activates pending content before loading the catalog.
+A signed app update replaces the Reader's HTML/CSS/JavaScript, which also contains
+every text page, cue file and the recording catalog. Text corrections, new cues and
+new recordings therefore ship exactly like code changes. Audio is not packaged;
+recordings stream or download from the site as before.
 
-The first snapshot is 3,889,665 bytes (about 3.9 MB), without audio. This initial
-implementation downloads a complete snapshot when content changes, not individual
-changed files. Downloads over 12 MiB produce a warning and continue. Unchanged
-releases only fetch the small manifest. Large audio remains user-controlled.
-Native content-state storage above 32 MiB also warns and continues; UTF-8, JSON,
-signed byte-count, digest, and compatibility validation remain enforced.
+The app checks after startup and when returning to the foreground or reconnecting,
+at most once per 15 minutes after a successful check. It verifies a signed release
+manifest, checks the exact native build and staged rollout, and uses
+`@capawesome/capacitor-live-update` to verify and download the signed ZIP (about
+1.9 MB). Automatic checks schedule that bundle for the next cold launch without
+reloading. There is no paid cloud dependency or vendor update-service account.
 
-**Controlled web updates** change compatible HTML/CSS/JavaScript. The app verifies
-a signed release manifest, checks the exact native build and staged rollout, and
-uses `@capawesome/capacitor-live-update` to verify and download the signed ZIP.
-Automatic checks schedule that bundle for the next cold launch without reloading.
-There is no paid cloud dependency or vendor update-service account.
+Builds 6 and 7 also check `/updates/content/<compatibility>/`. Those published
+files are kept unchanged so those builds keep working; they report "up to date"
+for content because no newer content feed is published.
 
 ## Manual Checking
 
 Native Reader Settings > More > App Updates includes **Check for Updates**.
-It checks both feeds immediately, bypassing the normal 15-minute interval while
+It checks the app update feed immediately, bypassing the normal 15-minute interval while
 sharing any check already in flight. Status distinguishes checking, downloading,
 up to date, unpublished feeds, unsupported builds, and failed checks. Missing or
 invalid feeds never report success.
@@ -47,8 +46,10 @@ pill as the PWA, with **Apply** and **Later**. Both delivery paths render
 button. Manual checking reopens a dismissed prompt. **Apply** saves the current
 reading and reloads through the native LiveUpdate plugin. Playback, recording, cue authoring, and
 active download/removal work must finish first. The error remains visible and the
-update stays pending. Apply becomes the wine-colored **Cancel** button and hides
-Later during a 1.2-second grace period. Cancel or leaving Reader prevents the
+update stays pending. Apply becomes a neutral **Cancel** button, a thin line sweeps
+along the bottom of the pill, and Later hides during a 1.2-second grace period.
+The line has no fill level because applying reports no measurable progress; it is
+hidden with reduced motion. Cancel or leaving Reader prevents the
 pending reload without removing the staged bundle. Cancel disables once native
 reload begins, which cannot be undone. Reload failure permits retry. Ignoring Apply preserves the
 automatic next-cold-launch behavior. Audio, preferences and bookmarks stay intact.
@@ -84,52 +85,23 @@ OTA must not hide functionality from App Review.
 
 ## Integrity And Recovery
 
-- RSA signatures protect both release manifests; the native SDK also verifies
-  the web ZIP signature. SHA-256 checks bind manifests to exact content bytes.
+- An RSA signature protects the release manifest; the native SDK also verifies
+  the web ZIP signature. SHA-256 checks bind the manifest to the exact ZIP bytes.
 - The public key is pinned in `config/update-public-key.pem` and the native
   plugin configuration. The private key is ignored under
   `.asc/update-signing/private.pem`, with owner-only permissions. Back it up
   securely outside the repository. Losing it requires a native key-rotation build.
-- Content is JSON only. The parser rejects markup in rendered text, arbitrary
-  media URLs, malformed records, incompatible schemas and mismatched audio/cues.
-- Content compatibility pins page/verse/token addresses and the supported
-  reading/narrator set. Text corrections and recordings within those existing
-  readings are supported. New scrolls, new narrators, range-recording schemas,
-  or structural page changes require a new contract/native or eligible web build.
-- Existing empty legacy timing files are normalized to the current schema only
-  when they contain zero cues; no timing positions are invented.
-- Complete content state is atomically written in Application Support, excluded
-  from backup. Audio, settings and bookmarks are not rewritten or removed.
-- A pending content revision is a startup trial. Reader readiness confirms it;
-  an interrupted/failed trial falls back to the last confirmed content, or the
-  bundled core, and quarantines that revision. Corrupt/incompatible snapshots
-  are rejected. Failures are logged, not presented as successful updates.
 - The web SDK has a 30-second readiness deadline, blocks failed bundles and
   falls back to the original bundled app (not a guaranteed previous OTA bundle).
-- Storage includes saved content-update bytes. The content store holds at most
-  the current and pending snapshot; native web bundle cleanup is SDK-managed.
+- Native web bundle cleanup is SDK-managed. Audio, settings and bookmarks are
+  not rewritten or removed by an update.
 - Offline launch does not wait for the server. Network checks start after Reader
   readiness. No service worker is registered in the iOS app; web/PWA behavior is unchanged.
 
-## Publish Content
+## Feed Hosting
 
-Use the repository-pinned Node/npm. Keep audio manifests and source cue data current.
-
-```sh
-npm run updates:content
-```
-
-This validates the real corpus and creates a signed `latest.json` plus an immutable
-hash-named JSON snapshot in `.asc/updates/content/<compatibility>/`. It does not
-upload anything. A mismatched private/public signing key stops publication.
-`TIKKUN_UPDATE_PRIVATE_KEY_FILE` can point to an externally stored signing key.
-
-The GitHub deployment serves the staged public files at:
-`https://tikkunreader.com/updates/content/<compatibility>/`.
-Commit the snapshot and its signed `latest.json` together. Retain
-previous immutable files for in-flight clients. The feed needs real JSON responses,
-not the site's HTML fallback, and CORS for `capacitor://localhost`.
-`site/_headers` contains the required update-path CORS/cache headers.
+Feeds need real JSON/ZIP responses, not the site's HTML fallback, and CORS for
+`capacitor://localhost`. `site/_headers` contains the required update-path CORS/cache headers.
 `functions/updates/[[path]].ts` also prevents Cloudflare Pages from returning its
 HTML fallback for absent feeds, returns a real 404, and sets native CORS plus
 no-store caching for manifests. Hash-named artifacts are immutable.
@@ -171,9 +143,16 @@ will not be retried; fix it and publish a new ZIP digest.
 
 ### Automatic Preparation On Push
 
-Cloudflare Pages uses `node scripts/build-pages.mjs` with output directory `dist`. This dependency-free bootstrap enforces the pinned Node version, installs the pinned npm if needed, runs `npm ci` without the signing secret, and then invokes the same preparation used by `npm run build:pages`. On a production push to `develop`, the command restores previously published update files, runs `verify:quick`, builds native web assets, prepares and signs the separate content and interface feeds, verifies them, then builds and checks the website containing both feeds. A failure exits nonzero and prevents the new deployment. The existing read-only GitHub verification workflow continues to run its full release/browser checks separately; Pages does not wait for that workflow. Review those checks when deciding what to merge/push. Local builds and preview branches run the ordinary website build without preparing updates or passing the signing key to build subprocesses.
+Cloudflare Pages uses `node scripts/build-pages.mjs` with output directory `dist`. This dependency-free bootstrap enforces the pinned Node version, installs the pinned npm if needed, runs `npm ci` without the signing secret, and then invokes the same preparation used by `npm run build:pages`. On a production push to `develop`, the command restores previously published update files, runs `verify:quick`, builds native web assets, prepares and signs the app update for the target build, verifies it together with every retained feed, then builds and checks the website containing them. A failure exits nonzero and prevents the new deployment. The existing read-only GitHub verification workflow continues to run its full release/browser checks separately; Pages does not wait for that workflow. Review those checks when deciding what to merge/push. Local builds and preview branches run the ordinary website build without preparing updates or passing the signing key to build subprocesses.
 
 One-time production configuration:
+
+Order matters. Automatic mode fails the whole Pages deployment, website included,
+when the current native source does not match `config/native-update-target.json`.
+If waiting to push until a matching native archive and target record are ready,
+leave the already configured `automatic` mode unchanged. Use
+`TIKKUN_UPDATE_MODE=manual` only if the website must deploy before that archive
+and record are ready, then switch back to `automatic` once they are committed.
 
 - Build command: `node scripts/build-pages.mjs`; output: `dist`; production branch: `develop`. Set `SKIP_DEPENDENCY_INSTALL=1` and `NODE_VERSION=22.23.2` in production and preview so the bootstrap owns installation.
 - Production-only encrypted secret `TIKKUN_UPDATE_PRIVATE_KEY`: the PEM contents of the existing `.asc/update-signing/private.pem`, matching `config/update-public-key.pem`. Never add this secret to Git, previews, logs, frontend variables or downloaded files.
@@ -182,7 +161,7 @@ One-time production configuration:
 
 The bootstrap installs build/test tools explicitly with `npm ci --include=dev`, including when the hosting environment sets `NODE_ENV=production`.
 
-The signing key is written to an owner-only temporary file only for the two signing subprocesses and deleted even on failure. Dependency installation, frontend builds, tests, and the staging verifier receive neither the PEM environment variable nor its file path. Pages also exposes production variables to production Functions; keep Functions trusted and never return their environment. Preview variables must not contain the key.
+The signing key is written to an owner-only temporary file only for the signing subprocess and deleted even on failure. Dependency installation, frontend builds, tests, and the staging verifier receive neither the PEM environment variable nor its file path. Pages also exposes production variables to production Functions; keep Functions trusted and never return their environment. Preview variables must not contain the key.
 
 ### Export The Native Compatibility Record
 
@@ -213,8 +192,8 @@ npm run updates:release -- --native-build 7
 ```
 
 Despite its historical name, this command only prepares local artifacts. It runs
-`verify:release`, builds native web assets, generates and signs the separate web
-and content feeds under `.asc/updates/`, verifies and copies them into
+`verify:release`, builds native web assets, generates and signs the app update
+under `.asc/updates/web/`, verifies and copies it into
 `site/updates/`, then builds the website and verifies the prepared artifacts.
 Reruns replace each `latest.json` with the newest signed manifest and retain older
 hash-named downloads for clients already using them. It prints artifact paths for
@@ -246,15 +225,15 @@ and compare the live digests and rollout with the prepared artifacts.
 ### Individual Steps
 
 The existing Cloudflare Pages project is **tikkun**, serving `tikkun.pages.dev`
-and `tikkunreader.com`. After creating both releases, run:
+and `tikkunreader.com`. After creating the release, run:
 
 ```sh
 npm run updates:stage -- --native-build 7
 npm run build
 ```
 
-Staging verifies both manifest signatures, exact byte counts, hashes, ZIP
-signature, and the content contract before copying public artifacts into
+Staging verifies the manifest signature, exact byte counts, hashes and ZIP
+signature before copying public artifacts into
 `site/updates/`. Only verified public artifacts enter the website; no private
 signing material is copied. Browser precaching and native asset packaging exclude
 this directory. Retain its prior immutable artifacts on subsequent deployments.
@@ -271,11 +250,11 @@ npm run updates:verify -- --native-build 7
 ```
 
 Verification checks manifest and ZIP signatures, exact byte counts and hashes,
-content compatibility, JSON/ZIP responses, native CORS, caching, and an absent-feed
+JSON/ZIP responses, native CORS, caching, and an absent-feed
 404. Build 6 is the first web-feed target; do not copy its manifest into build 5.
 Future native builds use the same updater but require their own signed
 `/updates/web/BUILD_NUMBER/` release. A newer build does not blindly install an
-older build's package. With `build:pages` configured, production pushes generate compatible native update files automatically. The local backup command signs and copies approved web/content revisions for your review and commit.
+older build's package. With `build:pages` configured, production pushes generate compatible native update files automatically. The local backup command signs and copies an approved revision for your review and commit.
 
 ## Fresh Phone Builds
 

@@ -198,6 +198,16 @@
   }
 }
 
+/* Between the phone Library and the five-column desktop index, two books per
+   row keep the parsha list compact; Beresheet stays on the right. */
+@media screen and (min-width: 551px) and (max-width: 715px) {
+  .parsha-books:not(.mod-holidays) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 1.5rem;
+  }
+}
+
 .parsha-book {
   flex: 1 0;
   text-align: center;
@@ -896,6 +906,9 @@
     display: grid;
     grid-auto-columns: minmax(8.5rem, 1fr);
     grid-auto-flow: column;
+    /* Readings run in Hebrew order: the nearest sits at the right, where an
+       RTL scroller opens and snaps natively. */
+    direction: rtl;
     gap: 0.45rem;
     margin: 0;
     padding: 0 0 0.2rem;
@@ -911,6 +924,7 @@
 
   .mobile-coming-up a {
     display: grid;
+    direction: ltr;
     gap: 0.3rem;
     min-height: 4.6rem;
     padding: 0.75rem;

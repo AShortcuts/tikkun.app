@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest'
-import publishedSecond from '../../audio-cues/yoni-davidov/beresheet/2.json'
+import publishedSecond from '../../audio-cues/yoni-davidov/01 beresheet/2.json'
 import { getAdminDraftStorageKey } from '../admin/draft-storage.ts'
 import { createCueDraftPayload } from '../audio/cue-draft.ts'
 import { parseCueExportPayload } from '../audio/cue-validation.ts'

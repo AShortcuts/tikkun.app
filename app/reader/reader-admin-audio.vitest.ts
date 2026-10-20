@@ -92,20 +92,17 @@ test.each([
   await openReader(width, layout, sides)
   await vi.waitFor(() => expectCueStatus(publishedStatus))
   expect(frame?.contentDocument?.querySelectorAll('.aliyah-rail-button')).toHaveLength(7)
-  // Reading hides the inline gutter; mobile provides its own visible play control.
-  if (width < 768 || layout === 'match') {
-    await clickPlay(width)
-    await vi.waitFor(() => {
-      expect(element(panelSelector).textContent).toContain('Vezot Haberacha Aliyah 7')
-      expect(element<HTMLAudioElement>('audio').currentSrc).toContain('/vezot-haberacha/7.m4a')
-      expectCueStatus(publishedStatus)
-    }, { timeout: 10_000, interval: 50 })
-    const audio = element<HTMLAudioElement>('audio')
-    await vi.waitFor(() => expect(audio.paused).toBe(false))
-    await clickPlay(width)
-    await vi.waitFor(() => expect(audio.paused).toBe(true))
+  await clickPlay(width)
+  await vi.waitFor(() => {
+    expect(element(panelSelector).textContent).toContain('Vezot Haberacha Aliyah 7')
+    expect(element<HTMLAudioElement>('audio').currentSrc).toContain('/vezot-haberacha/7.m4a')
     expectCueStatus(publishedStatus)
-  }
+  }, { timeout: 10_000, interval: 50 })
+  const audio = element<HTMLAudioElement>('audio')
+  await vi.waitFor(() => expect(audio.paused).toBe(false))
+  await clickPlay(width)
+  await vi.waitFor(() => expect(audio.paused).toBe(true))
+  expectCueStatus(publishedStatus)
 }, 30_000)
 
 test.each([1280, 390])('a complete local cue draft cannot turn the seventh aliyah green or blue at %ipx', async width => {

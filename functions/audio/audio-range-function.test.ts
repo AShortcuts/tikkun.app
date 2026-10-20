@@ -311,6 +311,15 @@ test('preserves upstream errors instead of shaping them as media responses', asy
   expect(await response.text()).toBe('Missing')
 })
 
+test('reports an unpublished recording instead of serving the app shell as audio', async () => {
+  const shell = new Response('<!doctype html>', { headers: { 'content-type': 'text/html; charset=utf-8' } })
+  const response = await onRequest(context(undefined, { assetResponse: shell }).value)
+
+  expect(response.status).toBe(404)
+  expect(response.headers.get('cache-control')).toBe('no-store')
+  expect(await response.text()).toBe('Recording not found')
+})
+
 test.each([
   ['bytes=0-1', [10, 20], 'bytes 0-1/6'],
   ['bytes=3-', [40, 50, 60], 'bytes 3-5/6'],

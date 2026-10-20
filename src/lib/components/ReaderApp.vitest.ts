@@ -81,9 +81,10 @@ test('shows recovery links and retries a rejected Reader import', async () => {
 
   expect(loadApp).toHaveBeenCalledTimes(2)
   expect(startApp).toHaveBeenCalledOnce()
+  // The reveal finishes the fill and holds it before opening, so it outlasts the default wait.
   await vi.waitFor(() => expect(
     target?.querySelector('[data-target-id="reader-boot-state"]')
-  ).toBeNull())
+  ).toBeNull(), { timeout: 3000 })
 
   await unmount(component!)
   component = null
@@ -133,10 +134,10 @@ test('keeps loading until the requested reading is positioned', async () => {
   await eventually(() => root.dataset.readerBootState === 'ready' ? root : null)
   expect(root.getAttribute('aria-busy')).toBe('false')
   expect(required('.reader-loading-doors').classList.contains('open')).toBe(true)
-  await vi.waitFor(() => expect(root.querySelector('[data-target-id="reader-boot-state"]')).toBeNull())
+  await vi.waitFor(() => expect(root.querySelector('[data-target-id="reader-boot-state"]')).toBeNull(), { timeout: 3000 })
 })
 
-test('starts with the rendered document and advances as real startup work completes', async () => {
+test('creeps toward but never reaches the next real step while startup is stalled', async () => {
   const imported = deferred()
   const ready = deferred()
   let report: ReaderAppOptions['onStartupProgress']
@@ -149,81 +150,64 @@ test('starts with the rendered document and advances as real startup work comple
     return { startApp, stopApp: vi.fn() }
   }, undefined, undefined, 'fill')
   const root = await eventually(() => target?.querySelector<HTMLElement>('[data-reader-boot-progress]'))
+  const fill = await eventually(() => target?.querySelector('.reader-loading-fill'))
+
+  // Stalled after the rendered document (0.2, next step 0.2): motion slows and stays under 0.3.
+  await wait(300)
+  const early = fillProgress(fill)
+  await wait(700)
+  const later = fillProgress(fill)
+  await wait(700)
+  const latest = fillProgress(fill)
   expect(root.getAttribute('data-reader-boot-progress')).toBe('0.2')
-  expect(getComputedStyle(required('.reader-loading-entry')).animationName).not.toBe('none')
-  await new Promise(resolve => setTimeout(resolve, 250))
-  expect(root.getAttribute('data-reader-boot-progress')).toBe('0.2')
-  expect(getComputedStyle(required('.reader-loading-fill')).clipPath).toBe('inset(0px 0px 80%)')
+  expect(early).toBeGreaterThan(0.15)
+  expect(later).toBeGreaterThan(0.2)
+  expect(latest).toBeLessThanOrEqual(0.3)
+  expect(later - early).toBeGreaterThan(latest - later)
 
   imported.resolve()
   await eventually(() => startApp.mock.calls.length ? root : null)
-  await vi.waitFor(() => expect(root.getAttribute('data-reader-boot-progress')).toBe('0.4'))
-  report?.('text')
   report?.('text')
   await vi.waitFor(() => expect(Number(root.getAttribute('data-reader-boot-progress'))).toBeCloseTo(0.6))
-  const fill = required<SVGElement>('.reader-loading-fill')
-  await vi.waitFor(() => expect(getComputedStyle(fill).clipPath).toBe('inset(0px 0px 40%)'))
-  await new Promise(resolve => setTimeout(resolve, 250))
-  expect(Number(root.getAttribute('data-reader-boot-progress'))).toBeCloseTo(0.6)
+  await vi.waitFor(() => expect(fillProgress(fill)).toBeGreaterThanOrEqual(0.6))
+  await wait(1200)
+  expect(fillProgress(fill)).toBeLessThanOrEqual(0.7)
   expect(root.getAttribute('data-reader-boot-state')).toBe('loading')
 
   report?.('rendered')
-  await vi.waitFor(() => expect(root.getAttribute('data-reader-boot-progress')).toBe('0.8'))
-  expect(root.getAttribute('data-reader-boot-state')).toBe('loading')
   report?.('positioned')
-  await vi.waitFor(() => expect(root.getAttribute('data-reader-boot-progress')).toBe('1'))
-  expect(root.getAttribute('data-reader-boot-state')).toBe('loading')
-  expect(getComputedStyle(fill).clipPath).toBe('inset(0px 0px 0%)')
-  expect(getComputedStyle(fill).transitionDuration).toBe('0s')
+  await vi.waitFor(() => expect(fillProgress(fill)).toBe(1))
   ready.resolve()
   await vi.waitFor(() => expect(root.getAttribute('data-reader-boot-state')).toBe('ready'))
-  expect(root.getAttribute('data-reader-boot-progress')).toBe('1')
   expect(root.querySelector('.reader-loading-mark')).toBeNull()
   report?.('text')
   expect(root.getAttribute('data-reader-boot-progress')).toBe('1')
 })
 
-test('blends rapid startup updates into forward motion without resetting the entry animation', async () => {
-  const imported = deferred()
+test('speeds up through real progress without jumping or moving backward', async () => {
   const ready = deferred()
   let report: ReaderAppOptions['onStartupProgress']
   const startApp = vi.fn((options?: ReaderAppOptions) => {
     report = options?.onStartupProgress
     return { ready: ready.promise }
   })
-  mountReader(async () => {
-    await imported.promise
-    return { startApp, stopApp: vi.fn() }
-  }, undefined, undefined, 'fill')
-  await eventually(() => target?.querySelector('.reader-loading-entry'))
-  const entry = required('.reader-loading-entry')
-  const fill = required('.reader-loading-fill')
-  const entryAnimation = entry.getAnimations()[0]
-  expect(entryAnimation).toBeDefined()
-  const fillProgress = () => {
-    const inset = getComputedStyle(fill).clipPath.match(/inset\(0px 0px ([\d.]+)%\)/)
-    if (!inset) throw new Error(`Unexpected fill mask: ${getComputedStyle(fill).clipPath}`)
-    return 1 - Number(inset[1]) / 100
-  }
-  // Establish the initial style before exercising updates in consecutive frames.
-  fillProgress()
-  imported.resolve()
+  mountReader(async () => ({ startApp, stopApp: vi.fn() }), undefined, undefined, 'fill')
+  const fill = await eventually(() => target?.querySelector('.reader-loading-fill'))
   await eventually(() => startApp.mock.calls.length ? target : null)
+  await vi.waitFor(() => expect(fillProgress(fill)).toBeGreaterThan(0.39))
+
   report?.('text')
-  await new Promise(requestAnimationFrame)
-  const samples = [fillProgress()]
   report?.('rendered')
-  for (let frame = 0; frame < 6; frame += 1) {
+  const samples = [fillProgress(fill)]
+  while (samples.at(-1)! < 0.8 && samples.length < 120) {
     await new Promise(requestAnimationFrame)
-    samples.push(fillProgress())
+    samples.push(fillProgress(fill))
   }
 
-  expect(entryAnimation.playState).not.toBe('idle')
-  expect(samples.every((value, index) => index === 0 || value >= samples[index - 1] - 0.001)).toBe(true)
-  expect(new Set(samples.filter(value => value > 0.2 && value < 0.79).map(value => value.toFixed(3))).size).toBeGreaterThanOrEqual(3)
-  report?.('positioned')
-  await vi.waitFor(() => expect(fillProgress()).toBe(1))
-  expect(getComputedStyle(entry).animationName).toBe('none')
+  expect(samples.at(-1)).toBeGreaterThanOrEqual(0.8)
+  expect(samples.every((value, index) => index === 0 || value >= samples[index - 1])).toBe(true)
+  const between = new Set(samples.filter(value => value > samples[0] + 0.02 && value < 0.78).map(value => value.toFixed(3)))
+  expect(between.size).toBeGreaterThanOrEqual(4)
   ready.resolve()
   await vi.waitFor(() => expect(target?.querySelector('.reader-loading-mark')).toBeNull())
 })
@@ -245,7 +229,13 @@ test.each([[390, 844], [1280, 720]])('opens diagonal doors only after readiness 
     await eventually(() => startApp.mock.calls.length ? target : null)
     const root = required('[data-target-id="app-root"]')
     const doors = required<HTMLElement>('.reader-loading-doors')
-    expect(target?.querySelector('.reader-loading-mark')).toBeNull()
+    const fills = [...doors.querySelectorAll<SVGElement>('.reader-door .reader-loading-fill')]
+    expect(fills).toHaveLength(2)
+    // Both halves run the same fill, so the aleph never shows a seam while loading.
+    for (let frame = 0; frame < 5; frame += 1) {
+      await new Promise(requestAnimationFrame)
+      expect(getComputedStyle(fills[1]).clipPath).toBe(getComputedStyle(fills[0]).clipPath)
+    }
     expect(doors.getBoundingClientRect().width).toBe(width)
     expect(doors.getBoundingClientRect().height).toBe(height)
     for (const [x, y] of [[1, 1], [width - 1, 1], [1, height - 1], [width - 1, height - 1]]) {
@@ -256,6 +246,7 @@ test.each([[390, 844], [1280, 720]])('opens diagonal doors only after readiness 
     report?.('rendered')
     report?.('positioned')
     await vi.waitFor(() => expect(root.getAttribute('data-reader-boot-progress')).toBe('1'))
+    await vi.waitFor(() => expect(fills.map(fillProgress)).toEqual([1, 1]))
     expect(doors.classList.contains('open')).toBe(false)
     ready.resolve()
     await eventually(() => root.getAttribute('data-reader-boot-state') === 'ready' ? root : null)
@@ -269,7 +260,8 @@ test.each([[390, 844], [1280, 720]])('opens diagonal doors only after readiness 
     expect(animations).toHaveLength(2)
     for (const animation of animations) {
       animation.pause()
-      animation.currentTime = 340
+      // 300ms hold after the fill settles, then halfway through the 680ms opening.
+      animation.currentTime = 300 + 340
     }
     await new Promise(requestAnimationFrame)
     const northeast = new DOMMatrixReadOnly(getComputedStyle(upper).transform)
@@ -290,6 +282,38 @@ test.each([[390, 844], [1280, 720]])('opens diagonal doors only after readiness 
   }
 })
 
+test.each(['light', 'sepia', 'dark', 'custom'] as const)('keeps both doors fully opaque while parting in the %s theme', async (theme) => {
+  const html = document.documentElement
+  const previousTheme = html.dataset.readerTheme
+  const previousMotion = html.dataset.readerReducedMotion
+  try {
+    html.dataset.readerTheme = theme
+    html.dataset.readerReducedMotion = 'off'
+    const ready = deferred()
+    mountReader(async () => ({ startApp: () => ({ ready: ready.promise }), stopApp: vi.fn() }))
+    const doors = await eventually(() => target?.querySelector('.reader-loading-doors'))
+    ready.resolve()
+    await vi.waitFor(() => expect(doors.classList.contains('parting')).toBe(true), { timeout: 3000 })
+    const lowerPaper = required('.southwest .door-paper')
+    // Finish the tone fade so the door shows its parted color.
+    lowerPaper.getAnimations().forEach(animation => animation.finish())
+    // Translucent theme text colors must not make a door see-through.
+    for (const paper of [required('.northeast .door-paper'), lowerPaper]) {
+      const probe = document.createElement('div')
+      paper.append(probe)
+      probe.style.backgroundColor = getComputedStyle(paper).backgroundColor
+      const alpha = probe.style.backgroundColor.match(/\/\s*([\d.]+)\)$|rgba\([^)]*,\s*([\d.]+)\)$/)
+      probe.remove()
+      expect(alpha, `${theme} door color ${getComputedStyle(paper).backgroundColor}`).toBeNull()
+    }
+  } finally {
+    if (previousTheme === undefined) delete html.dataset.readerTheme
+    else html.dataset.readerTheme = previousTheme
+    if (previousMotion === undefined) delete html.dataset.readerReducedMotion
+    else html.dataset.readerReducedMotion = previousMotion
+  }
+})
+
 test.each(['explicit', 'system', 'changed-during-reveal'] as const)('skips or cancels the doors for %s reduced motion', async (mode) => {
   const html = document.documentElement
   const previousMotion = html.dataset.readerReducedMotion
@@ -302,7 +326,8 @@ test.each(['explicit', 'system', 'changed-during-reveal'] as const)('skips or ca
     const upper = required('.reader-door.northeast')
     ready.resolve()
     if (mode === 'changed-during-reveal') {
-      await vi.waitFor(() => expect(upper.getAnimations()).toHaveLength(1))
+      // The doors part once the fill settles.
+      await vi.waitFor(() => expect(upper.getAnimations()).toHaveLength(1), { timeout: 2000 })
       html.dataset.readerReducedMotion = 'on'
       expect(getComputedStyle(upper).animationName).toBe('none')
     }
@@ -352,26 +377,32 @@ test('a failed startup never fills to completion or accepts late progress', asyn
   expect(failed.getAttribute('data-reader-boot-progress')).toBe('0.4')
 })
 
-test('uses static progress steps for system and explicit reduced motion', async () => {
+test('uses exact progress steps for system and explicit reduced motion', async () => {
   const html = document.documentElement
   const previousMotion = html.dataset.readerReducedMotion
   try {
-    const ready = deferred()
-    mountReader(async () => ({ startApp: () => ({ ready: ready.promise }), stopApp: vi.fn() }), undefined, undefined, 'fill')
-    await eventually(() => target?.querySelector('.reader-loading-fill'))
-    const fill = required('.reader-loading-fill')
-    const entry = required('.reader-loading-entry')
     html.dataset.readerReducedMotion = 'on'
-    expect(getComputedStyle(fill).transitionDuration).toBe('0s')
+    const imported = deferred()
+    const ready = deferred()
+    mountReader(async () => {
+      await imported.promise
+      return { startApp: () => ({ ready: ready.promise }), stopApp: vi.fn() }
+    }, undefined, undefined, 'fill')
+    const fill = await eventually(() => target?.querySelector('.reader-loading-fill'))
     expect(getComputedStyle(fill).animationName).toBe('none')
-    expect(getComputedStyle(entry).animationName).toBe('none')
+    await vi.waitFor(() => expect(fillProgress(fill)).toBeCloseTo(0.2, 3))
+    await wait(400)
+    expect(fillProgress(fill)).toBeCloseTo(0.2, 3)
+
     html.dataset.readerReducedMotion = 'automatic'
     await commands.emulateAccessibilityMedia({ reducedMotion: 'reduce' })
-    expect(getComputedStyle(fill).transitionDuration).toBe('0s')
-    expect(getComputedStyle(entry).animationName).toBe('none')
+    imported.resolve()
+    await vi.waitFor(() => expect(fillProgress(fill)).toBeCloseTo(0.4, 3))
+    await wait(400)
+    expect(fillProgress(fill)).toBeCloseTo(0.4, 3)
+
     html.dataset.readerReducedMotion = 'off'
-    expect(getComputedStyle(fill).transitionProperty).toBe('clip-path')
-    expect(parseFloat(getComputedStyle(fill).transitionDuration)).toBe(0.18)
+    await vi.waitFor(() => expect(fillProgress(fill)).toBeGreaterThan(0.41))
     ready.resolve()
   } finally {
     if (previousMotion === undefined) delete html.dataset.readerReducedMotion
@@ -475,6 +506,16 @@ function mountReader(loadApp: () => Promise<{
       loadingAnimation,
     },
   })
+}
+
+function fillProgress(fill: Element) {
+  const inset = getComputedStyle(fill).clipPath.match(/inset\(0px 0px ([\d.]+)%\)/)
+  if (!inset) throw new Error(`Unexpected fill mask: ${getComputedStyle(fill).clipPath}`)
+  return 1 - Number(inset[1]) / 100
+}
+
+function wait(milliseconds: number) {
+  return new Promise(resolve => setTimeout(resolve, milliseconds))
 }
 
 async function eventually(read: () => Element | null | undefined) {

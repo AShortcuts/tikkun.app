@@ -17,8 +17,7 @@ afterEach(() => {
 test.each([
   [390, 'match', 'one'],
   [390, 'match', 'two'],
-  [390, 'reading', 'one'],
-  [390, 'reading', 'two'],
+  // Reading at 390px is the isolated view, which shows one aliyah at a time.
   [1280, 'match', 'one'],
   [1280, 'match', 'two'],
   [1280, 'reading', 'one'],
@@ -49,7 +48,11 @@ test.each([
   const book = requiredElement(frameDocument, '.tikkun-book')
   const rail = requiredElement(frameDocument, '.aliyah-rail')
   const before = requiredElement(book, '[data-class="line"][data-page-number="244"][data-line-index="41"]')
-  const after = requiredElement(book, '[data-class="line"][data-page-number="245"][data-line-index="0"]')
+  // Line 245:0 opens with the end of 33:17. Reading reflows by pasuk, so its
+  // boundary is the first word of 33:18, where aliyah 4 begins.
+  const after = readerTextLayout === 'reading'
+    ? requiredElement(book, '[data-reader-canonical="true"] .word[data-token-key="245:0:1:0"]')
+    : requiredElement(book, '[data-class="line"][data-page-number="245"][data-line-index="0"]')
   const settle = async () => {
     for (let count = 0; count < 3; count += 1) {
       await new Promise<void>(resolve => view.requestAnimationFrame(() => resolve()))
@@ -57,7 +60,7 @@ test.each([
   }
   await settle()
   const focal = book.getBoundingClientRect().top + book.clientHeight / 2
-  const beforeRect = before.getBoundingClientRect()
+  const beforeRect = readerTextLayout === 'reading' ? visibleWordBounds(before) : before.getBoundingClientRect()
   const afterRect = after.getBoundingClientRect()
   const above = Math.round(book.scrollTop + beforeRect.top + beforeRect.height / 2 - focal)
   const below = Math.round(book.scrollTop + afterRect.top + afterRect.height / 2 - focal)
@@ -97,6 +100,18 @@ function requiredElement(root: ParentNode, selector: string) {
   const element = root.querySelector<HTMLElement>(selector)
   if (!element) throw new Error(`Aliyah scroll test requires ${selector}`)
   return element
+}
+
+// Reading lines are inline, and WebKit stretches their bounding box to an empty
+// fragment left by the absolutely positioned aliyah gutter. Measure the words.
+function visibleWordBounds(line: HTMLElement) {
+  const rects = [...line.querySelectorAll<HTMLElement>('.word:not([hidden])')]
+    .map(word => word.getBoundingClientRect())
+    .filter(rect => rect.width > 0 && rect.height > 0)
+  if (!rects.length) throw new Error('Aliyah scroll test requires visible words in the boundary line')
+  const top = Math.min(...rects.map(rect => rect.top))
+  const bottom = Math.max(...rects.map(rect => rect.bottom))
+  return { top, height: bottom - top }
 }
 
 test.each([[390, false], [1280, false], [390, true], [1280, true]] as const)('keeps parsha and service aliyot separate at %ipx (Israel: %s)', async (width, israel) => {

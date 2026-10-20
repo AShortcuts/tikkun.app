@@ -25,6 +25,25 @@ export function getReaderFocalPointScrollTop(root: HTMLElement) {
   return root.scrollTop + (getReaderFocalPointClientY(root) - rootRect.top)
 }
 
+export function getVisibleReaderFocalWord(root: HTMLElement): HTMLElement | null {
+  const focalY = getReaderFocalPointClientY(root)
+  let closest: HTMLElement | null = null
+  let distance = Number.POSITIVE_INFINITY
+  for (const word of root.querySelectorAll<HTMLElement>(
+    '[data-reader-canonical="true"] .word:not([hidden])',
+  )) {
+    const rect = word.getBoundingClientRect()
+    if (!rect.width || !rect.height) continue
+    const candidateDistance = Math.abs((rect.top + rect.bottom) / 2 - focalY)
+    if (candidateDistance < distance ||
+      (Math.abs(candidateDistance - distance) < 1 && word.classList.contains('is-active-word'))) {
+      closest = word
+      distance = candidateDistance
+    }
+  }
+  return closest
+}
+
 export function getElementTopWithinScrollRoot(root: HTMLElement, element: HTMLElement) {
   const rootRect = root.getBoundingClientRect()
   const elementRect = element.getBoundingClientRect()

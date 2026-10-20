@@ -15,7 +15,7 @@ const prepare = vi.fn()
 
 beforeEach(() => {
   const channel = { phase: 'idle' as const, pending: false, checkedAt: null }
-  nativeUpdateState.set({ web: { ...channel }, content: { ...channel }, applying: false, canCancel: false, applyError: null })
+  nativeUpdateState.set({ web: { ...channel }, applying: false, canCancel: false, applyError: null })
   nativeUpdatePromptDismissed.set(false)
   target = document.createElement('div')
   document.body.append(target)
@@ -30,7 +30,7 @@ afterEach(async () => {
   vi.restoreAllMocks()
 })
 
-test.each([320, 390, 1280])('native updates use the same centered pill, Apply/Later and wine Cancel at %ipx', async width => {
+test.each([320, 390, 1280])('native updates use the same centered pill, Apply/Later and neutral Cancel at %ipx', async width => {
   await page.viewport(width, 844)
   const fetcher = vi.spyOn(globalThis, 'fetch')
   expect(target.textContent).toBe('')
@@ -50,7 +50,11 @@ test.each([320, 390, 1280])('native updates use the same centered pill, Apply/La
   action.click()
   flushSync()
   expect(action.textContent).toBe('Cancel')
-  expect(getComputedStyle(action).backgroundColor).toBe('rgb(139, 32, 64)')
+  // Cancel is a quiet tint of the prompt's own ink, never a warning color.
+  const ink = getComputedStyle(prompt).color
+  expect(getComputedStyle(action).color).toBe(ink)
+  expect(getComputedStyle(action).backgroundColor).not.toBe('rgb(139, 32, 64)')
+  expect(prompt.querySelector('.service-worker-update-progress')).not.toBeNull()
   expect(target.querySelector('[aria-label="Dismiss update"]')).toBeNull()
   action.click()
   await vi.advanceTimersByTimeAsync(1200)
@@ -62,11 +66,11 @@ test.each([320, 390, 1280])('native updates use the same centered pill, Apply/La
 })
 
 test('Later only hides the prompt; manual checking can show it again', async () => {
-  updateChannel('content', { phase: 'ready', pending: true })
+  updateChannel('web', { phase: 'ready', pending: true })
   flushSync()
   await page.getByRole('button', { name: 'Dismiss update' }).click()
   expect(target.textContent).toBe('')
-  expect(get(nativeUpdateState).content.pending).toBe(true)
+  expect(get(nativeUpdateState).web.pending).toBe(true)
   await checkNativeUpdates(true)
   flushSync()
   expect(target.textContent).toContain('Update available')

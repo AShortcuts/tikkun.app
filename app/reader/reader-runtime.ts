@@ -6,6 +6,7 @@ import { createPlaybackAnalytics, trackPreferenceChanges } from '../analytics/ob
 import { readerRouteKind } from '../analytics/schema.ts'
 import { getWebServiceWorker, isNativeApp } from '../platform/native.ts'
 import { mountReaderSwipeBack } from './reader-swipe-back.ts'
+import { findReadingVerseStartWord, readingVerseAtWord } from './reading-verse-target.ts'
 import { createNativeUpdatePrompt } from '../updates/native-update-prompt.ts'
 import { loadPassageTokens } from '../audio/passage-tokens.ts'
 import { audioButtonState } from '../reading/audio-button-state.ts'
@@ -14,6 +15,9 @@ import { PassageAudioResolver, type PassageAudioState } from '../reading/passage
 import { HDate } from '@hebcal/hdate'
 import utils from '../components/utils.ts'
 import { ScrollViewModel } from '../view-model/scroll-view-model.ts'
+import { createIsolatedAliyahViewModel } from '../reading/isolated-aliyah-view.ts'
+import { resolvePassageTokenIdentity, type PassageTokenForm, type PassageTokenIdentity } from '../reading/passage-token-identity.ts'
+import { initialIsolatedEntry, isolatedEntryForToken, targetForEntry } from './isolated-reading-selection.ts'
 import { LeiningGenerator } from '../calendar-model/generator.ts'
 import { publishNativePractice } from '../platform/native-practice.ts'
 import {
@@ -24,10 +28,12 @@ import {
   type CalendarSettings,
 } from '../calendar-settings.ts'
 import { applyAnnotationMode } from '../components/annotation-rendering.ts'
-import { alignSmallSpecialLettersWhenFontsReady } from '../special-letter-layout.ts'
+import { alignSmallSpecialLetters, alignSmallSpecialLettersWhenFontsReady } from '../special-letter-layout.ts'
+import { observeReaderResize } from '../adaptive/reader-resize.ts'
 import type { ViewportRange } from '../viewport-tracker.ts'
 import {
   createReaderViewport,
+  isMobileReaderViewport,
   type ReaderViewport,
 } from '../adaptive/reader-viewport.ts'
 import { TopBarTracker } from '../view-model/navigation/top-bar-model.ts'
@@ -49,6 +55,8 @@ import {
 import {
   generateCueAnalyticsUrl,
   generatePageUrl,
+  generateAliyahUrl,
+  parseUrl,
 } from '../view-model/navigation/url-parser.ts'
 import { isSemanticallyRoutableReaderHash } from '../view-model/navigation/routable-reader-hash.ts'
 import { isReaderHash } from '../view-model/navigation/reader-hash.ts'
@@ -94,6 +102,8 @@ import {
   formatAliyahLabel,
   getAliyahNavigationEntriesForRun,
   resolveActiveTargetForRun,
+  isSameAliyahNavigationTarget,
+  type AliyahNavigationEntry,
   type AliyahNavigationItem,
   type AliyahNavigationPlayback,
   type AliyahNavigationTarget,
@@ -120,6 +130,7 @@ import {
 } from '../reading/aliyah-dom-target.ts'
 import {
   aliyahMembershipsForFocalLine,
+  aliyahMembershipsAtRef,
   isSameAliyahIdentity,
   parseAliyahIndex,
   resolveActiveAliyahIdentity,
@@ -242,6 +253,8 @@ import {
 import {
   centerElementInScrollRoot,
   getReaderFocalPointScrollTop,
+  getReaderFocalPointClientY,
+  getVisibleReaderFocalWord,
 } from '../reader-scroll.ts'
 
 export interface ReaderRuntime {
@@ -293,7 +306,6 @@ export function startReaderRuntime({
   let readerNoticeTimer: number | null = null
   let readerPreferences: ReaderPreferences = getDefaultReaderPreferences()
   let aliyahStartMarkerLayoutFrame = 0
-  let aliyahStartMarkerResizeTimer: number | null = null
   let pendingAliyahRailSelection: {
     runId: string
     aliyahIndex: PlaybackAliyahIndex
@@ -302,6 +314,20 @@ export function startReaderRuntime({
   } | null = null
   let explicitAliyahSelection: AliyahIdentity | null = null
   let explicitAliyahSelectionHash: string | null = null
+  let isolatedReading: AliyahNavigationEntry | null = null
+  let readerSourceModel: ScrollViewModel | null = null
+  let rememberReaderFocalPosition: ((word?: HTMLElement | null) => void) | null = null
+  let readerRenderGeneration = 0
+  let preservePlaybackDuringDisplayReplacement = false
+  let playbackNavigationHash: string | null = null
+  let pendingReaderRestoration: {
+    hash: string
+    tokenKey: string | null
+    tokenForm?: PassageTokenForm
+    tokenLabel?: string
+    preservePlayback: boolean
+    target?: AliyahNavigationTarget
+  } | null = null
   let lastAliyahRailScrollTop: number | null = null
   let aliyahNavigationGlobal: AliyahNavigation | null = null
   const resolvedAliyahCueStatuses = new Map<string, AliyahCueStatus>()
@@ -409,8 +435,8 @@ export function startReaderRuntime({
     signal: AbortSignal
   ) {
     void alignSmallSpecialLettersWhenFontsReady(root, signal)
-      .then(() => {
-        if (signal.aborted || !readerDisplaySessionGlobal) return
+      .then((aligned) => {
+        if (!aligned || signal.aborted || !readerDisplaySessionGlobal) return
         readerDisplaySessionGlobal.invalidateProgressAnchors('text-layout')
         invalidateReaderPositionAfterLayout()
       })
@@ -423,7 +449,7 @@ export function startReaderRuntime({
     return new URLSearchParams(location.search).get('debugActiveToken')
   }
 
-  function renderReaderModel(target: ScrollViewModel): ReaderRouteRendering {
+  function renderPreparedReaderModel(target: ScrollViewModel): ReaderRouteRendering {
     const rendering = getReaderDisplaySession().render(target)
     if (startupComplete || !onStartupProgress) return rendering
 
@@ -439,7 +465,165 @@ export function startReaderRuntime({
     }
   }
 
+  function isolatedAnchor(): ReaderProgressAnchor | null {
+    if (!isolatedReading) return null
+    return {
+      run: isolatedReading.run,
+      aliyahIndex: isolatedReading.aliyah.index,
+      label: formatAliyahLabel(isolatedReading.aliyah.index, isolatedReading.run),
+      line: null,
+      position: 0,
+    }
+  }
+
+  function showPassageStatus(error = false) {
+    const book = getBook()
+    const status = document.createElement('section')
+    status.className = 'reader-passage-status'
+    status.setAttribute('role', error ? 'alert' : 'status')
+    const message = document.createElement('p')
+    message.textContent = error ? 'This aliyah could not be loaded.' : 'Loading aliyah…'
+    status.append(message)
+    if (error) {
+      const retry = document.createElement('button')
+      retry.type = 'button'
+      retry.textContent = 'Try again'
+      // Failed dynamic imports remain cached for this document's lifetime.
+      retry.addEventListener('click', () => window.location.reload(), { once: true })
+      status.append(retry)
+    }
+    book.replaceChildren(status)
+    book.style.visibility = ''
+    book.setAttribute('aria-busy', String(!error))
+  }
+
+  function renderReaderModel(
+    source: ScrollViewModel,
+    context?: { hash: string; aliyahTarget?: AliyahNavigationTarget },
+  ): ReaderRouteRendering {
+    readerSourceModel = source
+    const generation = ++readerRenderGeneration
+    const hash = context?.hash ?? location.hash.split('?', 1)[0]
+    const restoration = pendingReaderRestoration?.hash === hash ? pendingReaderRestoration : null
+    pendingReaderRestoration = null
+    const preservePlayback = restoration?.preservePlayback || playbackNavigationHash === hash
+    playbackNavigationHash = null
+    const wasIsolated = Boolean(isolatedReading)
+    isolatedReading = isMobileReaderViewport(window) && readerPreferences.readerTextLayout === 'reading' && !recordingMode.enabled
+      ? initialIsolatedEntry(source, restoration?.target ?? context?.aliyahTarget)
+      : null
+    const isCurrent = () => generation === readerRenderGeneration
+    if (isolatedReading) document.documentElement.dataset.readerIsolated = 'true'
+    else delete document.documentElement.dataset.readerIsolated
+
+    if (isolatedReading || wasIsolated) {
+      if (!preservePlayback) {
+        playbackAction.cancel()
+        readerPlaybackGlobal?.resetRoute()
+      }
+      // A Play gesture has already authorized the shared media element. Display
+      // replacement must not invalidate that action or clear its source again.
+      preservePlaybackDuringDisplayReplacement = true
+      try { getReaderDisplaySession().deactivate() }
+      finally { preservePlaybackDuringDisplayReplacement = false }
+      if (isolatedReading) {
+        showPassageStatus()
+        syncAliyahNavigationContent()
+        syncAliyahNavigationToolbar(isolatedAnchor())
+      }
+    }
+
+    let rendering: ReaderRouteRendering | null = null
+    let restoredIdentity: PassageTokenIdentity | null = null
+    let restoredPlainTokenKey: string | undefined
+    let failureHandled = false
+    const handleFailure = (error: unknown) => {
+      if (!isCurrent() || !isolatedReading || failureHandled) return
+      failureHandled = true
+      console.error('Failed to load isolated aliyah', error)
+      playbackAction.cancel()
+      readerPlaybackGlobal?.resetRoute()
+      getReaderDisplaySession().deactivate()
+      showPassageStatus(true)
+      syncAliyahNavigationContent()
+      syncAliyahNavigationToolbar(isolatedAnchor())
+    }
+    const prepared = (async () => {
+      let entry = isolatedReading
+      if (entry) await source.startingLocation
+      if (restoration?.tokenKey && source.initialLocation.scroll === 'torah') {
+        restoredIdentity = await resolvePassageTokenIdentity({
+          scroll: 'torah', tokenKey: restoration.tokenKey,
+          label: restoration.tokenLabel, form: restoration.tokenForm,
+        })
+        restoredPlainTokenKey = restoration.tokenForm !== 'annotated' &&
+          restoration.tokenLabel?.normalize('NFC') !== restoredIdentity.canonicalText.normalize('NFC') &&
+          restoredIdentity.plainTokenKeys.includes(restoration.tokenKey)
+          ? restoration.tokenKey : restoredIdentity.plainTokenKeys[0]
+        if (!isCurrent()) throw new DOMException('Reading superseded', 'AbortError')
+      }
+      if (entry && restoration?.tokenKey) {
+        entry = await isolatedEntryForToken(source, restoredIdentity?.canonicalTokenKey ?? restoration.tokenKey, entry, isCurrent)
+        if (!isCurrent()) throw new DOMException('Reading superseded', 'AbortError')
+        isolatedReading = entry
+      }
+      const model = entry
+        ? await createIsolatedAliyahViewModel(source, targetForEntry(entry),
+          restoration || 'pageNumber' in source.initialLocation ? entry.aliyah.start : source.initialLocation)
+        : source
+      if (!isCurrent()) throw new DOMException('Reading superseded', 'AbortError')
+      preservePlaybackDuringDisplayReplacement = Boolean(entry || wasIsolated || preservePlayback)
+      try { rendering = renderPreparedReaderModel(model) }
+      finally { preservePlaybackDuringDisplayReplacement = false }
+      return rendering
+    })().catch((error: unknown) => {
+      handleFailure(error)
+      throw error
+    })
+    const ready = prepared.then(display => display.ready)
+    const complete = prepared.then(async display => {
+      await display.complete
+      if (!isCurrent()) return
+      if (restoration?.tokenKey) {
+        const tokenKey = restoredIdentity
+          ? isolatedReading || currentTokenForm() === 'annotated'
+            ? restoredIdentity.canonicalTokenKey : restoredPlainTokenKey
+          : restoration.tokenKey
+        if (!tokenKey) throw new Error('The saved word is unavailable in this text form.')
+        await jumpToTokenKey(tokenKey, { isCurrent, preferredPlainTokenKey: restoredPlainTokenKey,
+          scrollBehavior: restoration.preservePlayback ? 'auto' : undefined,
+        })
+        if (!isCurrent()) return
+        rememberReaderFocalPosition?.(getBook().querySelector<HTMLElement>('.is-active-word'))
+      }
+      if (isolatedReading) {
+        const ref = restoredIdentity?.ref ?? (!('pageNumber' in source.initialLocation) && !restoration
+          ? source.initialLocation : isolatedReading.aliyah.start)
+        readerRouteGlobal?.syncScrolledReading(generateAliyahUrl(
+          isolatedReading.run, isolatedReading.aliyah.index, ref,
+        ))
+      }
+      refreshReaderChrome()
+    }).catch((error: unknown) => {
+      handleFailure(error)
+      throw error
+    })
+    return {
+      ready,
+      complete,
+      isCurrent,
+      failureHandled: () => failureHandled,
+      getMountedPageNode: pageNumber => rendering?.getMountedPageNode(pageNumber) ?? null,
+    }
+  }
+
   function deactivateReaderRuntime() {
+    readerSourceModel = null
+    readerRenderGeneration += 1
+    isolatedReading = null
+    pendingReaderRestoration = null
+    playbackNavigationHash = null
+    delete document.documentElement.dataset.readerIsolated
     readerDisplaySessionGlobal?.deactivate()
   }
 
@@ -468,6 +652,7 @@ export function startReaderRuntime({
   const showPersistenceNotice = (message: string) => showReaderNotice(message)
 
   function readerHashFromAnchor(anchor: ReaderProgressAnchor | null) {
+    if (isolatedReading) return generateAliyahUrl(isolatedReading.run, isolatedReading.aliyah.index)
     if (!anchor?.run) return null
     const aliyah = anchor.run.aliyot.find(
       (candidate) => candidate.index === anchor.aliyahIndex
@@ -511,6 +696,7 @@ export function startReaderRuntime({
   }
 
   function currentReadingAnchor() {
+    if (isolatedReading) return isolatedAnchor()
     const displaySession = readerDisplaySessionGlobal
     if (!displaySession?.capture()) return null
     const book = getBook()
@@ -556,9 +742,9 @@ export function startReaderRuntime({
     saveLastReadingFromAnchor(currentReadingAnchor())
   }
 
-  function resetReaderSideNavigationState() {
+  function resetReaderSideNavigationState({ preservePlayback = false } = {}) {
     aliyahNavigationGlobal?.closeCompact()
-    readerPlaybackGlobal?.resetRoute()
+    if (!preservePlayback) readerPlaybackGlobal?.resetRoute()
     publishedRecordingIssues = []
     localRecordingIssues = []
     localRecordingIssueRevision = null
@@ -617,6 +803,10 @@ export function startReaderRuntime({
     }
     if (displaySession) displaySession.updateAnnotations(update)
     else update()
+    const activeToken = readerPlaybackGlobal?.snapshot().activeTokenKey
+    if (isolatedReading && activeToken) {
+      void readerPlaybackGlobal?.activateToken(activeToken, { scroll: false }).catch(reportReadingNavigationError)
+    }
     const activeDisplay = displaySession?.capture()
     if (activeDisplay) {
       scheduleSpecialLetterAlignment(book, activeDisplay.signal)
@@ -868,7 +1058,12 @@ export function startReaderRuntime({
     if (activeSignal) scheduleSpecialLetterAlignment(book, activeSignal)
     scheduleAliyahStartMarkerLayout(book)
     invalidateReaderPositionAfterLayout()
-    void readerPlaybackGlobal?.syncHighlight({ scroll: false })
+    const playback = readerPlaybackGlobal?.snapshot()
+    if (isolatedReading && playback?.activeTokenKey && !playback.session) {
+      void readerPlaybackGlobal?.activateToken(playback.activeTokenKey, { scroll: false }).catch(reportReadingNavigationError)
+    } else {
+      void readerPlaybackGlobal?.syncHighlight({ scroll: false })
+    }
     return true
   }
 
@@ -923,35 +1118,58 @@ export function startReaderRuntime({
   }
 
   function getReaderFocalTokenKey() {
+    const word = getReaderFocalWord()
+    return word ? canonicalVisibleTokenKey(word) : null
+  }
+
+  function getReaderFocalWord() {
     const target = getReaderFocalPointScrollTarget(getBook())
     if (!target) return null
-    if (target.dataset.tokenKey) return target.dataset.tokenKey
+    return target.dataset.tokenKey ? target : getFirstVisibleWord(target) ??
+      target.querySelector<HTMLElement>('.word[data-token-key]')
+  }
 
-    return (
-      getFirstVisibleWord(target)?.dataset.tokenKey ??
-      target.querySelector<HTMLElement>('.word[data-token-key]')?.dataset.tokenKey ??
-      null
-    )
+  function currentTokenForm(word?: HTMLElement): PassageTokenForm {
+    const book = getBook()
+    if (book.dataset.readerLayout === 'reading' && book.dataset.readerSides === 'two') return 'annotated'
+    return (word ? word.dataset.annotationsMode === 'on' : annotationsEnabled) ? 'annotated' : 'unannotated'
+  }
+
+  function canonicalVisibleTokenKey(word: HTMLElement) {
+    const tokenKey = word.dataset.tokenKey
+    if (!tokenKey) return null
+    const passage = readerDisplaySessionGlobal?.capture()?.viewModel.isolatedAliyah
+    return passage?.tokenIdentity({ tokenKey, form: currentTokenForm(word) }).canonicalTokenKey ?? tokenKey
   }
 
   function getTokenLabel(tokenKey: string) {
+    const passage = readerDisplaySessionGlobal?.capture()?.viewModel.isolatedAliyah
+    if (passage) return passage.tokenIdentity({ tokenKey, form: 'annotated' }).canonicalText
     const token = document.querySelector<HTMLElement>(`[data-token-key="${tokenKey}"]`)
     return token?.textContent?.trim().replace(/\s+/g, ' ') || `Word ${tokenKey}`
   }
 
-  async function jumpToTokenKey(tokenKey: string, options: { audioTime?: number } = {}) {
+  async function jumpToTokenKey(tokenKey: string, options: { audioTime?: number; isCurrent?: () => boolean; preferredPlainTokenKey?: string; scrollBehavior?: ScrollBehavior } = {}) {
     const position = parseTokenKey(tokenKey)
     if (!position) throw new TypeError(`Invalid token key: ${tokenKey}`)
     const displaySession = getReaderDisplaySession()
+    const lease = displaySession.capture()
+    const isCurrent = () => Boolean(lease?.isCurrent() && (options.isCurrent?.() ?? true))
+    if (!isCurrent()) return
+    if (lease?.viewModel.isolatedAliyah && !lease.viewModel.isolatedAliyah.containsTokenKey(tokenKey)) {
+      throw new Error('The saved word is outside the selected aliyah.')
+    }
     const virtualizationHold = displaySession.holdNavigation()
     try {
-      await displaySession
-        .capture()
-        ?.ensurePageMountedForNavigation(position.pageNumber)
+      await lease?.ensurePageMountedForNavigation(position.pageNumber)
+      if (!isCurrent()) { virtualizationHold.release(); return }
       virtualizationHold.releaseAfterNavigation()
       const token = await readerPlaybackGlobal?.activateToken(tokenKey, {
         scroll: true,
+        scrollBehavior: options.scrollBehavior,
+        preferredPlainTokenKey: options.preferredPlainTokenKey,
       })
+      if (!isCurrent()) { virtualizationHold.release(); return }
       if (!token) virtualizationHold.release()
       if (
         options.audioTime !== undefined &&
@@ -972,8 +1190,9 @@ export function startReaderRuntime({
   }
 
   function bookmarkCurrentToken() {
-    const tokenKey = getReaderFocalTokenKey()
-    if (!tokenKey) return
+    const word = getReaderFocalWord()
+    const tokenKey = word?.dataset.tokenKey
+    if (!word || !tokenKey) return
 
     const existing = bookmarks.find((bookmark) => bookmark.tokenKey === tokenKey)
     if (existing) {
@@ -987,11 +1206,12 @@ export function startReaderRuntime({
     }
 
     const session = readerPlaybackGlobal?.snapshot().session
-    const cue = readerPlaybackGlobal?.cueForToken(tokenKey)
-    const hash = getBookmarkHashForTokenKey(tokenKey)
+    const canonicalKey = canonicalVisibleTokenKey(word) ?? tokenKey
+    const cue = readerPlaybackGlobal?.cueForToken(canonicalKey)
+    const hash = getBookmarkHashForTokenKey(canonicalKey)
     const bookmark = createBookmark({
       hash,
-      label: getTokenLabel(tokenKey),
+      label: currentTokenForm(word) === 'annotated' ? getTokenLabel(canonicalKey) : word.textContent?.trim() || getTokenLabel(canonicalKey),
       tokenKey,
       audioId: session?.recording.id,
       timeStart: cue?.timeStart,
@@ -1041,7 +1261,7 @@ export function startReaderRuntime({
   }
 
   function getReaderControlsState(
-    tokenKey = getReaderFocalTokenKey()
+    tokenKey = getReaderFocalWord()?.dataset.tokenKey ?? null
   ): ReaderControlsState {
     const isBookmarked = Boolean(
       tokenKey && bookmarks.some((bookmark) => bookmark.tokenKey === tokenKey)
@@ -1056,13 +1276,25 @@ export function startReaderRuntime({
   }
 
   function getBookmarkHashForTokenKey(tokenKey: string) {
+    const passage = readerDisplaySessionGlobal?.capture()?.viewModel.isolatedAliyah
+    if (passage) {
+      const identity = passage.tokenIdentity({ tokenKey, form: 'annotated' })
+      return generateAliyahUrl(passage.run, passage.aliyahIndex, identity.ref)
+    }
     const token = document.querySelector<HTMLElement>(`[data-token-key="${tokenKey}"]`)
     const lineInfo = token ? getLineInfoFromElement(token) : null
-    const verse = lineInfo?.verses[0]
+    const verse = token && getBook().dataset.readerLayout === 'reading'
+      ? readingVerseAtWord(getBook(), token) ?? lineInfo?.verses[0]
+      : lineInfo?.verses[0]
     const initialRef = verse && lineInfo?.run
       ? { ...verse, scroll: lineInfo.run.scroll }
       : lineInfo?.run?.aliyot[0]?.start
 
+    if (isolatedReading) {
+      const reference = initialRef && compareRefs(initialRef, isolatedReading.aliyah.start) >= 0 &&
+        compareRefs(initialRef, isolatedReading.aliyah.end) <= 0 ? initialRef : isolatedReading.aliyah.start
+      return generateAliyahUrl(isolatedReading.run, isolatedReading.aliyah.index, reference)
+    }
     if (lineInfo?.run) return createLastReadingHash(lineInfo.run, initialRef)
     const currentReaderHash = readerRouteGlobal?.snapshot().currentReaderHash
     return currentReaderHash && currentReaderHash !== '#/next'
@@ -1137,18 +1369,32 @@ export function startReaderRuntime({
     return checkpoints.sort(compareCheckpoints)
   }
 
-  function jumpToCheckpoint(checkpoint: Checkpoint) {
-    if (checkpoint.hash && checkpoint.hash !== location.hash) {
-      location.hash = checkpoint.hash
-      window.setTimeout(() => {
-        void jumpToTokenKey(checkpoint.tokenKey, {
-          audioTime: checkpoint.timeStart,
-        })
-      }, 0)
-      return
-    }
+  function reportReadingNavigationError(error: unknown) {
+    if (error instanceof DOMException && error.name === 'AbortError') return
+    console.error('Failed to navigate to the requested reading', error)
+    showReaderNotice(error instanceof Error ? error.message : 'This reading could not be opened. Try again.', { assertive: true })
+  }
 
-    void jumpToTokenKey(checkpoint.tokenKey, { audioTime: checkpoint.timeStart })
+  function jumpToCheckpoint(checkpoint: Checkpoint) {
+    void (async () => {
+      const hash = checkpoint.hash ?? location.hash
+      if (hash === location.hash && !isolatedReading && !isMobileReaderViewport(window)) {
+        await jumpToTokenKey(checkpoint.tokenKey, { audioTime: checkpoint.timeStart })
+        return
+      }
+      const route = parseUrl(createCalendarGenerator(), hash.replace(/^#/, ''))
+      if (route?.view !== 'reader') throw new Error('This saved reading is unavailable.')
+      pendingReaderRestoration = {
+        hash: route.canonicalHash ?? hash,
+        tokenKey: checkpoint.tokenKey,
+        tokenLabel: checkpoint.label,
+        preservePlayback: false,
+      }
+      const restored = await readerRouteGlobal?.navigateAndWait(hash)
+      if (restored && checkpoint.timeStart !== undefined && readerPlaybackGlobal?.snapshot().session) {
+        readerPlaybackGlobal.seek(checkpoint.timeStart)
+      }
+    })().catch(reportReadingNavigationError)
   }
 
   async function scrollToAliyahMarker(
@@ -1175,7 +1421,11 @@ export function startReaderRuntime({
 
     const line = target.element.closest<HTMLElement>('[data-line-index]')
     virtualizationHold.releaseAfterNavigation()
-    centerElementInScrollRoot(getBook(), line ?? target.element, { behavior: 'smooth' })
+    const book = getBook()
+    const aliyah = line && getLineInfoFromElement(line)?.aliyahStarts.find(start => start.index === aliyahIndex)
+    const word = book.dataset.readerLayout === 'reading' && line && aliyah
+      ? findReadingVerseStartWord(book, line, aliyah.start) : null
+    centerElementInScrollRoot(book, word ?? line ?? target.element, { behavior: 'smooth' })
     syncAliyahNavigationToolbar(
       displaySession.progressAnchorForElement(line ?? target.element)
     )
@@ -1715,20 +1965,6 @@ export function startReaderRuntime({
       passive: true,
       signal: scope.signal,
     })
-    window.addEventListener(
-      'resize',
-      () => {
-        closeAliyahStartPopup()
-        if (aliyahStartMarkerResizeTimer !== null) {
-          window.clearTimeout(aliyahStartMarkerResizeTimer)
-        }
-        aliyahStartMarkerResizeTimer = window.setTimeout(() => {
-          aliyahStartMarkerResizeTimer = null
-          if (!scope.signal.aborted) scheduleAliyahStartMarkerLayout(book)
-        }, 120)
-      },
-      { signal: scope.signal }
-    )
     const refreshFontLayout = () => {
       if (scope.signal.aborted) return
       readerDisplaySessionGlobal?.invalidateProgressAnchors('text-layout')
@@ -1756,10 +1992,6 @@ export function startReaderRuntime({
       closeAliyahStartPopup()
       aliyahStartPopup?.remove()
       aliyahStartPopup = null
-      if (aliyahStartMarkerResizeTimer !== null) {
-        window.clearTimeout(aliyahStartMarkerResizeTimer)
-        aliyahStartMarkerResizeTimer = null
-      }
       if (aliyahStartMarkerLayoutFrame) {
         cancelAnimationFrame(aliyahStartMarkerLayoutFrame)
         aliyahStartMarkerLayoutFrame = 0
@@ -1818,6 +2050,7 @@ export function startReaderRuntime({
   }
 
   function getPreferredMobileAliyahRun(currentRun: LeiningRun | null) {
+    if (isolatedReading) return isolatedReading.run
     const routeSnapshot = readerRouteGlobal?.snapshot()
     const slugMatch = routeSnapshot?.hashPath.match(
       /^#\/torah\/parsha\/([^/?]+)/
@@ -1965,7 +2198,7 @@ export function startReaderRuntime({
     )
     const mobileRun = getPreferredMobileAliyahRun(currentRun) ?? currentRun
     const mobileEntries = getAliyahNavigationEntriesForRun(mobileRun)
-    const mobileActive = resolveActiveTargetForRun({
+    const mobileActive = isolatedReading ? targetForEntry(isolatedReading) : resolveActiveTargetForRun({
       runId: mobileRun.id,
       current: currentTarget,
       playback,
@@ -1993,6 +2226,7 @@ export function startReaderRuntime({
       desktop: desktopSnapshot,
       compact: mobileSnapshot,
       authoringEnabled: cueAuthoringGlobal?.isActive() ?? false,
+      isolated: Boolean(isolatedReading),
     })
   }
 
@@ -2000,6 +2234,20 @@ export function startReaderRuntime({
     runId: string,
     aliyahIndex: PlaybackAliyahIndex
   ) {
+    if (isolatedReading) {
+      // The rail's current aliyah returns to the start of its passage. A loaded
+      // recording for it also returns to the first word, paused at 0:00.
+      if (isSameAliyahNavigationTarget(targetForEntry(isolatedReading), { runId, aliyahIndex })) {
+        const session = readerPlaybackGlobal?.snapshot().session
+        if (session?.runId === runId && session.aliyahIndex === aliyahIndex) {
+          void readerPlaybackGlobal!.rewind().catch(reportReadingNavigationError)
+        }
+        getBook().scrollTo({ top: 0, behavior: 'smooth' })
+        return
+      }
+      void navigateIsolatedAliyah({ runId, aliyahIndex }).catch(reportReadingNavigationError)
+      return
+    }
     const now = performance.now()
     pendingAliyahRailSelection = {
       runId,
@@ -2012,6 +2260,37 @@ export function startReaderRuntime({
 
     const actionToken = railScrollAction.start()
     void scrollToAliyahMarker(runId, aliyahIndex, actionToken)
+  }
+
+  async function navigateIsolatedAliyah(
+    target: AliyahNavigationTarget,
+    { forPlayback = false }: { forPlayback?: boolean } = {},
+  ) {
+    if (isSameAliyahNavigationTarget(isolatedReading && targetForEntry(isolatedReading), target)) return true
+    const run = isolatedReading?.run.leining.runs.find(candidate => candidate.id === target.runId) ??
+      resolveReadingRun(createCalendarGenerator(), target.runId)
+    if (!run) throw new Error('The requested reading is unavailable.')
+    const hash = generateAliyahUrl(run, target.aliyahIndex)
+    const entry = getAliyahNavigationEntriesForRun(run).find(candidate => isSameAliyahNavigationTarget(targetForEntry(candidate), target))
+    if (!entry) throw new Error('The selected aliyah is unavailable.')
+    pendingReaderRestoration = null
+    if (forPlayback) playbackNavigationHash = hash
+    else {
+      playbackNavigationHash = null
+      playbackAction.cancel()
+      readerPlaybackGlobal?.resetRoute()
+    }
+    // Publish the selection before hashchange so another tap can supersede it,
+    // including a tap back to the passage that was just left.
+    readerRenderGeneration += 1
+    isolatedReading = entry
+    preservePlaybackDuringDisplayReplacement = true
+    try { getReaderDisplaySession().deactivate() }
+    finally { preservePlaybackDuringDisplayReplacement = false }
+    showPassageStatus()
+    syncAliyahNavigationContent()
+    syncAliyahNavigationToolbar(isolatedAnchor())
+    return await readerRouteGlobal?.navigateAndWait(hash) ?? false
   }
 
   function mountAliyahNavigation(scope: MountScope) {
@@ -2297,7 +2576,7 @@ export function startReaderRuntime({
   function resetDisplayResources() {
     readerPlaybackGlobal?.resetRecordingCache()
     railScrollAction.cancel()
-    playbackAction.cancel()
+    if (!preservePlaybackDuringDisplayReplacement) playbackAction.cancel()
   }
 
   function isPlaybackActive() {
@@ -2451,6 +2730,17 @@ export function startReaderRuntime({
     const center = range?.center
     const centerRun = center?.run
     const activeDisplay = readerDisplaySessionGlobal?.capture()
+    const book = getBook()
+    if (book.dataset.readerLayout === 'reading') {
+      const word = getVisibleReaderFocalWord(book)
+      const ref = word && readingVerseAtWord(book, word)
+      if (ref) {
+        return {
+          centerRun,
+          memberships: aliyahMembershipsAtRef(activeDisplay?.viewModel.relevantRuns ?? (centerRun ? [centerRun] : []), ref),
+        }
+      }
+    }
     const memberships = center
       ? aliyahMembershipsForFocalLine({
           runs:
@@ -2505,6 +2795,7 @@ export function startReaderRuntime({
     range: ViewportRange | null,
     anchors: readonly ReaderProgressAnchor[]
   ): ReaderProgressAnchor | null {
+    if (isolatedReading) return isolatedAnchor()
     const { centerRun, memberships } = getCenterLineAliyahMemberships(range)
 
     let pending: AliyahIdentity | null = pendingAliyahRailSelection
@@ -2592,6 +2883,8 @@ export function startReaderRuntime({
   function getReaderFocalPointScrollTarget(book: HTMLElement) {
     const activeWord = book.querySelector<HTMLElement>('.word.is-active-word')
     if (activeWord) return activeWord
+
+    if (book.dataset.readerLayout === 'reading') return getVisibleReaderFocalWord(book)
 
     const centerLine = readerDisplaySessionGlobal?.viewportRange()?.center
     if (!centerLine) return null
@@ -2714,7 +3007,8 @@ export function startReaderRuntime({
       button.dataset.audioDimmed = String(appearance.dimmed)
       button.dataset.audioTooltip = appearance.tooltip
       setControlIcon(button, isPlayingCurrentSession ? 'pause' : 'play')
-      const label = state?.lineInfo.labels[0] ?? 'aliyah'
+      const label = button.closest('.aliyah-badge')?.querySelector('.aliyah-label-text')?.textContent?.trim()
+        || (state ? formatAliyahLabel(state.aliyahIndex, state.run) : 'aliyah')
       button.title = authoringAvailable
         ? `Select ${label} for audio and cue recording`
         : authoringEnabled && cueIsIncomplete && cueStatus
@@ -2741,6 +3035,7 @@ export function startReaderRuntime({
   function syncAliyahNavigationToolbar(
     current: ReaderProgressAnchor | null
   ) {
+    if (isolatedReading) current = isolatedAnchor()
     const playback = readerPlaybackGlobal?.snapshot()
     const recording =
       current?.run && current.aliyahIndex
@@ -2938,6 +3233,9 @@ export function startReaderRuntime({
     if (!readerPlayback) return
     const state = getSessionButtonState(button)
     if (!state) return
+    if (isolatedReading && !cueAuthoringGlobal?.isActive()) {
+      return startPlaybackForToolbarCurrentAliyah({ runId: state.run.id, aliyahIndex: state.aliyahIndex })
+    }
     const actionToken = playbackAction.start()
     if (cueAuthoringGlobal?.isActive() && !state.recording) {
       await loadAliyahForAudioAuthoring(
@@ -2987,7 +3285,6 @@ export function startReaderRuntime({
   ) {
     const readerPlayback = readerPlaybackGlobal
     if (!readerPlayback) return
-    const actionToken = playbackAction.start()
     const activeDisplay = readerDisplaySessionGlobal?.capture()
     const run =
       activeDisplay?.viewModel.relevantRuns.find(
@@ -3004,6 +3301,11 @@ export function startReaderRuntime({
       cueAuthoringGlobal?.isActive() && !availability.recording
     )
     if (!authoringTarget && (!availability.available || availability.passage?.problem === 'checking')) return
+    const switchingIsolatedAliyah = Boolean(isolatedReading && !isSameAliyahNavigationTarget(
+      targetForEntry(isolatedReading), { runId, aliyahIndex },
+    ))
+    if (switchingIsolatedAliyah) readerPlayback.resetRoute()
+    const actionToken = playbackAction.start()
 
     if (readerPlayback.isTargetActive({
       recordingId: availability.recording?.id ?? null,
@@ -3027,6 +3329,10 @@ export function startReaderRuntime({
       )
     }
 
+    if (switchingIsolatedAliyah) {
+      const navigated = await navigateIsolatedAliyah({ runId, aliyahIndex }, { forPlayback: true })
+      if (!navigated || !playbackAction.isCurrent(actionToken)) return
+    }
     const target = await getReaderDisplaySession().ensureAliyahDomTargetRendered(
       runId,
       aliyahIndex
@@ -3056,7 +3362,19 @@ export function startReaderRuntime({
       readerDisplaySessionGlobal?.viewportRange() ?? null
   ) {
     const book = getBook()
+    rememberReaderFocalPosition?.()
     const progressSnapshot = getReaderDisplaySession().progressSnapshot()
+    if (isolatedReading) {
+      const extent = book.scrollHeight - book.clientHeight
+      getReaderShell().setProgress({
+        label: formatAliyahLabel(isolatedReading.aliyah.index, isolatedReading.run),
+        percent: extent > 0 ? Math.min(100, Math.max(0, book.scrollTop / extent * 100)) : 100,
+      })
+      syncAliyahNavigationToolbar(isolatedAnchor())
+      syncAliyahNavigationContent(range, progressSnapshot)
+      readerControlsGlobal?.sync()
+      return
+    }
     const anchors = progressSnapshot.anchors
     const viewportCenter = anchors.length
       ? getReaderFocalPointScrollTop(book)
@@ -3170,9 +3488,33 @@ export function startReaderRuntime({
     presentReaderPosition()
   }
 
+  function captureLayoutRestoration(
+    hash: string,
+    focalWord = getVisibleReaderFocalWord(getBook()),
+  ): NonNullable<typeof pendingReaderRestoration> {
+    const current = isolatedAnchor() ?? getCurrentAliyahFromViewportRange(
+      readerDisplaySessionGlobal?.viewportRange() ?? null,
+      readerDisplaySessionGlobal?.progressSnapshot().anchors ?? [],
+    )
+    return {
+      hash,
+      tokenKey: focalWord?.dataset.tokenKey ?? null,
+      tokenForm: currentTokenForm(focalWord ?? undefined),
+      tokenLabel: focalWord?.textContent?.trim(),
+      preservePlayback: true,
+      target: current?.run && current.aliyahIndex
+        ? { runId: current.run.id, aliyahIndex: current.aliyahIndex } : undefined,
+    }
+  }
+
   function updateReaderPreferencesFromSettings(
     updates: Partial<ReaderPreferences>
   ) {
+    const rebuildIsolation = isMobileReaderViewport(window) && !recordingMode.enabled &&
+      updates.readerTextLayout !== undefined && updates.readerTextLayout !== readerPreferences.readerTextLayout
+    if (rebuildIsolation && readerRouteGlobal?.snapshot().view === 'reader') {
+      pendingReaderRestoration = captureLayoutRestoration(readerRouteGlobal.snapshot().currentReaderHash ?? location.hash)
+    }
     const shouldSmoothRecenter =
       updates.focalPointMode !== undefined &&
       updates.focalPointMode !== readerPreferences.focalPointMode
@@ -3228,7 +3570,14 @@ export function startReaderRuntime({
     }
     trackPreferenceChanges(readerPreferences, nextPreferences)
     readerPreferences = nextPreferences
-    if (shouldUpdatePagePresentation) {
+    if (rebuildIsolation) {
+      syncEffectiveReaderPagePresentation({ rerender: false,
+        beforeLayout: () => applyReaderPreferences(readerPreferences),
+      })
+      if (pendingReaderRestoration) {
+        void readerRouteGlobal?.navigateAndWait(pendingReaderRestoration.hash).catch(reportReadingNavigationError)
+      }
+    } else if (shouldUpdatePagePresentation) {
       syncEffectiveReaderPagePresentation({
         beforeLayout: () => applyReaderPreferences(readerPreferences),
       })
@@ -3249,32 +3598,109 @@ export function startReaderRuntime({
 
   function setupReaderViewportResize(scope: MountScope, book: HTMLElement) {
     let pendingScrollTarget: HTMLElement | null = null
-    let recenterFrame = 0
-
-    const handleResize = () => {
-      readerDisplaySessionGlobal?.invalidateProgressAnchors('viewport-resized')
-      pendingScrollTarget ??= getReaderFocalPointScrollTarget(book)
-      setAppHeight()
-      if (recenterFrame) return
-
-      recenterFrame = requestAnimationFrame(() => {
-        recenterFrame = 0
-        const scrollTarget = pendingScrollTarget
-        pendingScrollTarget = null
-        scheduleSpecialLetterAlignment(book, scope.signal)
-        recenterReaderFocalPoint(scrollTarget)
-      })
+    let pendingFocalOffset = 0
+    let width = window.innerWidth
+    let height = window.innerHeight
+    let positionDirty = false
+    let settledFrame = 0
+    let transitionRevision = 0
+    let restorationInFlight: typeof pendingReaderRestoration = null
+    let focalPosition: { word: HTMLElement; offset: number; scrollTop: number } | null = null
+    const rememberFocalPosition = (restoredWord?: HTMLElement | null, intendedOffset?: number) => {
+      // A hidden reader (behind the Reading Index) has no measurable focal word.
+      if (width !== window.innerWidth || height !== window.innerHeight ||
+        book.hasAttribute('aria-busy') || positionDirty || !book.clientHeight) return
+      if (!restoredWord && focalPosition?.word.isConnected && focalPosition.scrollTop === book.scrollTop) return
+      const word = restoredWord ?? getVisibleReaderFocalWord(book)
+      if (!word) { focalPosition = null; return }
+      const rect = word.getBoundingClientRect()
+      const offset = intendedOffset ?? (rect.top + rect.bottom) / 2 - getReaderFocalPointClientY(book)
+      focalPosition = { word, offset, scrollTop: book.scrollTop }
     }
+    rememberReaderFocalPosition = rememberFocalPosition
+    book.addEventListener('scroll', () => rememberFocalPosition(), { passive: true, signal: scope.signal })
+
+    const viewportLayout = observeReaderResize(window, 'viewport', () => {
+      if (width === window.innerWidth && height === window.innerHeight) return
+      width = window.innerWidth
+      height = window.innerHeight
+      positionDirty = true
+      const retained = focalPosition?.word.isConnected ? focalPosition : null
+      pendingScrollTarget = retained?.word ?? getVisibleReaderFocalWord(book)
+      const focalRect = pendingScrollTarget?.getBoundingClientRect()
+      pendingFocalOffset = retained?.offset ?? (focalRect
+        ? (focalRect.top + focalRect.bottom) / 2 - getReaderFocalPointClientY(book) : 0)
+      closeAliyahStartPopup()
+      document.documentElement.dataset.readerResizing = 'true'
+      if (settledFrame) cancelAnimationFrame(settledFrame)
+      setAppHeight()
+      const route = readerRouteGlobal?.snapshot()
+      const shouldIsolate = Boolean(isMobileReaderViewport(window) &&
+        readerPreferences.readerTextLayout === 'reading' && !recordingMode.enabled &&
+        readerSourceModel && initialIsolatedEntry(readerSourceModel))
+      if (route?.view === 'reader' && shouldIsolate !== Boolean(isolatedReading)) {
+        const hash = route.currentReaderHash ?? location.hash
+        const restoration = restorationInFlight?.hash === hash
+          ? restorationInFlight : captureLayoutRestoration(hash, pendingScrollTarget)
+        restorationInFlight = restoration
+        pendingReaderRestoration = restoration
+        pendingScrollTarget = null
+        syncEffectiveReaderPagePresentation({ rerender: false })
+        const revision = ++transitionRevision
+        void readerRouteGlobal!.navigateAndWait(location.hash).then(() => {
+          if (scope.signal.aborted || revision !== transitionRevision) return
+          restorationInFlight = null
+        }).catch(reportReadingNavigationError)
+      } else {
+        syncEffectiveReaderPagePresentation()
+      }
+      readerSettingsGlobal?.sync()
+    })
+
+    const positionLayout = observeReaderResize(window, 'position', () => {
+      // Defer while hidden; revealing the reader resizes it, which schedules
+      // this phase again with real geometry.
+      if (!positionDirty || !book.clientHeight) return
+      positionDirty = false
+      if (aliyahStartMarkerLayoutFrame) cancelAnimationFrame(aliyahStartMarkerLayoutFrame)
+      aliyahStartMarkerLayoutFrame = 0
+      if (document.fonts.status === 'loaded') alignSmallSpecialLetters(book)
+      else scheduleSpecialLetterAlignment(book, scope.signal)
+      applyAliyahStartWordMarkers(book)
+      readerDisplaySessionGlobal?.invalidateProgressAnchors('viewport-resized')
+      if (pendingScrollTarget?.isConnected) {
+        const rect = pendingScrollTarget.getBoundingClientRect()
+        book.scrollTop += (rect.top + rect.bottom) / 2 - getReaderFocalPointClientY(book) - pendingFocalOffset
+      }
+      readerDisplaySessionGlobal?.refreshViewport()
+      invalidateReaderPosition()
+      // WebKit rounds scrollTop to whole pixels; keep the intended offset so
+      // repeated resizes do not accumulate that rounding into visible drift.
+      const restoredWord = pendingScrollTarget?.isConnected ? pendingScrollTarget : undefined
+      rememberFocalPosition(restoredWord, restoredWord ? pendingFocalOffset : undefined)
+      pendingScrollTarget = null
+      readerDisplaySessionGlobal?.flushPresentation()
+      settledFrame = requestAnimationFrame(() => {
+        settledFrame = 0
+        delete document.documentElement.dataset.readerResizing
+      })
+    })
+
+    book.addEventListener('reader-layout', () => {
+      positionDirty = true
+      positionLayout.request()
+    }, { signal: scope.signal })
 
     setAppHeight()
-    window.addEventListener('resize', handleResize, { signal: scope.signal })
-    window.visualViewport?.addEventListener('resize', handleResize, {
-      signal: scope.signal,
-    })
     scope.own(() => {
+      viewportLayout.destroy()
+      positionLayout.destroy()
       pendingScrollTarget = null
-      if (recenterFrame) cancelAnimationFrame(recenterFrame)
-      recenterFrame = 0
+      restorationInFlight = null
+      rememberReaderFocalPosition = null
+      focalPosition = null
+      if (settledFrame) cancelAnimationFrame(settledFrame)
+      delete document.documentElement.dataset.readerResizing
     })
   }
 
@@ -3375,10 +3801,6 @@ export function startReaderRuntime({
   const readerViewport = createReaderViewport(scope, window)
   readerViewportGlobal = readerViewport
   syncEffectiveReaderPagePresentation({ rerender: false })
-  readerViewport.onChange(() => {
-    syncEffectiveReaderPagePresentation()
-    readerSettingsGlobal?.sync()
-  })
   scope.own(() => {
     if (readerViewportGlobal === readerViewport) {
       readerViewportGlobal = null
@@ -3757,7 +4179,7 @@ export function startReaderRuntime({
       focusReaderSurface()
     },
     openAliyahNavigation: (returnFocus) => {
-      if (isCompactReaderViewport()) {
+      if (isolatedReading || isCompactReaderViewport()) {
         aliyahNavigationGlobal?.openCompact(returnFocus)
         return
       }
@@ -4111,7 +4533,7 @@ export function startReaderRuntime({
       return
     }
     if (!word || !playback.session) return
-    const tokenKey = word.dataset.tokenKey ?? null
+    const tokenKey = canonicalVisibleTokenKey(word)
     if (!tokenKey) return
     const tokenIndex = readerPlayback.tokenIndex(tokenKey)
     const cue = readerPlayback.cueForToken(tokenKey)
@@ -4306,7 +4728,7 @@ export function startReaderRuntime({
         if (explicitAliyahSelectionHash !== nextReaderHash) {
           clearExplicitAliyahSelection()
         }
-        resetReaderSideNavigationState()
+        resetReaderSideNavigationState({ preservePlayback: playbackNavigationHash === nextReaderHash })
         readerDisplaySession.resetViewport()
         readerControlsGlobal?.close()
         closeAliyahStartPopup()

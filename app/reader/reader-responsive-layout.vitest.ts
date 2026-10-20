@@ -64,7 +64,8 @@ afterEach(async () => {
   }
 })
 
-test.each(['match', 'reading'] as const)('anchors mobile aliyah overlays to their first letter in %s after scrolling and resizing', async (readerTextLayout) => {
+// Reading at these widths is the isolated view, which has no start overlays.
+test.each(['match'] as const)('anchors mobile aliyah overlays to their first letter in %s after scrolling and resizing', async (readerTextLayout) => {
   await page.viewport(1280, 1000)
   originalLocalStorage = snapshotStorage(localStorage)
   localStorage.clear()

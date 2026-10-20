@@ -11,6 +11,12 @@ npm run dev:aligner
 
 Run this command from the Tikkun project root. Run `npm run dev` in another terminal for the website and its `/settings/` admin hub. Stop a newly started aligner with Ctrl+C; saved work stays on disk. Starting the server does not start queued alignment jobs.
 
+Startup imports new recordings from the local source library before opening the aligner. Configure `work/audio-source.json` with `{"sourceRoot":"/path/to/source recordings"}`, or set `TIKKUN_AUDIO_SOURCE_ROOT`. The file is ignored by Git. Use the folder containing numbered parsha folders, such as `38 Korach` and `41 Pinchas`; M4A and MP3 filenames must identify aliyot 1 through 7. On this Mac, the source is already configured to the Yoni Davidov aliyah recordings folder.
+
+Import adds new audio under `site/audio/`, refreshes the local audio and reading manifests, and prints the new recording IDs. Unchanged files are skipped; missing copies of unchanged audio are restored. Existing recordings absent from the source folder and all cue files stay intact. Replacing registered audio requires an explicit `npm run audio:sync` after reviewing the change, because cues are bound to exact audio bytes. The latest import report is saved to `work/audio-import-report.json`. Import does not commit, publish, or start alignment jobs.
+
+Running the command again refreshes a compatible running server's library; refresh the browser to see new parshiot. A server started before this update needs a one-time Ctrl+C and restart, which the command reports without stopping it automatically.
+
 With the preserved cue-flag snapshot present, the launcher defaults to port
 8768 and reuses its running server. Explicit command-line options still take
 precedence. The original services on 8767 and 8769 remain separate; use the
@@ -31,8 +37,9 @@ cue-flag preview for ongoing work.
 5. After a server restart, the queue waits for an explicit start. An interrupted
    active item needs **Retry**; completed results and review revisions survive.
 
-The initial library contains 70 locally available recordings, including all
-seven Behalotecha aliyot. No model download is needed. The shared testing
+**Clear queue** removes every entry, including completed, failed, interrupted, cancelled, waiting, and active recordings. The empty list persists after a refresh or restart. Waiting work stops immediately; an active recording finishes safely and saves its cues without returning to the list. New selections stay paused until it finishes and you choose **Start queue**. Saved cues, reviews, audio, and downloads remain available; add a recording again to reuse its saved result.
+
+The library lists locally registered recordings, including newly imported parshiot. No model download is needed. The shared testing
 allowance is checked before each recording, and elapsed model work is recorded.
 An active recording finishes before the run window or pause takes effect.
 

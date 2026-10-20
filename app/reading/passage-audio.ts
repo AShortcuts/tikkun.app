@@ -208,7 +208,7 @@ export class PassageAudioResolver {
     const missingMessage = absent.length
       ? `Audio unavailable for ${missingReferences.join(', ')} ${missing.length === 1 ? 'portion' : 'portions'}`
       : `Excerpt timing needed: ${missingReferences.join(', ')}`
-    const message = complete ? cueComplete ? '' : 'Full audio available. Some word highlighting is missing.' :
+    const message = complete ? cueComplete ? '' : 'Full audio available. Some highlighting is missing.' :
       `${missingMessage}${absent.length && timingNeeded ? '. Some excerpts also need timing cues.' : ''}`
     return { problem, message, recording: portions[0]?.segments[0]?.recording ?? candidates[0]?.recording ?? null,
       portions, missing, tokenKeys, range, cueComplete, issue, canPlay: portions.length > 0 }

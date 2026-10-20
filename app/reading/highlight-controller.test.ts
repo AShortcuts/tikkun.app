@@ -67,6 +67,8 @@ function createBookWithTokens(tokenKeys: string[]) {
   const tokens = new Map(tokenKeys.map((tokenKey) => [tokenKey, createTokenElement(tokenKey)]))
   const scrollCalls: unknown[] = []
   return {
+    dataset: { readerSides: 'one' },
+    classList: { contains: () => true },
     addEventListener() {},
     clientHeight: 100,
     scrollTop: 25,
@@ -409,7 +411,7 @@ test('drops cached token elements when the display changes', async () => {
   expect(await controller.activateTokenKey('12:7:0:2', { scroll: false })).toBe(oldToken)
 
   activeToken = newToken
-  controller.setDisplay({} as never)
+  controller.setDisplay({ viewModel: { isolatedAliyah: null } } as never)
 
   expect(await controller.activateTokenKey('12:7:0:2', { scroll: false })).toBe(newToken)
 })
@@ -445,6 +447,7 @@ test('mounts the cue page before activating a cue token', async () => {
   const controller = new HighlightController(book)
 
   controller.setDisplay({
+    viewModel: { isolatedAliyah: null },
     async ensurePageMounted(pageNumber: number): Promise<null> {
       calls.push(pageNumber)
       return null
@@ -474,6 +477,7 @@ test('keeps the latest cue active when an older page mount resolves later', asyn
     throw new Error('First page mount was not started')
   }
   controller.setDisplay({
+    viewModel: { isolatedAliyah: null },
     ensurePageMounted(pageNumber: number) {
       if (pageNumber !== 12) return Promise.resolve()
       return new Promise<void>((resolve) => {
@@ -509,6 +513,7 @@ test('invalidates a pending cue activation when the display changes', async () =
     throw new Error('Page mount was not started')
   }
   controller.setDisplay({
+    viewModel: { isolatedAliyah: null },
     ensurePageMounted() {
       return new Promise<void>((resolve) => {
         resolveMount = resolve
@@ -523,11 +528,65 @@ test('invalidates a pending cue activation when the display changes', async () =
     fragmentIndex: 0,
     wordIndex: 2,
   }, { scroll: false })
-  controller.setDisplay({ ensurePageMounted: async (): Promise<void> => {} } as never)
+  controller.setDisplay({ viewModel: { isolatedAliyah: null }, ensurePageMounted: async (): Promise<void> => {} } as never)
   resolveMount()
 
   await expect(pending).resolves.toBeNull()
   expect(controller.getActiveTokenKey()).toBeNull()
+})
+
+test('rejects neighboring words on a mounted physical line before mounting, highlighting, or scrolling', async () => {
+  const selected = '12:7:0:2'
+  const neighbor = '12:7:0:1'
+  const book = createBookWithTokens([selected, neighbor])
+  const controller = new HighlightController(book)
+  const mounts: number[] = []
+  controller.setDisplay({
+    viewModel: { isolatedAliyah: {
+      containsTokenKey: (key: string) => key === selected,
+      containsRenderedTokenKey: (key: string) => key === selected,
+    } },
+    async ensurePageMounted(page: number) { mounts.push(page) },
+  } as never)
+  await controller.activateTokenKey(selected, { scroll: false })
+  const cue = { timeStart: 0, pageNumber: 12, lineIndex: 7, fragmentIndex: 0, wordIndex: 1 }
+  expect(await controller.activateCue(cue)).toBeNull()
+  expect(await controller.activateTokenKey(neighbor)).toBeNull()
+  expect(mounts).toEqual([])
+  expect(controller.getActiveTokenKey()).toBe(selected)
+  expect(book.querySelectorAll(`[data-token-key="${neighbor}"]`)[0].classList.contains('is-active-word')).toBe(false)
+  expect(book.scrollTop).toBe(25)
+})
+
+test('keeps an exact unpointed bookmark through form changes while audio uses canonical maqaf groups', async () => {
+  const canonical = '5:0:0:2'
+  const plain = '5:0:0:3'
+  const book = createBookWithTokens([canonical, plain])
+  let annotated = false
+  book.classList.contains = () => annotated
+  const controller = new HighlightController(book)
+  controller.setDisplay({
+    viewModel: { isolatedAliyah: {
+      containsTokenKey: (key: string) => key === canonical,
+      tokenIdentity: () => ({ plainTokenKeys: [canonical, plain] }),
+    } },
+    async ensurePageMounted() {},
+  } as never)
+  const elements = (key: string) => book.querySelectorAll<HTMLElement>(`[data-token-key="${key}"]`)[0]
+  await controller.activateTokenKey(canonical, { scroll: false, preferredPlainTokenKey: plain })
+  expect(controller.getActiveTokenKey()).toBe(canonical)
+  expect(elements(plain).classList.contains('is-active-word')).toBe(true)
+  expect(elements(canonical).classList.contains('is-active-word')).toBe(false)
+  annotated = true
+  await controller.activateTokenKey(canonical, { scroll: false })
+  expect(elements(canonical).classList.contains('is-active-word')).toBe(true)
+  annotated = false
+  await controller.activateTokenKey(canonical, { scroll: false })
+  expect(elements(plain).classList.contains('is-active-word')).toBe(true)
+  expect(elements(canonical).classList.contains('is-active-word')).toBe(false)
+  await controller.activateCue({ timeStart: 0, pageNumber: 5, lineIndex: 0, fragmentIndex: 0, wordIndex: 2 }, { scroll: false })
+  expect(elements(plain).classList.contains('is-active-word')).toBe(true)
+  expect(elements(canonical).classList.contains('is-active-word')).toBe(true)
 })
 
 test('evicts old token element cache entries instead of retaining every highlighted word', async () => {

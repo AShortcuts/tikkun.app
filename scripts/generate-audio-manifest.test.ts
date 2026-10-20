@@ -5,6 +5,7 @@ import {
   readFile,
   readdir,
   rm,
+  stat,
   writeFile,
 } from 'node:fs/promises'
 import os from 'node:os'
@@ -12,6 +13,7 @@ import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import {
   inferAliyah,
+  importAudioCatalog,
   parseAudioSyncOptions,
   selectAliyahFiles,
   syncAudioCatalog,
@@ -169,4 +171,85 @@ test('command options accept environment and explicit source configuration', () 
       TIKKUN_AUDIO_SOURCE_ROOT: '/env/audio',
     }).sourceRoot
   ).toBe('/cli/audio')
+})
+
+test('startup import adds new recordings, keeps absent sources and cues, and skips unchanged files', async () => {
+  const root = await temporaryRoot()
+  const sourceRoot = path.join(root, 'source')
+  const targetAudioRoot = path.join(root, 'audio')
+  const targetFile = path.join(root, 'manifest.ts')
+  const firstFolder = path.join(sourceRoot, '01 Beresheet')
+  await mkdir(firstFolder, { recursive: true })
+  await writeFile(path.join(firstFolder, '1.m4a'), 'existing audio')
+  const existingRecordings = await syncAudioCatalog({ sourceRoot, targetAudioRoot, targetFile })
+  const firstAudio = path.join(targetAudioRoot, 'beresheet/1.m4a')
+  const originalMtime = (await stat(firstAudio)).mtimeMs
+  const cueFile = path.join(root, 'saved-cues.json')
+  await writeFile(cueFile, 'saved timings')
+  await rm(firstFolder, { recursive: true })
+  for (const folder of ['38 Korach', '41 Pinchas']) {
+    await mkdir(path.join(sourceRoot, folder))
+    for (let aliyah = 1; aliyah <= 7; aliyah++) {
+      await writeFile(path.join(sourceRoot, folder, `${aliyah}.m4a`), `${folder} ${aliyah}`)
+    }
+  }
+  const options = { sourceRoot, targetAudioRoot, targetFile, existingRecordings,
+    narrator: { id: 'yoni-davidov', displayName: 'Yoni Davidov', credit: 'Recordings by Yoni Davidov', default: true } }
+  const imported = await importAudioCatalog(options)
+  expect(imported.added).toHaveLength(14)
+  expect(imported.recordings).toHaveLength(15)
+  expect(await readFile(firstAudio, 'utf8')).toBe('existing audio')
+  expect((await stat(firstAudio)).mtimeMs).toBe(originalMtime)
+  expect(await readFile(cueFile, 'utf8')).toBe('saved timings')
+  const manifestMtime = (await stat(targetFile)).mtimeMs
+  const newAudio = path.join(targetAudioRoot, 'pinchas/7.m4a')
+  const newMtime = (await stat(newAudio)).mtimeMs
+
+  const repeated = await importAudioCatalog({ ...options, existingRecordings: imported.recordings })
+  expect(repeated).toMatchObject({ added: [], restored: [], copiedBytes: 0 })
+  expect((await stat(targetFile)).mtimeMs).toBe(manifestMtime)
+  expect((await stat(newAudio)).mtimeMs).toBe(newMtime)
+  await rm(newAudio)
+  const restored = await importAudioCatalog({ ...options, existingRecordings: imported.recordings })
+  expect(restored).toMatchObject({ added: [], restored: ['pinchas-7'] })
+  expect(await readFile(newAudio, 'utf8')).toBe('41 Pinchas 7')
+})
+
+test('startup import refuses changed registered audio before adding any new files', async () => {
+  const root = await temporaryRoot()
+  const sourceRoot = path.join(root, 'source')
+  const firstFolder = path.join(sourceRoot, '01 Beresheet')
+  const targetAudioRoot = path.join(root, 'audio')
+  const targetFile = path.join(root, 'manifest.ts')
+  await mkdir(firstFolder, { recursive: true })
+  await writeFile(path.join(firstFolder, '1.m4a'), 'original')
+  const existingRecordings = await syncAudioCatalog({ sourceRoot, targetAudioRoot, targetFile })
+  const before = await readFile(targetFile, 'utf8')
+  await writeFile(path.join(firstFolder, '1.m4a'), 'replacement')
+  await writeFile(path.join(firstFolder, '2.m4a'), 'new aliyah')
+
+  await expect(importAudioCatalog({ sourceRoot, targetAudioRoot, targetFile, existingRecordings,
+    narrator: { id: 'yoni-davidov' } })).rejects.toThrow(/will not replace audio tied to saved cues/)
+  expect(await readFile(targetFile, 'utf8')).toBe(before)
+  expect(await readFile(path.join(targetAudioRoot, 'beresheet/1.m4a'), 'utf8')).toBe('original')
+  expect(await readdir(path.join(targetAudioRoot, 'beresheet'))).toEqual(['1.m4a'])
+})
+
+test('startup import refuses an unregistered destination file with different contents', async () => {
+  const root = await temporaryRoot()
+  const sourceRoot = path.join(root, 'source')
+  const firstFolder = path.join(sourceRoot, '01 Beresheet')
+  const targetAudioRoot = path.join(root, 'audio')
+  const targetFile = path.join(root, 'manifest.ts')
+  await mkdir(firstFolder, { recursive: true })
+  await writeFile(path.join(firstFolder, '1.m4a'), 'original')
+  const existingRecordings = await syncAudioCatalog({ sourceRoot, targetAudioRoot, targetFile })
+  await writeFile(path.join(firstFolder, '2.m4a'), 'new aliyah')
+  await writeFile(path.join(targetAudioRoot, 'beresheet/2.m4a'), 'unregistered recording')
+  const before = await readFile(targetFile, 'utf8')
+
+  await expect(importAudioCatalog({ sourceRoot, targetAudioRoot, targetFile, existingRecordings,
+    narrator: { id: 'yoni-davidov' } })).rejects.toThrow(/Existing audio differs/)
+  expect(await readFile(targetFile, 'utf8')).toBe(before)
+  expect(await readFile(path.join(targetAudioRoot, 'beresheet/2.m4a'), 'utf8')).toBe('unregistered recording')
 })

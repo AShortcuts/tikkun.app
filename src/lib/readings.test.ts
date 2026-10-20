@@ -38,8 +38,8 @@ vi.mock('../../generated/public-reading-manifest.ts', async (importOriginal) => 
 test('builds public coverage from generated recordings and cue data', () => {
   expect(readingCoverage).toHaveLength(56)
   expect(coverageSummary).toEqual({
-    readingsWithAudio: 11,
-    availableAliyot: 77,
+    readingsWithAudio: 13,
+    availableAliyot: 91,
     syncedReadings: 6,
   })
   expect(availableReadings.every((reading) => reading.availableAliyot.length > 0)).toBe(

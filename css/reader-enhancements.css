@@ -335,12 +335,6 @@ html[data-reader-reduced-motion='on'] .annotations-toggle[data-pointer-press] {
   transform: translateY(-50%) scale(var(--reader-control-press-scale));
 }
 
-@media screen and (max-width: 870px) {
-  .aliyah-badge .aliyah-audio-button:not(:disabled):active {
-    transform: scale(var(--reader-control-press-scale));
-  }
-}
-
 @media (hover: hover) and (pointer: fine) {
   .toolbar-button:hover {
     background: var(--medium-accent-color);
@@ -386,6 +380,10 @@ html[data-reader-reduced-motion='on'] .annotations-toggle[data-pointer-press] {
   transform: scaleY(var(--reader-progress-ratio, 0));
   transform-origin: top;
   transition: transform 0.1s linear;
+}
+
+html[data-reader-resizing='true'] :is(.reader-progress-fill, .reader-progress-mobile-fill) {
+  transition: none;
 }
 
 .reader-progress-percent {
@@ -769,12 +767,6 @@ html[data-reader-reduced-motion='on'] .annotations-toggle[data-pointer-press] {
   }
 }
 
-@media screen and (max-width: 870px) and (prefers-reduced-motion: reduce) {
-  .aliyah-badge .aliyah-audio-button:not(:disabled):active {
-    transform: none;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .annotations-toggle[data-pointer-press],
   .annotations-toggle[data-pointer-press][data-press-active] {
@@ -798,4 +790,32 @@ html[data-reader-reduced-motion='on'] .annotations-toggle[data-pointer-press] {
     outline: 2px solid Highlight;
     outline-offset: 2px;
   }
+}
+html[data-reader-isolated='true'] .reader-passage-status {
+  direction: ltr;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  min-height: 12rem;
+  padding: 2rem 1rem;
+  color: var(--text-color);
+  font-family: var(--ui-font-family, 'Noto Sans Hebrew UI', sans-serif);
+  font-size: 1rem;
+  text-align: center;
+}
+
+html[data-reader-isolated='true'] .reader-passage-status button {
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  border: 0;
+  border-radius: 8px;
+  color: var(--text-color);
+  background: var(--light-accent-color);
+  font: inherit;
+  cursor: pointer;
+}
+
+html[data-reader-isolated='true'] .reader-passage-status button:focus-visible {
+  outline: 2px solid var(--text-color);
+  outline-offset: 3px;
 }

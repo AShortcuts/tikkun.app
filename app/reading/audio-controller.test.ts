@@ -519,6 +519,25 @@ test('does not reload media after a recoverable play rejection', async () => {
   expect(controller.error).toBeNull()
 })
 
+test('treats a pause that interrupts a pending play as a pause, not a failure', async () => {
+  stubMediaGlobals()
+  const audio = new FakeAudioElement(20)
+  const controller = new AudioController(audio as unknown as HTMLAudioElement)
+  await controller.loadSession(createActiveAudioSession(plan(null)))
+  let interrupt!: (error: Error) => void
+  audio.play = () => {
+    audio.paused = false
+    return new Promise<void>((_resolve, reject) => { interrupt = reject })
+  }
+
+  const playback = controller.play()
+  controller.pause()
+  interrupt(new DOMException('The play() request was interrupted by a call to pause().', 'AbortError'))
+
+  await expect(playback).resolves.toBeUndefined()
+  expect(controller.error).toBeNull()
+})
+
 test('waits for a finite open-segment duration and supports cancellation', async () => {
   stubMediaGlobals()
   const audio = new FakeAudioElement(Number.NaN, 0)

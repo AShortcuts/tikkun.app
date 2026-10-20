@@ -381,6 +381,9 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
       await this.audio.play()
     } catch (error) {
       if (generation !== this.activationGeneration) return
+      // play() rejects with AbortError when pause() interrupts it. WebKit keeps
+      // that promise pending until playback starts, so a quick pause lands here.
+      if (error instanceof DOMException && error.name === 'AbortError' && this.audio.paused) return
       const playbackError = this.asError(error, 'Audio playback failed')
       this.reportPlaybackError(playbackError, generation, false)
       throw playbackError
@@ -429,9 +432,13 @@ export class AudioController extends EventEmitter<AudioControllerEvents> {
     this.activateSegment(segmentIndex, clampedTime, !this.audio.paused)
   }
 
+  /** Seeks to the passage start, or a whole recording's first cue. */
+  seekToStart() {
+    this.seek(this.activeSession?.passage ? 0 : this.activeSession?.cues[0]?.timeStart ?? 0)
+  }
+
   replayFromStart() {
-    const startTime = this.activeSession?.passage ? 0 : this.activeSession?.cues[0]?.timeStart ?? 0
-    this.seek(startTime)
+    this.seekToStart()
     return this.play()
   }
 

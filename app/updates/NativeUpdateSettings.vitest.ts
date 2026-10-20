@@ -11,7 +11,7 @@ let component: ReturnType<typeof mount>
 
 beforeEach(() => {
   const channel = { phase: 'idle' as const, pending: false, checkedAt: null }
-  nativeUpdateState.set({ web: { ...channel }, content: { ...channel }, applying: false, canCancel: false, applyError: null })
+  nativeUpdateState.set({ web: { ...channel }, applying: false, canCancel: false, applyError: null })
   fixture = document.createElement('div')
   fixture.className = 'settings-category-panel'
   fixture.style.cssText = 'width: min(100%, 380px); box-sizing: border-box; padding: 16px;'
@@ -55,7 +55,6 @@ test('busy, offline, unpublished and current states stay distinct and accessible
   flushSync()
   await expect.element(page.getByRole('status')).toHaveTextContent('No update has been published')
   updateChannel('web', { phase: 'current' })
-  updateChannel('content', { phase: 'current' })
   flushSync()
   await expect.element(page.getByRole('status')).toHaveTextContent('Up to date.')
   nativeUpdateState.update(state => ({ ...state, applyError: 'Pause audio before applying the update.' }))

@@ -7,7 +7,6 @@
   import type { ReaderAppOptions } from '../../../app/index.ts'
   import '../../../css/master.css'
   import readerTheme from '../../../css/reader-theme.css?raw'
-  import { prepareNativeContent, nativeContentReady } from '../../../app/updates/content-runtime.ts'
   import { nativeWebReady } from '../../../app/updates/web-runtime.ts'
   import { checkNativeUpdates } from '../../../app/updates/native-updates.ts'
   import { isNativeApp } from '../../../app/platform/native.ts'
@@ -23,6 +22,8 @@
   type ReaderBootState = 'loading' | 'ready' | 'failed'
 
   const documentProgress = 0.2
+  // Web startup has four steps; native launches recompute this in bootReader.
+  const defaultStartupSteps = 4
   const readerThemeStyle = `<style data-reader-theme-critical>${readerTheme}</style>`
   const loadDefaultReaderApp = () => import('../../../app/index.ts')
   const downloadOwner = getContext<DownloadOwner | undefined>(DOWNLOAD_OWNER_CONTEXT)
@@ -42,6 +43,7 @@
 
   let bootState = $state<ReaderBootState>('loading')
   let bootProgress = $state(documentProgress)
+  let bootStep = $state((1 - documentProgress) / defaultStartupSteps)
   let doorsVisible = $state(true)
   let themeColor = $state(typeof document === 'undefined' ? ''
     : getComputedStyle(document.documentElement).getPropertyValue('--paper-color').trim())
@@ -71,9 +73,9 @@
     doorsVisible = true
     reloadOnRetry = false
 
-    const hasNativeContent = Boolean(import.meta.env.TIKKUN_NATIVE_MEDIA_ORIGIN && isNativeApp())
     // The rendered document is the first completed step, before hydration or app import.
-    const totalSteps = 4 + Number(Boolean(nativeLinks)) + Number(hasNativeContent)
+    const totalSteps = defaultStartupSteps + Number(Boolean(nativeLinks))
+    bootStep = (1 - documentProgress) / totalSteps
     const completedSteps: string[] = []
     const completeStep = (step: string) => {
       if (disposed || revision !== bootRevision || bootState !== 'loading' || completedSteps.includes(step)) return
@@ -86,9 +88,6 @@
       await nativeLinks?.ready
       if (disposed || revision !== bootRevision) return
       if (nativeLinks) completeStep('launch')
-      await prepareNativeContent()
-      if (disposed || revision !== bootRevision) return
-      if (hasNativeContent) completeStep('content')
       app = await loadApp()
       if (disposed || revision !== bootRevision) return
       completeStep('module')
@@ -111,7 +110,6 @@
       if (disposed || revision !== bootRevision) return
       bootProgress = 1
       bootState = 'ready'
-      void nativeContentReady()
       void nativeWebReady()
     } catch (error) {
       if (disposed || revision !== bootRevision) return
@@ -228,7 +226,12 @@
   </div>
 
   {#if loadingAnimation === 'doors' && doorsVisible && bootState !== 'failed'}
-    <ReaderLoadingDoors open={bootState === 'ready'} oncomplete={() => { doorsVisible = false }} />
+    <ReaderLoadingDoors
+      open={bootState === 'ready'}
+      progress={bootProgress}
+      step={bootStep}
+      oncomplete={() => { doorsVisible = false }}
+    />
   {:else if bootState !== 'ready'}
     <section
       class="reader-boot-state"
@@ -239,7 +242,7 @@
     >
       {#if bootState === 'loading'}
         <div class="reader-boot-loading">
-          <ReaderLoadingMark progress={bootProgress} />
+          <ReaderLoadingMark progress={bootProgress} step={bootStep} />
           <p>Opening your reading…</p>
         </div>
       {:else}

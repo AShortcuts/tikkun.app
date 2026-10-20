@@ -144,8 +144,9 @@ test('Media remains opaque through automatic, explicit and custom theme changes'
     { themeMode: 'light', expected: 'rgb(242, 242, 247)' },
     { themeMode: 'sepia', expected: 'rgb(242, 242, 247)' },
     { themeMode: 'dark', expected: 'rgb(0, 0, 0)' },
-    { themeMode: 'custom', customBackgroundColor: '#112233', expected: systemBackground },
-    { themeMode: 'custom', customBackgroundColor: '#fafafa', expected: systemBackground },
+    // Custom themes choose dark or light interface colors from their background.
+    { themeMode: 'custom', customBackgroundColor: '#112233', expected: 'rgb(0, 0, 0)' },
+    { themeMode: 'custom', customBackgroundColor: '#fafafa', expected: 'rgb(242, 242, 247)' },
     { themeMode: 'automatic', expected: systemBackground },
   ] as const
   for (const { expected, ...preferences } of cases) {

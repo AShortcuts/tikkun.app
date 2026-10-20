@@ -1012,6 +1012,21 @@
               </label>
             {/if}
 
+            <label class="settings-field mod-checkbox mod-card mod-switch">
+              <span class="settings-field-copy">
+                <span class="settings-field-label">Pasuk numbers</span>
+                <span class="settings-field-helper">Show each pasuk's number beside it.</span>
+              </span>
+              <input
+                data-target-id="settings-verse-numbers"
+                type="checkbox"
+                role="switch"
+                checked={preferences.verseNumbers}
+                onchange={(event) =>
+                  updatePreferences({ verseNumbers: event.currentTarget.checked })}
+              />
+            </label>
+
             <div class="settings-reader-choice">
               <span class="settings-field-label">Sides</span>
           <div

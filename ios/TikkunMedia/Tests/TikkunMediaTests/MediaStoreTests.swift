@@ -193,6 +193,20 @@ final class MediaStoreTests: XCTestCase {
         XCTAssertTrue(inventory.isEmpty)
     }
 
+    func testUnpublishedRecordingIsReportedInsteadOfCorrupt() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [IncompleteMediaProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let store = try MediaStore(root: scratch.appendingPathComponent("owned"), origin: origin, session: session)
+        for name in ["shell", "missing"] {
+            do { _ = try await store.download(asset(Data(repeating: 1, count: 15), name: name), progress: { _ in }); XCTFail("\(name) must not commit") }
+            catch { XCTAssertEqual(error as? MediaFailure, .unpublished) }
+        }
+        let inventory = try await store.inventory()
+        XCTAssertTrue(inventory.isEmpty)
+    }
+
     func testLowSpaceStopsDownloadButUnknownCapacityDoesNot() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [IncompleteMediaProtocol.self]
@@ -289,7 +303,17 @@ private final class IncompleteMediaProtocol: URLProtocol {
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
-        let failure = request.url!.lastPathComponent == "error.m4a"
+        let name = request.url!.lastPathComponent
+        if name == "shell.m4a" || name == "missing.m4a" {
+            let shell = Data("<!doctype html>".utf8)
+            let response = HTTPURLResponse(url: request.url!, statusCode: name == "shell.m4a" ? 200 : 404, httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "text/html; charset=utf-8", "Content-Length": String(shell.count)])!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: shell)
+            client?.urlProtocolDidFinishLoading(self)
+            return
+        }
+        let failure = name == "error.m4a"
         let response = HTTPURLResponse(url: request.url!, statusCode: failure ? 503 : 200, httpVersion: "HTTP/1.1",
             headerFields: ["Content-Length": failure ? "0" : "1048576"])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)

@@ -68,6 +68,8 @@ export interface ReaderPreferences {
   activeSavedThemeId: string | null
   readerTextLayout: ReaderTextLayout
   readingFontScale: number
+  /** Shows pasuk numbers beside the text in both Reading and Match. */
+  verseNumbers: boolean
   readerSideMode: ReaderSideMode
   readerSideOrder: ReaderSideOrder
 }
@@ -98,6 +100,7 @@ export const defaultReaderPreferences: ReaderPreferences = {
   activeSavedThemeId: null,
   readerTextLayout: 'match',
   readingFontScale: 1,
+  verseNumbers: true,
   readerSideMode: 'one',
   readerSideOrder: 'tikkun-right',
 }
@@ -274,6 +277,10 @@ function normalizeReaderPreferences(
       defaults.readingFontScale,
       readingFontScaleRange
     ),
+    verseNumbers:
+      typeof candidate.verseNumbers === 'boolean'
+        ? candidate.verseNumbers
+        : defaults.verseNumbers,
     readerSideMode: isReaderSideMode(candidate.readerSideMode)
       ? candidate.readerSideMode
       : defaults.readerSideMode,
@@ -379,6 +386,7 @@ export function applyReaderPreferences(preferences: ReaderPreferences) {
   root.dataset.readerTheme = preferences.themeMode
   root.dataset.readerTextLayout = preferences.readerTextLayout
   root.style.setProperty('--reading-font-scale', String(preferences.readingFontScale))
+  root.dataset.verseNumbers = preferences.verseNumbers ? 'on' : 'off'
   root.dataset.readerSideMode = preferences.readerSideMode
   root.dataset.readerSideOrder = preferences.readerSideOrder
   root.style.setProperty(

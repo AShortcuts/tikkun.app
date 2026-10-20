@@ -28,4 +28,10 @@ export function applyAnnotationMode(root: ParentNode, enabled: boolean) {
       word.innerHTML = isPresent ? nextMarkup : ''
       word.dataset.annotationsMode = wordMode
     })
+  root.querySelectorAll<HTMLElement>('.reader-pasuk-break[data-annotations-on-break]').forEach(lineBreak => {
+    const fixed = lineBreak.closest<HTMLElement>('[data-reader-annotations]')?.dataset.readerAnnotations
+    const annotated = fixed === 'on' || fixed !== 'off' && enabled
+    const present = (annotated ? lineBreak.dataset.annotationsOnBreak : lineBreak.dataset.annotationsOffBreak) === 'true'
+    lineBreak.style.display = present ? '' : 'none'
+  })
 }

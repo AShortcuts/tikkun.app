@@ -38,11 +38,18 @@ test.each(['invalid', 'unavailable'] as const)('rejects %s published dependencie
   await expect(dependencies.check(asset)).rejects.toThrow('Published timings failed')
 })
 
-test('rejects incompatible tokenization and unknown catalog identities', async () => {
+test('saves audio without outdated timings and rejects unknown catalog identities', async () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
   const dependencies = createBundledRecordingDependencies({ recordings: [recording], baseUrl,
     resolve: async () => ready({ ...payload, tokenizationVersion: 'old' }),
   })
-  await expect(dependencies.check(asset)).rejects.toThrow('incompatible text version')
+  await expect(dependencies.check(asset)).resolves.toBe('audio-only')
+  expect(warn).toHaveBeenCalledWith(expect.stringContaining('outdated old timings'))
+  warn.mockRestore()
+  const untimed = createBundledRecordingDependencies({ recordings: [recording], baseUrl,
+    resolve: async () => ready({ ...payload, tokenizationVersion: 'v1', cues: [], cueCount: 0, tokenCount: 0 }),
+  })
+  await expect(untimed.check(asset)).resolves.toBe('audio-only')
   await expect(dependencies.check({ ...asset, digest: 'b'.repeat(64) })).rejects.toThrow('not in the installed content catalog')
 })
 

@@ -1,4 +1,4 @@
-import { afterEach, expect, test, vi } from 'vitest'
+import { afterEach, expect, onTestFinished, test, vi } from 'vitest'
 
 let frame: HTMLIFrameElement | null = null
 
@@ -88,6 +88,13 @@ test('toggles the focal measure from lazily loaded reader settings', async () =>
 }, 30_000)
 
 test('replaces the URL when aliyah starts cross the focal point and restores that aliyah after reload', async () => {
+  // Phone-width Reading is the isolated view; Match keeps continuous scrolling.
+  const savedPreferences = localStorage.getItem('tikkun.reader-preferences')
+  localStorage.setItem('tikkun.reader-preferences', JSON.stringify({ readerTextLayout: 'match' }))
+  onTestFinished(() => {
+    if (savedPreferences === null) localStorage.removeItem('tikkun.reader-preferences')
+    else localStorage.setItem('tikkun.reader-preferences', savedPreferences)
+  })
   frame = document.createElement('iframe')
   frame.title = 'Reader scroll route runtime test'
   frame.style.width = '390px'
@@ -282,7 +289,8 @@ test('promotes the URL when entering a combined parsha', async () => {
   await vi.waitFor(
     () => {
       expect(frameWindow.location.hash).toBe(
-        '#/torah/parsha/nitzavim-vayelech/5-29-9'
+        // A dated reading continues among that year's dated services.
+        '#/run/2026-09-05:shacharis,main/5-29-9'
       )
       expect(
         frameDocument

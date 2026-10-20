@@ -1,23 +1,46 @@
 <script lang="ts">
+  import { onMount, untrack } from 'svelte'
   import { READER_ALEPH_PATH as aleph } from './reader-loading.ts'
+  import { createLoadingFill, type LoadingFill } from './reader-loading-fill.ts'
 
-  let { progress }: { progress: number } = $props()
+  // `step` is the size of the next real startup step. Pass a shared `fill` to keep
+  // several copies of the mark in lockstep.
+  let { progress, step, onfilled, fill: sharedFill }: {
+    progress: number
+    step: number
+    onfilled?: () => void
+    fill?: LoadingFill
+  } = $props()
+  let fillElement: SVGSVGElement | undefined = $state()
+  const fill = untrack(() => sharedFill) ?? createLoadingFill()
+  const initialEmpty = untrack(() => (1 - progress) * 100)
+
+  $effect.pre(() => fill.set(progress, step))
+
+  onMount(() => {
+    if (!fillElement) return
+    const detach = fill.attach(fillElement)
+    const unsubscribe = onfilled ? fill.onFilled(onfilled) : undefined
+    return () => {
+      unsubscribe?.()
+      detach()
+    }
+  })
 </script>
 
 <div class="reader-loading-mark" aria-hidden="true">
   <svg class="reader-loading-track" viewBox="0 0 16 16" focusable="false">
     <path d={aleph} fill="currentColor" />
   </svg>
-  <div class="reader-loading-entry" class:complete={progress === 1}>
-    <svg
-      class="reader-loading-fill"
-      viewBox="0 0 16 16"
-      focusable="false"
-      style:--fill-empty="{(1 - progress) * 100}%"
-    >
-      <path d={aleph} fill="currentColor" />
-    </svg>
-  </div>
+  <svg
+    class="reader-loading-fill"
+    viewBox="0 0 16 16"
+    focusable="false"
+    bind:this={fillElement}
+    style="clip-path: inset(0 0 {initialEmpty}% 0)"
+  >
+    <path d={aleph} fill="currentColor" />
+  </svg>
 </div>
 
 <style>
@@ -28,7 +51,7 @@
     color: var(--text-color);
   }
 
-  svg, .reader-loading-entry {
+  svg {
     position: absolute;
     inset: 0;
     width: 100%;
@@ -36,38 +59,24 @@
   }
 
   .reader-loading-track { opacity: 0.09; }
-  .reader-loading-fill {
-    clip-path: inset(0 0 var(--fill-empty) 0);
-    transition: clip-path 180ms cubic-bezier(0.23, 1, 0.32, 1);
+
+  /* Before the script runs, ease through the rendered document's share and
+     settle below the smallest possible creep cap until the script takes over. */
+  .reader-loading-fill:not(:global(.live)) {
+    animation: reader-fill-start 2.6s cubic-bezier(0.25, 0.6, 0.3, 1) both;
   }
 
-  /* Entry and progress use separate masks so early updates cannot restart the fill. */
-  .reader-loading-entry {
-    clip-path: inset(0);
-    animation: reader-mark-start 180ms linear;
-  }
-
-  .reader-loading-entry.complete {
-    animation: none;
-  }
-
-  .reader-loading-entry.complete .reader-loading-fill {
-    transition: none;
-  }
-
-  @keyframes reader-mark-start {
+  @keyframes reader-fill-start {
     from { clip-path: inset(0 0 100% 0); }
-    to { clip-path: inset(0 0 0% 0); }
+    to { clip-path: inset(0 0 76% 0); }
   }
 
-  :global(html[data-reader-reduced-motion='on']) :is(.reader-loading-entry, .reader-loading-fill) {
-    transition: none;
+  :global(html[data-reader-reduced-motion='on']) .reader-loading-fill {
     animation: none;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    :global(html:not([data-reader-reduced-motion='off'])) :is(.reader-loading-entry, .reader-loading-fill) {
-      transition: none;
+    :global(html:not([data-reader-reduced-motion='off'])) .reader-loading-fill {
       animation: none;
     }
   }

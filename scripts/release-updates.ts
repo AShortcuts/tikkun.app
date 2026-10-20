@@ -5,13 +5,10 @@ import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
-import { object } from '../app/updates/content-schema.ts'
-import { verifyReleaseEnvelope } from '../app/updates/release-signature.ts'
 import { verifyWebRelease } from '../app/updates/web-update.ts'
 
 const rootDirectory = fileURLToPath(new URL('..', import.meta.url))
 const branch = 'develop'
-const digestPattern = /^[a-f0-9]{64}$/
 
 export const releaseHelp = `Usage: npm run updates:release -- --native-build NUMBER [options]
 
@@ -23,8 +20,8 @@ export const releaseHelp = `Usage: npm run updates:release -- --native-build NUM
 Requires macOS, the pinned Node/npm, a clean develop checkout, and the existing
 update signing key (TIKKUN_UPDATE_PRIVATE_KEY_FILE overrides its ignored local path).
 Checks/builds can take 10-20 minutes and several GB of temporary output.
-Prepares and verifies separate signed interface/content feeds under .asc/updates/.
-Copies verified feeds into site/updates; reruns replace latest manifests.
+Prepares and verifies the signed app update (code and content) under .asc/updates/.
+Copies the verified feed into site/updates; reruns replace its latest manifest.
 Never stages Git files, commits, pushes, or publishes.
 Review and publication remain manual. Native compatibility checks remain mandatory.`
 
@@ -55,22 +52,14 @@ interface Services {
 
 async function preparedRelease(options: ReleaseOptions, root: string) {
   const key = await readFile(path.join(root, 'config/update-public-key.pem'), 'utf8')
-  const contract = JSON.parse(await readFile(path.join(root, 'generated/native-content-contract.json'), 'utf8'))
-  if (!object(contract) || typeof contract.compatibility !== 'string' || !digestPattern.test(contract.compatibility)) throw new Error('Invalid content compatibility contract.')
   const webRoot = `.asc/updates/web/${options.nativeBuild}`
-  const contentRoot = `.asc/updates/content/${contract.compatibility}`
   const web = await verifyWebRelease(JSON.parse(await readFile(path.join(root, webRoot, 'latest.json'), 'utf8')), key)
-  const content = await verifyReleaseEnvelope(JSON.parse(await readFile(path.join(root, contentRoot, 'latest.json'), 'utf8')), key)
   if (web.nativeBuild !== options.nativeBuild || web.rollout !== options.rollout) throw new Error('Prepared web release does not match the requested build/rollout.')
-  if (!object(content) || content.schema !== 1 || typeof content.digest !== 'string' || !digestPattern.test(content.digest) ||
-      typeof content.bytes !== 'number' || !Number.isSafeInteger(content.bytes) || content.bytes <= 0) throw new Error('Invalid prepared content release.')
   const zip = await readFile(path.join(root, webRoot, `${web.bundleId}.zip`))
   if (zip.length !== web.bytes || createHash('sha256').update(zip).digest('hex') !== web.checksum ||
       !verify('sha256', zip, key, Buffer.from(web.signature, 'base64'))) throw new Error('Prepared web ZIP failed signature/digest verification.')
-  const snapshot = await readFile(path.join(root, contentRoot, `${content.digest}.json`))
-  if (snapshot.length !== content.bytes || createHash('sha256').update(snapshot).digest('hex') !== content.digest) throw new Error('Prepared content failed digest verification.')
-  return { bundleId: web.bundleId, contentDigest: content.digest, rollout: web.rollout,
-    paths: [`${webRoot}/latest.json`, `${webRoot}/${web.bundleId}.zip`, `${contentRoot}/latest.json`, `${contentRoot}/${content.digest}.json`].sort() }
+  return { bundleId: web.bundleId, rollout: web.rollout,
+    paths: [`${webRoot}/latest.json`, `${webRoot}/${web.bundleId}.zip`].sort() }
 }
 
 export async function releaseUpdates(options: ReleaseOptions, services: Services) {
@@ -102,7 +91,7 @@ export async function releaseUpdates(options: ReleaseOptions, services: Services
   if (archiveBuild !== options.nativeBuild) throw new Error('Target archive does not match the requested native build.')
   await stat(path.join(target, 'public/native-update-contract.json'))
   const commands = [
-    ['run', 'verify:release'], ['run', 'build:native'], ['run', 'updates:content'],
+    ['run', 'verify:release'], ['run', 'build:native'],
     ['run', 'updates:web', '--', '--native-build', options.nativeBuild, '--target-archive', options.archive, '--rollout', String(options.rollout), '--approve-web-only'],
     ['run', 'updates:stage', '--', '--native-build', options.nativeBuild],
     ['run', 'build'],

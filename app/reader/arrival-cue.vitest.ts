@@ -14,6 +14,7 @@ afterEach(() => {
   document.body.replaceChildren()
   delete document.documentElement.dataset.readerTheme
   delete document.documentElement.dataset.readerReducedMotion
+  delete document.documentElement.dataset.readerIsolated
   vi.useRealTimers()
 })
 
@@ -45,7 +46,8 @@ test.each([
   word.classList.add('is-active-word')
   const before = word.getBoundingClientRect().toJSON()
   cue.show(line)
-  const strips = [...root.querySelectorAll<HTMLElement>('.reader-arrival-cue > span')]
+  const container = root.closest('.tikkun-book')!
+  const strips = [...container.querySelectorAll<HTMLElement>('.reader-arrival-cue > span')]
   expect(strips).toHaveLength(sides === 'two' ? 2 : 1)
   expect(word.getBoundingClientRect().toJSON()).toEqual(before)
   expect(word.classList.contains('is-active-word')).toBe(true)
@@ -54,7 +56,7 @@ test.each([
     const rect = strip.getBoundingClientRect()
     return rect.left <= target.left && rect.right >= target.right && Math.abs(rect.top - target.top) < 4
   })).toBe(true)
-  expect(getComputedStyle(root.querySelector('.reader-arrival-cue')!).pointerEvents).toBe('none')
+  expect(getComputedStyle(container.querySelector('.reader-arrival-cue')!).pointerEvents).toBe('none')
 })
 
 test('replaces an earlier cue and removes all decoration after 1.6 seconds and unmount', async () => {
@@ -71,6 +73,20 @@ test('replaces an earlier cue and removes all decoration after 1.6 seconds and u
   cue.show(line)
   destroy?.()
   expect(root.querySelector('.reader-arrival-cue')).toBeNull()
+})
+
+test.each([390, 1280])('arrival cue leaves One Side gutters in the book coordinate space at %ipx', async width => {
+  await browser.viewport(width, 844)
+  if (width <= 550) document.documentElement.dataset.readerIsolated = 'true'
+  const { root, line, cue } = await setup({ layout: 'reading', sides: 'one' })
+  const gutter = line.querySelector<HTMLElement>('.line-gutter.mod-verses')!
+  const before = gutter.getBoundingClientRect().toJSON()
+  cue.show(line)
+  expect(root.classList.contains('mod-arrival-cue')).toBe(false)
+  expect(root.closest('.tikkun-book')?.classList.contains('mod-arrival-cue')).toBe(true)
+  expect(gutter.getBoundingClientRect().toJSON()).toEqual(before)
+  cue.clear()
+  expect(gutter.getBoundingClientRect().toJSON()).toEqual(before)
 })
 
 test('uses neutral light and blue dark cues, with a static reduced-motion cue', async () => {

@@ -2,6 +2,7 @@
   import { flushSync, onMount } from 'svelte'
   import UiIcon from '../../components/UiIcon.svelte'
   import { audioButtonState } from '../audio-button-state.ts'
+  import type { PassageAudioState } from '../passage-audio.ts'
   import {
     aliyahCueAuthoringActionLabel,
     isAliyahCueStatusUnfinished,
@@ -55,7 +56,7 @@
     state: toolbarState.compact.audioState,
     available: compactAudioAvailable,
     adminMissing: toolbarState.compact.authoringMissing,
-    cueIncomplete: toolbarState.compact.cueIncomplete,
+    cueIncomplete: cueIsIncomplete(toolbarState.compact.audioState, toolbarState.compact.cueIncomplete ?? false),
     playing: toolbarState.compact.playbackState === 'playing',
   }))
 
@@ -111,12 +112,16 @@
     })
   }
 
+  // A resolved passage state is authoritative; the cue-status flag only
+  // covers the time before that state exists.
+  function cueIsIncomplete(audioState: PassageAudioState | undefined, statusIncomplete: boolean) {
+    return audioState ? audioState.problem === 'incomplete-cues' : statusIncomplete
+  }
+
   function currentCueIsIncomplete() {
-    const status = toolbarState.current.cueStatus
-    if (toolbarState.current.audioState) return toolbarState.current.audioState.problem === 'incomplete-cues'
-    return Boolean(
-      toolbarState.current.audioAvailable &&
-        status !== 'published'
+    return cueIsIncomplete(
+      toolbarState.current.audioState,
+      Boolean(toolbarState.current.audioAvailable && toolbarState.current.cueStatus !== 'published'),
     )
   }
 

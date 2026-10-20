@@ -103,7 +103,7 @@ describe('unified reader search', () => {
     })
     expect(alias?.matchedAliasRanges.length).toBeGreaterThan(0)
 
-    const reading = search.search('Bereshit')[0]
+    const reading = search.search('Beresheet')[0]
     expect(reading?.labelRanges.length).toBeGreaterThan(0)
   })
 

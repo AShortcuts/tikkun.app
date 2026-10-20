@@ -8,7 +8,6 @@ import {
 } from './cue-validation.ts'
 import type { AudioRecording, CueExportPayload } from './types.ts'
 import { RetryablePromiseCache } from '../data/retryable-promise-cache.ts'
-import { activeContent } from '../updates/content-runtime.ts'
 
 const cuePayloadLoaders = import.meta.glob<unknown>('../../audio-cues/**/*.json', {
   import: 'default',
@@ -170,19 +169,13 @@ export class CueDataResolver {
   }
 }
 
-const cueDataResolver = new CueDataResolver(cuePayloadLoaders, (path) => {
-  const updated = activeContent()
-  if (!updated) return cuePayloadLoaders[path]
-  const cue = updated.cues[path.slice('../../'.length)]
-  return cue ? async () => cue : undefined
-})
+const cueDataResolver = new CueDataResolver(cuePayloadLoaders)
 
 export function publishedCueSourceForRecording(recording: AudioRecording): string | null {
   const path = cuePayloadPathForRecording(recording)
   const relative = path?.slice('../../'.length)
-  const updated = activeContent()
   if (!path || !relative) return null
-  return (updated ? Object.hasOwn(updated.cues, relative) : Object.hasOwn(cuePayloadLoaders, path)) ? relative : null
+  return Object.hasOwn(cuePayloadLoaders, path) ? relative : null
 }
 
 export function cuePayloadPathForRecording({

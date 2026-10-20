@@ -1,5 +1,4 @@
 import { get } from 'svelte/store'
-import { checkNativeContent } from './content-runtime.ts'
 import { checkNativeWeb } from './web-runtime.ts'
 import { nativeUpdatePromptDismissed, nativeUpdateState, updatePending, updatesBusy } from './update-state.ts'
 
@@ -9,7 +8,7 @@ export async function checkNativeUpdates(force = false) {
   if (get(nativeUpdateState).applying) return
   if (force) nativeUpdatePromptDismissed.set(false)
   nativeUpdateState.update(state => ({ ...state, applyError: null }))
-  await Promise.all([checkNativeContent(force), checkNativeWeb(force)])
+  await checkNativeWeb(force)
 }
 
 export async function applyNativeUpdate(prepare: () => void | Promise<void>) {

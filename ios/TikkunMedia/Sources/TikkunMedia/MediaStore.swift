@@ -33,7 +33,7 @@ public struct MediaAsset: Codable, Equatable, Sendable {
 }
 
 public enum MediaFailure: LocalizedError {
-    case invalidAsset, integrity, busy, unsafePath, invalidIntent, insufficientSpace, invalidResponse
+    case invalidAsset, integrity, busy, unsafePath, invalidIntent, insufficientSpace, invalidResponse, unpublished
     public var errorDescription: String? {
         switch self {
         case .invalidAsset: "Invalid recording identity or unapproved audio host."
@@ -43,6 +43,7 @@ public enum MediaFailure: LocalizedError {
         case .invalidIntent: "Saved download queue is invalid; existing data was not overwritten."
         case .insufficientSpace: "Not enough storage. Remove downloads or choose fewer recordings."
         case .invalidResponse: "The audio server did not return a complete recording."
+        case .unpublished: "This recording is not on the audio server yet. Try again after the next site update."
         }
     }
 }
@@ -210,8 +211,10 @@ public actor MediaStore {
             catch { NSLog("Could not clean temporary recording: %@", error.localizedDescription) }
         }
         try Task.checkCancellation()
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
-              let finalURL = http.url, MediaAsset.permits(finalURL, origin: origin) else { throw MediaFailure.invalidResponse }
+        guard let http = response as? HTTPURLResponse else { throw MediaFailure.invalidResponse }
+        // Older sites answer missing audio with their HTML app shell and a 200.
+        if http.statusCode == 404 || http.mimeType?.lowercased() == "text/html" { throw MediaFailure.unpublished }
+        guard http.statusCode == 200, let finalURL = http.url, MediaAsset.permits(finalURL, origin: origin) else { throw MediaFailure.invalidResponse }
         try commitDownloadedFile(temporary, asset: asset)
         return asset
     }

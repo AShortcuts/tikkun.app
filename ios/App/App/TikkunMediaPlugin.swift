@@ -16,58 +16,22 @@ public class TikkunMediaPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "metrics", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clearTemporary", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "readIntent", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "updateIntent", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "readContent", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "writeContent", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "updateIntent", returnType: CAPPluginReturnPromise)
     ]
 
     // Plugin state is main-queue confined; filesystem work runs on MediaStore.
     private static var sharedStore: MediaStore?
     private var downloads: [String: Task<Void, Never>] = [:]
-    private let contentQueue = DispatchQueue(label: "com.adamn.tikkunreader.content")
 
-    private func contentFile() throws -> URL {
-        var root = try FileManager.default.url(for: .applicationSupportDirectory,
-            in: .userDomainMask, appropriateFor: nil, create: true).appendingPathComponent("TikkunContent")
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        var resources = URLResourceValues()
-        resources.isExcludedFromBackup = true
-        try root.setResourceValues(resources)
-        return root.appendingPathComponent("state.json")
-    }
-
-    @objc func readContent(_ call: CAPPluginCall) {
-        contentQueue.async {
-            do {
-                let file = try self.contentFile()
-                guard FileManager.default.fileExists(atPath: file.path) else {
-                    call.resolve(["value": NSNull()]); return
-                }
-                let data = try Data(contentsOf: file)
-                guard let value = String(data: data, encoding: .utf8) else {
-                    throw MediaFailure.invalidAsset
-                }
-                if data.count > 32 * 1024 * 1024 {
-                    NSLog("Content state is %ld bytes; recommended storage budget is 32 MiB", data.count)
-                }
-                call.resolve(["value": value])
-            } catch { call.reject(error.localizedDescription) }
-        }
-    }
-
-    @objc func writeContent(_ call: CAPPluginCall) {
-        guard let value = call.getString("value"), let data = value.data(using: .utf8) else {
-            call.reject("Invalid content state"); return
-        }
-        if data.count > 32 * 1024 * 1024 {
-            NSLog("Content state is %ld bytes; recommended storage budget is 32 MiB", data.count)
-        }
-        contentQueue.async {
-            do {
-                _ = try JSONSerialization.jsonObject(with: data)
-                try data.write(to: self.contentFile(), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
-                call.resolve()
-            } catch { call.reject(error.localizedDescription) }
+    public override func load() {
+        // Builds 6 and 7 saved separate content snapshots here. Each app update now
+        // carries its own content, so remove the unused copy once.
+        DispatchQueue.global(qos: .utility).async {
+            guard let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
+            let legacy = support.appendingPathComponent("TikkunContent", isDirectory: true)
+            guard FileManager.default.fileExists(atPath: legacy.path) else { return }
+            do { try FileManager.default.removeItem(at: legacy) }
+            catch { NSLog("Could not remove legacy content snapshots: %@", error.localizedDescription) }
         }
     }
 
@@ -144,12 +108,9 @@ public class TikkunMediaPlugin: CAPPlugin, CAPBridgedPlugin {
         perform(call) { store in
             let result = try await store.metrics()
             let available: JSValue = result.availableBytes.map { Int($0) as JSValue } ?? NSNull()
-            let contentFile = try self.contentFile()
-            let contentBytes = FileManager.default.fileExists(atPath: contentFile.path)
-                ? (try contentFile.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) : 0
             return ["appBytes": Int(result.appBytes), "audioBytes": Int(result.audioBytes),
                 "temporaryBytes": Int(result.temporaryBytes), "metadataBytes": Int(result.metadataBytes),
-                "availableBytes": available, "contentBytes": contentBytes]
+                "availableBytes": available]
         }
     }
     @objc func download(_ call: CAPPluginCall) {

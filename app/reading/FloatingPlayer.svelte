@@ -1,6 +1,7 @@
 <script lang="ts">
   import { flushSync, onMount } from 'svelte'
   import UiIcon from '../components/UiIcon.svelte'
+  import { observeReaderResize } from '../adaptive/reader-resize.ts'
   import type {
     FloatingPlayer,
     FloatingPlayerAction,
@@ -519,17 +520,17 @@
     view.addEventListener('pointerup', onPointerFinish)
     view.addEventListener('pointercancel', onPointerFinish)
     view.addEventListener('blur', onWindowBlur)
-    view.addEventListener('resize', onLayout)
+    const resizeLayout = observeReaderResize(view, 'chrome', onLayout)
     document.addEventListener('pointerdown', onDocumentPointerDown)
-    const resizeObserver = new ResizeObserver(onLayout)
+    const resizeObserver = new ResizeObserver(() => resizeLayout.request())
     resizeObserver.observe(requireElement(playerElement, 'its player element'))
 
     return () => {
       cancelMinimizeTimer()
       resizeObserver.disconnect()
+      resizeLayout.destroy()
       cornerControls?.style.removeProperty('--corner-controls-player-bottom')
       document.removeEventListener('pointerdown', onDocumentPointerDown)
-      view.removeEventListener('resize', onLayout)
       view.removeEventListener('blur', onWindowBlur)
       view.removeEventListener('pointercancel', onPointerFinish)
       view.removeEventListener('pointerup', onPointerFinish)
@@ -662,7 +663,7 @@
       disabled={!snapshot.visible}
       onclick={() => send({ type: 'step', delta: -1 })}
     >
-      <UiIcon name={snapshot.untimed ? 'rewind10' : 'arrowRight'} />
+      <UiIcon name={snapshot.untimed ? 'rewind10' : 'arrowLeft'} />
     </button>
     <button
       bind:this={playButton}
@@ -698,7 +699,7 @@
       disabled={!snapshot.visible}
       onclick={() => send({ type: 'step', delta: 1 })}
     >
-      <UiIcon name={snapshot.untimed ? 'forward10' : 'arrowLeft'} />
+      <UiIcon name={snapshot.untimed ? 'forward10' : 'arrowRight'} />
     </button>
     <div bind:this={speedControl} class="floating-speed-control">
       <button

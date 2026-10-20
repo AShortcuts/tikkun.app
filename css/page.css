@@ -785,9 +785,12 @@ html[data-reader-side-order='torah-right']
   border-bottom: 0;
 }
 
-.tikkun-book[data-reader-layout='reading'] .tikkun-page-number,
-.tikkun-book[data-reader-layout='reading'] .line-gutter.mod-aliyot {
+.tikkun-book[data-reader-layout='reading'] .tikkun-page-number {
   display: none !important;
+}
+
+.tikkun-book[data-reader-layout='reading'] .line-gutter.mod-aliyot {
+  display: none;
 }
 
 .reader-reading-page {
@@ -809,12 +812,17 @@ html[data-reader-side-order='torah-right']
 
 .tikkun-book[data-reader-layout='reading'][data-reader-sides='one'] {
   --reading-verse-rail-width: 2.75rem;
-  position: relative;
-  padding-left: max(1rem, calc((100% - 54rem) / 2));
-  padding-right: max(
-    calc(1rem + var(--reading-verse-rail-width)),
-    calc((100% - 54rem) / 2 + var(--reading-verse-rail-width))
+  --reading-aliyah-rail-width: 0px;
+  --reading-text-inset: max(
+    calc(1rem + var(--reading-verse-rail-width) + var(--reading-aliyah-rail-width)),
+    calc((100% - 54rem + var(--reading-verse-rail-width) + var(--reading-aliyah-rail-width)) / 2)
   );
+  --reading-aliyah-gutter-right: calc(
+    var(--reading-text-inset) - var(--reading-verse-rail-width) - var(--reading-aliyah-rail-width)
+  );
+  position: relative;
+  padding-inline: var(--reading-text-inset);
+  text-align: right;
 }
 
 .tikkun-book[data-reader-layout='reading'][data-reader-sides='one']
@@ -850,6 +858,7 @@ html[data-reader-side-order='torah-right']
   position: static;
   direction: inherit;
   line-height: inherit;
+  text-align: right;
   width: auto;
 }
 
@@ -858,7 +867,7 @@ html[data-reader-side-order='torah-right']
   .line-gutter.mod-verses {
   position: absolute;
   top: var(--reading-verse-gutter-top, 0);
-  right: max(1rem, calc((100% - 54rem) / 2));
+  right: calc(var(--reading-aliyah-gutter-right) + var(--reading-aliyah-rail-width));
   left: auto;
   display: flex !important;
   direction: ltr;
@@ -886,21 +895,12 @@ html[data-reader-side-order='torah-right']
   .reader-reading-page {
   position: relative;
   display: grid;
+  width: 100%;
   grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
   column-gap: var(--reader-two-side-gap);
   box-sizing: border-box;
   direction: ltr;
   padding-inline: var(--reading-verse-rail-width);
-}
-
-.tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
-  .reader-reading-page::after {
-  position: absolute;
-  inset-block: 0;
-  left: 50%;
-  width: 1px;
-  background: color-mix(in srgb, var(--reader-ink-color, var(--page-ink-color)) 16%, transparent);
-  content: '';
 }
 
 .tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
@@ -939,6 +939,7 @@ html[data-reader-side-order='torah-right']
   .mod-reading-line
   .line-content {
   display: contents;
+  text-align: right;
 }
 
 .tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
@@ -971,6 +972,16 @@ html[data-reader-side-order='torah-right']
 }
 
 .tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  .tikkun-page.mod-measuring-paired-words .word[data-token-key] {
+  inline-size: auto;
+}
+
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  .tikkun-page.mod-measuring-paired-words .word.mod-maqaf-boundary {
+  margin-inline-end: 0;
+}
+
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
   .fragment::after {
   content: none;
 }
@@ -996,6 +1007,12 @@ html[data-reader-side-order='torah-right']
   display: flex !important;
 }
 
+/* Hidden in place, so the text never reflows when the setting changes. */
+html[data-verse-numbers='off']
+  .line-gutter.mod-verses {
+  visibility: hidden;
+}
+
 @media screen and (max-width: 920px) {
   .tikkun-book[data-reader-sides='two'] .line {
     grid-template-columns:
@@ -1007,6 +1024,70 @@ html[data-reader-side-order='torah-right']
 
   .tikkun-book[data-reader-sides='two'] .line-gutter.mod-aliyot {
     display: none;
+  }
+}
+
+@media screen and (min-width: 551px) {
+  html:not([data-reader-isolated='true']) .tikkun-book[data-reader-layout='reading'][data-reader-sides] {
+    --reading-aliyah-rail-width: clamp(7rem, 9vw, 9rem);
+  }
+
+  html:not([data-reader-isolated='true']) .tikkun-book[data-reader-layout='reading']
+    .line-gutter.mod-aliyot {
+    position: absolute;
+    inset: 0;
+    display: block;
+    padding: 0;
+    pointer-events: none;
+  }
+
+  html:not([data-reader-isolated='true']) .tikkun-book[data-reader-layout='reading']
+    .location-indicator.mod-aliyot {
+    display: contents;
+  }
+
+  html:not([data-reader-isolated='true']) .tikkun-book[data-reader-layout='reading']
+    .line-gutter.mod-aliyot .aliyah-badge {
+    position: absolute;
+    top: var(--reading-aliyah-gutter-top, 0);
+    right: var(--reading-aliyah-gutter-right, 0);
+    box-sizing: border-box;
+    width: var(--reading-aliyah-rail-width);
+    max-width: var(--reading-aliyah-rail-width);
+    min-height: 1.75rem;
+    /* Center the label in the same box that centers the play button and link. */
+    display: flex;
+    align-items: center;
+    padding-inline-end: 1.75rem;
+    visibility: var(--reading-aliyah-gutter-visibility, hidden);
+    direction: ltr;
+    pointer-events: auto;
+  }
+
+  html:not([data-reader-isolated='true']) .tikkun-book[data-reader-layout='reading']
+    .aliyah-badge.mod-with-audio {
+    padding-left: 2.1rem;
+  }
+
+  html:not([data-reader-isolated='true']) .tikkun-book[data-reader-layout='reading']
+    .aliyah-badge .aliyah-audio-button {
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  html:not([data-reader-isolated='true']) .tikkun-book[data-reader-layout='reading']
+    .aliyah-badge .aliyah-link {
+    right: 0;
+  }
+
+  html:not([data-reader-isolated='true']) .tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+    .reader-reading-page {
+    padding-inline: calc(var(--reading-verse-rail-width) + var(--reading-aliyah-rail-width));
+  }
+
+  html:not([data-reader-isolated='true']) .tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+    .line-gutter.mod-verses {
+    right: var(--reading-aliyah-rail-width);
   }
 }
 
@@ -1178,18 +1259,6 @@ html[data-reader-side-order='torah-right']
   top: 50%;
   left: 0;
   transform: translateY(-50%);
-}
-
-@media screen and (max-width: 870px) {
-  .aliyah-badge.mod-with-audio {
-    padding-left: 0;
-  }
-
-  .aliyah-badge .aliyah-audio-button {
-    top: calc(100% + 0.22rem);
-    left: 0;
-    transform: none;
-  }
 }
 
 .ui-icon {

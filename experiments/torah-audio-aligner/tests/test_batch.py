@@ -59,6 +59,26 @@ class BatchTests(unittest.TestCase):
         self.queues.append(queue)
         return queue
 
+    def test_library_reload_adds_sources_without_resetting_the_queue(self):
+        source = {**self.recording, "id": "first", "title": "First aliyah", "available": True}
+        catalog = {"textPagesSha256": "0" * 64, "sources": [source]}
+        library = RecordingLibrary(self.store.root, catalog)
+        queue = BatchQueue(self.store, library)
+        self.queues.append(queue)
+        self.add(queue, "first")
+        before = deepcopy(queue.state)
+        updated = {**catalog, "sources": catalog["sources"] + [{**source, "id": "new"}]}
+        with patch("batch_import.subprocess.run") as run:
+            run.return_value.stdout = json.dumps(updated)
+            library.reload()
+        self.assertEqual(library.get("new")["id"], "new")
+        self.assertIs(queue.library, library)
+        self.assertEqual(queue.state, before)
+        self.assertIsNone(queue.thread)
+        with self.assertRaisesRegex(AlignmentError, "Duplicate recording"):
+            library.reload({**catalog, "sources": catalog["sources"] * 2})
+        self.assertEqual(set(library.sources), {"first", "new"})
+
     def add(self, queue, *ids, force=True, request_id=None):
         return queue.enqueue([{"sourceId": identifier} for identifier in ids], request_id or uuid.uuid4().hex, force)
 
@@ -159,6 +179,90 @@ class BatchTests(unittest.TestCase):
             with self.subTest(status=status), self.assertRaises(RevisionConflict):
                 queue.clear_downloads([ready, waiting])
             self.assertEqual(queue.state, before)
+
+    def test_clear_queue_removes_every_status_and_preserves_saved_results(self):
+        queue = self.queue()
+        saved = self.store.save("fixture-1", initial_state(self.proposal), None)
+        archive = self.store.root / "exports/batches/download.zip"
+        archive.parent.mkdir(parents=True)
+        archive.write_bytes(b"existing download")
+        self.add(queue, "first")
+        original = queue.state["items"][0]
+        statuses = ("ready", "failed", "interrupted", "cancelled", "queued", "running")
+        queue.state["items"] = [{**original, "id": uuid.uuid4().hex, "status": status,
+                                 "resultId": "fixture-1" if status == "ready" else None}
+                                for status in statuses]
+        queue.state["paused"] = False
+        queue.state["pauseReason"] = "An earlier failure"
+        queue.persist()
+        self.assertEqual(queue.clear(), len(statuses))
+        self.assertEqual(queue.clear(), 0)
+        recovered = self.queue()
+        self.assertEqual(recovered.state["items"], [])
+        self.assertEqual(recovered.state["requests"], {})
+        self.assertTrue(recovered.state["paused"])
+        self.assertIsNone(recovered.state["pauseReason"])
+        self.assertTrue(recovered.snapshot()["clearQueueSupported"])
+        self.assertFalse(recovered.snapshot()["clearPending"])
+        self.assertEqual(self.store.saved("fixture-1"), saved)
+        self.assertEqual(archive.read_bytes(), b"existing download")
+        with patch.object(self.store, "detail", return_value={}):
+            self.add(recovered, "first", force=False)
+        self.assertEqual(recovered.state["items"][0]["resultId"], "fixture-1")
+        self.assertTrue(recovered.state["items"][0]["reused"])
+
+    def test_clear_queue_write_failure_preserves_queue_and_execution_state(self):
+        queue = self.queue()
+        self.add(queue, "first", "second")
+        queue.stop_at = 123
+        before = deepcopy(queue.state)
+        with patch("batch_queue.write_json", side_effect=OSError("Disk full")):
+            with self.assertRaisesRegex(OSError, "Disk full"):
+                queue.clear()
+        self.assertEqual(queue.state, before)
+        self.assertEqual(load_json(queue.path), before)
+        self.assertEqual(queue.stop_at, 123)
+        self.assertFalse(queue.clearing)
+
+    def test_clear_queue_detaches_active_work_without_resuming_or_restoring_rows(self):
+        for fails in (False, True):
+            entered, release = threading.Event(), threading.Event()
+            calls = []
+            def runner(item, phase):
+                calls.append(item["sourceId"])
+                entered.set()
+                release.wait(3)
+                phase("Finishing after clear")
+                if fails:
+                    raise AlignmentError("Deliberate test failure after clear")
+                return "fixture-1"
+            queue = self.queue(runner)
+            self.add(queue, "first", "second")
+            with self.subTest(fails=fails), patch.object(self.store, "detail", return_value={}), patch("traceback.print_exc"):
+                try:
+                    queue.control("start")
+                    self.assertTrue(entered.wait(1))
+                    self.assertEqual(queue.clear(), 2)
+                    self.assertEqual(queue.snapshot()["items"], [])
+                    self.assertTrue(queue.snapshot()["clearPending"])
+                    self.assertTrue(queue.snapshot()["running"])
+                    self.add(queue, "third")
+                    with self.assertRaisesRegex(RevisionConflict, "current recording finish"):
+                        queue.control("start")
+                finally:
+                    release.set()
+                self.wait(lambda: queue.thread is None)
+                self.assertEqual(calls, ["first"])
+                self.assertEqual([row["sourceId"] for row in queue.state["items"]], ["third"])
+                self.assertEqual(queue.state["items"][0]["status"], "queued")
+                self.assertTrue(queue.state["paused"])
+                self.assertFalse(queue.snapshot()["clearPending"])
+                self.assertFalse(queue.snapshot()["running"])
+                self.assertEqual(load_json(queue.path), queue.state)
+                queue.control("start")
+                self.wait(lambda: queue.thread is None)
+                self.assertEqual(calls, ["first", "third"])
+                queue.clear()
 
     def test_clear_downloads_write_failure_keeps_in_memory_and_saved_queue(self):
         queue = self.queue()

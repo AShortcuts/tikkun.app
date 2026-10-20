@@ -80,7 +80,7 @@ function cuePayload(change: Record<string, unknown> = {}) {
 
 async function withCueFixture(
   payload: unknown,
-  relativePath = 'reader/beresheet/1.json'
+  relativePath = 'reader/01 beresheet/1.json'
 ) {
   const root = await mkdtemp(path.join(tmpdir(), 'tikkun-cue-manifest-'))
   const filePath = path.join(root, relativePath)
@@ -260,14 +260,14 @@ test('rejects cue-bearing data with a stale tokenization version', async () => {
 })
 
 test('rejects valid Cue Data stored under the wrong path', async () => {
-  const fixture = await withCueFixture(cuePayload(), 'reader/noach/1.json')
+  const fixture = await withCueFixture(cuePayload(), 'reader/beresheet/1.json')
   try {
     await expect(readPublishedCueCoverage({
       root: fixture.root,
       recordings: [availableRecording],
       expectedTokenKeysByAudioId,
     })).rejects.toThrow(
-      'is reader/noach/1.json; expected reader/beresheet/1.json'
+      'is reader/beresheet/1.json; expected reader/01 beresheet/1.json'
     )
   } finally {
     await fixture.cleanup()

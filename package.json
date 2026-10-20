@@ -33,7 +33,6 @@
     "build:native": "node scripts/build-native.mjs",
     "build:pages": "node --import tsx scripts/build-pages-updates.ts",
     "updates:target": "node --import tsx scripts/native-update-target.ts",
-    "updates:content": "node --import tsx scripts/build-content-release.ts",
     "updates:web": "node --import tsx scripts/build-web-release.ts",
     "verify:native-clean": "node scripts/verify-native-clean.mjs",
     "native:sync": "npm run build:native && cap sync ios",
@@ -51,8 +50,9 @@
     "check": "npm run typecheck && npm run lint",
     "test:browser": "vitest run --project=browser",
     "test:browser:webkit": "vitest run --project=webkit",
+    "test:phone": "vitest run --project='phone*'",
     "verify:quick": "npm run check && npm run generated:check && npm run test:node",
-    "verify": "npm run verify:quick && npm run test:browser && npm run test:browser:webkit && npm run build",
+    "verify": "npm run verify:quick && npm run test:browser && npm run test:browser:webkit && npm run test:phone && npm run build",
     "verify:release": "node scripts/verify-release.mjs"
   },
   "repository": {

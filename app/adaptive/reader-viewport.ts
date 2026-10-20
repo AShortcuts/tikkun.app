@@ -2,6 +2,19 @@ import type { Destroy, MountScope } from '../lifecycle/mount.ts'
 
 export const COMPACT_READER_QUERY = '(max-width: 550px)'
 
+export function isMobileReaderViewport(
+  view: Pick<Window, 'innerWidth' | 'innerHeight'>
+): boolean {
+  const { innerWidth: width, innerHeight: height } = view
+  return (
+    Number.isFinite(width) &&
+    Number.isFinite(height) &&
+    width > 0 &&
+    height > 0 &&
+    Math.min(width, height) <= 550
+  )
+}
+
 export type ReaderViewportMode = 'compact' | 'wide'
 
 export interface ReaderViewport {
@@ -33,7 +46,7 @@ export function createReaderViewport(
     get mode() {
       return mode
     },
-    isCompact: () => mode === 'compact',
+    isCompact: () => mediaQuery.matches,
     onChange(listener) {
       listeners.add(listener)
       return scope.own(() => listeners.delete(listener))

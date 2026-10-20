@@ -617,12 +617,13 @@ test('shows alias context and navigates structured search results', () => {
   if (!input) throw new Error('Expected the parsha search input')
 
   expect(input.getAttribute('aria-label')).toBe('Search readings and settings')
-  inputValue(input, 'beresheet')
+  // "Beresheet" is the visible title; only an off-label alias shows "Matched:".
+  inputValue(input, 'Bereshit')
   expect(
     picker
       .querySelector('.search-result-alias')
       ?.textContent?.replace(/\s+/g, '')
-  ).toBe('Matched:beresheet')
+  ).toBe('Matched:bereshit')
 
   inputValue(input, 'Noach 3')
   const result = picker.querySelector<HTMLElement>(

@@ -53,6 +53,7 @@ export type AliyahNavigationContent = Readonly<{
   desktop: AliyahNavigationSnapshot | null
   compact: AliyahNavigationSnapshot | null
   authoringEnabled: boolean
+  isolated?: boolean
 }>
 
 export interface AliyahNavigation {

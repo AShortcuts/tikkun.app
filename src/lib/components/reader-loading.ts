@@ -1,6 +1,7 @@
 export type ReaderLoadingAnimation = 'doors' | 'fill'
 
-// Switch to 'fill' to restore the preserved progress animation.
+// 'doors' fills the aleph with real progress, then splits it open when ready.
+// Switch to 'fill' for the original progress-only screen.
 export const READER_LOADING_ANIMATION: ReaderLoadingAnimation = 'doors'
 
 // Original aleph silhouette, without the favicon's white outline.

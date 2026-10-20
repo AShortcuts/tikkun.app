@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest'
 import {
   generateAboutUrl,
+  generateAliyahUrl,
   generateCueAnalyticsUrl,
   generatePageUrl,
   generateUrl,
@@ -11,6 +12,10 @@ import { ScrollViewModel } from '../scroll-view-model.ts'
 import { renderLine } from '../test-utils.ts'
 import { LeiningGenerator } from '../../calendar-model/generator.ts'
 import type { UserSettings } from '../../calendar-model/user-settings.ts'
+import type { PlaybackAliyahIndex } from '../../reading/aliyah-dom-target.ts'
+import { resolveParshaRun } from './parsha-routes.ts'
+import { isReaderHash } from './reader-hash.ts'
+import { isSemanticallyRoutableReaderHash } from './routable-reader-hash.ts'
 
 const testSettings: UserSettings = {
   ashkenazi: true,
@@ -410,6 +415,161 @@ test('Generated run URL can start at a specific ref', async () => {
         )
       )
     )).toBe(await renderStartingLine(toModel(parseUrl(generator, '/run/2025-05-03:shacharis,main/3-14-1'))))
+})
+
+test('explicit aliyah links preserve canonical aliases and the continuous model', async () => {
+  const route = toReaderRoute(parseUrl(generator, '/torah/parsha/bereshit/1-2-4/aliyah/2'))
+  const continuous = toReaderRoute(parseUrl(generator, '/torah/parsha/beresheet/1-2-4'))
+  expect(route?.canonicalHash).toBe('#/torah/parsha/beresheet/1-2-4/aliyah/2')
+  expect(route?.aliyahTarget).toEqual({ runId: 'parsha:beresheet,main', aliyahIndex: 2 })
+  expect(continuous?.aliyahTarget).toBeUndefined()
+  expect(route?.model.constructor).toBe(continuous?.model.constructor)
+  expect(route?.model.relevantRuns.map(run => run.id))
+    .toEqual(continuous?.model.relevantRuns.map(run => run.id))
+  expect(await renderStartingLineForRoute(route)).toBe(await renderStartingLineForRoute(continuous))
+})
+
+test.each<PlaybackAliyahIndex>([7, 'Maftir'])(
+  'explicit overlapping target %s survives parsing and generation', (aliyahIndex) => {
+    const run = resolveParshaRun(generator, 'beresheet')!.run
+    const reference = { scroll: 'torah', b: 1, c: 6, v: 5 } as const
+    const hash = generateAliyahUrl(run, aliyahIndex, reference)
+    expect(hash).toBe(`#/torah/parsha/beresheet/1-6-5/aliyah/${aliyahIndex}`)
+    const route = toReaderRoute(parseUrl(generator, hash.slice(1)))
+    expect(route?.canonicalHash).toBe(hash)
+    expect(route?.aliyahTarget).toEqual({ runId: run.id, aliyahIndex })
+    expect(isReaderHash(hash)).toBe(true)
+    expect(isSemanticallyRoutableReaderHash(hash)).toBe(true)
+  }
+)
+
+test('generated aliyah links default to the selected start and accept its inclusive end', () => {
+  const run = resolveParshaRun(generator, 'beresheet')!.run
+  expect(generateAliyahUrl(run, 2)).toBe('#/torah/parsha/beresheet/1-2-4/aliyah/2')
+  expect(generateAliyahUrl(run, 'Maftir')).toBe('#/torah/parsha/beresheet/1-6-5/aliyah/Maftir')
+  const hash = generateAliyahUrl(run, 2, { scroll: 'torah', b: 1, c: 2, v: 19 })
+  expect(hash).toBe('#/torah/parsha/beresheet/1-2-19/aliyah/2')
+  expect(toReaderRoute(parseUrl(generator, hash.slice(1)))?.aliyahTarget?.aliyahIndex).toBe(2)
+})
+
+test('dated service targets keep their original run and divisions', async () => {
+  const run = generator.parseId('2026-10-04:shacharis,main')!
+  const ref = { scroll: 'torah', b: 5, c: 34, v: 1 } as const
+  const hash = generateAliyahUrl(run, 6, ref)
+  expect(hash).toBe('#/run/2026-10-04:shacharis,main/5-34-1/aliyah/6')
+  const route = toReaderRoute(parseUrl(generator, hash.slice(1)))
+  const continuous = toReaderRoute(parseUrl(generator, generateUrl(run, ref).slice(1)))
+  expect(route?.canonicalHash).toBeUndefined()
+  expect(route?.aliyahTarget).toEqual({ runId: run.id, aliyahIndex: 6 })
+  expect(route?.model.constructor).toBe(continuous?.model.constructor)
+  expect(route?.model.relevantRuns.map(run => run.id))
+    .toEqual(continuous?.model.relevantRuns.map(run => run.id))
+  expect(await renderStartingLineForRoute(route)).toBe(await renderStartingLineForRoute(continuous))
+
+  const canonical = toReaderRoute(parseUrl(generator, '/torah/parsha/vezos-haberacha/5-34-1/aliyah/7'))
+  expect(canonical?.canonicalHash).toBe('#/torah/parsha/vezot-haberacha/5-34-1/aliyah/7')
+  expect(canonical?.aliyahTarget).toEqual({ runId: 'parsha:vezot-haberacha,main', aliyahIndex: 7 })
+  expect(parseUrl(generator, '/torah/parsha/vezot-haberacha/5-34-1/aliyah/6'))
+    .toEqual({ view: 'not-found' })
+})
+
+test.each([
+  [false, '2026-10-04:shacharis,last-aliyah', 7],
+  [true, '2026-10-03:shacharis,last-aliyah', 8],
+  [false, '2026-10-04:shacharis,maftir', 'Maftir'],
+] as const)('special service targets round-trip in israel=%s: %s', (israel, runId, aliyahIndex) => {
+  const regionalGenerator = new LeiningGenerator({ ...testSettings, israel })
+  const run = regionalGenerator.parseId(runId)!
+  const hash = generateAliyahUrl(run, aliyahIndex)
+  expect(hash).toBe(`${generateUrl(run, run.aliyot[0].start)}/aliyah/${aliyahIndex}`)
+  expect(toReaderRoute(parseUrl(regionalGenerator, hash.slice(1)))?.aliyahTarget)
+    .toEqual({ runId, aliyahIndex })
+  expect(isReaderHash(hash)).toBe(true)
+  expect(isSemanticallyRoutableReaderHash(hash)).toBe(true)
+})
+
+test.each([
+  '/torah/parsha/beresheet/1-2-4/aliyah/1',
+  '/torah/parsha/beresheet/1-2-19/aliyah/3',
+  '/torah/parsha/beresheet/1-1-1/aliyah/8',
+  '/torah/parsha/beresheet/1-6-4/aliyah/Maftir',
+  '/torah/parsha/vezot-haberacha/5-34-1/aliyah/Maftir',
+  '/torah/parsha/haazinu/5-31-28/aliyah/1',
+  '/run/2026-10-04:shacharis,main/5-34-1/aliyah/7',
+  '/run/2026-10-04:shacharis,last-aliyah/1-1-1/aliyah/8',
+  '/run/2026-10-04:shacharis,main/1-1-1/aliyah/1',
+  '/run/2025-03-14:megillah,megillah/1-1-1/aliyah/1',
+])('rejects a missing division or mismatched reference: %s', (path) => {
+  expect(parseUrl(generator, path)).toEqual({ view: 'not-found' })
+})
+
+test('persisted route validation rejects semantically invalid explicit selections', () => {
+  for (const hash of [
+    '#/torah/parsha/beresheet/1-2-4/aliyah/1',
+    '#/torah/parsha/beresheet/1-1-1/aliyah/8',
+    '#/torah/parsha/haazinu/5-31-28/aliyah/1',
+    '#/run/2025-03-14:megillah,megillah/1-1-1/aliyah/1',
+  ]) expect(isSemanticallyRoutableReaderHash(hash), hash).toBe(false)
+})
+
+test.each([
+  '/torah/parsha/beresheet/aliyah/1',
+  '/run/2024-10-26:shacharis,main/aliyah/1',
+  '/torah/parsha/beresheet/1-1-1/aliyah',
+  '/torah/parsha/beresheet/1-1-1/aliyah/0',
+  '/torah/parsha/beresheet/1-1-1/aliyah/9',
+  '/torah/parsha/beresheet/1-1-1/aliyah/01',
+  '/torah/parsha/beresheet/1-1-1/aliyah/1.0',
+  '/torah/parsha/beresheet/1-1-1/aliyah/maftir',
+  '/torah/parsha/beresheet/1-1-1/aliyah/1/extra',
+  '/torah/parsha/beresheet/1-1-1/aliyah//1',
+  '/torah/parsha/beresheet/1-1-1/aliyah/1\n',
+  '/run/2024-10-26:shacharis,main/1-1-1/aliyah/1/extra',
+  '/torah/1-1-1/aliyah/1',
+  '/r/1-1-1/aliyah/1',
+  '/torah/page/1/aliyah/1',
+  '/esther/megillah-esther/1-1-1/aliyah/1',
+  '/esther/page/1/aliyah/1',
+  '/next/aliyah/1',
+  '/about/aliyah/1',
+  '/r/1-1-1/extra',
+  '/torah/parsha/beresheet/1-1-1/extra',
+  '/run/2024-10-26:shacharis,main/1-1-1/extra',
+  '/esther/megillah-esther/1-1-1/extra',
+  '/torah/page/1/extra',
+  '/esther/page/1/extra',
+])('rejects unsupported or trailing route components: %s', (path) => {
+  expect(parseUrl(generator, path)).toBeNull()
+  expect(isReaderHash(`#${path}`)).toBe(false)
+})
+
+test('aliyah generation rejects unavailable targets and refs instead of dropping their selection', () => {
+  const run = resolveParshaRun(generator, 'beresheet')!.run
+  for (const index of [0, 8, 9, 1.5, NaN, Infinity]) {
+    expect(() => generateAliyahUrl(run, index)).toThrow(/does not exist/)
+  }
+  expect(() => generateAliyahUrl(run, 1, { scroll: 'torah', b: 1, c: 2, v: 4 }))
+    .toThrow(/Reference does not belong/)
+  expect(() => generateAliyahUrl(run, 1, { scroll: 'esther', b: 1, c: 1, v: 1 }))
+    .toThrow(/Reference does not belong/)
+  expect(() => generateAliyahUrl(run, 1, { scroll: 'torah', b: 1, c: 1, v: 999 }))
+    .toThrow(/Reference does not belong/)
+  expect(() => generateAliyahUrl(generator.parseId('2025-03-14:megillah,megillah')!, 1))
+    .toThrow(/does not exist/)
+})
+
+test('reparsing history entries does not retain a previous explicit target', () => {
+  const paths = [
+    '/torah/parsha/beresheet/1-6-5/aliyah/7',
+    '/torah/parsha/beresheet/1-6-5/aliyah/Maftir',
+  ]
+  for (const [pathIndex, expectedIndex] of [[0, 7], [1, 'Maftir'], [0, 7], [1, 'Maftir']] as const) {
+    const route = toReaderRoute(parseUrl(generator, paths[pathIndex]))
+    expect(route?.canonicalHash).toBe(`#${paths[pathIndex]}`)
+    expect(route?.aliyahTarget).toEqual({ runId: 'parsha:beresheet,main', aliyahIndex: expectedIndex })
+  }
+  expect(toReaderRoute(parseUrl(generator, '/torah/parsha/beresheet/1-6-5'))?.aliyahTarget)
+    .toBeUndefined()
 })
 
 async function renderStartingLine(model: ScrollViewModel | null) {

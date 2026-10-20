@@ -38,7 +38,7 @@ const Page = (
       mirror?: boolean
     } = {}) =>
       page.lines
-        .map((line, idx) =>
+        .map((line, idx) => !page.wordSelection || page.wordSelection.lineKeys.has(`${page.pageNumber}:${idx}`) ?
           Line({
             pageNumber: page.pageNumber,
             lineIndex: idx,
@@ -46,8 +46,9 @@ const Page = (
             presentation,
             surface,
             mirror,
+            wordSelection: page.wordSelection,
             ...line,
-          }),
+          }) : '',
         )
         .join('')
 
@@ -76,15 +77,16 @@ const Page = (
   <table data-page-number="${page.pageNumber}" data-reader-sides="${presentation.sides}">
     <caption class="tikkun-page-number" aria-hidden="true">${page.pageNumber}</caption>
     ${page.lines
-      .map((line, idx) =>
+      .map((line, idx) => !page.wordSelection || page.wordSelection.lineKeys.has(`${page.pageNumber}:${idx}`) ?
         Line({
           pageNumber: page.pageNumber,
           lineIndex: idx,
           annotationsEnabled,
           presentation,
           pageReference,
+          wordSelection: page.wordSelection,
           ...line,
-        }),
+        }) : '',
       )
       .join('')}
   </table>

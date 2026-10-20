@@ -33,10 +33,10 @@ describe('reading search adapter', () => {
   })
 
   test('exposes the alias that produced a result', () => {
-    const result = search.search('beresheet')[0]
+    const result = search.search('Bereshit')[0]
 
-    expect(result?.englishLabel).toContain('Bereshit')
-    expect(result?.matchedAlias).toBe('beresheet')
+    expect(result?.englishLabel).toContain('Beresheet')
+    expect(result?.matchedAlias).toBe('bereshit')
   })
 
   test('resolves structured aliyah and reference queries', () => {

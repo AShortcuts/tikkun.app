@@ -1,14 +1,15 @@
 const referencePattern = '[1-9]\\d*-[1-9]\\d*-[1-9]\\d*'
 const slugPattern = '[a-z0-9]+(?:-[a-z0-9]+)*'
-const referenceSuffixPattern = new RegExp(`/${referencePattern}$`)
+const aliyahSuffixPattern = '/aliyah/(?:[1-8]|Maftir)'
+const referenceSuffixPattern = new RegExp(`(/${referencePattern})(${aliyahSuffixPattern})?$`)
 const torahParshaHashPattern = new RegExp(
-  `^#/torah/parsha/${slugPattern}(?:/${referencePattern})?$`
+  `^#/torah/parsha/${slugPattern}(?:/${referencePattern}(?:${aliyahSuffixPattern})?)?$`
 )
 const estherParshaHashPattern = new RegExp(
-  `^#/esther/(?!page(?:/|$))${slugPattern}(?:/${referencePattern})?$`
+  `^#/esther/(?!(?:page|parsha)(?:/|$))${slugPattern}(?:/${referencePattern})?$`
 )
 const readerHashPatterns = [
-  new RegExp(`^#/run/[^/?#\\s]+(?:/${referencePattern})?$`),
+  new RegExp(`^#/run/[^/?#\\s]+(?:/${referencePattern}(?:${aliyahSuffixPattern})?)?$`),
   new RegExp(`^#/torah/${referencePattern}$`),
   new RegExp(`^#/r/${referencePattern}$`),
   torahParshaHashPattern,
@@ -25,14 +26,14 @@ const semanticParshaHashPatterns = [
 export function isReaderHash(hash: unknown): hash is string {
   return (
     typeof hash === 'string' &&
-    readerHashPatterns.some((pattern) => pattern.test(hash))
+    readerHashPatterns.some((pattern) => pattern.exec(hash)?.[0] === hash)
   )
 }
 
 export function isSemanticParshaHash(hash: unknown) {
   return (
     typeof hash === 'string' &&
-    semanticParshaHashPatterns.some((pattern) => pattern.test(hash))
+    semanticParshaHashPatterns.some((pattern) => pattern.exec(hash)?.[0] === hash)
   )
 }
 
@@ -47,8 +48,11 @@ export function preserveSemanticParshaRoute(
     return scrolledHash
   }
 
-  const referenceSuffix = scrolledHash.match(referenceSuffixPattern)?.[0]
-  if (!referenceSuffix) return currentHash
+  if (!isReaderHash(scrolledHash)) return currentHash
+  const reference = scrolledHash.match(referenceSuffixPattern)?.[1]
+  if (!reference) return currentHash
+  // Dated service indices need not match the canonical parsha's divisions.
+  const currentAliyahSuffix = currentHash.match(referenceSuffixPattern)?.[2] ?? ''
 
-  return `${currentHash.replace(referenceSuffixPattern, '')}${referenceSuffix}`
+  return `${currentHash.replace(referenceSuffixPattern, '')}${reference}${currentAliyahSuffix}`
 }

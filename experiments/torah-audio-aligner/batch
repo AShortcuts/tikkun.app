@@ -1,6 +1,8 @@
 #!/bin/sh
 set -eu
 task_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+cd "$task_dir/../.."
+node --import tsx scripts/import-aligner-audio.mjs
 export PYTHONDONTWRITEBYTECODE=1
 if [ "$#" -eq 0 ] && [ -f "$task_dir/work/private-batch-cue-flags/queue.json" ]; then
   set -- --port 8768 --review-dir private-batch-cue-flags

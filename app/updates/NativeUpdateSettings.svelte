@@ -3,7 +3,7 @@
   import { nativeUpdateState, updatesBusy, updateStatusText } from './update-state.ts'
   import { checkNativeUpdates } from './native-updates.ts'
   const busy = $derived(updatesBusy($nativeUpdateState))
-  const checkedAt = $derived(Math.max($nativeUpdateState.web.checkedAt ?? 0, $nativeUpdateState.content.checkedAt ?? 0))
+  const checkedAt = $derived($nativeUpdateState.web.checkedAt)
 </script>
 
 <section class="settings-section" aria-label="App updates">

@@ -33,7 +33,7 @@ npm run dev
 
 Development and preview servers bind to `127.0.0.1` by default. Opt into LAN access explicitly with `npm run dev -- --host 0.0.0.0` on a trusted network.
 
-For the private Torah Audio Aligner, run `npm run dev:aligner` in a second terminal. It uses the existing Python environment and saved workspace, printing its local URL when ready. See [the batch beta guide](../experiments/torah-audio-aligner/BATCH_BETA.md) for setup and review instructions.
+For the private Torah Audio Aligner, run `npm run dev:aligner` in a second terminal. It imports new audio from the configured local source library, updates the local catalogs, then starts or refreshes the aligner using its existing Python environment and saved workspace. It does not start alignment jobs. See [the batch beta guide](../experiments/torah-audio-aligner/BATCH_BETA.md) for source configuration and review instructions.
 
 ### Build static output
 
@@ -58,6 +58,8 @@ The source directory must contain the narrator's complete recording library. Its
 The command replaces that narrator's generated media under `site/audio/`, normalizes each recording to `<narrator>/<reading>/<aliyah>.<format>`, and regenerates `generated/audio-manifest.ts`. You can set `TIKKUN_AUDIO_SOURCE_ROOT` instead of passing `--source`.
 
 The generated manifest is deterministic and grouped by parsha so diffs stay reviewable in git.
+
+The aligner's startup import is additive: it copies new recordings and restores missing copies of unchanged registered audio, preserves recordings absent from the source folder, and leaves cue files untouched. It refuses changed audio for an existing recording; review those replacements before using `audio:sync`. Startup source configuration lives in the ignored `experiments/torah-audio-aligner/work/audio-source.json` file (`{"sourceRoot":"/path/to/source recordings"}`), with `TIKKUN_AUDIO_SOURCE_ROOT` taking precedence. Without either setting, the aligner uses the already registered library and reports that import is not configured.
 
 ### Generate offline aliyah videos
 

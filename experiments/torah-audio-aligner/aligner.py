@@ -193,8 +193,15 @@ def prepare(args):
     command = ["node", "--import", "tsx", str(HERE / "compile-input.mts")]
     if args.manifest:
         command += ["--manifest", str(work_path(args.manifest))]
-    completed = subprocess.run(command,
-                               cwd=REPO, capture_output=True, text=True, timeout=90, check=True)
+    try:
+        completed = subprocess.run(command,
+                                   cwd=REPO, capture_output=True, text=True, timeout=90, check=True)
+    except subprocess.CalledProcessError as error:
+        stderr = (error.stderr or "").strip()
+        reason = next((line.strip() for line in stderr.splitlines()
+                       if re.match(r"^\[?\w*Error:", line)),
+                      stderr[-4000:] or f"Compiler exited with status {error.returncode}")
+        raise AlignmentError(f"Could not prepare recording text: {reason}") from error
     compilation = json.loads(completed.stdout)
     bundle = compilation["input"]
     verify_sources(bundle)

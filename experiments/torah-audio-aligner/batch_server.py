@@ -97,9 +97,13 @@ def batch_handler_for(app):
                     return self.file(HERE / "batch-ui" / path[1:], "text/javascript; charset=utf-8" if path.endswith('.js') else "text/css; charset=utf-8")
                 if path == "/api/health":
                     return self.json({"app": APP_ID, "workspace": digest_json(str(HERE)),
-                                      "storage": digest_json(str(app.store.root)), "status": "ready"})
+                                      "storage": digest_json(str(app.store.root)), "status": "ready",
+                                      "libraryRefresh": True, "clearQueue": True})
                 if path == "/api/batch/library":
-                    return self.json({"sources": list(app.library.sources.values()), "maxUploadBytes": MAX_UPLOAD})
+                    with app.queue.lock:
+                        app.library.reload()
+                        sources = list(app.library.sources.values())
+                    return self.json({"sources": sources, "maxUploadBytes": MAX_UPLOAD})
                 if path == "/api/batch/queue":
                     return self.json(app.queue.snapshot())
                 if path == "/api/batch/reviews":
@@ -128,6 +132,10 @@ def batch_handler_for(app):
                     return self.json(app.queue.snapshot())
                 if path == "/api/batch/clear-downloads":
                     cleared = app.queue.clear_downloads(self.body().get("itemIds"))
+                    return self.json({"cleared": cleared, "queue": app.queue.snapshot()})
+                if path == "/api/batch/clear-queue":
+                    self.body()
+                    cleared = app.queue.clear()
                     return self.json({"cleared": cleared, "queue": app.queue.snapshot()})
                 if path == "/api/batch/export":
                     content = app.export_zip(self.body().get("selections"))
@@ -159,7 +167,13 @@ def main():
         health = None
     if health:
         if health.get("app") == APP_ID and health.get("storage") == digest_json(str(work_path(args.review_dir))):
-            print(f"Private batch beta already running: {url}", flush=True); return
+            if not health.get("libraryRefresh") or not health.get("clearQueue"):
+                raise SystemExit("Audio import finished. The running aligner needs a one-time restart to load the latest controls and library: "
+                                 "press Ctrl+C in its terminal, then run npm run dev:aligner again. Saved cues are preserved.")
+            with urlopen(url + "/api/batch/library", timeout=95) as response:
+                library = json.load(response)
+            print(f"Private batch beta already running: {url} ({len(library['sources'])} recordings). Refresh the browser to see new imports.", flush=True)
+            return
         raise SystemExit("Port belongs to another service. Choose --port without stopping it.")
     root = work_path(args.review_dir)
     root.mkdir(parents=True, exist_ok=True)

@@ -48,7 +48,6 @@ typescript.include = typescript.include.map((entry) => entry.replace('./.svelte-
 await writeFile(path.join(root, 'tsconfig.native.json'), `${JSON.stringify(typescript, null, 2)}\n`)
 
 for (const args of [
-  ['--import', 'tsx', 'scripts/build-content-release.ts', '--contract'],
   ['scripts/build-system-calendar.mjs'],
   ['scripts/generate-torah-index.mjs'],
   ['--import', 'tsx', 'scripts/generate-public-reading-manifest.mjs'],

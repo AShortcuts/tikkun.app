@@ -13,7 +13,7 @@ import {
   type ActiveAudioSession,
 } from './audio-controller.ts'
 import type { PlaybackAliyahIndex } from './aliyah-dom-target.ts'
-import { HighlightController } from './highlight-controller.ts'
+import { HighlightController, type HighlightActivationOptions } from './highlight-controller.ts'
 import { isActivePlaybackTarget } from './playback-session.ts'
 import {
   createPlaybackTimeline,
@@ -45,11 +45,6 @@ type RecordingHostOptions = Omit<
   RecordingSessionOptions,
   'audioController' | 'highlightController' | 'presentation'
 >
-
-type HighlightActivationOptions = {
-  scroll?: boolean
-  scrollBehavior?: ScrollBehavior
-}
 
 type DeepReadonly<T> = T extends object
   ? { readonly [Key in keyof T]: DeepReadonly<T[Key]> }
@@ -222,6 +217,8 @@ export interface ReaderPlayback {
   play(retry?: () => Promise<void>): Promise<boolean>
   replayCurrentCue(): Promise<void>
   toggle(retry?: () => Promise<void>): Promise<void>
+  /** Pauses and returns the loaded aliyah to its first word at 0:00. */
+  rewind(): Promise<void>
   step(delta: -1 | 1): Promise<void>
   seek(time: number): void
   setPlaybackRate(rate: number, snap?: boolean): Promise<void>
@@ -829,6 +826,7 @@ export function createReaderPlayback(
       await audioController.replayCurrentCue()
     },
     toggle: (retry) => timeline.command({ type: 'toggle', retry }),
+    rewind: () => timeline.command({ type: 'rewind' }),
     step: (delta) => timeline.command({ type: 'step', delta }),
     seek(time) {
       audioController.seek(time)

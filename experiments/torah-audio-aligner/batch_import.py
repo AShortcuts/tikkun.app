@@ -35,14 +35,18 @@ def media_duration(path):
 class RecordingLibrary:
     def __init__(self, root, catalog=None):
         self.root = work_path(root)
+        self.reload(catalog)
+
+    def reload(self, catalog=None):
         if catalog is None:
             result = subprocess.run(["node", "--import", "tsx", str(HERE / "batch-library.mts")],
                                     cwd=REPO, capture_output=True, text=True, timeout=90, check=True)
             catalog = json.loads(result.stdout)
-        self.text_hash = catalog["textPagesSha256"]
-        self.sources = {row["id"]: row for row in catalog["sources"]}
-        if len(self.sources) != len(catalog["sources"]):
+        sources = {row["id"]: row for row in catalog["sources"]}
+        if len(sources) != len(catalog["sources"]):
             raise AlignmentError("Duplicate recording identities in the Tikkun library.")
+        self.text_hash = catalog["textPagesSha256"]
+        self.sources = sources
 
     def get(self, identifier):
         if not isinstance(identifier, str) or identifier not in self.sources:

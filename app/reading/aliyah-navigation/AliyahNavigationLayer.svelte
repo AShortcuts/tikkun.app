@@ -3,6 +3,7 @@
   import { flushSync, onMount } from 'svelte'
   import { SvelteSet } from 'svelte/reactivity'
   import UiIcon from '../../components/UiIcon.svelte'
+  import { observeReaderResize } from '../../adaptive/reader-resize.ts'
   import {
     ALIYAH_RAIL_AUTO_HIDE_MS,
     aliyahCueAuthoringActionLabel,
@@ -62,6 +63,22 @@
 
   let desktopSnapshot = $state<AliyahNavigationSnapshot | null>(null)
   let compactSnapshot = $state<AliyahNavigationSnapshot | null>(null)
+  let isolated = $state(false)
+  const isolatedVisible = $derived(isolated && Boolean(compactSnapshot?.items.length))
+  const segmentItems = $derived(
+    isolated ? compactSnapshot?.items ?? [] : compactSnapshot?.items.slice(0, 7) ?? []
+  )
+  const activeItemIndex = $derived(
+    compactSnapshot?.items.findIndex((item) =>
+      isSameAliyahNavigationTarget(compactSnapshot?.active, item.target)
+    ) ?? -1
+  )
+  const previousItem = $derived(
+    activeItemIndex > 0 ? compactSnapshot?.items[activeItemIndex - 1] : undefined
+  )
+  const nextItem = $derived(
+    activeItemIndex >= 0 ? compactSnapshot?.items[activeItemIndex + 1] : undefined
+  )
   let railVisibility = $state<AliyahRailVisibility>('hidden')
   let compactAvailable = $state(false)
   let authoringEnabled = $state(false)
@@ -72,6 +89,7 @@
   let durationLabels = $state<Record<string, string>>({})
 
   let railElement: HTMLElement
+  let compactRailElement: HTMLElement
   let pickerElement: HTMLElement
   let closeButton: HTMLButtonElement
   let hideTimer: number | null = null
@@ -188,6 +206,22 @@
       '--aliyah-rail-top',
       `${toolbar.getBoundingClientRect().bottom}px`
     )
+    revealActiveSegment()
+  }
+
+  function revealActiveSegment() {
+    if (!isolated || !compactRailElement?.clientWidth) return
+    const activeSegment = compactRailElement.querySelector<HTMLElement>(
+      '[aria-current="location"]'
+    )
+    if (!activeSegment) return
+    const railBounds = compactRailElement.getBoundingClientRect()
+    const segmentBounds = activeSegment.getBoundingClientRect()
+    if (segmentBounds.left < railBounds.left) {
+      compactRailElement.scrollLeft += segmentBounds.left - railBounds.left
+    } else if (segmentBounds.right > railBounds.right) {
+      compactRailElement.scrollLeft += segmentBounds.right - railBounds.right
+    }
   }
 
   function applyRailVisibility() {
@@ -230,7 +264,7 @@
       autoHideMs?: number
     } = {}
   ) {
-    if (!desktopSnapshot) return
+    if (isolated || !desktopSnapshot) return
     syncRailPosition()
     setRailVisibility(visibility)
     if (visibility === 'expanded') clearHideTimer()
@@ -242,9 +276,10 @@
       desktopSnapshot = cloneSnapshot(content.desktop)
       compactSnapshot = cloneSnapshot(content.compact)
       authoringEnabled = content.authoringEnabled
+      isolated = content.isolated ?? false
     })
 
-    if (desktopSnapshot) {
+    if (desktopSnapshot && !isolated) {
       syncRailPosition()
       applyRailVisibility()
       queueCueStatusLoads(desktopSnapshot)
@@ -254,6 +289,7 @@
     if (compactSnapshot) {
       queueCueStatusLoads(compactSnapshot)
       queueDurationLoads(compactSnapshot)
+      revealActiveSegment()
     }
     else closeCompact()
   }
@@ -265,6 +301,7 @@
       desktopSnapshot = null
       compactSnapshot = null
       authoringEnabled = false
+      isolated = false
       revision += 1
       cueStatuses = {}
       durationLabels = {}
@@ -298,6 +335,7 @@
         compactSnapshot = { ...compactSnapshot, active: target }
       }
     })
+    revealActiveSegment()
   }
 
   function syncPlayback(playback: AliyahNavigationPlayback) {
@@ -508,22 +546,26 @@
   }
 
   function selectCompactSegment(target: AliyahNavigationTarget) {
-    setActive(target)
+    if (!isolated) setActive(target)
     onSelect(target)
     onAfterNavigate()
   }
 
+  function selectRailSegment(target: AliyahNavigationTarget) {
+    selectCompactSegment(target)
+    // Tapping the rail also shows where each aliyah starts, then hides with the rail timer.
+    revealWide('peek')
+  }
+
   function selectCompactCard(target: AliyahNavigationTarget) {
     closeCompact()
-    setActive(target)
-    onSelect(target)
-    onAfterNavigate()
+    selectCompactSegment(target)
   }
 
   async function playCompactItem(target: AliyahNavigationTarget) {
     const item = compactSnapshot?.items.find(item => isSameAliyahNavigationTarget(item.target, target))
     if (!item || itemAppearance(item).actionDisabled) return
-    setActive(target)
+    if (!isolated) setActive(target)
     closeCompact({ focusTarget: getReaderFocusTarget() })
     const action = ++playAction
     const playback = await onPlayCompact(target)
@@ -602,8 +644,7 @@
 
   onMount(() => {
     connect(layer)
-    view.addEventListener('resize', syncRailPosition)
-    view.visualViewport?.addEventListener('resize', syncRailPosition)
+    const resizeLayout = observeReaderResize(view, 'chrome', syncRailPosition)
 
     return () => {
       destroyed = true
@@ -623,19 +664,21 @@
       onWideHidden()
       ownerDocument.documentElement.style.removeProperty('--aliyah-rail-top')
       delete ownerDocument.documentElement.dataset.aliyahRailVisibility
-      view.removeEventListener('resize', syncRailPosition)
-      view.visualViewport?.removeEventListener('resize', syncRailPosition)
+      resizeLayout.destroy()
     }
   })
 </script>
 
+<div class="mobile-aliyah-row" class:is-isolated={isolatedVisible}>
 <nav
+  bind:this={compactRailElement}
   class="mobile-aliyah-segments"
+  class:is-isolated={isolated}
   class:u-hidden={!compactSnapshot}
   data-target-id="mobile-aliyah-segments"
   aria-label="Aliyah navigation"
 >
-  {#each compactSnapshot?.items.slice(0, 7) ?? [] as item (item.key)}
+  {#each segmentItems as item (item.key)}
     <button
       class="mobile-aliyah-segment"
       class:is-current={isSameAliyahNavigationTarget(
@@ -664,22 +707,62 @@
       )
         ? 'location'
         : undefined}
-      onclick={() => selectCompactSegment(item.target)}
+      onclick={() => selectRailSegment(item.target)}
     ></button>
   {/each}
 </nav>
 
+{#if isolatedVisible}
+  <nav
+    class="isolated-aliyah-controls"
+    data-target-id="isolated-aliyah-controls"
+    aria-label="Previous or next aliyah"
+  >
+    <button
+      class="isolated-aliyah-step"
+      data-target-id="isolated-aliyah-previous"
+      type="button"
+      disabled={!previousItem}
+      aria-label={previousItem ? `Previous aliyah: ${previousItem.label}` : 'Previous aliyah'}
+      title={previousItem ? `Previous aliyah: ${previousItem.label}` : 'Previous aliyah'}
+      onclick={() => previousItem && selectCompactSegment(previousItem.target)}
+    >
+      <span class="isolated-aliyah-step-surface" aria-hidden="true">
+        <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+          <path d="m15 18-6-6 6-6" />
+        </svg>
+      </span>
+    </button>
+    <button
+      class="isolated-aliyah-step"
+      data-target-id="isolated-aliyah-next"
+      type="button"
+      disabled={!nextItem}
+      aria-label={nextItem ? `Next aliyah: ${nextItem.label}` : 'Next aliyah'}
+      title={nextItem ? `Next aliyah: ${nextItem.label}` : 'Next aliyah'}
+      onclick={() => nextItem && selectCompactSegment(nextItem.target)}
+    >
+      <span class="isolated-aliyah-step-surface" aria-hidden="true">
+        <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+          <path d="m9 18 6-6-6-6" />
+        </svg>
+      </span>
+    </button>
+  </nav>
+{/if}
+</div>
+
 <nav
   bind:this={railElement}
   class="aliyah-rail"
-  class:u-hidden={!desktopSnapshot}
+  class:u-hidden={isolated || !desktopSnapshot}
   class:is-peeking={railVisibility === 'peek'}
   class:is-expanded={railVisibility === 'expanded'}
   data-target-id="aliyah-rail"
   data-visibility={railVisibility}
   aria-label="Aliyah navigation"
-  aria-hidden={railVisibility === 'hidden'}
-  inert={railVisibility === 'hidden'}
+  aria-hidden={isolated || railVisibility === 'hidden'}
+  inert={isolated || railVisibility === 'hidden'}
   onpointerenter={handleRailPointerEnter}
   onpointerleave={handleRailPointerLeave}
   onfocusin={handleRailFocusIn}

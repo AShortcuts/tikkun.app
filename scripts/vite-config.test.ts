@@ -2,8 +2,8 @@ import { expect, test } from 'vitest'
 
 import { defaultViteHost, viteConfig } from '../vite.config'
 
-test('development servers bind to loopback by default', () => {
-  expect(defaultViteHost).toBe('127.0.0.1')
+test('development is reachable on the local network while preview stays on loopback', () => {
+  expect(defaultViteHost).toBe('0.0.0.0')
   expect(viteConfig.server?.host).toBe(defaultViteHost)
-  expect(viteConfig.preview?.host).toBe(defaultViteHost)
+  expect(viteConfig.preview?.host).toBe('127.0.0.1')
 })

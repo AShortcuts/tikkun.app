@@ -3,8 +3,14 @@ import type { UserSettings } from '../calendar-model/user-settings'
 import { last } from '../calendar-model/utils'
 import {
   type RenderedEntry,
+  type ScrollContentSource,
   ScrollViewModel,
 } from '../view-model/scroll-view-model'
+import type { LeiningRun } from '../calendar-model/model-types.ts'
+import type { RefWithScroll } from '../ref.ts'
+import { createIsolatedAliyahViewModel } from '../reading/isolated-aliyah-view.ts'
+import { resolveParshaRun } from '../view-model/navigation/parsha-routes.ts'
+import { applyAnnotationMode } from './annotation-rendering.ts'
 import { ScrollDisplay } from './ScrollDisplay'
 import { getCenteredElementScrollTop, getReaderFocalPointClientY, setReaderFocalPointMode } from '../reader-scroll'
 import '/css/master.css'
@@ -49,7 +55,8 @@ for (const testCase of [
   {
     name: 'near the top of the page',
     label: 'ויקהל',
-    runId: '2025-03-22:shacharis,main',
+    // 2025-03-22 adds the Parah maftir, so its dated view shows only that service.
+    runId: 'parsha:vayakhel,main',
   },
   {
     name: 'at the center of the page',
@@ -203,6 +210,34 @@ test('waits for the actual reader font before initial centering', async () => {
   }
 })
 
+test.each([
+  ['one', true], ['one', false], ['two', true], ['two', false],
+] as const)('centers the exact Reading verse in %s side mode with annotations=%s', async (sides, annotations) => {
+  root.style.height = '560px'
+  root.style.width = '1000px'
+  root.dataset.readerLayout = 'reading'
+  root.dataset.readerSides = sides
+  root.className = `tikkun-book mod-annotations-${annotations ? 'on' : 'off'}`
+  const plain = sides === 'one' && !annotations
+  for (const { ref, tokenKey, text } of [
+    { ref: { b: 1, c: 7, v: 17 }, tokenKey: '7:39:0:4', text: 'ויהי' },
+    // The verse begins on a new physical page, after a maqaf group in the previous verse.
+    { ref: { b: 1, c: 7, v: 19 }, tokenKey: `8:0:0:${plain ? 5 : 4}`, text: 'והמים' },
+    { ref: { b: 1, c: 9, v: 26 }, tokenKey: '10:0:0:7', text: 'ויאמר' },
+  ]) {
+    const model = ScrollViewModel.forId(generator, '2026-10-17:shacharis,main', { scroll: 'torah', ...ref })
+    if (!model) throw new Error('Noach model not found')
+    vm = model
+    const display = createDisplay()
+    await display.scrolled
+    const word = root.querySelector<HTMLElement>(`[data-reader-canonical="true"] .word[data-token-key="${tokenKey}"]:not([hidden])`)!
+    expect(word.textContent!.normalize('NFD').replace(/\p{M}/gu, '').trim()).toBe(text)
+    const rect = word.getBoundingClientRect()
+    expect(Math.abs(rect.top + rect.height / 2 - getReaderFocalPointClientY(root))).toBeLessThan(2)
+    display.destroy()
+  }
+})
+
 test.each(['match', 'reading'] as const)('preserves the focal token across %s side switches', async (layout) => {
   root.style.height = '650px'
   root.style.width = '1000px'
@@ -267,8 +302,9 @@ test('mounting the next Yitro page preserves the focal word exactly', async () =
 
 test('renders the previous page', async () => {
   // פרשת תצוה is near the bottom of the page, so we
-  // will fetch the next page, not the previous page.
-  await renderRun('2025-03-08:shacharis,main')
+  // will fetch the next page, not the previous page. The parsha route scrolls
+  // through חומש; 2025-03-08 adds Zachor, so its dated view is that service only.
+  await renderRun('parsha:tetzaveh,main')
 
   expect(textFromLine(root.querySelector('tr'))).toBe(
     'ובין קדש הקדשים ונתת את הכפרת על ארון'
@@ -1156,3 +1192,158 @@ function expectSameViewportAnchor(
     `Anchor offsets differ: ${JSON.stringify({ actual, expected })}`
   ).toBeLessThanOrEqual(5)
 }
+
+class IsolatedRangeFixture extends ScrollViewModel {
+  constructor(start: RefWithScroll, end: RefWithScroll) {
+    const original = resolveParshaRun(generator, 'beresheet')!.run
+    const run: LeiningRun = { ...original, aliyot: [{ index: 1, start, end }] }
+    super(generator, [run], start, {}, run.id)
+  }
+  protected override async contentSourceFromIndex(index: number): Promise<ScrollContentSource | null> {
+    return index >= 0 && index < 248 ? { type: 'page', pageNumber: index + 1 } : null
+  }
+  protected override async contentIndexFromPageNumber(page: number) { return page - 1 }
+}
+
+const isolatedRef = (b: number, c: number, v: number): RefWithScroll => ({ scroll: 'torah', b, c, v })
+
+async function isolatedDisplay(start: RefWithScroll, end = start, initialRef?: RefWithScroll, annotations = true) {
+  root.dataset.readerLayout = 'reading'
+  root.dataset.readerSides = 'one'
+  root.className = `tikkun-book mod-annotations-${annotations ? 'on' : 'off'}`
+  const base = new IsolatedRangeFixture(start, end)
+  await base.startingLocation
+  vm = await createIsolatedAliyahViewModel(base, { runId: base.initialRunId!, aliyahIndex: 1 }, initialRef)
+  return createDisplay()
+}
+
+function setIsolatedAnnotations(display: ScrollDisplay, enabled: boolean) {
+  display.updateAnnotations(() => {
+    root.classList.toggle('mod-annotations-on', enabled)
+    root.classList.toggle('mod-annotations-off', !enabled)
+    applyAnnotationMode(root, enabled)
+  })
+}
+
+function isolatedVisibleWords(surface = '[data-reader-canonical="true"]') {
+  return [...root.querySelectorAll<HTMLElement>(`${surface} .word:not([hidden])`)]
+}
+
+test('isolated passage omits same-line neighbors in both forms and repeated annotation toggles', async () => {
+  const display = await isolatedDisplay(isolatedRef(1, 1, 6), isolatedRef(1, 1, 13))
+  await display.scrolled
+  const canonicalKeys = [...root.querySelectorAll<HTMLElement>('.word[data-token-key][data-annotations-on-present="true"]')].map(word => word.dataset.tokenKey!)
+  expect(new Set(canonicalKeys)).toEqual(vm.isolatedAliyah!.tokenKeys)
+  expect(root.scrollTop).toBe(0)
+  expect(root.querySelector('[data-class="line"][data-line-index="0"]')).toBeNull()
+  for (const enabled of [false, true, false, true]) {
+    display.updateAnnotations(() => {
+      root.classList.toggle('mod-annotations-on', enabled)
+      root.classList.toggle('mod-annotations-off', !enabled)
+      applyAnnotationMode(root, enabled)
+    })
+    const words = isolatedVisibleWords()
+    const text = words.map(word => word.textContent!.replace(/\p{M}/gu, '')).join(' ')
+    expect(text).toMatch(/^ויאמר אלהים יהי רקיע/)
+    expect(text).toMatch(enabled ? /יום שלישי׃$/ : /יום שלישי$/)
+    expect(text).not.toContain('בראשית')
+    expect(text).not.toContain('יום רביעי')
+    expect(words.filter(word => word.dataset.tokenKey).every(word => vm.isolatedAliyah!.containsRenderedTokenKey(word.dataset.tokenKey!))).toBe(true)
+    expect([...root.querySelectorAll<HTMLElement>('.reader-pasuk-break')].filter(br => getComputedStyle(br).display !== 'none')).toHaveLength(8)
+  }
+})
+
+test('isolated passage mounts its complete final verse before ready and rejects outside mounts/eviction', async () => {
+  const display = await isolatedDisplay(isolatedRef(5, 33, 17))
+  await display.rendered
+  expect(display.getMountedPageNumbers()).toEqual([244, 245])
+  await display.scrolled
+  const beforeKeys = new Set(isolatedVisibleWords().map(word => word.dataset.tokenKey).filter(Boolean))
+  expect(beforeKeys).toEqual(vm.isolatedAliyah!.tokenKeys)
+  expect(isolatedVisibleWords().at(-1)!.textContent).toContain('מְנַשֶּֽׁה׃')
+  expect(await display.ensurePageMounted(243)).toBeNull()
+  expect(await display.ensurePageMountedForNavigation(246)).toBeNull()
+  expect(await display.ensurePageMounted(244, { runId: 'another-run' })).toBeNull()
+  expect(await display.ensureNextContentMounted()).toBeNull()
+  expect(display.evictPages([244, 245])).toEqual([])
+  const fetchNext = vi.spyOn(vm, 'fetchNextPage')
+  root.scrollTop = root.scrollHeight
+  root.dispatchEvent(new Event('scroll'))
+  await nextAnimationFrame()
+  expect(fetchNext).not.toHaveBeenCalled()
+  expect(display.getMountedPageNumbers()).toEqual([244, 245])
+  for (const sides of ['two', 'one'] as const) {
+    display.setPresentation({ layout: 'reading', sides })
+    expect(new Set(isolatedVisibleWords().map(word => word.dataset.tokenKey).filter(Boolean))).toEqual(beforeKeys)
+    if (sides === 'two') {
+      expect(new Set(isolatedVisibleWords('.reader-text-side.mod-torah').map(word => word.dataset.tokenKey).filter(Boolean))).toEqual(beforeKeys)
+    }
+    expect(display.getMountedPageNumbers()).toEqual([244, 245])
+  }
+})
+
+test.each([true, false])('isolated explicit verse centers its source token in annotations=%s', async (annotations) => {
+  root.style.height = '240px'
+  const display = await isolatedDisplay(isolatedRef(1, 1, 1), isolatedRef(1, 2, 3), isolatedRef(1, 1, 9), annotations)
+  await display.scrolled
+  const { page } = await vm.startingLocation
+  if (page.type !== 'page') throw new Error('Missing page')
+  const initialKey = vm.isolatedAliyah!.initialTokenKey
+  const key = annotations ? initialKey : page.wordSelection!.unannotatedKeysByAnnotated.get(initialKey)![0]
+  const word = root.querySelector<HTMLElement>(`.word[data-token-key="${key}"]:not([hidden])`)!
+  expect(word.textContent!.replace(/\p{M}/gu, '')).toBe('ויאמר')
+  expect(Math.abs(root.scrollTop - getCenteredElementScrollTop(root, word))).toBeLessThan(5)
+  expect(display.getMountedPageNumbers()).toEqual(vm.isolatedAliyah!.pageNumbers)
+})
+
+test('isolated inverted-nun decorations keep source coordinates and survive both forms', async () => {
+  const display = await isolatedDisplay(isolatedRef(4, 10, 35), isolatedRef(4, 10, 36))
+  await display.scrolled
+  for (const enabled of [true, false, true]) {
+    setIsolatedAnnotations(display, enabled)
+    const words = isolatedVisibleWords()
+    const nuns = words.filter(word => word.textContent!.trim() === '\u05c6')
+    expect(nuns).toHaveLength(2)
+    expect(nuns.every(word => !word.dataset.tokenKey)).toBe(true)
+    const first = words.find(word => word.dataset.tokenKey)!
+    expect(first.dataset.tokenKey).toBe('165:26:1:1')
+    expect(first.textContent!.replace(/\p{M}/gu, '')).toBe('ויהי')
+  }
+})
+
+test('isolated ktiv/kri keeps each form and its source identity after annotation toggles', async () => {
+  const display = await isolatedDisplay(isolatedRef(1, 8, 17))
+  await display.scrolled
+  const kri = isolatedVisibleWords().find(word => word.textContent!.replace(/\p{M}/gu, '') === 'היצא')!
+  expect(kri.classList.contains('ktiv-kri')).toBe(true)
+  const canonicalKey = kri.dataset.tokenKey!
+  expect(vm.isolatedAliyah!.tokenKeys.has(canonicalKey)).toBe(true)
+  const page = await vm.fetchPageByPageNumber(Number(kri.dataset.pageNumber))
+  if (!page || page.type !== 'page') throw new Error('Missing page')
+  const plainKey = page.wordSelection!.unannotatedKeysByAnnotated.get(canonicalKey)![0]
+  setIsolatedAnnotations(display, false)
+  const ktiv = root.querySelector<HTMLElement>(`.word[data-token-key="${plainKey}"]`)!
+  expect(ktiv.textContent).toBe('הוצא')
+  expect(ktiv.classList.contains('ktiv-kri')).toBe(false)
+  setIsolatedAnnotations(display, true)
+  expect(kri.textContent!.replace(/\p{M}/gu, '')).toBe('היצא')
+  expect(kri.dataset.tokenKey).toBe(canonicalKey)
+  expect(kri.classList.contains('ktiv-kri')).toBe(true)
+})
+
+test.each([
+  [1, 2, 4, 'genesis-2-4-small-he'],
+  [5, 32, 18, 'deuteronomy-32-18-small-yod'],
+] as const)('isolated special letter %i:%i:%i preserves %s in both forms', async (b, c, v, id) => {
+  const display = await isolatedDisplay(isolatedRef(b, c, v))
+  await display.scrolled
+  for (const enabled of [true, false, true]) {
+    setIsolatedAnnotations(display, enabled)
+    const letter = root.querySelector<HTMLElement>(`[data-special-letter-id="${id}"]`)!
+    expect(letter).not.toBeNull()
+    const word = letter.closest<HTMLElement>('.word')!
+    expect(word.hidden).toBe(false)
+    expect(vm.isolatedAliyah!.containsRenderedTokenKey(word.dataset.tokenKey!)).toBe(true)
+    expect(letter.classList.contains('mod-small')).toBe(true)
+  }
+})

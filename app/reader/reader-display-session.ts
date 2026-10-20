@@ -74,6 +74,7 @@ export interface ReaderDisplaySession {
   viewportRange(): ViewportRange | null
   resetViewport(): void
   refreshViewport(): void
+  flushPresentation(): void
   setPagePresentation(presentation: ReaderPagePresentation, beforeLayout?: () => void): boolean
   updateAnnotations(mutation: () => void): void
   progressSnapshot(): ReaderProgressAnchorSnapshot
@@ -487,6 +488,8 @@ export function createReaderDisplaySession({
   ): Promise<ReaderDisplaySessionDomTarget | null> {
     const lease = capture()
     if (!lease) return null
+    const isolated = lease.viewModel.isolatedAliyah
+    if (isolated && (isolated.runId !== runId || isolated.aliyahIndex !== aliyahIndex)) return null
     let marker = getAliyahMarkerElement(runId, aliyahIndex)
     if (marker) {
       pageWindow.setRailTarget(pageNumberFromMountedElement(marker))
@@ -646,6 +649,7 @@ export function createReaderDisplaySession({
     refreshViewport() {
       viewportTracker?.refresh()
     },
+    flushPresentation: () => presentation.flush(),
     setPagePresentation(nextPresentation, beforeLayout) {
       if (!activeDisplay) return false
       if (activeDisplay.usesPresentation(nextPresentation)) return false

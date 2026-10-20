@@ -3,6 +3,7 @@
   import UiIcon from '../components/UiIcon.svelte'
   import { nativeControlHaptic } from '../platform/native-haptics.ts'
   import { isNativeApp } from '../platform/native.ts'
+  import { observeReaderResize } from '../adaptive/reader-resize.ts'
   import type {
     ReaderShell,
     ReaderShellComponentProps,
@@ -146,7 +147,17 @@
       throw new Error('Reader Shell toolbar requires a browser window')
     }
 
-    const resizeObserver = new ownerWindow.ResizeObserver(fitMobileTitle)
+    let toolbarWidth = toolbar.clientWidth
+    const resizeLayout = observeReaderResize(ownerWindow, 'chrome', () => {
+      toolbarWidth = toolbar.clientWidth
+      fitMobileTitle()
+    })
+    const resizeObserver = new ownerWindow.ResizeObserver(() => {
+      const width = toolbar.clientWidth
+      if (width === toolbarWidth) return
+      toolbarWidth = width
+      resizeLayout.request()
+    })
     resizeObserver.observe(toolbar)
     let connected = true
     const handleControlClick = (event: MouseEvent) => {
@@ -168,6 +179,7 @@
     return () => {
       connected = false
       resizeObserver.disconnect()
+      resizeLayout.destroy()
       ownerDocument.removeEventListener('click', handleControlClick, true)
     }
   })

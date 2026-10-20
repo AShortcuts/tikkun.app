@@ -9,9 +9,8 @@ import type { ReleaseCommand } from './release-updates.ts'
 
 const roots: string[] = []
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
-const compatibility = 'c'.repeat(64)
-const bundleId = createHash('sha256').update('test ZIP').digest('hex')
-const contentDigest = createHash('sha256').update('test content').digest('hex')
+const zipDigest = (zip: string) => createHash('sha256').update(zip).digest('hex')
+const bundleId = zipDigest('test ZIP')
 const envelope = (value: unknown) => {
   const payload = JSON.stringify(value)
   return JSON.stringify({ payload, signature: sign('sha256', Buffer.from(payload), privateKey).toString('base64') })
@@ -37,7 +36,6 @@ async function fixture(rollout?: number) {
   await put('.gitignore', '.asc/\n')
   await put('package.json', JSON.stringify({ engines: { node: '22.23.2', npm: '11.19.0' }, repository: { url: 'git+https://github.com/AShortcuts/tikkun.app.git' } }))
   await put('config/update-public-key.pem', publicKey.export({ type: 'spki', format: 'pem' }).toString())
-  await put('generated/native-content-contract.json', JSON.stringify({ compatibility }))
   await put('source.ts', 'export const value = 1\n')
   git('add', '.')
   git('commit', '-m', 'Source baseline')
@@ -49,19 +47,17 @@ async function fixture(rollout?: number) {
   await put('.asc/artifacts/Tikkun-1.0-6.xcarchive/Products/Applications/App.app/public/native-update-contract.json', '{}')
   const calls: Array<{ command: string; args: string[] }> = []
   const logs: string[] = []
-  const state = { failure: '', content: 'test content' }
+  const state = { failure: '', zip: 'test ZIP' }
   const run: ReleaseCommand = async (command, args) => {
     calls.push({ command, args })
     if (command === 'npm') {
       if (args[0] === '--version') return '11.19.0\n'
       if (args.includes(state.failure)) throw new Error(`Simulated failure: ${state.failure}`)
       if (args.includes('updates:web')) {
-        const contentDigest = createHash('sha256').update(state.content).digest('hex')
-        await put(`.asc/updates/web/6/${bundleId}.zip`, 'test ZIP')
-        await put('.asc/updates/web/6/latest.json', envelope({ schema: 1, channel: 'production', nativeBuild: '6', bundleId, checksum: bundleId,
-          signature: sign('sha256', Buffer.from('test ZIP'), privateKey).toString('base64'), bytes: 8, rollout: Number(args[args.indexOf('--rollout') + 1]) }))
-        await put(`.asc/updates/content/${compatibility}/${contentDigest}.json`, state.content)
-        await put(`.asc/updates/content/${compatibility}/latest.json`, envelope({ schema: 1, digest: contentDigest, bytes: Buffer.byteLength(state.content) }))
+        const id = zipDigest(state.zip)
+        await put(`.asc/updates/web/6/${id}.zip`, state.zip)
+        await put('.asc/updates/web/6/latest.json', envelope({ schema: 1, channel: 'production', nativeBuild: '6', bundleId: id, checksum: id,
+          signature: sign('sha256', Buffer.from(state.zip), privateKey).toString('base64'), bytes: Buffer.byteLength(state.zip), rollout: Number(args[args.indexOf('--rollout') + 1]) }))
       }
       if (args.includes('updates:stage')) {
         await mkdir(path.join(root, 'site/updates'), { recursive: true })
@@ -96,17 +92,15 @@ test('dry run does not build, sign, copy feeds, stage, commit or publish', async
   expect(f.git('rev-parse', 'HEAD')).toBe(f.sourceSha)
 })
 
-test.each([undefined, 10])('prepares separate signed feeds at rollout %s and copies them locally without changing Git history or index', async rollout => {
+test.each([undefined, 10])('prepares the signed app update at rollout %s and copies it locally without changing Git history or index', async rollout => {
   const f = await fixture(rollout)
   await f.put('site/updates/existing.json', 'existing published feed')
   f.git('add', 'site/updates/existing.json')
   f.git('commit', '-m', 'Existing public feed')
   const head = f.git('rev-parse', 'HEAD')
   const result = await releaseUpdates(f.options, f.services)
-  expect(result).toMatchObject({ status: 'prepared', bundleId, contentDigest, rollout: rollout ?? 100 })
+  expect(result).toMatchObject({ status: 'prepared', bundleId, rollout: rollout ?? 100 })
   expect(result).toHaveProperty('paths', [
-    `.asc/updates/content/${compatibility}/${contentDigest}.json`,
-    `.asc/updates/content/${compatibility}/latest.json`,
     `.asc/updates/web/6/${bundleId}.zip`,
     '.asc/updates/web/6/latest.json',
   ].sort())
@@ -114,7 +108,7 @@ test.each([undefined, 10])('prepares separate signed feeds at rollout %s and cop
   expect(f.git('diff', '--cached', '--name-only')).toBe('')
   expect(await readFile(path.join(f.root, 'site/updates/existing.json'), 'utf8')).toBe('existing published feed')
   expect(f.calls.filter(call => call.command === 'npm' && call.args[0] === 'run').map(call => call.args[1]))
-    .toEqual(['verify:release', 'build:native', 'updates:content', 'updates:web', 'updates:stage', 'build'])
+    .toEqual(['verify:release', 'build:native', 'updates:web', 'updates:stage', 'build'])
   expect(f.calls.some(call => call.command === 'gh' || ['add', 'commit', 'push', 'ls-remote'].includes(call.args[0]))).toBe(false)
   expect(f.logs.some(line => line.includes('Nothing Git-staged, committed, pushed, or published'))).toBe(true)
 })
@@ -139,15 +133,12 @@ test('retains toolchain, branch and private-key safeguards', async () => {
   await expect(releaseUpdates(f.options, f.services)).rejects.toThrow('owner-only')
 })
 
-test.each(['web', 'content'])('rejects corrupted %s bytes before reporting prepared', async kind => {
+test('rejects corrupted app update bytes before reporting prepared', async () => {
   const f = await fixture()
   const run = f.services.run
   f.services.run = async (command, args, capture) => {
     const result = await run(command, args, capture)
-    if (command === 'npm' && args[1] === 'build') {
-      const file = kind === 'web' ? `.asc/updates/web/6/${bundleId}.zip` : `.asc/updates/content/${compatibility}/${contentDigest}.json`
-      await f.put(file, 'corrupted')
-    }
+    if (command === 'npm' && args[1] === 'build') await f.put(`.asc/updates/web/6/${bundleId}.zip`, 'corrupted')
     return result
   }
   await expect(releaseUpdates(f.options, f.services)).rejects.toThrow('verification')
@@ -176,15 +167,15 @@ test('reruns replace tracked latest manifests and retain older downloads without
   f.git('add', 'site/updates')
   f.git('commit', '-m', 'First release')
   const head = f.git('rev-parse', 'HEAD')
-  f.state.content = 'new content'
+  f.state.zip = 'new ZIP'
   await releaseUpdates(f.options, f.services)
-  f.state.content = 'newest content'
+  f.state.zip = 'newest ZIP'
   await releaseUpdates(f.options, f.services)
-  const directory = path.join(f.root, 'site/updates/content', compatibility)
+  const directory = path.join(f.root, 'site/updates/web/6')
   const latest = JSON.parse(JSON.parse(await readFile(path.join(directory, 'latest.json'), 'utf8')).payload)
-  expect(latest.digest).toBe(createHash('sha256').update(f.state.content).digest('hex'))
-  expect(await readFile(path.join(directory, `${latest.digest}.json`), 'utf8')).toBe(f.state.content)
-  expect(await readFile(path.join(directory, `${contentDigest}.json`), 'utf8')).toBe('test content')
+  expect(latest.bundleId).toBe(zipDigest(f.state.zip))
+  expect(await readFile(path.join(directory, `${latest.bundleId}.zip`), 'utf8')).toBe(f.state.zip)
+  expect(await readFile(path.join(directory, `${bundleId}.zip`), 'utf8')).toBe('test ZIP')
   expect(f.git('diff', '--cached', '--name-only')).toBe('')
   expect(f.git('rev-parse', 'HEAD')).toBe(head)
 })

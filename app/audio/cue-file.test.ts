@@ -2,8 +2,10 @@ import { expect, test } from 'vitest'
 import { cuePayloadPathForRecording } from './cue-data.ts'
 import type { ParshaAudioRecording } from './types.ts'
 import {
+  cueContentKeyForPath,
   cueFileNameForRecording,
   cueFileRelativePath,
+  cueReadingFolderName,
 } from './cue-file.ts'
 
 const recording: ParshaAudioRecording = {
@@ -23,10 +25,20 @@ const recording: ParshaAudioRecording = {
 test('uses one cue-file identity for export and runtime lookup', () => {
   expect(cueFileNameForRecording(recording)).toBe('6.json')
   expect(cueFileRelativePath(recording)).toBe(
-    'audio-cues/yoni-davidov/lech-lecha/6.json'
+    'audio-cues/yoni-davidov/03 lech-lecha/6.json'
   )
   expect(cuePayloadPathForRecording(recording)).toBe(
-    '../../audio-cues/yoni-davidov/lech-lecha/6.json'
+    '../../audio-cues/yoni-davidov/03 lech-lecha/6.json'
+  )
+})
+
+test('numbers parsha folders in Torah order and keeps update keys unnumbered', () => {
+  expect(cueReadingFolderName({ kind: 'parsha', id: 'beresheet', name: 'Beresheet' })).toBe('01 beresheet')
+  expect(cueReadingFolderName({ kind: 'parsha', id: 'korach', name: 'Korach' })).toBe('38 korach')
+  expect(cueReadingFolderName({ kind: 'parsha', id: 'vezot-haberacha', name: 'Vezot Haberacha' })).toBe('54 vezot-haberacha')
+  expect(cueReadingFolderName({ kind: 'range', id: 'korach', name: 'Range' })).toBe('korach')
+  expect(cueContentKeyForPath('audio-cues/yoni-davidov/38 korach/1.json')).toBe(
+    'audio-cues/yoni-davidov/korach/1.json'
   )
 })
 

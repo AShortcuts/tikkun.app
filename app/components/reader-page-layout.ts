@@ -1,5 +1,6 @@
 import type { ReaderPagePresentation } from '../reader-presentation.ts'
 import { verseStartWordIndex } from '../reading/aliyah-token-sequence.ts'
+import { findReadingVerseStartWord } from '../reader/reading-verse-target.ts'
 import { applyAnnotationMode } from './annotation-rendering.ts'
 import { seaShirahGeometry, seaShirahLayout, type SeaShirahMeasurements } from './sea-shirah-layout.ts'
 import { matchShirahSamples } from './match-shirah-source.ts'
@@ -11,14 +12,20 @@ const visibleWords = (root: ParentNode, selector: string) =>
 
 const readingMaqafSpaces = new WeakMap<HTMLElement, Map<Node, string>>()
 
-function joinReadingMaqafBoundaries(page: HTMLElement, sides: ReaderPagePresentation['sides']) {
-  const book = page.closest<HTMLElement>('.tikkun-book') ?? page
-  const spaces = readingMaqafSpaces.get(book) ?? new Map<Node, string>()
-  for (const [node, original] of spaces) {
-    node.nodeValue = original
+function setLayoutStyle(element: HTMLElement, property: string, value: string) {
+  if (element.style.getPropertyValue(property) !== value) {
+    element.style.setProperty(property, value)
   }
-  spaces.clear()
-  book.querySelectorAll('.mod-maqaf-boundary').forEach((word) => word.classList.remove('mod-maqaf-boundary'))
+}
+
+function removeLayoutStyle(element: HTMLElement, property: string) {
+  if (element.style.getPropertyValue(property)) element.style.removeProperty(property)
+}
+
+function joinReadingMaqafBoundaries(book: HTMLElement, sides: ReaderPagePresentation['sides']) {
+  const previousSpaces = readingMaqafSpaces.get(book)
+  const spaces = new Map<Node, string>()
+  const boundaryWords = new Set<HTMLElement>()
 
   const surfaces = sides === 'one'
     ? [book]
@@ -37,8 +44,8 @@ function joinReadingMaqafBoundaries(page: HTMLElement, sides: ReaderPagePresenta
         Number(next.dataset.pageNumber) !== Number(word.dataset.pageNumber) + 1
       )) continue
       if (sides === 'two') {
-        word.classList.add('mod-maqaf-boundary')
-        next.classList.add('mod-maqaf-boundary')
+        boundaryWords.add(word)
+        boundaryWords.add(next)
       }
 
       // Physical source rows may end mid-phrase. Join only their intervening
@@ -47,22 +54,34 @@ function joinReadingMaqafBoundaries(page: HTMLElement, sides: ReaderPagePresenta
       let node: Node | null
       while ((node = walker.nextNode()) && !next.contains(node)) {
         if (node.parentElement?.closest('.word, .line-gutter, .tikkun-page-number')) continue
-        const original = node.nodeValue
+        const original = previousSpaces?.get(node) ?? node.nodeValue
         if (!original || original.trim()) continue
         spaces.set(node, original)
-        node.nodeValue = '\u2060'
       }
     }
+  }
+  for (const [node, original] of previousSpaces ?? []) {
+    if (!spaces.has(node) && node.nodeValue !== original) node.nodeValue = original
+  }
+  for (const node of spaces.keys()) {
+    if (node.nodeValue !== '\u2060') node.nodeValue = '\u2060'
+  }
+  for (const word of book.querySelectorAll<HTMLElement>('.mod-maqaf-boundary')) {
+    if (!boundaryWords.has(word)) word.classList.remove('mod-maqaf-boundary')
+  }
+  for (const word of boundaryWords) {
+    if (!word.classList.contains('mod-maqaf-boundary')) word.classList.add('mod-maqaf-boundary')
   }
   readingMaqafSpaces.set(book, spaces)
 }
 
-function clearPairedWordWidths(page: HTMLElement) {
+function clearPairedWordWidths(page: HTMLElement, retainedWords?: ReadonlySet<HTMLElement>) {
   page
     .querySelectorAll<HTMLElement>('.word[data-token-key]')
     .forEach((word) => {
-      word.style.removeProperty('--reader-paired-word-width')
-      word.style.removeProperty('--reader-paired-word-spacing')
+      if (retainedWords?.has(word)) return
+      removeLayoutStyle(word, '--reader-paired-word-width')
+      removeLayoutStyle(word, '--reader-paired-word-spacing')
     })
 }
 
@@ -164,9 +183,9 @@ function sizeOrdinaryMatchLines(page: HTMLElement, sides: ReaderPagePresentation
 }
 
 function clearMatchSongFrame(page: HTMLElement) {
-  page.classList.remove('mod-match-song-frame')
+  if (page.classList.contains('mod-match-song-frame')) page.classList.remove('mod-match-song-frame')
   for (const property of ['inline-size', 'inline-offset', 'gutter-inline-offset', 'ordinary-flow-size', 'shirah-flow-size']) {
-    page.style.removeProperty(`--match-page-${property}`)
+    removeLayoutStyle(page, `--match-page-${property}`)
   }
 }
 
@@ -436,8 +455,7 @@ function sizeMatchShirah(
   return pages
 }
 
-function synchronizeReadingWordWidths(page: HTMLElement) {
-  clearPairedWordWidths(page)
+function measureReadingWordWidths(page: HTMLElement) {
   const torahWordsByToken = new Map<string, HTMLElement>()
   const updates: { torah: HTMLElement; tikkun: HTMLElement; width: string; torahSpacing: string; tikkunSpacing: string }[] = []
 
@@ -476,21 +494,66 @@ function synchronizeReadingWordWidths(page: HTMLElement) {
       tikkunSpacing: `${((pairedWidth - tikkunWidth) / fontSize).toFixed(4)}em`,
     })
   }
-  // Measure the natural widths first; interleaved writes force layout per word.
-  for (const { torah, tikkun, width, torahSpacing, tikkunSpacing } of updates) {
-    tikkun.style.setProperty('--reader-paired-word-width', width)
-    torah.style.setProperty('--reader-paired-word-width', width)
-    if (tikkun.classList.contains('mod-maqaf-boundary')) {
-      tikkun.style.setProperty('--reader-paired-word-spacing', tikkunSpacing)
-      torah.style.setProperty('--reader-paired-word-spacing', torahSpacing)
-    }
+  return updates
+}
+
+function measureReadingPageWordWidths(pages: readonly HTMLElement[]) {
+  // Override only pairing constraints; retain the natural padding and borders.
+  try {
+    for (const page of pages) page.classList.add('mod-measuring-paired-words')
+    return pages.flatMap(measureReadingWordWidths)
+  } finally {
+    for (const page of pages) page.classList.remove('mod-measuring-paired-words')
   }
 }
 
-function positionTwoSidedReadingGutters(page: HTMLElement) {
+type ReadingGutterPosition = { gutter: HTMLElement; top: string }
+
+/** Gutter top that centers `gutter` on its pasuk's first word, relative to `originTop`. */
+function centeredGutterTop(word: HTMLElement, gutter: HTMLElement, originTop: number) {
+  const wordRect = word.getBoundingClientRect()
+  return wordRect.top - originTop + (wordRect.height - gutter.getBoundingClientRect().height) / 2
+}
+
+function measureReadingAliyahBadges(
+  page: HTMLElement,
+  sides: ReaderPagePresentation['sides'],
+): ReadingGutterPosition[] {
+  const source = page.tikkunPage
+  const book = page.closest<HTMLElement>('.tikkun-book')
+  const view = page.ownerDocument.defaultView
+  if (!source || !book || !view || view.innerWidth <= 550 ||
+    page.ownerDocument.documentElement.dataset.readerIsolated === 'true') return []
+
+  const container = sides === 'one' ? book : page.querySelector<HTMLElement>('.reader-reading-page')
+  if (!container) return []
+  const origin = container.getBoundingClientRect().top + container.clientTop - container.scrollTop
+  const positions: ReadingGutterPosition[] = []
+  const nextTopByToken = new Map<string, number>()
+  const gap = Number.parseFloat(view.getComputedStyle(book).fontSize) * 0.45
+
+  for (const line of page.querySelectorAll<HTMLElement>('.mod-reading-line[data-class="line"]')) {
+    const info = source.lines[Number(line.dataset.lineIndex)]
+    if (!info) continue
+    for (const badge of line.querySelectorAll<HTMLElement>('.line-gutter.mod-aliyot .aliyah-badge')) {
+      const aliyah = info.aliyahStarts.find(start => String(start.index) === badge.dataset.aliyahIndex)
+      const anchor = aliyah && findReadingVerseStartWord(book, line, aliyah.start)
+      if (!anchor) continue
+      const tokenKey = anchor.dataset.tokenKey!
+      const height = badge.getBoundingClientRect().height
+      const top = Math.max(centeredGutterTop(anchor, badge, origin), nextTopByToken.get(tokenKey) ?? -Infinity)
+      positions.push({ gutter: badge, top: `${top}px` })
+      nextTopByToken.set(tokenKey, top + height + gap)
+    }
+  }
+  return positions
+}
+
+function measureTwoSidedReadingGutters(page: HTMLElement): ReadingGutterPosition[] {
+  const positions: ReadingGutterPosition[] = []
   const readingPage = page.querySelector<HTMLElement>('.reader-reading-page')
   const book = page.closest<HTMLElement>('.tikkun-book')
-  if (!readingPage || !book) return
+  if (!readingPage || !book) return positions
   const pageRect = readingPage.getBoundingClientRect()
 
   for (const side of page.querySelectorAll<HTMLElement>(
@@ -525,17 +588,20 @@ function positionTwoSidedReadingGutters(page: HTMLElement) {
       const anchorWord = currentLineWords[startWordIndex] ?? currentLineWords[0]
       if (!anchorWord) continue
 
-      gutter.style.setProperty(
-        '--reading-verse-gutter-top',
-        `${anchorWord.getBoundingClientRect().top - pageRect.top}px`,
-      )
+      positions.push({ gutter, top: `${centeredGutterTop(anchorWord, gutter, pageRect.top)}px` })
     }
   }
+  return positions
 }
 
-function positionOneSidedReadingGutters(page: HTMLElement) {
+function measureOneSidedReadingGutters(page: HTMLElement): ReadingGutterPosition[] {
+  const positions: ReadingGutterPosition[] = []
   const book = page.closest<HTMLElement>('.tikkun-book')
-  if (!book) return
+  if (!book) return positions
+  const selection = page.tikkunPage?.wordSelection
+  const canonicalWords = (line: HTMLElement) => selection
+    ? [...line.querySelectorAll<HTMLElement>('.word[data-token-key][data-annotations-on-present="true"]')]
+    : visibleWords(line, '[data-reader-canonical="true"] .word[data-token-key]')
 
   const bookRect = book.getBoundingClientRect()
   const allLines = [
@@ -551,66 +617,104 @@ function positionOneSidedReadingGutters(page: HTMLElement) {
     if (!gutter?.textContent?.trim()) continue
 
     const lineIndex = allLines.indexOf(line)
-    const currentLineWords = visibleWords(
-      line,
-      '[data-reader-canonical="true"] .word[data-token-key]',
-    )
+    const currentLineWords = canonicalWords(line)
     const previousLineWords =
       lineIndex > 0
-        ? visibleWords(
-            allLines[lineIndex - 1],
-            '[data-reader-canonical="true"] .word[data-token-key]',
-          )
+        ? canonicalWords(allLines[lineIndex - 1])
         : []
     const startWordIndex = verseStartWordIndex({
       currentLineWords,
       previousLineWords,
       verseOrdinal: 0,
     })
-    const anchorWord = currentLineWords[startWordIndex] ?? currentLineWords[0]
+    let anchorWord = currentLineWords[startWordIndex] ?? currentLineWords[0]
+    if (selection && !book.classList.contains('mod-annotations-on') && anchorWord?.dataset.tokenKey) {
+      const keys = selection.unannotatedKeysByAnnotated.get(anchorWord.dataset.tokenKey) ?? []
+      const visible = keys.map(key => line.querySelector<HTMLElement>(`.word[data-token-key="${key}"]:not([hidden])`)).find(Boolean)
+      if (visible) anchorWord = visible
+    }
     if (!anchorWord) continue
 
-    gutter.style.setProperty(
-      '--reading-verse-gutter-top',
-      `${anchorWord.getBoundingClientRect().top - bookRect.top + book.scrollTop}px`,
-    )
+    positions.push({ gutter, top: `${centeredGutterTop(anchorWord, gutter, bookRect.top - book.scrollTop)}px` })
+  }
+  return positions
+}
+
+function clearReaderPageLayout(page: HTMLElement, presentation: ReaderPagePresentation) {
+  clearMatchSongFrame(page)
+  removeLayoutStyle(page, '--reading-shirah-inline-size')
+  removeLayoutStyle(page, '--match-shirah-inline-expansion')
+  removeLayoutStyle(page, '--match-shirah-inline-offset')
+  removeLayoutStyle(page, '--match-shirah-inline-size')
+  removeLayoutStyle(page, '--match-shirah-aliyah-display')
+  removeLayoutStyle(page, '--match-shirah-text-scale')
+  removeLayoutStyle(page, '--match-text-scale')
+  removeLayoutStyle(page, '--match-haazinu-gap')
+  removeLayoutStyle(page, '--match-ordinary-inline-size')
+  removeLayoutStyle(page, '--match-ordinary-inline-offset')
+  if (page.classList.contains('mod-match-fitted')) page.classList.remove('mod-match-fitted')
+  const table = page.querySelector('table')
+  if (table) removeLayoutStyle(table, 'width')
+
+  if (presentation.layout !== 'reading' || presentation.sides !== 'two') {
+    clearPairedWordWidths(page)
+  }
+}
+
+export function applyReaderPageLayouts(
+  pages: readonly HTMLElement[],
+  presentation: ReaderPagePresentation,
+): void {
+  if (presentation.layout === 'match') {
+    for (const page of pages) {
+      clearReaderPageLayout(page, presentation)
+      const songPages = sizeMatchShirah(page, presentation.sides)
+      // Ordinary lines fit independently of any shirah sharing their physical page.
+      sizeOrdinaryMatchLines(page, presentation.sides)
+      songPages?.forEach((member) => alignMatchSongFrame(member, presentation.sides))
+    }
+    return
+  }
+
+  const books = new Set<HTMLElement>()
+  for (const page of pages) {
+    clearReaderPageLayout(page, presentation)
+    books.add(page.closest<HTMLElement>('.tikkun-book') ?? page)
+  }
+  for (const book of books) joinReadingMaqafBoundaries(book, presentation.sides)
+
+  // Each measurement phase sees every page's final preceding writes.
+  if (presentation.sides === 'two') {
+    const widths = measureReadingPageWordWidths(pages)
+    const pairedWords = new Set<HTMLElement>()
+    for (const { torah, tikkun, width, torahSpacing, tikkunSpacing } of widths) {
+      pairedWords.add(tikkun)
+      pairedWords.add(torah)
+      setLayoutStyle(tikkun, '--reader-paired-word-width', width)
+      setLayoutStyle(torah, '--reader-paired-word-width', width)
+      if (tikkun.classList.contains('mod-maqaf-boundary')) {
+        setLayoutStyle(tikkun, '--reader-paired-word-spacing', tikkunSpacing)
+        setLayoutStyle(torah, '--reader-paired-word-spacing', torahSpacing)
+      } else {
+        removeLayoutStyle(tikkun, '--reader-paired-word-spacing')
+        removeLayoutStyle(torah, '--reader-paired-word-spacing')
+      }
+    }
+    for (const page of pages) clearPairedWordWidths(page, pairedWords)
+  }
+  const gutters = pages.flatMap(presentation.sides === 'two'
+    ? measureTwoSidedReadingGutters : measureOneSidedReadingGutters)
+  const aliyahBadges = pages.flatMap(page => measureReadingAliyahBadges(page, presentation.sides))
+  for (const { gutter, top } of gutters) setLayoutStyle(gutter, '--reading-verse-gutter-top', top)
+  for (const { gutter, top } of aliyahBadges) {
+    setLayoutStyle(gutter, '--reading-aliyah-gutter-top', top)
+    setLayoutStyle(gutter, '--reading-aliyah-gutter-visibility', 'visible')
   }
 }
 
 export function applyReaderPageLayout(
   page: HTMLElement,
   presentation: ReaderPagePresentation,
-) {
-  clearMatchSongFrame(page)
-  page.style.removeProperty('--reading-shirah-inline-size')
-  page.style.removeProperty('--match-shirah-inline-expansion')
-  page.style.removeProperty('--match-shirah-inline-offset')
-  page.style.removeProperty('--match-shirah-inline-size')
-  page.style.removeProperty('--match-shirah-aliyah-display')
-  page.style.removeProperty('--match-shirah-text-scale')
-  page.style.removeProperty('--match-text-scale')
-  page.style.removeProperty('--match-haazinu-gap')
-  page.style.removeProperty('--match-ordinary-inline-size')
-  page.style.removeProperty('--match-ordinary-inline-offset')
-  page.classList.remove('mod-match-fitted')
-  page.querySelector('table')?.style.removeProperty('width')
-
-  clearPairedWordWidths(page)
-
-  if (presentation.layout === 'match') {
-    const songPages = sizeMatchShirah(page, presentation.sides)
-    // Ordinary lines fit independently of any shirah sharing their physical page.
-    sizeOrdinaryMatchLines(page, presentation.sides)
-    songPages?.forEach((member) => alignMatchSongFrame(member, presentation.sides))
-    return
-  }
-
-  joinReadingMaqafBoundaries(page, presentation.sides)
-
-  if (presentation.sides === 'two') {
-    synchronizeReadingWordWidths(page)
-    positionTwoSidedReadingGutters(page)
-  } else {
-    positionOneSidedReadingGutters(page)
-  }
+): void {
+  applyReaderPageLayouts([page], presentation)
 }

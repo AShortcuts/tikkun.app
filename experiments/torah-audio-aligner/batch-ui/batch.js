@@ -87,12 +87,13 @@ function renderQueue() {
   const results = readyResults();
   const remaining = results.filter(item => !item.review.exportReady).length;
   $('batch-summary').textContent = `${waiting} waiting · ${remaining} to review${queue.running ? ' · aligning' : ''}`;
-  $('queue-status').textContent = queue.pauseReason || (queue.running ? 'Aligning one recording. You can review completed results now.' : waiting ? 'Queue saved. Start when you are ready.' : results.length ? 'Results saved. Review them at your pace.' : 'Add recordings to begin. Nothing starts until you choose Start queue.');
+  $('queue-status').textContent = queue.clearPending ? 'Queue cleared. The current recording is finishing safely; its cues will stay available.' : queue.pauseReason || (queue.running ? 'Aligning one recording. You can review completed results now.' : waiting ? 'Queue saved. Start when you are ready.' : results.length ? 'Results saved. Review them at your pace.' : 'Add recordings to begin. Nothing starts until you choose Start queue.');
   $('queue-budget').textContent = `${Math.floor(queue.remainingTestingSeconds / 60)} minutes remain in the approved testing allowance. No model downloads are needed.`;
-  $('queue-start').disabled = busy || !waiting || !queue.paused;
+  $('queue-start').disabled = busy || queue.clearPending || !waiting || !queue.paused;
   $('queue-start').textContent = queue.items.some(item => item.status === 'interrupted') ? 'Resume queue' : 'Start queue';
   $('queue-pause').disabled = busy || queue.paused;
   $('queue-cancel').disabled = busy || !waiting;
+  $('queue-clear').disabled = busy || !queue.items.length;
   $('review-next').disabled = busy || !remaining;
   const eligible = new Set(results.filter(item => generatedCueExport || item.review.exportReady).map(item => item.resultId));
   for (const id of zipSelection) if (!eligible.has(id)) zipSelection.delete(id);
@@ -169,6 +170,18 @@ $('clear-downloads').addEventListener('click', action(async () => {
     queue = result.queue;
     for (const id of resultIds) { zipSelection.delete(id); seenReady.delete(id); }
     $('batch-download-status').textContent = `Cleared ${result.cleared} completed ${result.cleared === 1 ? 'entry' : 'entries'} from the queue. Add a recording again to reuse its saved cues.`;
+  } finally { busy = false; renderQueue(); renderSelection(); }
+}));
+$('queue-clear').addEventListener('click', action(async () => {
+  if (!queue.clearQueueSupported) throw new Error('Restart the aligner with Ctrl+C, then npm run dev:aligner, and reload this page to clear the queue.');
+  busy = true; renderQueue(); renderSelection();
+  try {
+    await save();
+    if (polling) await polling;
+    const result = await api('/api/batch/clear-queue', {});
+    queue = result.queue;
+    zipSelection.clear(); seenReady.clear();
+    $('batch-download-status').textContent = `Cleared ${result.cleared} queue ${result.cleared === 1 ? 'entry' : 'entries'}. Saved cues and reviews remain available; add a recording again to reuse them.`;
   } finally { busy = false; renderQueue(); renderSelection(); }
 }));
 $('add-selected').addEventListener('click', action(async () => {

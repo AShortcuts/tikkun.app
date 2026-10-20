@@ -7,8 +7,9 @@ import {
   getFirstGraphemeRect,
 } from '../reading/aliyah-start-marker.ts'
 import { verseStartWordIndex } from '../reading/aliyah-token-sequence.ts'
+import { aliyahLabel } from '../calendar-model/aliyah-label.ts'
 import Page from './Page.ts'
-import { applyReaderPageLayout } from './reader-page-layout.ts'
+import { applyReaderPageLayout, applyReaderPageLayouts } from './reader-page-layout.ts'
 import type { RenderedPageInfo } from '../view-model/scroll-view-model.ts'
 import beshalachPageJson from '../../text/pages/torah/78.json' with { type: 'json' }
 import haazinuPageJson from '../../text/pages/torah/242.json' with { type: 'json' }
@@ -36,6 +37,7 @@ afterEach(() => {
   delete document.documentElement.dataset.readerSideMode
   delete document.documentElement.dataset.readerSideOrder
   delete document.documentElement.dataset.readerTextLayout
+  delete document.documentElement.dataset.readerIsolated
 })
 
 test.each(['light', 'dark', 'sepia', 'custom'])(
@@ -1105,16 +1107,23 @@ test('keeps Reading maqaf joins across mounted pages and restores annotation spa
     await page.viewport(width, 900)
     for (const scale of [1, 1.5]) {
       book.style.setProperty('--reading-font-scale', `${scale}`)
-      pages.forEach((member) => applyReaderPageLayout(member, presentation))
+      applyReaderPageLayouts(pages, presentation)
       expect(suffix.getBoundingClientRect().top).toBeCloseTo(prefix.getBoundingClientRect().top, 0)
     }
   }
   applyAnnotationMode(book, false)
-  pages.forEach((member) => applyReaderPageLayout(member, presentation))
+  applyReaderPageLayouts(pages, presentation)
   expect(boundary.toString()).toBe(originalSpacing)
   applyAnnotationMode(book, true)
-  pages.forEach((member) => applyReaderPageLayout(member, presentation))
+  applyReaderPageLayouts(pages, presentation)
   expect(suffix.getBoundingClientRect().top).toBeCloseTo(prefix.getBoundingClientRect().top, 0)
+
+  const observer = new MutationObserver(() => {})
+  observer.observe(book, { subtree: true, characterData: true, attributes: true })
+  applyReaderPageLayouts(pages, presentation)
+  const unchangedMutations = observer.takeRecords()
+  observer.disconnect()
+  expect(unchangedMutations).toHaveLength(0)
 
   pages[1].remove()
   applyReaderPageLayout(pages[0], presentation)
@@ -1124,6 +1133,182 @@ test('keeps Reading maqaf joins across mounted pages and restores annotation spa
   expect(prefix.dataset.tokenKey).toBe('131:41:0:8')
   expect(suffix.dataset.tokenKey).toBe('132:0:0:0')
 })
+
+test.each(['one', 'two'] as const)(
+  'keeps batched %s-sided Reading gutters and token geometry aligned after resize',
+  async (sides) => {
+    await page.viewport(844, 900)
+    document.documentElement.dataset.readerSideOrder = 'tikkun-right'
+    const presentation = { layout: 'reading', sides } as const
+    install(`<div class="tikkun-book mod-annotations-on" data-reader-layout="reading" data-reader-sides="${sides}" dir="rtl" style="height: 760px">
+      <section class="tikkun-page">${Page(renderedPage(36, vayishlachPage36Json), { presentation })}</section>
+      <section class="tikkun-page">${Page(renderedPage(37, vayishlachPageJson), { presentation })}</section>
+    </div>`)
+    await document.fonts.ready
+    const book = required<HTMLElement>('.tikkun-book')
+    const pages = requiredAll<HTMLElement>('.tikkun-page')
+    const originalWords = requiredAll<HTMLElement>('.word', book)
+    const originalTokens = originalWords.map(word => word.dataset.tokenKey)
+    const originalText = originalWords.map(word => word.textContent)
+
+    for (const width of [844, 1024, 768]) {
+      await page.viewport(width, 900)
+      applyReaderPageLayouts(pages, presentation)
+      const words = requiredAll<HTMLElement>('.word', book)
+      expect(words.map(word => word.dataset.tokenKey)).toEqual(originalTokens)
+      expect(words.map(word => word.textContent)).toEqual(originalText)
+      expect(words.every((word, index) => word === originalWords[index])).toBe(true)
+
+      let checkedGutters = 0
+      let checkedPairs = 0
+      for (const member of pages) {
+        for (const gutter of requiredAll<HTMLElement>('.line-gutter.mod-verses', member)) {
+          if (!gutter.textContent?.trim() || !gutter.getClientRects().length) continue
+          const line = gutter.closest<HTMLElement>('.mod-reading-line')!
+          const side = gutter.closest<HTMLElement>('.reader-reading-page-side')!
+          const selector = sides === 'one'
+            ? '.mod-reading-line'
+            : `.reader-reading-page-side.${side.classList.contains('mod-torah') ? 'mod-torah' : 'mod-tikkun'} .mod-reading-line`
+          const lines = requiredAll<HTMLElement>(selector, book)
+          const index = lines.indexOf(line)
+          const currentLineWords = requiredAll<HTMLElement>('.word:not([hidden])', line)
+          const previousLineWords = index > 0
+            ? requiredAll<HTMLElement>('.word:not([hidden])', lines[index - 1]) : []
+          const start = verseStartWordIndex({ currentLineWords, previousLineWords, verseOrdinal: 0 })
+          const anchor = currentLineWords[start] ?? currentLineWords[0]
+          // Gutters center on their pasuk's first word.
+          expect(Math.abs(verticalCenter(gutter) - verticalCenter(anchor)),
+            `${anchor.dataset.tokenKey} gutter at ${width}px`).toBeLessThanOrEqual(1)
+          checkedGutters += 1
+        }
+
+        if (sides === 'two') {
+          const torah = new Map(requiredAll<HTMLElement>(
+            '.reader-reading-page-side.mod-torah .word:not([hidden])', member,
+          ).map(word => [word.dataset.tokenKey, word]))
+          for (const word of requiredAll<HTMLElement>(
+            '.reader-reading-page-side.mod-tikkun .word:not([hidden])', member,
+          )) {
+            const mirror = torah.get(word.dataset.tokenKey)
+            if (!mirror) continue
+            expect(Math.abs(word.getBoundingClientRect().top - mirror.getBoundingClientRect().top),
+              `${word.dataset.tokenKey} mirrored row at ${width}px`).toBeLessThanOrEqual(1)
+            checkedPairs += 1
+          }
+        }
+      }
+      expect(checkedGutters).toBeGreaterThan(0)
+      if (sides === 'two') expect(checkedPairs).toBeGreaterThan(0)
+
+      const observer = new MutationObserver(() => {})
+      observer.observe(book, { subtree: true, attributes: true, attributeFilter: ['style'] })
+      try {
+        applyReaderPageLayouts(pages, presentation)
+        const wordStyleMutations = observer.takeRecords().filter(record =>
+          record.target instanceof HTMLElement && record.target.matches('.word'))
+        expect(wordStyleMutations, `unchanged ${sides}-sided refresh at ${width}px`).toHaveLength(0)
+      } finally {
+        observer.disconnect()
+      }
+      expect(book.querySelector('.mod-measuring-paired-words')).toBeNull()
+    }
+  },
+)
+
+test.each([
+  [551, 'one'], [768, 'two'], [920, 'two'], [1280, 'one'], [1280, 'two'],
+] as const)('restores one canonical Reading Play badge per exact start at %ipx / %s', async (width, sides) => {
+  await page.viewport(width, 900)
+  const source = readingAliyahFixture()
+  const presentation = { layout: 'reading', sides } as const
+  document.documentElement.dataset.readerSideOrder = 'tikkun-right'
+  install(`<div class="tikkun-book mod-annotations-on" data-reader-layout="reading" data-reader-sides="${sides}" dir="rtl" style="height:760px">
+    <section class="tikkun-page">${Page(source, { presentation })}</section>
+  </div>`)
+  const book = required<HTMLElement>('.tikkun-book')
+  const member = required<HTMLElement>('.tikkun-page')
+  member.tikkunPage = source
+  await document.fonts.ready
+  const originalWords = requiredAll<HTMLElement>('.word')
+  const badges = requiredAll<HTMLElement>('.aliyah-badge[data-aliyah-index]')
+  expect(badges).toHaveLength(3)
+  expect(requiredAll('[data-audio-button="true"]')).toHaveLength(3)
+  expect(requiredAll('[data-reader-mirror] .aliyah-badge')).toHaveLength(0)
+
+  for (const annotated of [true, false]) {
+    applyAnnotationMode(book, annotated)
+    book.classList.toggle('mod-annotations-on', annotated)
+    book.classList.toggle('mod-annotations-off', !annotated)
+    for (const order of ['tikkun-right', 'torah-right']) {
+      document.documentElement.dataset.readerSideOrder = order
+      applyReaderPageLayout(member, presentation)
+      if (sides === 'one') {
+        const bookStyle = getComputedStyle(book)
+        expect(bookStyle.paddingLeft).toBe(bookStyle.paddingRight)
+      }
+      const first = required<HTMLElement>('[data-reader-canonical="true"] [data-token-key="1:1:0:1"]')
+      const secondKey = !annotated && sides === 'one' ? '1:1:0:4' : '1:1:0:3'
+      const second = required<HTMLElement>(`[data-reader-canonical="true"] [data-token-key="${secondKey}"]`)
+      const secondRect = badges[1].getBoundingClientRect()
+      expect(verticalCenter(badges[0])).toBeCloseTo(verticalCenter(first), 0)
+      expect(verticalCenter(badges[1])).toBeCloseTo(verticalCenter(second), 0)
+      expect(badges[2].getBoundingClientRect().top).toBeGreaterThanOrEqual(secondRect.bottom)
+      const rightWords = requiredAll<HTMLElement>(sides === 'one'
+        ? '.word:not([hidden])'
+        : `.reader-reading-page-side.mod-${order === 'tikkun-right' ? 'tikkun' : 'torah'} .word:not([hidden])`)
+      const textRight = Math.max(...rightWords.map(word => word.getBoundingClientRect().right))
+      for (const badge of badges) {
+        expect(getComputedStyle(badge).visibility).toBe('visible')
+        const rect = badge.getBoundingClientRect()
+        expect(rect.left).toBeGreaterThan(textRight)
+        expect(rect.right).toBeLessThanOrEqual(book.getBoundingClientRect().right)
+        const button = required<HTMLElement>('[data-audio-button="true"]', badge)
+        expect(button.getBoundingClientRect().width).toBeGreaterThan(0)
+        expect(getComputedStyle(button).visibility).toBe('visible')
+      }
+      expect(requiredAll<HTMLElement>('.word').every((word, i) => word === originalWords[i])).toBe(true)
+      expect(getComputedStyle(required('.mod-reading-line')).display).toBe('inline')
+    }
+  }
+})
+
+test.each([[390, 844], [844, 390]])('keeps isolated Reading gutters hidden at %ix%i', async (width, height) => {
+  await page.viewport(width, height)
+  document.documentElement.dataset.readerIsolated = 'true'
+  document.documentElement.dataset.readerSideOrder = 'tikkun-right'
+  const source = readingAliyahFixture()
+  const presentation = { layout: 'reading', sides: width <= 550 ? 'one' : 'two' } as const
+  install(`<div class="tikkun-book mod-annotations-on" data-reader-layout="reading" data-reader-sides="${presentation.sides}" dir="rtl">
+    <section class="tikkun-page">${Page(source, { presentation })}</section>
+  </div>`)
+  const member = required<HTMLElement>('.tikkun-page')
+  member.tikkunPage = source
+  applyReaderPageLayout(member, presentation)
+  for (const gutter of requiredAll<HTMLElement>('.line-gutter.mod-aliyot')) {
+    expect(getComputedStyle(gutter).display).toBe('none')
+  }
+  for (const button of requiredAll<HTMLElement>('[data-audio-button="true"]')) {
+    expect(button.getClientRects()).toHaveLength(0)
+  }
+})
+
+function readingAliyahFixture() {
+  const source = renderedPage(1, [
+    { text: [['הֶמְשֵׁךְ']], verses: [{ book: 1, chapter: 1, verse: 1 }], isPetucha: false },
+    {
+      text: [['סוֹף׃ אֶת־כָּל הָאָרֶץ׃ וַיֹּאמֶר אֱלֹהִים׃']],
+      verses: [{ book: 1, chapter: 1, verse: 2 }, { book: 1, chapter: 1, verse: 3 }],
+      isPetucha: false,
+    },
+  ])
+  source.lines[1].aliyahStarts = ([2, 7, 'Maftir'] as const).map((index, i) => ({
+    index,
+    start: { scroll: 'torah', b: 1, c: 1, v: i === 0 ? 2 : 3 },
+    end: { scroll: 'torah', b: 1, c: 1, v: 3 },
+  }))
+  source.lines[1].labels = source.lines[1].aliyahStarts.map(aliyah => aliyahLabel(aliyah.index))
+  return source
+}
 
 test('joins one Reading pasuk across its physical JSON lines', async () => {
   await page.viewport(1800, 900)
@@ -1288,15 +1473,10 @@ test('mirrors every Vayishlach token at the reported Two Sided wrap', async () =
     )
 
     expect(verseStartIndex).toBeGreaterThan(0)
-    expect(
-      Number.parseFloat(
-        verseGutter.style.getPropertyValue('--reading-verse-gutter-top'),
-      ),
-    ).toBeCloseTo(
-      verseStartWord.getBoundingClientRect().top -
-        required('.reader-reading-page').getBoundingClientRect().top,
-      1,
-    )
+    // Only the outer side shows verse numbers.
+    if (verseGutter.getClientRects().length) {
+      expect(verticalCenter(verseGutter)).toBeCloseTo(verticalCenter(verseStartWord), 1)
+    }
   }
 
   for (const lineIndex of [20, 21, 22, 23, 24, 25, 26, 27, 28]) {
@@ -1468,10 +1648,14 @@ test.each(['match', 'reading'] as const)(
       layout === 'match' ? '.tikkun-page' : '.reader-reading-page',
     )
     const dividerStyle = getComputedStyle(dividerRoot, '::after')
-    expect(dividerStyle.position).toBe('absolute')
-    expect(dividerStyle.top).toBe('0px')
-    expect(dividerStyle.bottom).toBe('0px')
-    expect(dividerStyle.width).toBe('1px')
+    if (layout === 'match') {
+      expect(dividerStyle.position).toBe('absolute')
+      expect(dividerStyle.top).toBe('0px')
+      expect(dividerStyle.bottom).toBe('0px')
+      expect(dividerStyle.width).toBe('1px')
+    } else {
+      expect(dividerStyle.content).toBe('none')
+    }
     expect(getComputedStyle(required('.line-content'), '::after').content).toBe(
       'none',
     )
@@ -1815,13 +1999,13 @@ test('computes physical player order and theme-aware compact playback text', asy
   expect(getComputedStyle(controls).flexDirection).toBe('row')
   expect(
     getComputedStyle(required('[data-target-id="floating-next"]')).order,
-  ).toBe('1')
+  ).toBe('3')
   expect(
     getComputedStyle(required('[data-target-id="floating-play"]')).order,
   ).toBe('2')
   expect(
     getComputedStyle(required('[data-target-id="floating-prev"]')).order,
-  ).toBe('3')
+  ).toBe('1')
   expect(
     getComputedStyle(required('[data-target-id="floating-play"]')).boxShadow,
   ).toBe('none')
@@ -1894,6 +2078,11 @@ function install(markup: string) {
   fixture = document.createElement('section')
   fixture.innerHTML = markup
   document.body.appendChild(fixture)
+}
+
+function verticalCenter(element: Element) {
+  const rect = element.getBoundingClientRect()
+  return rect.top + rect.height / 2
 }
 
 function required<T extends Element = HTMLElement>(

@@ -16,6 +16,8 @@ export interface ReaderPresentationScheduler {
   invalidateAfterLayout(
     ...invalidations: ReaderPresentationInvalidation[]
   ): void
+  /** Presents pending work immediately once the caller has completed layout. */
+  flush(): void
   destroy(): void
 }
 
@@ -87,6 +89,18 @@ export function createReaderPresentationScheduler({
       if (destroyed || invalidations.length === 0) return
       for (const invalidation of invalidations) deferred.add(invalidation)
       scheduleFrame()
+    },
+    flush() {
+      if (destroyed) return
+      if (animationFrame !== null) frame.cancel(animationFrame)
+      animationFrame = null
+      for (const invalidation of deferred) pending.add(invalidation)
+      deferred.clear()
+      const invalidations = Object.freeze(ordered(pending))
+      pending.clear()
+      if (!invalidations.length) return
+      revision += 1
+      present(Object.freeze({ revision, invalidations }))
     },
     destroy() {
       if (destroyed) return

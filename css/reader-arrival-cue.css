@@ -1,4 +1,5 @@
-.tikkun-page.mod-arrival-cue {
+.tikkun-page.mod-arrival-cue,
+.tikkun-book.mod-arrival-cue {
   position: relative;
   isolation: isolate;
 }

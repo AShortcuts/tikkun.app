@@ -10,6 +10,7 @@ import utils from './utils.ts'
 import {
   centerElementInScrollRoot,
   getReaderFocalPointClientY,
+  getVisibleReaderFocalWord,
 } from '../reader-scroll.ts'
 import {
   createPageLifecycleSnapshot,
@@ -23,7 +24,9 @@ import {
   isReaderTextLayout,
   type ReaderPagePresentation,
 } from '../reader-presentation.ts'
-import { applyReaderPageLayout, readerPageFont } from './reader-page-layout.ts'
+import { applyReaderPageLayout, applyReaderPageLayouts, readerPageFont } from './reader-page-layout.ts'
+import { observeReaderResize, type ReaderResizeSubscription } from '../adaptive/reader-resize.ts'
+import { findReadingVerseStartWord } from '../reader/reading-verse-target.ts'
 
 const { htmlToElement, purgeNode } = utils
 
@@ -43,6 +46,7 @@ interface ScrollPreservationAnchor {
   pageNumber: number
   lineIndex: number
   tokenKey: string | null
+  plainTokenKeys?: readonly string[]
   alignment: 'center' | 'top'
   viewportOffset: number
 }
@@ -86,8 +90,12 @@ export class ScrollDisplay {
   private recordingPageLocks = 0
   private presentation: ReaderPagePresentation
   private readonly pageLayoutObserver: ResizeObserver | null
-  private pageLayoutFrame = 0
+  private readonly pageLayoutSubscription: ReaderResizeSubscription
+  private pageLayoutDirty = true
+  private lastLayoutSize = ''
+  private readonly handleFontsLoaded = () => this.schedulePageLayoutRefresh()
   private presentationAnchor: ScrollPreservationAnchor | null = null
+  private stopAnnotationSettle: (() => void) | null = null
 
   constructor(
     readonly viewModel: ScrollViewModel,
@@ -95,17 +103,46 @@ export class ScrollDisplay {
   ) {
     this.presentation = readPagePresentation(root)
     applyPagePresentation(root, this.presentation)
+    const view = root.ownerDocument.defaultView
+    if (!view) throw new Error('Reader layout requires a browser window')
+    this.pageLayoutSubscription = observeReaderResize(view, 'content', () => {
+      const size = this.layoutViewportSize()
+      if (this.disposed || (!this.pageLayoutDirty && size === this.lastLayoutSize)) return
+      this.pageLayoutDirty = false
+      this.lastLayoutSize = size
+      this.refreshMountedPageLayouts()
+    })
     this.pageLayoutObserver =
       typeof ResizeObserver === 'undefined'
         ? null
-        : new ResizeObserver(() => this.schedulePageLayoutRefresh())
+        : new ResizeObserver(() => {
+          if (this.layoutViewportSize() !== this.lastLayoutSize) this.schedulePageLayoutRefresh()
+        })
     this.pageLayoutObserver?.observe(root)
+    root.ownerDocument.fonts.addEventListener('loadingdone', this.handleFontsLoaded)
     root.scrollTop = 0
     purgeNode(root)
     root.addEventListener('scroll', this.handleEdgeScroll, { passive: true })
 
     this.rendered = viewModel.startingLocation.then(
       async ({ page, lineNumber }) => {
+        if (viewModel.isolatedAliyah) {
+          const pages = await Promise.all(viewModel.isolatedAliyah.pageNumbers.map(pageNumber =>
+            viewModel.fetchPageByPageNumber(pageNumber, { runId: viewModel.isolatedAliyah!.runId })))
+          if (pages.some(entry => !entry || entry.type !== 'page')) {
+            throw new Error('The complete isolated aliyah could not be mounted.')
+          }
+          let startingLine: HTMLElement | null = null
+          for (const entry of pages) {
+            if (!entry) continue
+            const node = this.renderNext(entry, { preserveViewport: false })
+            if (entry.contentIndex === page.contentIndex) {
+              startingLine = node.querySelector<HTMLElement>(`[data-class="line"][data-line-index="${lineNumber - 1}"]`)
+            }
+          }
+          if (!startingLine) throw new Error('The isolated aliyah starting line is missing.')
+          return startingLine
+        }
         const pageNode = this.renderNext(page, { preserveViewport: false })
         const lines = [...pageNode.querySelectorAll<HTMLElement>('.line')]
         const lineIndex = lineNumber - 1
@@ -132,20 +169,42 @@ export class ScrollDisplay {
       // so that we become measurable.
       await waitForDocumentFonts(this.root)
       await new Promise(requestAnimationFrame)
+      if (this.disposed) return
       this.refreshMountedPageLayouts()
-      this.scrollTo({ element: line })
+      if (viewModel.isolatedAliyah) {
+        const initial = viewModel.initialLocation
+        const start = viewModel.isolatedAliyah.start
+        if (!('pageNumber' in initial) && initial.b === start.b && initial.c === start.c && initial.v === start.v) {
+          this.root.scrollTop = 0
+          this.root.dispatchEvent(new Event('scroll'))
+        } else {
+          const initialKey = viewModel.isolatedAliyah.initialTokenKey
+          const selection = line.closest<HTMLElement>('.tikkun-page')?.tikkunPage?.wordSelection
+          const keys = this.presentation.sides === 'two' || this.annotationsEnabled()
+            ? [initialKey] : selection?.unannotatedKeysByAnnotated.get(initialKey) ?? [initialKey]
+          const token = keys.map(key => line.querySelector<HTMLElement>(`.word[data-token-key="${key}"]:not([hidden])`)).find(Boolean)
+          this.scrollTo({ element: token ?? line })
+        }
+      } else if (this.presentation.layout === 'reading' && !('pageNumber' in viewModel.initialLocation)) {
+        const word = findReadingVerseStartWord(this.root, line, viewModel.initialLocation)
+        if (!word) throw new Error('The requested reading verse could not be found.')
+        this.scrollTo({ element: word })
+      } else {
+        this.scrollTo({ element: line })
+      }
       this.edgeLoadingReady = true
     })
   }
 
   destroy() {
     this.disposed = true
+    this.stopAnnotationSettle?.()
     this.edgeLoadingReady = false
     this.pendingInitialCenterScrollTop = null
     this.root.removeEventListener('scroll', this.handleEdgeScroll)
     this.pageLayoutObserver?.disconnect()
-    if (this.pageLayoutFrame) cancelAnimationFrame(this.pageLayoutFrame)
-    this.pageLayoutFrame = 0
+    this.pageLayoutSubscription.destroy()
+    this.root.ownerDocument.fonts.removeEventListener('loadingdone', this.handleFontsLoaded)
   }
 
   setPresentation(presentation: ReaderPagePresentation, beforeLayout?: () => void) {
@@ -174,20 +233,16 @@ export class ScrollDisplay {
             }),
           ),
         )
-        applyReaderPageLayout(node, this.presentation)
-        record.measuredHeight = measurePageHeight(node)
         this.touchPageRecord(record)
         rerendered.push({ page, node })
       }
 
+      this.refreshMountedPageLayouts()
       for (const { page, node } of rerendered) {
         this.dispatchPageRendered(page, node)
       }
     }, anchor)
     this.presentationAnchor = anchor
-    if (this.presentation.layout === 'reading') {
-      this.schedulePageLayoutRefresh()
-    }
     return true
   }
 
@@ -198,6 +253,42 @@ export class ScrollDisplay {
       this.refreshMountedPageLayouts()
     }, anchor)
     this.presentationAnchor = anchor
+    this.settleAnnotationLayout(anchor)
+  }
+
+  // WebKit can report provisional glyph heights for freshly replaced pointed
+  // Hebrew until a later rendering update, which can drop a wrapped row after
+  // the viewport was restored. Watch the anchor briefly and re-anchor while the
+  // reader stays put.
+  private settleAnnotationLayout(anchor: ScrollPreservationAnchor | null) {
+    this.stopAnnotationSettle?.()
+    const view = this.root.ownerDocument.defaultView
+    if (!view || !anchor) return
+    let expectedScrollTop = this.root.scrollTop
+    let expectedScrollHeight = this.root.scrollHeight
+    let remainingFrames = 30
+    let frame = 0
+    const check = () => {
+      frame = 0
+      if (this.disposed || Math.abs(this.root.scrollTop - expectedScrollTop) > 0.5) return stop()
+      const word = findPreservedWord(this.root, anchor)
+      const drifted = word && Math.abs(getViewportOffset(this.root, word, anchor.alignment) - anchor.viewportOffset) > 0.5
+      if (drifted || this.root.scrollHeight !== expectedScrollHeight) {
+        this.mutatePreservingViewport(null, () => this.refreshMountedPageLayouts(), anchor)
+        expectedScrollTop = this.root.scrollTop
+        expectedScrollHeight = this.root.scrollHeight
+      }
+      remainingFrames -= 1
+      if (remainingFrames > 0) frame = view.requestAnimationFrame(check)
+      else stop()
+    }
+    const stop = () => {
+      if (frame) view.cancelAnimationFrame(frame)
+      frame = 0
+      if (this.stopAnnotationSettle === stop) this.stopAnnotationSettle = null
+    }
+    this.stopAnnotationSettle = stop
+    frame = view.requestAnimationFrame(check)
   }
 
   private getPresentationAnchor() {
@@ -205,9 +296,20 @@ export class ScrollDisplay {
     const priorWord = priorAnchor && findPreservedWord(this.root, priorAnchor)
     // Several words can share the center after reflow. Reuse the logical word
     // across return toggles unless the reader has scrolled away from it.
-    return priorWord && Math.abs(
+    if (priorWord && Math.abs(
       getViewportOffset(this.root, priorWord, priorAnchor.alignment) - priorAnchor.viewportOffset,
-    ) < 1 ? priorAnchor : getScrollPreservationAnchor(this.root)
+    ) < 1) return priorAnchor
+    const anchor = getScrollPreservationAnchor(this.root)
+    const passage = this.viewModel.isolatedAliyah
+    if (anchor?.tokenKey && passage) {
+      const form = this.presentation.sides === 'two' || this.annotationsEnabled() ? 'annotated' : 'unannotated'
+      const identity = passage.tokenIdentity({ tokenKey: anchor.tokenKey, form })
+      anchor.plainTokenKeys = form === 'unannotated'
+        ? [anchor.tokenKey, ...identity.plainTokenKeys.filter(key => key !== anchor.tokenKey)]
+        : identity.plainTokenKeys
+      anchor.tokenKey = identity.canonicalTokenKey
+    }
+    return anchor
   }
 
   usesPresentation(presentation: ReaderPagePresentation) {
@@ -218,19 +320,24 @@ export class ScrollDisplay {
   }
 
   private schedulePageLayoutRefresh() {
-    if (this.disposed || this.pageLayoutFrame) return
-    this.pageLayoutFrame = requestAnimationFrame(() => {
-      this.pageLayoutFrame = 0
-      this.refreshMountedPageLayouts()
-    })
+    if (this.disposed) return
+    this.pageLayoutDirty = true
+    this.pageLayoutSubscription.request()
+  }
+
+  private layoutViewportSize() {
+    const view = this.root.ownerDocument.defaultView!
+    return `${view.innerWidth}:${view.innerHeight}:${this.root.clientWidth}:${this.root.clientHeight}`
   }
 
   private refreshMountedPageLayouts() {
-    for (const record of this.pageMounts.values()) {
-      if (record.state !== 'mounted' || !record.node?.isConnected) continue
-      applyReaderPageLayout(record.node, this.presentation)
-      record.measuredHeight = measurePageHeight(record.node)
-    }
+    const mounted = [...this.pageMounts.values()].filter(record =>
+      record.state === 'mounted' && record.node?.isConnected)
+    applyReaderPageLayouts(mounted.map(record => record.node!), this.presentation)
+    for (const record of mounted) record.measuredHeight = measurePageHeight(record.node!)
+    this.pageLayoutDirty = false
+    this.lastLayoutSize = this.layoutViewportSize()
+    this.root.dispatchEvent(new Event('reader-layout'))
   }
 
   private scrollTo({ element }: { element: HTMLElement }) {
@@ -275,7 +382,7 @@ export class ScrollDisplay {
   }
 
   private readonly handleEdgeScroll = () => {
-    if (this.disposed || !this.edgeLoadingReady || this.recordingPageLocks > 0) return
+    if (this.disposed || !this.edgeLoadingReady || this.recordingPageLocks > 0 || this.viewModel.isolatedAliyah) return
     if (this.consumePendingInitialCenterScroll()) return
     if (this.edgeLoadPromise) return
     const direction = this.getEdgeLoadDirection()
@@ -314,6 +421,7 @@ export class ScrollDisplay {
   }
 
   private async loadAdjacentPage(direction: EdgeLoadDirection) {
+    if (this.viewModel.isolatedAliyah) return null
     const entry =
       direction === 'previous'
         ? await this.viewModel.fetchPreviousPage()
@@ -644,7 +752,7 @@ export class ScrollDisplay {
   }
 
   evictPage(pageNumber: number) {
-    if (this.disposed || this.recordingPageLocks > 0) return false
+    if (this.disposed || this.recordingPageLocks > 0 || this.viewModel.isolatedAliyah) return false
     const records = this.getPageRecords(pageNumber)
     let didEvict = false
     for (const record of records) {
@@ -977,13 +1085,10 @@ function getScrollPreservationAnchor(
   root: HTMLElement,
 ): ScrollPreservationAnchor | null {
   const focalY = getReaderFocalPointClientY(root)
-  let closestLine: HTMLElement | null = null
+  let closestLine: HTMLElement | null = getVisibleReaderFocalWord(root)
   let closestDistance = Number.POSITIVE_INFINITY
 
-  const words = [...root.querySelectorAll<HTMLElement>(
-    '[data-reader-canonical="true"] .word:not([hidden])',
-  )].filter(isVisibleElement)
-  const candidates = words.length ? words : root.querySelectorAll<HTMLElement>(
+  const candidates = closestLine ? [] : root.querySelectorAll<HTMLElement>(
     '[data-class="line"]',
   )
   for (const line of candidates) {
@@ -1068,9 +1173,12 @@ function findPreservedWord(root: HTMLElement, anchor: ScrollPreservationAnchor) 
   const entry = root.querySelector<HTMLElement>(
     `[data-content-index="${anchor.contentIndex}"]`,
   )
-  return [...(entry?.querySelectorAll<HTMLElement>(
+  const keys = anchor.plainTokenKeys && root.dataset.readerSides !== 'two' &&
+    !root.classList.contains('mod-annotations-on') ? anchor.plainTokenKeys : [anchor.tokenKey]
+  const words = [...(entry?.querySelectorAll<HTMLElement>(
     '[data-reader-canonical="true"] .word',
-  ) ?? [])].find((word) => word.dataset.tokenKey === anchor.tokenKey && isVisibleElement(word)) ?? null
+  ) ?? [])]
+  return keys.map(key => words.find(word => word.dataset.tokenKey === key && isVisibleElement(word))).find(Boolean) ?? null
 }
 
 function isVisibleElement(element: HTMLElement) {

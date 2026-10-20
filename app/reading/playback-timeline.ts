@@ -37,6 +37,7 @@ export type PlaybackCommand =
   | { type: 'step'; delta: -1 | 1 }
   | { type: 'set-rate'; rate: number; snap?: boolean }
   | { type: 'set-cue-index'; index: number | null }
+  | { type: 'rewind' }
 
 export interface PlaybackTimelineOptions {
   resolveRun?(id: string): LeiningRun | null
@@ -451,26 +452,36 @@ export function createPlaybackTimeline(
     if (played) refresh()
   }
 
-  const restart = async (restartAudio = true) => {
+  const highlightStart = async (scroll: boolean) => {
     const session = audioController.session
     if (!session) return
+    if (session.cues.length && (!session.passage || session.cues[0].timeStart === 0)) {
+      cueNavigationIndex = 0
+      await highlightController.activateCue(session.cues[0], { scroll })
+    } else if (session.tokenKeys[0]) {
+      await highlightController.activateTokenKey(session.tokenKeys[0], { scroll })
+    }
+  }
+
+  const restart = async (restartAudio = true) => {
+    if (!audioController.session) return
 
     const playback = restartAudio
       ? options.attemptReplayFromStart(() => restart(restartAudio))
       : null
 
-    if (session.cues.length && (!session.passage || session.cues[0].timeStart === 0)) {
-      cueNavigationIndex = 0
-      await highlightController.activateCue(session.cues[0], {
-        scroll: true,
-      })
-    } else if (session.tokenKeys[0]) {
-      await highlightController.activateTokenKey(session.tokenKeys[0], {
-        scroll: true,
-      })
-    }
+    await highlightStart(true)
 
     if (playback) await playback
+  }
+
+  // Returns to the first word, paused at 0:00; the caller owns scrolling.
+  const rewind = async () => {
+    if (!audioController.session) return
+    audioController.pause()
+    audioController.seekToStart()
+    await highlightStart(false)
+    refresh()
   }
 
   const command: PlaybackTimeline['command'] = async (nextCommand) => {
@@ -486,6 +497,9 @@ export function createPlaybackTimeline(
         return
       case 'set-cue-index':
         cueNavigationIndex = nextCommand.index
+        return
+      case 'rewind':
+        await rewind()
     }
   }
 

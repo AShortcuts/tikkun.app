@@ -110,7 +110,7 @@ test('Cancel retains staged updates and a retry cannot be canceled by stale comp
 test('Cancel during asynchronous preparation prevents reload and ignores its stale error', async () => {
   const { applyNativeUpdate, cancelNativeUpdate } = await import('./native-updates.ts')
   const { updateChannel, nativeUpdateState } = await import('./update-state.ts')
-  updateChannel('content', { pending: true, phase: 'ready' })
+  updateChannel('web', { pending: true, phase: 'ready' })
   vi.useFakeTimers()
   let rejectPreparation!: (error: Error) => void
   const applied = applyNativeUpdate(() => new Promise<void>((_, reject) => { rejectPreparation = reject }))
@@ -119,5 +119,5 @@ test('Cancel during asynchronous preparation prevents reload and ignores its sta
   rejectPreparation(new Error('Stale failure'))
   await applied
   expect(bridge.reload).not.toHaveBeenCalled()
-  expect(get(nativeUpdateState)).toMatchObject({ applying: false, applyError: null, content: { pending: true } })
+  expect(get(nativeUpdateState)).toMatchObject({ applying: false, applyError: null, web: { pending: true } })
 })

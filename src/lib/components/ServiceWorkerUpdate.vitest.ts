@@ -135,8 +135,10 @@ test('replaces Apply with Cancel and suppresses reload after cancellation', asyn
   expect(status.getAttribute('aria-busy')).toBe('true')
   expect(status.textContent).toContain('Applying update…')
   expect(reload.textContent).toBe('Cancel')
-  expect(getComputedStyle(reload).backgroundColor).toBe('rgb(139, 32, 64)')
-  expect(getComputedStyle(reload).color).toBe('rgb(255, 255, 255)')
+  // Cancel only stops a pending reload, so it uses a faint tint of the prompt ink.
+  const cancelStyle = getComputedStyle(reload)
+  expect(cancelStyle.color).toBe(getComputedStyle(status).color)
+  expect(cancelStyle.backgroundColor).toMatch(/ \/ 0\.1\)$/)
   expect(reload.disabled).toBe(false)
   expect(target.querySelector('[aria-label="Dismiss update"]')).toBeNull()
 

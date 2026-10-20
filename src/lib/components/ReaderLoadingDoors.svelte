@@ -1,11 +1,22 @@
 <script lang="ts">
-  import { READER_ALEPH_PATH } from './reader-loading.ts'
+  import ReaderLoadingMark from './ReaderLoadingMark.svelte'
+  import { createLoadingFill } from './reader-loading-fill.ts'
 
-  let { open, oncomplete }: { open: boolean; oncomplete: () => void } = $props()
+  let { open, progress, step, oncomplete }: {
+    open: boolean
+    progress: number
+    step: number
+    oncomplete: () => void
+  } = $props()
   let upperDoor: HTMLDivElement | undefined = $state()
+  // The doors part only once the fill has visibly completed, then hold briefly.
+  let filled = $state(false)
+  const parting = $derived(open && filled)
+  // Both halves share one fill, so the aleph stays whole until it splits.
+  const fill = createLoadingFill()
 
   $effect(() => {
-    if (!open || !upperDoor) return
+    if (!parting || !upperDoor) return
     const animations = upperDoor.getAnimations()
     const complete = oncomplete
     let active = true
@@ -20,6 +31,7 @@
 <section
   class="reader-loading-doors"
   class:open
+  class:parting
   data-target-id="reader-boot-state"
   data-state={open ? 'opening' : 'loading'}
   role="status"
@@ -29,16 +41,13 @@
   <span class="loading-status">Opening your reading…</span>
   <div class="reader-door northeast" bind:this={upperDoor} aria-hidden="true">
     <div class="door-paper">
-      <svg class="aleph" viewBox="0 0 16 16" focusable="false">
-        <path d={READER_ALEPH_PATH} fill="currentColor" />
-      </svg>
+      <!-- Each door carries the same fill so the full aleph splits along the seam. -->
+      <div class="aleph"><ReaderLoadingMark {progress} {step} {fill} onfilled={() => { filled = true }} /></div>
     </div>
   </div>
   <div class="reader-door southwest" aria-hidden="true">
     <div class="door-paper">
-      <svg class="aleph" viewBox="0 0 16 16" focusable="false">
-        <path d={READER_ALEPH_PATH} fill="currentColor" />
-      </svg>
+      <div class="aleph"><ReaderLoadingMark {progress} {step} {fill} /></div>
       <p class="caption">Opening your reading…</p>
     </div>
   </div>
@@ -94,9 +103,16 @@
     clip-path: polygon(0 0, 100% 100%, 0 100%);
   }
 
-  .open .southwest .door-paper {
-    --door-tint: color-mix(in srgb, var(--text-color) 3%, transparent);
-    background-image: linear-gradient(var(--door-tint), var(--door-tint));
+  /* The lower door eases into a slightly deeper tone during the hold before it moves.
+     Fading its own color keeps the aleph halves in one layer, so no seam line appears.
+     The light, sepia and dark text colors are 70% opaque, so the mix forces full
+     alpha; otherwise the door turns slightly see-through and the reading shows. */
+  .southwest .door-paper {
+    transition: background-color 300ms ease;
+  }
+
+  .parting .southwest .door-paper {
+    background-color: color-mix(in srgb, rgb(from var(--text-color) r g b / 1) 3%, var(--paper-color));
   }
 
   .aleph {
@@ -106,7 +122,11 @@
     width: var(--mark-size);
     height: var(--mark-size);
     transform: translate(-50%, -50%);
-    animation: aleph-appear 300ms ease-out;
+  }
+
+  .aleph :global(.reader-loading-mark) {
+    width: 100%;
+    height: 100%;
   }
 
   .caption {
@@ -125,9 +145,10 @@
 
   .open { pointer-events: none; }
 
-  .open .reader-door {
+  .parting .reader-door {
     will-change: transform;
-    animation: door-open 680ms cubic-bezier(0.76, 0, 0.24, 1) both;
+    /* A brief hold on the settled, full aleph before the seal breaks. */
+    animation: door-open 680ms cubic-bezier(0.76, 0, 0.24, 1) 300ms both;
   }
 
   .northeast {
@@ -145,16 +166,15 @@
     to { transform: translate3d(var(--door-x), var(--door-y), 0); }
   }
 
-  @keyframes aleph-appear { from { opacity: 0.55; } to { opacity: 1; } }
   @keyframes caption-appear { from { opacity: 0; } to { opacity: 1; } }
-  :global(html[data-reader-reduced-motion='on']) :is(.reader-door, .aleph, .caption) {
+  :global(html[data-reader-reduced-motion='on']) :is(.reader-door, .caption) {
     animation: none;
   }
 
   :global(html[data-reader-reduced-motion='on']) .open { visibility: hidden; }
 
   @media (prefers-reduced-motion: reduce) {
-    :global(html:not([data-reader-reduced-motion='off'])) :is(.reader-door, .aleph, .caption) {
+    :global(html:not([data-reader-reduced-motion='off'])) :is(.reader-door, .caption) {
       animation: none;
     }
 
@@ -162,7 +182,7 @@
   }
 
   @media (forced-colors: active) {
-    .door-paper, .open .southwest .door-paper { background: Canvas; }
-    .aleph, .caption { color: CanvasText; }
+    .door-paper, .parting .southwest .door-paper { background: Canvas; transition: none; }
+    .caption { color: CanvasText; }
   }
 </style>

@@ -78,7 +78,8 @@ for (const relative of [
   'app/reader/canonical-line-words.ts', 'app/reader/word-tokenization.ts',
   'app/text-filter.ts', 'app/reading/exact-token-range.ts',
   'scripts/public-reading-tokens.ts',
-  'app/calendar-model/vezot-haberacha.ts',
+  'app/calendar-model/parsha-reading.ts', 'app/calendar-model/hebcal-conversions.ts',
+  'app/view-model/navigation/parsha-routes.ts', 'app/view-model/navigation/parsha-route-catalog.ts',
 ]) compilerSources[relative] = hash(await readFile(path.join(root, relative)))
 for (const relative of [manifestPath, 'experiments/torah-audio-aligner/compile-input.mts']) {
   provenanceSources[relative] = hash(await readFile(path.join(root, relative)))

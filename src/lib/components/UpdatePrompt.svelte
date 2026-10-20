@@ -30,6 +30,9 @@
     disabled={actionDisabled}
     onclick={onaction}
   >{actionLabel}</button>
+  {#if applying}
+    <span class="service-worker-update-progress" aria-hidden="true"></span>
+  {/if}
   {#if !applying}
     <button type="button" aria-label="Dismiss update" onclick={ondismiss}>Later</button>
   {/if}
@@ -62,6 +65,7 @@
     font: 400 0.86rem/1.4 var(--hebrew-ui-font-family, sans-serif);
     transform: translateX(-50%);
     backdrop-filter: blur(18px);
+    overflow: hidden;
   }
 
   span { overflow-wrap: anywhere; }
@@ -86,9 +90,37 @@
     font-weight: 500;
   }
 
+  /* Cancel only stops a pending reload, so it stays neutral rather than alarming. */
   .service-worker-update-action.canceling {
-    background: #8b2040;
-    color: #ffffff;
+    background: color-mix(in srgb, var(--update-ink) 10%, transparent);
+    color: var(--update-ink);
+  }
+
+  /* Applying has no measurable progress, so the line sweeps without a fill level. */
+  .service-worker-update-progress {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 38%;
+    height: 2px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--update-ink) 55%, transparent);
+    animation: update-progress-sweep 1.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  }
+
+  @keyframes update-progress-sweep {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(265%); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(html:not([data-reader-reduced-motion='off'])) .service-worker-update-progress {
+      display: none;
+    }
+  }
+
+  :global(html[data-reader-reduced-motion='on']) .service-worker-update-progress {
+    display: none;
   }
 
   button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }

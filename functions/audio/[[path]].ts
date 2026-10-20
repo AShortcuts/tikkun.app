@@ -170,6 +170,14 @@ export async function onRequest({
   if (assetResponse.status !== 200) {
     return forwardAsset(assetResponse, request.method)
   }
+  // Pages answers unknown paths with the app shell; never present that page as audio.
+  if (assetResponse.headers.get('content-type')?.toLowerCase().startsWith('text/html')) {
+    await assetResponse.body?.cancel('Audio asset is not published')
+    return new Response('Recording not found', {
+      status: 404,
+      headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' },
+    })
+  }
 
   if (!rangeHeader || request.method === 'HEAD' ||
       !isByteRangeHeader(rangeHeader) || !ifRangeMatches(request, assetResponse)) {

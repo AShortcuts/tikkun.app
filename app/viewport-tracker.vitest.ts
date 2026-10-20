@@ -84,7 +84,8 @@ test('reports the initial viewport', async () => {
   await resize(5)
   await renderRun('2025-03-01:shacharis,main')
   expect(lastReportedRange).toEqual({
-    first: ': בָּהָ֔ר אַרְבָּעִ֣ים י֔וֹם וְאַרְבָּעִ֖ים לָֽיְלָה׃#(פ)',
+    // The first row is measured below the book's top padding.
+    first: 'תרומה: וַיְדַבֵּ֥ר יְהֹוָ֖ה אֶל־מֹשֶׁ֥ה לֵּאמֹֽר׃ דַּבֵּר֙ אֶל־בְּנֵ֣י יִשְׂרָאֵ֔ל',
     center:
       'תרומה: וַיְדַבֵּ֥ר יְהֹוָ֖ה אֶל־מֹשֶׁ֥ה לֵּאמֹֽר׃ דַּבֵּר֙ אֶל־בְּנֵ֣י יִשְׂרָאֵ֔ל',
     last:
@@ -100,7 +101,8 @@ test('updates when scrolling down', async () => {
   await scrollRootBy(lineHeight)
 
   expect(lastReportedRange).toEqual({
-    first: ': בָּהָ֔ר אַרְבָּעִ֣ים י֔וֹם וְאַרְבָּעִ֖ים לָֽיְלָה׃#(פ)',
+    // The first row is measured below the book's top padding.
+    first: 'תרומה: וַיְדַבֵּ֥ר יְהֹוָ֖ה אֶל־מֹשֶׁ֥ה לֵּאמֹֽר׃ דַּבֵּר֙ אֶל־בְּנֵ֣י יִשְׂרָאֵ֔ל',
     center:
       ': וְיִקְחוּ־לִ֖י תְּרוּמָ֑ה מֵאֵ֤ת כׇּל־אִישׁ֙ אֲשֶׁ֣ר יִדְּבֶ֣נּוּ לִבּ֔וֹ',
     last:
@@ -186,7 +188,8 @@ test('only reports fully-visible lines', async () => {
   await resize(4)
   await renderRun('2025-03-01:shacharis,main')
   expect(lastReportedRange).toEqual({
-    first: ': בָּהָ֔ר אַרְבָּעִ֣ים י֔וֹם וְאַרְבָּעִ֖ים לָֽיְלָה׃#(פ)',
+    // The first row is measured below the book's top padding.
+    first: 'תרומה: וַיְדַבֵּ֥ר יְהֹוָ֖ה אֶל־מֹשֶׁ֥ה לֵּאמֹֽר׃ דַּבֵּר֙ אֶל־בְּנֵ֣י יִשְׂרָאֵ֔ל',
     center:
       'תרומה: וַיְדַבֵּ֥ר יְהֹוָ֖ה אֶל־מֹשֶׁ֥ה לֵּאמֹֽר׃ דַּבֵּר֙ אֶל־בְּנֵ֣י יִשְׂרָאֵ֔ל',
     last: ': וְיִקְחוּ־לִ֖י תְּרוּמָ֑ה מֵאֵ֤ת כׇּל־אִישׁ֙ אֲשֶׁ֣ר יִדְּבֶ֣נּוּ לִבּ֔וֹ',

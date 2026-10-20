@@ -1,17 +1,12 @@
 import { compareRefs } from '../calendar-model/ref-utils.ts'
 import { listTorahBooks } from '../components/torah-reference.ts'
-import { isIndexedReference, listScrollVerses, loadScroll } from '../location.ts'
-import { verseEndLocation } from '../reading/verse-end-location.ts'
-import type { LineType } from '../components/Page.ts'
-import { canonicalLineWords } from '../reader/canonical-line-words.ts'
-import { collectExactTokenRange } from '../reading/exact-token-range.ts'
-import { loadScrollPageLines, type RenderedPageInfo } from '../view-model/scroll-view-model.ts'
+import { isIndexedReference, listScrollVerses } from '../location.ts'
+import { loadPassageSelection, type PassageRange } from '../reading/passage-selection.ts'
+import type { RenderedPageInfo } from '../view-model/scroll-view-model.ts'
 import type { RefWithScroll } from '../ref.ts'
 import { chapterVerseLabel, verseRangeLabel } from '../components/verse-range-label.ts'
-import textFilter from '../text-filter.ts'
-import { tokenizeReaderWords } from '../reader/word-tokenization.ts'
 
-export type PassageRange = { start: RefWithScroll; end: RefWithScroll }
+export type { PassageRange } from '../reading/passage-selection.ts'
 export type PrintOptions = {
   removeCredits: boolean
   pageNumbers: boolean
@@ -76,34 +71,7 @@ export function passageTitle(ranges: PassageRange[], language: 'he' | 'en' = 'he
 export async function loadPrintPassage(ranges: PassageRange[]) {
   validateRanges(ranges)
   const scroll = ranges[0].start.scroll
-  const resolver = await loadScroll(scroll)
-  const pageCache = new Map<number, Promise<LineType[]>>()
-  const loadPage = (page: number) => {
-    if (!pageCache.has(page)) pageCache.set(page, loadScrollPageLines(scroll, page))
-    return pageCache.get(page)!
-  }
-  const requestedPages = new Set<number>()
-  for (const range of ranges) {
-    const first = resolver.physicalLocationFromRef(range.start).pageNumber
-    const last = (await verseEndLocation(range.end, resolver, loadPage)).pageNumber
-    // Boundary context lets the shared token-range helper resolve verses that
-    // begin mid-line or continue across a physical column.
-    for (let n = Math.max(1, first - 1); n <= last; n++) requestedPages.add(n)
-  }
-  const numbers = [...requestedPages].sort((a, b) => a - b)
-  const loaded = await Promise.all(numbers.map(async pageNumber => ({ pageNumber, lines: await loadPage(pageNumber) })))
-  const rows = loaded.flatMap(page => page.lines.map((line, index) => ({ page: page.pageNumber, index, line })))
-  const wordsByLine = rows.map(row => canonicalLineWords(row.page, row.index, row.line))
-  const selected = new Set<string>()
-  for (const { start, end } of ranges) {
-    const matches = (ref: RefWithScroll, row: typeof rows[number]) => row.line.verses.findIndex(v => v.book === ref.b && v.chapter === ref.c && v.verse === ref.v)
-    const startLineIndex = rows.findIndex(row => matches(start, row) >= 0)
-    const endLineIndex = rows.findIndex(row => matches(end, row) >= 0)
-    if (startLineIndex < 0 || endLineIndex < 0) throw new Error('The selected passage could not be found in the scroll columns.')
-    const tokens = collectExactTokenRange({ wordsByLine, startLineIndex, startVerseOrdinal: matches(start, rows[startLineIndex]), endLineIndex, endVerseOrdinal: matches(end, rows[endLineIndex]) })
-    if (!tokens.length) throw new Error('The selected passage has no printable text.')
-    tokens.forEach(key => selected.add(key))
-  }
+  const { contextPages: loaded, tokenKeys: selected, projection } = await loadPassageSelection(ranges)
   const selectedPages = new Set([...selected].map(key => Number(key.split(':')[0])))
   let previousRef: RefWithScroll | undefined
   const pages: RenderedPageInfo[] = loaded.map(({ pageNumber, lines }) => ({
@@ -115,24 +83,5 @@ export async function loadPrintPassage(ranges: PassageRange[]) {
       return { ...line, scroll, verses, focalRef, labels: [], aliyahStarts: [], aliyot: [] }
     }),
   }))
-  const selectedUnannotated = new Set<string>()
-  for (const { pageNumber, lines } of loaded) {
-    lines.forEach((line, lineIndex) => line.text.forEach((column, columnIndex) => column.forEach((fragment, fragmentIndex) => {
-      const prefix = `${pageNumber}:${lineIndex}:${columnIndex * 100 + fragmentIndex}:`
-      let annotatedIndex = 0
-      let unannotatedIndex = 0
-      // Torah form expands maqaf groups into separate words. Project the
-      // selection through the existing text filters without changing geometry.
-      for (const raw of tokenizeReaderWords(fragment)) {
-        const annotated = tokenizeReaderWords(textFilter({ text: raw.text, annotated: true }))
-        const unannotated = tokenizeReaderWords(textFilter({ text: raw.text, annotated: false }))
-        if (annotated.some((_, i) => selected.has(`${prefix}${annotatedIndex + i}`))) {
-          unannotated.forEach((_, i) => selectedUnannotated.add(`${prefix}${unannotatedIndex + i}`))
-        }
-        annotatedIndex += annotated.length
-        unannotatedIndex += unannotated.length
-      }
-    })))
-  }
-  return { pages: pages.filter(page => selectedPages.has(page.pageNumber)), selected, selectedUnannotated }
+  return { pages: pages.filter(page => selectedPages.has(page.pageNumber)), selected, selectedUnannotated: projection.unannotated }
 }

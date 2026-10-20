@@ -3,7 +3,9 @@ import { createReadStream } from 'node:fs'
 import {
   access,
   copyFile,
+  link,
   mkdir,
+  readFile,
   readdir,
   rename,
   rm,
@@ -355,74 +357,15 @@ export async function syncAudioCatalog({
   await mkdir(stagedAudioRoot, { recursive: true })
 
   try {
-    const folders = (await readdir(resolvedSourceRoot, { withFileTypes: true }))
-      .filter((entry) => entry.isDirectory())
-      .sort((left, right) => left.name.localeCompare(right.name))
-    const recordings = []
-    const seenParshaSlugs = new Set()
-    const seenParshaNumbers = new Set()
-
-    for (const folder of folders) {
-      const [, numberText, rawName] = folder.name.match(/^(\d+)\s+(.+)$/) ?? []
-      if (!numberText || !rawName) continue
-      const parshaNumber = Number(numberText)
-      const sourceParshaSlug = slugify(rawName)
-      const canonicalIdentity = canonicalParshaIdentities.get(sourceParshaSlug)
-      const parshaSlug = canonicalIdentity?.slug ?? sourceParshaSlug
-      const parshaName = canonicalIdentity?.name ?? rawName
-      if (!parshaSlug || !Number.isSafeInteger(parshaNumber) || parshaNumber <= 0) {
-        throw new Error(`Invalid parsha folder name: ${JSON.stringify(folder.name)}`)
-      }
-      if (seenParshaSlugs.has(parshaSlug)) {
-        throw new Error(`Duplicate parsha slug from source folders: ${parshaSlug}`)
-      }
-      if (seenParshaNumbers.has(parshaNumber)) {
-        throw new Error(`Duplicate parsha number from source folders: ${parshaNumber}`)
-      }
-      seenParshaSlugs.add(parshaSlug)
-      seenParshaNumbers.add(parshaNumber)
-
-      const sourceFolderPath = path.join(resolvedSourceRoot, folder.name)
-      const filenames = (await readdir(sourceFolderPath, { withFileTypes: true }))
-        .filter((entry) => entry.isFile())
-        .map((entry) => entry.name)
-      const selected = selectAliyahFiles(filenames, folder.name)
-      if (!selected.size) continue
-
-      const targetFolderName = parshaSlug
-      const stagedTargetFolder = path.join(stagedAudioRoot, targetFolderName)
-      await mkdir(stagedTargetFolder, { recursive: true })
-
-      for (const [aliyah, match] of [...selected].sort(
-        (left, right) => left[0] - right[0]
-      )) {
-        const sourcePath = path.join(sourceFolderPath, match.filename)
-        const targetFileName = `${aliyah}.${match.format}`
-        const stagedMediaPath = path.join(stagedTargetFolder, targetFileName)
-        await copyFile(sourcePath, stagedMediaPath)
-        recordings.push({
-          id: `${parshaSlug}-${aliyah}`,
-          narratorId: narrator.id,
-          parshaSlug,
-          parshaName,
-          parshaNumber,
-          aliyah,
-          title: `${parshaName} Aliyah ${aliyah}`,
-          playSrc: toSiteUrl(narrator.id, targetFolderName, targetFileName),
-          downloadSrc: toSiteUrl(narrator.id, targetFolderName, targetFileName),
-          format: match.format,
-          status: 'available',
-          mediaIdentity: await mediaIdentity(stagedMediaPath),
-          notes: `Source file: ${match.filename}`,
-        })
+    const { recordings, files } = await discoverAudioCatalog(resolvedSourceRoot, narrator.id)
+    for (const file of files) {
+      const destination = path.join(stagedAudioRoot, file.relativePath)
+      await mkdir(path.dirname(destination), { recursive: true })
+      await copyFile(file.sourcePath, destination)
+      if ((await mediaIdentity(destination)).digest !== file.recording.mediaIdentity.digest) {
+        throw new Error(`Source audio changed during import: ${file.recording.id}`)
       }
     }
-
-    recordings.sort(
-      (left, right) =>
-        left.parshaNumber - right.parshaNumber || left.aliyah - right.aliyah
-    )
-    validateAudioCatalog(recordings)
     await writeFile(stagedManifest, renderAudioManifest({ recordings, narrator }))
     await replaceCatalogAtomically({
       stagedAudioRoot,
@@ -437,6 +380,142 @@ export async function syncAudioCatalog({
       rm(stagedManifest, { force: true }),
     ])
   }
+}
+
+export async function discoverAudioCatalog(sourceRoot, narratorId = 'yoni-davidov') {
+  const folders = (await readdir(sourceRoot, { withFileTypes: true }))
+    .filter((entry) => entry.isDirectory())
+    .sort((left, right) => left.name.localeCompare(right.name))
+  const recordings = []
+  const files = []
+  const seenParshaSlugs = new Set()
+  const seenParshaNumbers = new Set()
+
+  for (const folder of folders) {
+    const [, numberText, rawName] = folder.name.match(/^(\d+)\s+(.+)$/) ?? []
+    if (!numberText || !rawName) continue
+    const parshaNumber = Number(numberText)
+    const sourceParshaSlug = slugify(rawName)
+    const canonicalIdentity = canonicalParshaIdentities.get(sourceParshaSlug)
+    const parshaSlug = canonicalIdentity?.slug ?? sourceParshaSlug
+    const parshaName = canonicalIdentity?.name ?? rawName
+    if (!parshaSlug || !Number.isSafeInteger(parshaNumber) || parshaNumber <= 0) {
+      throw new Error(`Invalid parsha folder name: ${JSON.stringify(folder.name)}`)
+    }
+    if (seenParshaSlugs.has(parshaSlug)) {
+      throw new Error(`Duplicate parsha slug from source folders: ${parshaSlug}`)
+    }
+    if (seenParshaNumbers.has(parshaNumber)) {
+      throw new Error(`Duplicate parsha number from source folders: ${parshaNumber}`)
+    }
+    seenParshaSlugs.add(parshaSlug)
+    seenParshaNumbers.add(parshaNumber)
+
+    const sourceFolderPath = path.join(sourceRoot, folder.name)
+    const filenames = (await readdir(sourceFolderPath, { withFileTypes: true }))
+      .filter((entry) => entry.isFile())
+      .map((entry) => entry.name)
+    const selected = selectAliyahFiles(filenames, folder.name)
+    if (!selected.size) continue
+
+    const targetFolderName = parshaSlug
+    for (const [aliyah, match] of [...selected].sort(
+      (left, right) => left[0] - right[0]
+    )) {
+      const sourcePath = path.join(sourceFolderPath, match.filename)
+      const targetFileName = `${aliyah}.${match.format}`
+      const recording = {
+        id: `${parshaSlug}-${aliyah}`,
+        narratorId,
+        parshaSlug,
+        parshaName,
+        parshaNumber,
+        aliyah,
+        title: `${parshaName} Aliyah ${aliyah}`,
+        playSrc: toSiteUrl(narratorId, targetFolderName, targetFileName),
+        downloadSrc: toSiteUrl(narratorId, targetFolderName, targetFileName),
+        format: match.format,
+        status: 'available',
+        mediaIdentity: await mediaIdentity(sourcePath),
+        notes: `Source file: ${match.filename}`,
+      }
+      recordings.push(recording)
+      files.push({ sourcePath, relativePath: path.join(targetFolderName, targetFileName), recording })
+    }
+  }
+
+  recordings.sort(
+    (left, right) =>
+      left.parshaNumber - right.parshaNumber || left.aliyah - right.aliyah
+  )
+  validateAudioCatalog(recordings)
+  return { recordings, files }
+}
+
+// Startup import is additive. Replacing registered audio remains an explicit audio:sync operation.
+export async function importAudioCatalog({ sourceRoot, targetAudioRoot, targetFile, narrator, existingRecordings }) {
+  if (existingRecordings.some(recording => recording.narratorId !== narrator.id)) {
+    throw new Error('Startup import must use the narrator already registered in the audio manifest.')
+  }
+  const previousManifest = await readFile(targetFile, 'utf8')
+  const { recordings: discovered, files } = await discoverAudioCatalog(sourceRoot, narrator.id)
+  const byId = new Map(existingRecordings.map(recording => [recording.id, recording]))
+  const copies = []
+  for (const file of files) {
+    const existing = byId.get(file.recording.id)
+    if (existing && (existing.mediaIdentity.digest !== file.recording.mediaIdentity.digest || existing.playSrc !== file.recording.playSrc)) {
+      throw new Error(`Source audio differs for ${existing.id}. Startup import will not replace audio tied to saved cues. Review the change and use npm run audio:sync explicitly.`)
+    }
+    const destination = path.join(targetAudioRoot, file.relativePath)
+    if (await pathExists(destination)) {
+      if ((await mediaIdentity(destination)).digest !== file.recording.mediaIdentity.digest) {
+        throw new Error(`Existing audio differs at ${destination}; no recordings were imported.`)
+      }
+    } else {
+      copies.push({ ...file, destination })
+    }
+    if (!existing) byId.set(file.recording.id, file.recording)
+  }
+  const recordings = [...byId.values()].sort((a, b) => a.parshaNumber - b.parshaNumber || a.aliyah - b.aliyah)
+  validateAudioCatalog(recordings)
+  const manifest = renderAudioManifest({ recordings, narrator })
+  const stagedManifest = `${targetFile}.stage-${process.pid}-${Date.now()}`
+  const added = []
+  const restored = []
+  const created = []
+  try {
+    for (const file of copies) {
+      await mkdir(path.dirname(file.destination), { recursive: true })
+      const temporary = `${file.destination}.stage-${process.pid}`
+      try {
+        await copyFile(file.sourcePath, temporary)
+        if ((await mediaIdentity(temporary)).digest !== file.recording.mediaIdentity.digest) {
+          throw new Error(`Source audio changed during import: ${file.recording.id}`)
+        }
+        await link(temporary, file.destination)
+        created.push(file.destination)
+      } finally {
+        await rm(temporary, { force: true })
+      }
+    }
+    if (manifest !== previousManifest) {
+      await writeFile(stagedManifest, manifest)
+      if (await readFile(targetFile, 'utf8') !== previousManifest) {
+        throw new Error('The audio catalog changed during import. Run the command again.')
+      }
+      await rename(stagedManifest, targetFile)
+    }
+  } catch (error) {
+    await Promise.all(created.map(file => rm(file)))
+    throw error
+  } finally {
+    await rm(stagedManifest, { force: true })
+  }
+  for (const recording of discovered) {
+    if (!existingRecordings.some(existing => existing.id === recording.id)) added.push(recording.id)
+    else if (copies.some(file => file.recording.id === recording.id)) restored.push(recording.id)
+  }
+  return { recordings, added, restored, copiedBytes: copies.reduce((total, file) => total + file.recording.mediaIdentity.byteLength, 0) }
 }
 
 export function parseAudioSyncOptions(argv, env = process.env) {

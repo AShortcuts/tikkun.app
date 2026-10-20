@@ -28,6 +28,7 @@ const preferences: ReaderPreferences = {
   customTextColor: '#3b3026',
   readerTextLayout: 'match',
   readingFontScale: 1,
+  verseNumbers: true,
   readerSideMode: 'one',
   readerSideOrder: 'tikkun-right',
 }

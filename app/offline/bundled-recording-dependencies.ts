@@ -33,10 +33,12 @@ export function createBundledRecordingDependencies({ recordings, baseUrl, resolv
         if (resolution.status === 'missing') { audioOnly = true; continue }
         throw new Error(`${recording.title}: ${resolution.problem.message}`)
       }
+      if (resolution.payload.cues.length === 0) { audioOnly = true; continue }
       if (resolution.payload.tokenizationVersion !== TOKENIZATION_VERSION) {
-        throw new Error(`${recording.title}: published timings use an incompatible text version.`)
+        // Playback ignores outdated timings too; the audio itself remains usable.
+        console.warn(`Saving ${recording.id} without outdated ${resolution.payload.tokenizationVersion} timings`)
+        audioOnly = true
       }
-      if (resolution.payload.cues.length === 0) audioOnly = true
     }
     return audioOnly ? 'audio-only' as const : 'ready' as const
   }

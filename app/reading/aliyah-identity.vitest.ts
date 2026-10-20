@@ -123,6 +123,8 @@ test('parses valid aliyah indices from DOM values', () => {
   expect(parseAliyahIndex('Maftir')).toBe('Maftir')
   expect(parseAliyahIndex(undefined)).toBeNull()
   expect(parseAliyahIndex('0')).toBeNull()
-  expect(parseAliyahIndex('8')).toBeNull()
+  // Israel's Simchat Torah on Shabbat calls Chatan Bereshit as aliyah 8.
+  expect(parseAliyahIndex('8')).toBe(8)
+  expect(parseAliyahIndex('9')).toBeNull()
   expect(parseAliyahIndex('1.5')).toBeNull()
 })

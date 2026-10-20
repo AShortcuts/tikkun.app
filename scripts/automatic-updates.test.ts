@@ -55,10 +55,11 @@ async function fixture() {
     await put(`site/updates/web/${build}/latest.json`, envelope({ schema: 1, channel: 'production', nativeBuild: build,
       bundleId: hash(zip), checksum: hash(zip), bytes: Buffer.byteLength(zip), rollout,
       signature: sign('sha256', Buffer.from(zip), privateKey).toString('base64') }))
-    await put(`site/updates/content/${compatibility}/${hash(content)}.json`, content)
-    await put(`site/updates/content/${compatibility}/latest.json`, envelope({ schema: 1, digest: hash(content), bytes: Buffer.byteLength(content) }))
   }
   await feed('old ZIP')
+  // Builds 6 and 7 still read this published content feed; new builds no longer create one.
+  await put(`site/updates/content/${compatibility}/${hash(content)}.json`, content)
+  await put(`site/updates/content/${compatibility}/latest.json`, envelope({ schema: 1, digest: hash(content), bytes: Buffer.byteLength(content) }))
   const directory = path.join(root, 'site/updates')
   const index = await inspectUpdateFeeds(directory, publicKey)
   const files = new Map<string, Buffer>(await Promise.all(index.files.map(async (file): Promise<[string, Buffer]> => [file.path, await readFile(path.join(directory, file.path))])))
@@ -75,7 +76,7 @@ async function fixture() {
     const command = args[1]
     calls.push(command)
     expect(env.TIKKUN_UPDATE_PRIVATE_KEY).toBeUndefined()
-    if (['updates:content', 'updates:web'].includes(command)) {
+    if (command === 'updates:web') {
       expect(await readFile(env.TIKKUN_UPDATE_PRIVATE_KEY_FILE!, 'utf8')).toBe(secret)
       expect((await stat(env.TIKKUN_UPDATE_PRIVATE_KEY_FILE!)).mode & 0o077).toBe(0)
       temporaryKeys.push(env.TIKKUN_UPDATE_PRIVATE_KEY_FILE!)
@@ -151,13 +152,14 @@ test.each([{ CF_PAGES: '1', CF_PAGES_BRANCH: 'feature' }, { CF_PAGES_BRANCH: 'de
   expect(f.fetcher).not.toHaveBeenCalled()
 })
 
-test('automatic production builds retain downloads and emit signed feeds with the website', async () => {
+test('automatic production builds retain downloads, including legacy content feeds, and emit the signed app update', async () => {
   const f = await fixture()
   await rm(f.directory, { recursive: true })
   expect(await buildPagesUpdates(f.services)).toMatchObject({ mode: 'automatic', nativeBuild: '7', files: 5 })
-  expect(f.calls).toEqual(['verify:quick', 'build:native', 'updates:content', 'updates:web', 'updates:stage', 'build'])
+  expect(f.calls).toEqual(['verify:quick', 'build:native', 'updates:web', 'updates:stage', 'build'])
   const output = path.join(f.root, 'dist/updates')
   expect(await readFile(path.join(output, `web/7/${hash('old ZIP')}.zip`), 'utf8')).toBe('old ZIP')
+  expect(await readFile(path.join(output, `content/${compatibility}/${hash(content)}.json`), 'utf8')).toBe(content)
   const latest = await verifyReleaseEnvelope(JSON.parse(await readFile(path.join(output, 'web/7/latest.json'), 'utf8')), publicKey)
   expect(latest).toMatchObject({ bundleId: hash('new ZIP') })
   expect(await verifyReleaseEnvelope(JSON.parse(await readFile(path.join(output, 'index.json'), 'utf8')), publicKey)).toEqual(await inspectUpdateFeeds(output, publicKey))

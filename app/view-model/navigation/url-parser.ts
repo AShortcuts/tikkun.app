@@ -2,6 +2,10 @@ import { LeiningGenerator } from '../../calendar-model/generator.ts'
 import type { LeiningRun } from '../../calendar-model/model-types.ts'
 import { containsRef } from '../../calendar-model/ref-utils.ts'
 import { generateTorahReferenceHash } from '../../components/torah-reference.ts'
+import {
+  findAliyahInRun,
+  type PlaybackAliyahIndex,
+} from '../../reading/aliyah-dom-target.ts'
 import type { RefWithScroll, ScrollName } from '../../ref.ts'
 import {
   hasScrollData,
@@ -16,6 +20,7 @@ export type AppRoute =
       view: 'reader'
       model: ScrollViewModel
       canonicalHash?: string
+      aliyahTarget?: { runId: string; aliyahIndex: PlaybackAliyahIndex }
     }
   | {
       view: 'about'
@@ -39,6 +44,23 @@ export function generateUrl(run: LeiningRun, initialRef?: RefWithScroll) {
   return `#/run/${run.id}/${initialRef.b}-${initialRef.c}-${initialRef.v}`
 }
 
+/** Generates an explicit aliyah link without changing its reading context. */
+export function generateAliyahUrl(
+  run: LeiningRun,
+  aliyahIndex: PlaybackAliyahIndex,
+  initialRef?: RefWithScroll
+): string {
+  const aliyah = findAliyahInRun(run, aliyahIndex)
+  if (!aliyah || parseAliyahIndex(String(aliyahIndex)) === null) {
+    throw new Error(`Aliyah ${aliyahIndex} does not exist in reading ${run.id}`)
+  }
+  const ref = initialRef ?? aliyah.start
+  if (!isIndexedReference(ref) || !refBelongsToAliyah(ref, run, aliyahIndex)) {
+    throw new Error(`Reference does not belong to Torah aliyah ${aliyahIndex} in reading ${run.id}`)
+  }
+  return `${generateUrl(run, ref)}/aliyah/${aliyahIndex}`
+}
+
 export function generateAboutUrl() {
   return '#/about'
 }
@@ -51,8 +73,6 @@ export function generatePageUrl(scroll: ScrollName, page: number) {
   return `#/${scroll}/page/${page}`
 }
 
-// TODO(decide): Should we support links to a specific עלייה in a run?
-
 const pathHandlers: Record<
   string,
   (
@@ -61,8 +81,11 @@ const pathHandlers: Record<
     options?: ParseUrlOptions
   ) => AppRoute | null
 > = {
-  run(generator, [runId, ref]) {
+  run(generator, [runId, ...pathParts]) {
     if (!runId) return null
+    const referencePath = parseAliyahReferencePath(pathParts)
+    if (!referencePath) return null
+    const { ref, aliyahIndex } = referencePath
     const run = generator.parseId(runId)
     if (!run) return null
     if (!hasScrollData(run.scroll)) return { view: 'not-found' }
@@ -71,15 +94,27 @@ const pathHandlers: Record<
     if (initialRef && !refBelongsToRun(initialRef, run)) {
       return { view: 'not-found' }
     }
+    if (aliyahIndex !== undefined && !refBelongsToAliyah(initialRef, run, aliyahIndex)) {
+      return { view: 'not-found' }
+    }
     const model = ScrollViewModel.forId(generator, run.id, initialRef ?? undefined)
-    return model ? { view: 'reader', model } : null
+    return model ? {
+      view: 'reader',
+      model,
+      ...(aliyahIndex !== undefined && {
+        aliyahTarget: { runId: run.id, aliyahIndex },
+      }),
+    } : null
   },
   /** Keeps legacy Torah reference links working. */
-  r(generator, [ref]) {
-    return parseTorahReferenceRoute(generator, ref)
+  r(generator, pathParts) {
+    return pathParts.length === 1
+      ? parseTorahReferenceRoute(generator, pathParts[0])
+      : null
   },
   /** Opens the current calendar reading. */
-  next(generator, _pathParts, options) {
+  next(generator, pathParts, options) {
+    if (pathParts.length !== 0) return null
     return {
       view: 'reader',
       model: ScrollViewModel.forDate(generator, options?.now ?? new Date()),
@@ -91,7 +126,8 @@ const pathHandlers: Record<
   esther(generator, pathParts, options) {
     return parseEstherRoute(generator, pathParts, options)
   },
-  about(_generator, [page]) {
+  about(_generator, [page, ...pathParts]) {
+    if (pathParts.length !== 0) return null
     if (!page) return { view: 'about' }
     if (
       page === 'playback-analytics' ||
@@ -110,8 +146,11 @@ function parseTorahRoute(
   options?: ParseUrlOptions
 ): AppRoute | null {
   if (routeType === 'parsha') {
-    const [slug, ref] = pathParts
+    const [slug, ...referenceParts] = pathParts
     if (!slug) return null
+    const referencePath = parseAliyahReferencePath(referenceParts)
+    if (!referencePath) return null
+    const { ref, aliyahIndex } = referencePath
 
     const resolved = resolveParshaRun(generator, slug, options?.now)
     if (!resolved) return null
@@ -119,6 +158,9 @@ function parseTorahRoute(
 
     const initialRef = refFromPath(ref, resolved.run.scroll)
     if (ref && !initialRef) return missingReferenceRoute(ref)
+    if (aliyahIndex !== undefined && !refBelongsToAliyah(initialRef, resolved.run, aliyahIndex)) {
+      return { view: 'not-found' }
+    }
     // Earlier parsha links could point at the holiday's other scrolls.
     if (initialRef && !refBelongsToRun(initialRef, resolved.run))
       return parseTorahReferenceRoute(generator, ref)
@@ -134,10 +176,12 @@ function parseTorahRoute(
     return {
       view: 'reader',
       model,
-      canonicalHash: generateParshaUrl(
-        resolved.canonicalSlug,
-        initialRef ?? undefined
-      ),
+      canonicalHash: aliyahIndex === undefined
+        ? generateParshaUrl(resolved.canonicalSlug, initialRef ?? undefined)
+        : generateAliyahUrl(resolved.run, aliyahIndex, initialRef ?? undefined),
+      ...(aliyahIndex !== undefined && {
+        aliyahTarget: { runId: resolved.run.id, aliyahIndex },
+      }),
     }
   }
 
@@ -179,6 +223,7 @@ function parseEstherRoute(
 ): AppRoute | null {
   if (routeType === 'page') return parsePageRoute(generator, 'esther', pathParts, options)
   if (routeType === 'parsha') return null
+  if (pathParts.length > 1) return null
 
   const [ref] = pathParts
   const resolved = resolveParshaRun(
@@ -215,9 +260,11 @@ function parseEstherRoute(
 function parsePageRoute(
   generator: LeiningGenerator,
   scroll: ScrollName,
-  [page]: string[],
+  pathParts: string[],
   options?: ParseUrlOptions
 ): AppRoute | null {
+  if (pathParts.length !== 1) return null
+  const [page] = pathParts
   if (!page || !/^\d+$/.test(page)) return null
   const pageNumber = Number(page)
   if (!isValidScrollPageNumber(scroll, pageNumber)) {
@@ -251,6 +298,31 @@ function refBelongsToRun(ref: RefWithScroll, run: LeiningRun) {
   return ref.scroll === run.scroll && containsRef(run, ref)
 }
 
+function refBelongsToAliyah(
+  ref: RefWithScroll | null,
+  run: LeiningRun,
+  aliyahIndex: PlaybackAliyahIndex
+) {
+  const aliyah = findAliyahInRun(run, aliyahIndex)
+  return ref !== null && ref.scroll === 'torah' && run.scroll === 'torah' &&
+    aliyah !== null && containsRef(aliyah, ref)
+}
+
+function parseAliyahIndex(value: string): PlaybackAliyahIndex | null {
+  if (value === 'Maftir') return value
+  return /^[1-8]$/.test(value) ? Number(value) : null
+}
+
+function parseAliyahReferencePath(
+  pathParts: string[]
+): { ref?: string; aliyahIndex?: PlaybackAliyahIndex } | null {
+  if (pathParts.length <= 1) return { ref: pathParts[0] }
+  const [ref, suffix, index] = pathParts
+  if (pathParts.length !== 3 || suffix !== 'aliyah') return null
+  const aliyahIndex = parseAliyahIndex(index)
+  return aliyahIndex === null ? null : { ref, aliyahIndex }
+}
+
 function missingReferenceRoute(ref: string): AppRoute | null {
   return /^\d+-\d+-\d+$/.test(ref) ? { view: 'not-found' } : null
 }
@@ -277,6 +349,8 @@ export function parseUrl(
   options?: ParseUrlOptions
 ): AppRoute | null {
   const routePath = path.split('?', 1)[0]
-  const [urlType, ...pathParts] = routePath.split('/').filter((p) => p)
+  if (/[\s#]/.test(routePath)) return null
+  const [urlType, ...pathParts] = routePath.replace(/^\/|\/$/g, '').split('/')
+  if (pathParts.some((part) => !part)) return null
   return pathHandlers[urlType]?.(generator, pathParts, options) ?? null
 }

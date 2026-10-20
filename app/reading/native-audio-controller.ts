@@ -148,8 +148,12 @@ export class NativeAudioController extends EventEmitter<AudioControllerEvents> i
     if (id) this.background(this.command(id, () => this.bridge.seek({ sessionID: id, time })))
   }
 
-  replayFromStart() {
+  seekToStart() {
     this.seek(this.session?.passage ? 0 : this.session?.cues[0]?.timeStart ?? 0)
+  }
+
+  replayFromStart() {
+    this.seekToStart()
     return this.play()
   }
 

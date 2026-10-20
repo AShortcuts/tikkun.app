@@ -1,10 +1,10 @@
 import type { LineType } from '../components/Page.ts'
-import { activeContent } from '../updates/content-runtime.ts'
 import type { Ref, RefWithScroll, ScrollName } from '../ref.ts'
 import { LeiningGenerator } from '../calendar-model/generator.ts'
 import { canonicalParshaReadings, resolveReadingRun } from './navigation/parsha-routes.ts'
 import type {
   LeiningAliyah,
+  LeiningInstance,
   LeiningRun,
 } from '../calendar-model/model-types.ts'
 import {
@@ -22,6 +22,9 @@ import {
 } from '../calendar-model/utils.ts'
 import { AliyahLabeller } from './aliyah-labeller.ts'
 import { verseEndLocation } from '../reading/verse-end-location.ts'
+import type { PlaybackAliyahIndex } from '../reading/aliyah-dom-target.ts'
+import type { PassageWordSelection } from '../reading/passage-selection.ts'
+import type { PassageTokenIdentity, PassageTokenQuery } from '../reading/passage-token-identity.ts'
 import {
   hasScrollData,
   loadScroll,
@@ -52,8 +55,6 @@ const pageLoaders: Record<string, PageLoader> | null = isNodeRuntime
     })
 
 export async function loadScrollPageLines(scroll: ScrollName, pageNumber: number): Promise<LineType[]> {
-    const updated = activeContent()?.pages[`${scroll}/${pageNumber}`]
-    if (updated) return updated
     const pageLoader =
       pageLoaders?.[
         `../../text/pages/${scroll}/${pageNumber}.json`
@@ -88,6 +89,27 @@ export interface RenderedPageInfo {
   /** Identifies the run that owns this logical occurrence, when applicable. */
   runId?: string
   lines: RenderedLineInfo[]
+  /** Optional source-coordinate projection, retained across presentation changes. */
+  wordSelection?: PassageWordSelection
+}
+
+export interface IsolatedAliyahSelection {
+  readonly runId: string
+  readonly aliyahIndex: PlaybackAliyahIndex
+  readonly run: LeiningRun
+  readonly aliyah: LeiningAliyah
+  readonly start: RefWithScroll
+  readonly end: RefWithScroll
+  readonly pageNumbers: readonly number[]
+  /** Canonical annotated IDs, excluding inverted-nun decorations. */
+  readonly tokenKeys: ReadonlySet<string>
+  readonly initialTokenKey: string
+  tokenIdentity(query: PassageTokenQuery): PassageTokenIdentity
+  containsTokenKey(tokenKey: string): boolean
+  /** Either emitted form; use canonical tokenKeys for audio/progress guards. */
+  containsRenderedTokenKey(tokenKey: string): boolean
+  containsPage(pageNumber: number): boolean
+  containsRef(ref: Ref | RefWithScroll): boolean
 }
 
 export interface PageOccurrenceHint {
@@ -165,15 +187,17 @@ export interface RenderedLineInfo {
 
 /** Tracks scrolling through a single "view" of a scroll, associated with one or more LeiningRuns. */
 export abstract class ScrollViewModel {
-  private readonly contentCursor: Promise<ContentCursor>
+  readonly isolatedAliyah: IsolatedAliyahSelection | null = null
+  readonly initialLocation: StartLocation
+  private contentCursorPromise: Promise<ContentCursor> | undefined
   private readonly pageEntryPromises = new Map<
     number,
     Promise<RenderedEntry | null>
   >()
-  readonly startingLocation: Promise<{
+  private startingLocationPromise: Promise<{
     page: RenderedEntry
     lineNumber: number
-  }>
+  }> | undefined
   readonly resolver: Promise<ScrollResolver>
   readonly initialTitle: string | undefined
 
@@ -183,8 +207,9 @@ export abstract class ScrollViewModel {
     readonly relevantRuns: LeiningRun[],
     initialRef: StartLocation,
     private readonly displayTitleByRunId: Record<string, string> = {},
-    initialRunId?: string
+    readonly initialRunId?: string
   ) {
+    this.initialLocation = initialRef
     const initialRun = relevantRuns.find((run) => run.id === initialRunId)
     // Page-number routes use a seed run, not the reading on that page.
     this.initialTitle =
@@ -192,11 +217,17 @@ export abstract class ScrollViewModel {
         ? this.displayTitleForRun(initialRun)
         : undefined
     this.resolver = loadScroll(initialRef.scroll)
-    const startingInfo = this.loadAndConsumeScroll(initialRef, initialRunId)
-    this.contentCursor = startingInfo.then(
-      ({ contentIndex }) => new ContentCursor(contentIndex)
-    )
-    this.startingLocation = startingInfo.then(({ location }) => location)
+  }
+
+  // Route validation creates models without rendering them. Only an actual
+  // consumer should start text loading and own any resulting failure.
+  get startingLocation() {
+    return this.startingLocationPromise ??= this.loadAndConsumeScroll(this.initialLocation, this.initialRunId)
+      .then(({ location }) => location)
+  }
+
+  private get contentCursor() {
+    return this.contentCursorPromise ??= this.startingLocation.then(({ page }) => new ContentCursor(page.contentIndex))
   }
 
   displayTitleForRun(run: LeiningRun) {
@@ -256,6 +287,10 @@ export abstract class ScrollViewModel {
       return new FullScrollViewModel(generator, run, initialRef, displayTitleByRunId)
     // For the פרשה itself, render all of חומש.
     if (run.leining.kind === 'parsha')
+      return new FullScrollViewModel(generator, run, initialRef, displayTitleByRunId)
+    // An ordinary dated שבת reading also continues through חומש, among that
+    // year's dated readings, so its divisions stay those of the service.
+    if (isOrdinaryShabbatReading(run))
       return new FullScrollViewModel(generator, run, initialRef, displayTitleByRunId)
     // For any part of יום טוב, special מפטיר, or הפתרה, only render relevant parts.
     return new HolidayViewModel(generator, run, initialRef, displayTitleByRunId)
@@ -364,7 +399,7 @@ export abstract class ScrollViewModel {
     return promise
   }
 
-  private async loadPage(contentIndex: number): Promise<RenderedEntry | null> {
+  protected async loadPage(contentIndex: number): Promise<RenderedEntry | null> {
     const source = await this.contentSourceFromIndex(contentIndex)
     if (!source) return null
     if (source.type === 'message') return { ...source, contentIndex }
@@ -483,11 +518,12 @@ class FullScrollViewModel extends ScrollViewModel {
   }
 
   private static calculateRuns(
-    _generator: LeiningGenerator,
+    generator: LeiningGenerator,
     run: LeiningRun
   ): LeiningRun[] {
     // When used for a מגילה, just include this run.
     if (run.scroll !== 'torah') return [run]
+    if (run.leining.kind === 'service') return datedShabbatRuns(generator, run, run.leining)
     const runs = getParshaRuns()
     // A combined parsha replaces its constituent readings only in this view.
     const first = runs.findIndex(candidate => containsRef(run, candidate.aliyot[0].start))
@@ -502,6 +538,26 @@ class FullScrollViewModel extends ScrollViewModel {
 /** Gets all LeiningRuns that should appear in the חומש-only view. */
 function getParshaRuns() {
   return canonicalParshaReadings().map(reading => reading.runs[0])
+}
+
+/** A weekly-parsha service whose Torah reading is only its main portion. */
+function isOrdinaryShabbatReading(run: LeiningRun) {
+  return run.leining.kind === 'service' && run.leining.isParsha &&
+    run.type === LeiningRunType.Main &&
+    run.leining.runs.filter(candidate => candidate.scroll === 'torah').length === 1
+}
+
+/** That year's dated parsha readings, with `run` in its own place. */
+function datedShabbatRuns(generator: LeiningGenerator, run: LeiningRun, service: LeiningInstance) {
+  const runs = generator
+    .forEntireChumash(new HDate(service.date.date))
+    .flatMap(date => date.leinings)
+    .filter(leining => leining.isParsha || leining.runs.some(isVezosHabracha))
+    .map(leining => leining.runs[0])
+  const index = runs.findIndex(candidate => candidate.id === run.id)
+  if (index < 0) throw new Error(`Reading ${run.id} is missing from its year's parsha sequence`)
+  runs[index] = run
+  return runs
 }
 
 export function isVezosHabracha(r: LeiningRun): boolean {

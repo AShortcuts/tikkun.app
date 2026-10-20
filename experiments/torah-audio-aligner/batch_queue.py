@@ -38,6 +38,7 @@ class BatchQueue:
         self.runner = runner or self.run_recording
         self.budget = budget or require_budget
         self.thread = None
+        self.clearing = False
         self.closed = False
         self.stop_at = None
         self.state = load_json(self.path) if self.path.exists() else {
@@ -130,10 +131,12 @@ class BatchQueue:
     def snapshot(self):
         with self.lock:
             result = deepcopy(self.state)
+            result["clearPending"] = self.clearing
         result.pop("requests", None)
         result["clearDownloadsSupported"] = True
+        result["clearQueueSupported"] = True
         result["remainingTestingSeconds"] = max(0, self.budget(0))
-        result["running"] = any(item["status"] == "running" for item in result["items"])
+        result["running"] = result["clearPending"] or any(item["status"] == "running" for item in result["items"])
         for item in result["items"]:
             if item.get("resolvedBy") in self.store.entries:
                 item.update(status="resolved", phase="Resolved by a later alignment", error=None,
@@ -141,6 +144,17 @@ class BatchQueue:
             if item["status"] == "ready":
                 item["review"] = review_status(self.store, item["resultId"])
         return result
+
+    def clear(self):
+        with self.lock:
+            count = len(self.state["items"])
+            updated = {**self.state, "paused": True, "pauseReason": None, "items": [], "requests": {}}
+            write_json(self.path, updated, replace=True)
+            self.state = updated
+            # The worker may finish its detached row and save cues, but cannot restart this queue.
+            self.clearing = bool(self.thread and self.thread.is_alive())
+            self.stop_at = None
+            return count
 
     def clear_downloads(self, item_ids):
         if (not isinstance(item_ids, list) or not 1 <= len(item_ids) <= 2000
@@ -170,6 +184,8 @@ class BatchQueue:
     def control(self, action, item_id=None, minutes=10):
         with self.lock:
             if action == "start":
+                if self.clearing:
+                    raise RevisionConflict("The queue is cleared. Let the current recording finish before starting a new batch.")
                 if type(minutes) is not int or not 1 <= minutes <= 60:
                     raise AlignmentError("Choose a run limit from 1 to 60 minutes.")
                 if self.thread and self.thread.is_alive() and not self.state["paused"]:
@@ -209,6 +225,7 @@ class BatchQueue:
         while True:
             with self.lock:
                 if self.closed or self.state["paused"]:
+                    self.clearing = False
                     self.thread = None
                     return
                 item = next((row for row in self.state["items"] if row["status"] == "queued"), None)

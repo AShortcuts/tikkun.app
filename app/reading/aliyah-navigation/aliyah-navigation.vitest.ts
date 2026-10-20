@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { page } from 'vitest/browser'
+import readerStyles from '../../../css/master.css?inline'
 import { createMount } from '../../lifecycle/mount.ts'
+import { formatAliyahLabel } from './model.ts'
 import {
   ALIYAH_RAIL_AUTO_HIDE_MS,
   createAliyahNavigation,
@@ -15,6 +18,7 @@ import type {
 
 let fixture: HTMLElement | null = null
 let destroy: (() => void) | null = null
+let stylesheet: HTMLStyleElement | null = null
 
 beforeEach(() => {
   fixture = document.createElement('section')
@@ -28,7 +32,7 @@ beforeEach(() => {
   document.body.appendChild(fixture)
 })
 
-afterEach(() => {
+afterEach(async () => {
   destroy?.()
   destroy = null
   fixture?.remove()
@@ -37,6 +41,222 @@ afterEach(() => {
   vi.restoreAllMocks()
   document.documentElement.style.removeProperty('--aliyah-rail-top')
   delete document.documentElement.dataset.aliyahRailVisibility
+  delete document.documentElement.dataset.readerIsolated
+  if (stylesheet) {
+    stylesheet.remove()
+    stylesheet = null
+    await page.viewport(1280, 900)
+  }
+})
+
+test('isolated navigation retains every division and waits for the authoritative selection', () => {
+  const onSelect = vi.fn()
+  const onAfterNavigate = vi.fn()
+  const navigation = mountNavigation({ onSelect, onAfterNavigate })
+  navigation.syncContent({
+    desktop: completeSnapshot,
+    compact: completeSnapshot,
+    authoringEnabled: false,
+    isolated: true,
+  })
+  const next = required<HTMLButtonElement>('[data-target-id="isolated-aliyah-next"]')
+  const previous = required<HTMLButtonElement>('[data-target-id="isolated-aliyah-previous"]')
+
+  expect(requiredAll('.mobile-aliyah-segment')).toHaveLength(9)
+  expect(previous.disabled).toBe(true)
+  expect(next.disabled).toBe(false)
+  expect(next.getAttribute('aria-label')).toBe(`Next aliyah: ${completeSnapshot.items[1].label}`)
+  previous.click()
+  expect(onSelect).not.toHaveBeenCalled()
+  expect(onAfterNavigate).not.toHaveBeenCalled()
+
+  next.click()
+  expect(onSelect).toHaveBeenCalledExactlyOnceWith(completeSnapshot.items[1].target)
+  expect(onAfterNavigate).toHaveBeenCalledOnce()
+  expect(required<HTMLElement>('.mobile-aliyah-segment[aria-current="location"]').dataset.aliyahIndex).toBe('1')
+  expect(previous.disabled).toBe(true)
+
+  navigation.setActive(completeSnapshot.items[1].target)
+  expect(previous.disabled).toBe(false)
+  expect(required<HTMLElement>('.mobile-aliyah-segment[aria-current="location"]').dataset.aliyahIndex).toBe('2')
+  previous.click()
+  expect(onSelect).toHaveBeenLastCalledWith(completeSnapshot.items[0].target)
+
+  navigation.setActive(completeSnapshot.items[7].target)
+  next.click()
+  expect(onSelect).toHaveBeenLastCalledWith({ runId: 'run-maftir', aliyahIndex: 'Maftir' })
+  navigation.setActive(completeSnapshot.items[8].target)
+  expect(next.disabled).toBe(true)
+  next.click()
+  expect(onSelect).toHaveBeenCalledTimes(3)
+  previous.click()
+  expect(onSelect).toHaveBeenLastCalledWith(completeSnapshot.items[7].target)
+})
+
+test('isolated rail and controls share selection; the current segment asks to return to its start', () => {
+  const onSelect = vi.fn()
+  const onAfterNavigate = vi.fn()
+  const navigation = mountNavigation({ onSelect, onAfterNavigate })
+  navigation.syncContent({
+    desktop: completeSnapshot, compact: completeSnapshot,
+    authoringEnabled: false, isolated: true,
+  })
+  const maftir = required<HTMLButtonElement>('.mobile-aliyah-segment[data-aliyah-index="Maftir"]')
+  maftir.click()
+  expect(onSelect).toHaveBeenCalledExactlyOnceWith(completeSnapshot.items[8].target)
+  navigation.setActive(completeSnapshot.items[8].target)
+  maftir.click()
+  // The reader handles a repeated selection by scrolling back to the passage start.
+  expect(onSelect).toHaveBeenCalledTimes(2)
+  expect(onSelect).toHaveBeenLastCalledWith(completeSnapshot.items[8].target)
+  expect(maftir.getAttribute('aria-current')).toBe('location')
+
+  navigation.setActive({ runId: 'different-run', aliyahIndex: 1 })
+  expect(required<HTMLButtonElement>('[data-target-id="isolated-aliyah-next"]').disabled).toBe(true)
+  expect(required<HTMLButtonElement>('[data-target-id="isolated-aliyah-previous"]').disabled).toBe(true)
+  navigation.setActive(null)
+  expect(required<HTMLButtonElement>('[data-target-id="isolated-aliyah-next"]').disabled).toBe(true)
+  expect(required<HTMLButtonElement>('[data-target-id="isolated-aliyah-previous"]').disabled).toBe(true)
+})
+
+test('tapping a rail segment shows aliyah starts until the rail timer hides them', () => {
+  vi.useFakeTimers()
+  const onSelect = vi.fn()
+  const navigation = mountNavigation({ onSelect })
+  const content = { desktop: completeSnapshot, compact: completeSnapshot, authoringEnabled: false }
+  navigation.syncContent(content)
+  expect(document.documentElement.dataset.aliyahRailVisibility).toBe('hidden')
+
+  required<HTMLButtonElement>('.mobile-aliyah-segment[data-aliyah-index="3"]').click()
+  expect(onSelect).toHaveBeenCalledExactlyOnceWith(completeSnapshot.items[2].target)
+  expect(document.documentElement.dataset.aliyahRailVisibility).toBe('peek')
+  vi.advanceTimersByTime(ALIYAH_RAIL_AUTO_HIDE_MS)
+  expect(document.documentElement.dataset.aliyahRailVisibility).toBe('hidden')
+
+  // Isolated Reading has no aliyah starts to reveal.
+  navigation.syncContent({ ...content, isolated: true })
+  required<HTMLButtonElement>('.mobile-aliyah-segment[data-aliyah-index="3"]').click()
+  expect(document.documentElement.dataset.aliyahRailVisibility).toBe('hidden')
+})
+
+test('isolation suppresses only the wide rail and restores existing navigation on exit', () => {
+  const onSelect = vi.fn()
+  const navigation = mountNavigation({ onSelect })
+  const content = { desktop: completeSnapshot, compact: completeSnapshot, authoringEnabled: false }
+  navigation.syncContent(content)
+  expect(requiredAll('.mobile-aliyah-segment')).toHaveLength(7)
+  expect(requiredAll('.isolated-aliyah-controls')).toHaveLength(0)
+  required<HTMLButtonElement>('.mobile-aliyah-segment[aria-current="location"]').click()
+  expect(onSelect).toHaveBeenCalledOnce()
+  navigation.revealWide('expanded')
+  expect(required('.aliyah-rail').getAttribute('aria-hidden')).toBe('false')
+
+  navigation.syncContent({ ...content, isolated: true })
+  navigation.revealWide('expanded')
+  expect(required('.aliyah-rail').classList.contains('u-hidden')).toBe(true)
+  expect(required('.aliyah-rail').getAttribute('aria-hidden')).toBe('true')
+  expect(required<HTMLElement>('.aliyah-rail').inert).toBe(true)
+
+  navigation.syncContent(content)
+  expect(requiredAll('.mobile-aliyah-segment')).toHaveLength(7)
+  expect(requiredAll('.isolated-aliyah-controls')).toHaveLength(0)
+  expect(required('.aliyah-rail').classList.contains('u-hidden')).toBe(false)
+  navigation.revealWide('expanded')
+  expect(required('.aliyah-rail').getAttribute('aria-hidden')).toBe('false')
+  navigation.clearContent()
+  expect(requiredAll('.mobile-aliyah-segment')).toHaveLength(0)
+  expect(requiredAll('.isolated-aliyah-controls')).toHaveLength(0)
+})
+
+test('isolated single and empty readings cannot navigate beyond their indexed boundaries', () => {
+  const navigation = mountNavigation()
+  const single = { ...completeSnapshot, items: [completeSnapshot.items[0]] }
+  navigation.syncContent({ desktop: single, compact: single, authoringEnabled: false, isolated: true })
+  expect(required<HTMLButtonElement>('[data-target-id="isolated-aliyah-next"]').disabled).toBe(true)
+  expect(required<HTMLButtonElement>('[data-target-id="isolated-aliyah-previous"]').disabled).toBe(true)
+  navigation.syncContent({ desktop: null, compact: null, authoringEnabled: false, isolated: true })
+  expect(requiredAll('.isolated-aliyah-controls')).toHaveLength(0)
+})
+
+test('isolated rail and smaller edge controls reserve clearance in portrait and landscape', async () => {
+  stylesheet = document.createElement('style')
+  stylesheet.textContent = readerStyles
+  document.head.append(stylesheet)
+  document.documentElement.dataset.readerIsolated = 'true'
+  fixture!.classList.add('app')
+  required('[data-target-id="aliyah-navigation-layer-root"]').classList.add('aliyah-navigation-root')
+  required('[data-target-id="reader"]').classList.add('app-body')
+  const navigation = mountNavigation()
+  navigation.syncContent({
+    desktop: completeSnapshot, compact: completeSnapshot,
+    authoringEnabled: false, isolated: true,
+  })
+  const rail = required<HTMLElement>('.mobile-aliyah-segments')
+  const row = required<HTMLElement>('.mobile-aliyah-row')
+  const next = required<HTMLButtonElement>('[data-target-id="isolated-aliyah-next"]')
+  const previous = required<HTMLButtonElement>('[data-target-id="isolated-aliyah-previous"]')
+
+  for (const [width, height] of [[390, 844], [844, 390], [320, 568]]) {
+    await page.viewport(width, height)
+    const railBounds = rail.getBoundingClientRect()
+    const rowBounds = row.getBoundingClientRect()
+    const nextBounds = next.getBoundingClientRect()
+    const previousBounds = previous.getBoundingClientRect()
+    expect(getComputedStyle(rail).display).toBe('flex')
+    expect(rowBounds.width).toBe(width)
+    expect(rowBounds.height).toBe(44)
+    // Both buttons share the rail's row: previous at the left edge, next at the right edge.
+    for (const bounds of [railBounds, nextBounds, previousBounds]) {
+      expect(bounds.top).toBeGreaterThanOrEqual(rowBounds.top - 0.5)
+      expect(bounds.bottom).toBeLessThanOrEqual(rowBounds.bottom + 0.5)
+    }
+    expect(previousBounds.left).toBeCloseTo(rowBounds.left + parseFloat(getComputedStyle(row).paddingLeft))
+    expect(nextBounds.right).toBeCloseTo(rowBounds.right - parseFloat(getComputedStyle(row).paddingRight))
+    expect(railBounds.left).toBeGreaterThanOrEqual(previousBounds.right - 0.5)
+    expect(railBounds.right).toBeLessThanOrEqual(nextBounds.left + 0.5)
+    expect(required('[data-target-id="reader"]').getBoundingClientRect().top).toBeGreaterThanOrEqual(rowBounds.bottom)
+    expect(getComputedStyle(document.documentElement).getPropertyValue('--isolated-aliyah-navigation-height').trim()).toBe('44px')
+    for (const button of [next, previous, ...requiredAll<HTMLButtonElement>('.mobile-aliyah-segment')]) {
+      expect(button.getBoundingClientRect().width).toBeGreaterThanOrEqual(44)
+      expect(button.getBoundingClientRect().height).toBeGreaterThanOrEqual(44)
+    }
+    expect(required('.isolated-aliyah-step-surface').getBoundingClientRect().width).toBe(32)
+    expect(required('.isolated-aliyah-step-surface').getBoundingClientRect().height).toBe(32)
+    expect(required('.isolated-aliyah-step .ui-icon').getBoundingClientRect().width).toBe(16)
+    expect(required('.isolated-aliyah-step .ui-icon').getBoundingClientRect().height).toBe(16)
+    expect(getComputedStyle(required('.aliyah-rail')).display).toBe('none')
+    if (width === 320) expect(rail.scrollWidth).toBeGreaterThan(rail.clientWidth)
+    expect(document.documentElement.scrollWidth).toBe(width)
+    const selected = required('.mobile-aliyah-segment[aria-current="location"]')
+    await expect.poll(() => getComputedStyle(selected, '::before').backgroundColor).toBe('rgb(10, 132, 255)')
+    navigation.syncPlayback({ target: completeSnapshot.items[0].target, playing: true, progressLabel: '0:10/2:05' })
+    await expect.poll(() => getComputedStyle(selected, '::before').backgroundColor).toBe('rgb(245, 197, 66)')
+    navigation.syncPlayback(idlePlayback)
+    next.focus()
+    expect(document.activeElement).toBe(next)
+    expect(getComputedStyle(next.querySelector('.isolated-aliyah-step-surface')!).outlineWidth).toBe('2px')
+    next.blur()
+    navigation.setActive(completeSnapshot.items[8].target)
+    const maftirBounds = required('.mobile-aliyah-segment[data-aliyah-index="Maftir"]').getBoundingClientRect()
+    expect(maftirBounds.left).toBeGreaterThanOrEqual(railBounds.left - 0.5)
+    expect(maftirBounds.right).toBeLessThanOrEqual(railBounds.right + 0.5)
+    navigation.setActive(completeSnapshot.items[0].target)
+    if (width !== 320) {
+      await page.screenshot({ path: `../../../.vitest-attachments/isolated-navigation-${width}.png` })
+    }
+  }
+
+  await page.viewport(844, 390)
+  navigation.syncContent({ desktop: completeSnapshot, compact: completeSnapshot, authoringEnabled: false })
+  delete document.documentElement.dataset.readerIsolated
+  expect(getComputedStyle(rail).display).toBe('none')
+  expect(requiredAll('.isolated-aliyah-controls')).toHaveLength(0)
+  navigation.revealWide('expanded')
+  expect(getComputedStyle(required('.aliyah-rail')).display).toBe('flex')
+  await page.viewport(390, 844)
+  expect(getComputedStyle(rail).display).toBe('flex')
+  expect(rail.getBoundingClientRect().height).toBe(32)
+  expect(requiredAll('.mobile-aliyah-segment')).toHaveLength(7)
 })
 
 test('renders both navigation presentations behind one typed interface', async () => {
@@ -305,7 +525,7 @@ test('keeps mobile aliyah text beside Play and lets long statuses wrap', async (
       await new Promise<void>((resolve) => view.requestAnimationFrame(() => resolve()))
       // Exercise long status copy independently of the fixture's recording coverage.
       const longStatus = get('.mobile-aliyah-card[data-aliyah-index="5"] .mobile-aliyah-card-status')
-      longStatus.textContent = 'Full audio available. Some word highlighting is missing.'
+      longStatus.textContent = 'Full audio available. Some highlighting is missing.'
       get('.mobile-aliyah-card[data-aliyah-index="5"]').classList.remove('is-unavailable')
       for (const card of doc.querySelectorAll<HTMLElement>('.mobile-aliyah-card')) {
         const main = card.querySelector<HTMLElement>('.mobile-aliyah-card-main')!
@@ -811,6 +1031,23 @@ const snapshot: AliyahNavigationSnapshot = {
       recordingKey: null,
     },
   ],
+}
+
+const completeSnapshot: AliyahNavigationSnapshot = {
+  signature: 'run-a:1-8|run-maftir:Maftir',
+  active: { runId: 'run-a', aliyahIndex: 1 },
+  playback: idlePlayback,
+  items: ([1, 2, 3, 4, 5, 6, 7, 8, 'Maftir'] as const).map((aliyahIndex) => {
+    const runId = aliyahIndex === 'Maftir' ? 'run-maftir' : 'run-a'
+    return {
+      key: `${runId}:${aliyahIndex}`,
+      target: { runId, aliyahIndex },
+      label: formatAliyahLabel(aliyahIndex),
+      compactLabel: String(aliyahIndex),
+      audioKey: null,
+      recordingKey: null,
+    }
+  }),
 }
 
 function mountNavigation(

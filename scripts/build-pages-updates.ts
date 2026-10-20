@@ -54,7 +54,6 @@ export async function buildPagesUpdates({ root, environment, run, log, fetcher }
       const keyFile = path.join(temporary, 'private.pem')
       await writeFile(keyFile, secret, { mode: 0o600 })
       const signing = { ...clean, TIKKUN_UPDATE_PRIVATE_KEY_FILE: keyFile }
-      await run(['run', 'updates:content'], signing)
       await run(['run', 'updates:web', '--', '--native-build', target.nativeBuild, '--target-record', targetFile,
         '--rollout', rollout, '--approve-web-only'], signing)
       await run(['run', 'updates:stage', '--', '--native-build', target.nativeBuild], clean)

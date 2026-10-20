@@ -1,11 +1,7 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
 import { createHash, verify } from 'node:crypto'
 import { parseArgs } from 'node:util'
-import { fileURLToPath } from 'node:url'
 import { verifyWebRelease } from '../app/updates/web-update.ts'
-import { verifyReleaseEnvelope } from '../app/updates/release-signature.ts'
-import { contentCompatibility, object, parseContentSnapshot } from '../app/updates/content-schema.ts'
 import { updateConfig } from './update-config.mjs'
 
 const { values } = parseArgs({ options: {
@@ -18,8 +14,6 @@ if (origin.protocol !== 'https:' || origin.username || origin.password || origin
   throw new Error('Verification requires an HTTPS origin without credentials or a path')
 }
 const key = updateConfig().publicKey
-const { compatibility } = JSON.parse(await readFile(fileURLToPath(new URL('../generated/native-content-contract.json', import.meta.url)), 'utf8'))
-assert.match(compatibility, /^[a-f0-9]{64}$/)
 
 async function download(path: string, maxBytes: number) {
   const response = await fetch(new URL(path, origin), { redirect: 'error', credentials: 'omit',
@@ -50,17 +44,8 @@ assert.equal(zip.length, web.bytes)
 assert.equal(createHash('sha256').update(zip).digest('hex'), web.checksum)
 assert.ok(verify('sha256', zip, key, Buffer.from(web.signature, 'base64')), 'Web ZIP signature')
 
-const contentPrefix = `/updates/content/${compatibility}`
-const content = await verifyReleaseEnvelope(JSON.parse((await download(`${contentPrefix}/latest.json`, 4096)).toString('utf8')), key)
-if (!object(content) || content.schema !== 1 || typeof content.digest !== 'string' || !/^[a-f0-9]{64}$/.test(content.digest) ||
-    typeof content.bytes !== 'number' || !Number.isSafeInteger(content.bytes) || content.bytes <= 0) throw new Error('Invalid content release')
-const snapshot = await download(`${contentPrefix}/${content.digest}.json`, content.bytes)
-assert.equal(snapshot.length, content.bytes)
-assert.equal(createHash('sha256').update(snapshot).digest('hex'), content.digest)
-assert.equal(await contentCompatibility(parseContentSnapshot(JSON.parse(snapshot.toString('utf8')))), compatibility)
-
 const missing = await fetch(new URL('/updates/web/invalid/latest.json', origin), { redirect: 'error', signal: AbortSignal.timeout(15_000) })
 assert.equal(missing.status, 404, 'Missing feed must not return homepage HTML')
 await missing.body?.cancel()
 console.log(JSON.stringify({ verified: true, origin: origin.origin, nativeBuild: build, bundleId: web.bundleId,
-  contentDigest: content.digest, rollout: web.rollout, webBytes: zip.length, contentBytes: snapshot.length, missingFeed: 404 }))
+  rollout: web.rollout, webBytes: zip.length, missingFeed: 404 }))

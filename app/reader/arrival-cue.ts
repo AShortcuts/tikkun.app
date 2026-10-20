@@ -1,4 +1,6 @@
 import type { MountScope } from '../lifecycle/mount.ts'
+import type { Ref } from '../ref.ts'
+import { findReadingVerseStartWord } from './reading-verse-target.ts'
 
 export const ARRIVAL_CUE_DURATION_MS = 1600
 
@@ -8,15 +10,21 @@ export function createArrivalCue(scope: MountScope, document: Document, view: Wi
   const clear = () => { release?.(); release = null }
   scope.own(clear)
 
-  function show(line: HTMLElement) {
+  function show(line: HTMLElement, ref?: Ref) {
     clear()
     if (scope.signal.aborted || !line.isConnected) return
     const page = line.closest<HTMLElement>('.tikkun-page')
-    const first = [...line.querySelectorAll<HTMLElement>('.word[data-token-key]')]
+    const book = page?.closest<HTMLElement>('.tikkun-book')
+    const verseStart = ref && book?.dataset.readerLayout === 'reading'
+      ? findReadingVerseStartWord(book, line, ref) : null
+    const first = verseStart ?? [...line.querySelectorAll<HTMLElement>('.word[data-token-key]')]
       .find(word => word.getBoundingClientRect().width > 0)
     if (!page || !first) return
 
-    const origin = page.getBoundingClientRect()
+    const container = book?.dataset.readerLayout === 'reading' && book.dataset.readerSides === 'one'
+      ? book : page
+    const origin = container.getBoundingClientRect()
+    const pageOrigin = page.getBoundingClientRect()
     const layer = document.createElement('div')
     layer.className = 'reader-arrival-cue'
     layer.setAttribute('aria-hidden', 'true')
@@ -36,16 +44,16 @@ export function createArrivalCue(scope: MountScope, document: Document, view: Wi
       const right = Math.max(...rects.map(rect => rect.right))
       const bottom = Math.max(...rects.map(rect => rect.bottom))
       const strip = document.createElement('span')
-      strip.style.cssText = `left:${left - origin.left - 2}px;top:${top - origin.top - 1}px;width:${right - left + 4}px;height:${bottom - top + 3}px`
+      strip.style.cssText = `left:${left - origin.left - 2}px;top:${top - origin.top + (container === book ? book.scrollTop : 0) - 1}px;width:${right - left + 4}px;height:${bottom - top + 3}px`
       layer.append(strip)
     }
     if (!layer.childElementCount) return
-    page.classList.add('mod-arrival-cue')
-    page.append(layer)
+    container.classList.add('mod-arrival-cue')
+    container.append(layer)
     // Layout changes invalidate measured rows; scrolling itself does not.
     const observer = new ResizeObserver(() => {
       const next = page.getBoundingClientRect()
-      if (Math.abs(next.width - origin.width) > 1 || Math.abs(next.height - origin.height) > 1) clear()
+      if (Math.abs(next.width - pageOrigin.width) > 1 || Math.abs(next.height - pageOrigin.height) > 1) clear()
     })
     observer.observe(page)
     const timer = view.setTimeout(clear, ARRIVAL_CUE_DURATION_MS)
@@ -53,7 +61,7 @@ export function createArrivalCue(scope: MountScope, document: Document, view: Wi
       view.clearTimeout(timer)
       observer.disconnect()
       layer.remove()
-      page.classList.remove('mod-arrival-cue')
+      container.classList.remove('mod-arrival-cue')
     }
   }
 

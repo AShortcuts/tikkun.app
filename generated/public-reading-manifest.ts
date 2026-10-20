@@ -422,6 +422,108 @@ export const publicAliyotByParsha: Readonly<
       "readerHash": "#/torah/parsha/behalotecha/4-11-30"
     }
   ],
+  "korach": [
+    {
+      "number": 1,
+      "audioId": "korach-1",
+      "cueStatus": "cued",
+      "expectedTokenCount": 153,
+      "readerHash": "#/torah/parsha/korach/4-16-1"
+    },
+    {
+      "number": 2,
+      "audioId": "korach-2",
+      "cueStatus": "cued",
+      "expectedTokenCount": 91,
+      "readerHash": "#/torah/parsha/korach/4-16-14"
+    },
+    {
+      "number": 3,
+      "audioId": "korach-3",
+      "cueStatus": "cued",
+      "expectedTokenCount": 278,
+      "readerHash": "#/torah/parsha/korach/4-16-20"
+    },
+    {
+      "number": 4,
+      "audioId": "korach-4",
+      "cueStatus": "cued",
+      "expectedTokenCount": 78,
+      "readerHash": "#/torah/parsha/korach/4-17-9"
+    },
+    {
+      "number": 5,
+      "audioId": "korach-5",
+      "cueStatus": "cued",
+      "expectedTokenCount": 118,
+      "readerHash": "#/torah/parsha/korach/4-17-16"
+    },
+    {
+      "number": 6,
+      "audioId": "korach-6",
+      "cueStatus": "cued",
+      "expectedTokenCount": 331,
+      "readerHash": "#/torah/parsha/korach/4-17-25"
+    },
+    {
+      "number": 7,
+      "audioId": "korach-7",
+      "cueStatus": "cued",
+      "expectedTokenCount": 154,
+      "readerHash": "#/torah/parsha/korach/4-18-21"
+    }
+  ],
+  "pinchas": [
+    {
+      "number": 1,
+      "audioId": "pinchas-1",
+      "cueStatus": "missing",
+      "expectedTokenCount": 137,
+      "readerHash": "#/torah/parsha/pinchas/4-25-10"
+    },
+    {
+      "number": 2,
+      "audioId": "pinchas-2",
+      "cueStatus": "missing",
+      "expectedTokenCount": 419,
+      "readerHash": "#/torah/parsha/pinchas/4-26-5"
+    },
+    {
+      "number": 3,
+      "audioId": "pinchas-3",
+      "cueStatus": "missing",
+      "expectedTokenCount": 223,
+      "readerHash": "#/torah/parsha/pinchas/4-26-52"
+    },
+    {
+      "number": 4,
+      "audioId": "pinchas-4",
+      "cueStatus": "missing",
+      "expectedTokenCount": 200,
+      "readerHash": "#/torah/parsha/pinchas/4-27-6"
+    },
+    {
+      "number": 5,
+      "audioId": "pinchas-5",
+      "cueStatus": "missing",
+      "expectedTokenCount": 173,
+      "readerHash": "#/torah/parsha/pinchas/4-28-1"
+    },
+    {
+      "number": 6,
+      "audioId": "pinchas-6",
+      "cueStatus": "missing",
+      "expectedTokenCount": 275,
+      "readerHash": "#/torah/parsha/pinchas/4-28-16"
+    },
+    {
+      "number": 7,
+      "audioId": "pinchas-7",
+      "cueStatus": "missing",
+      "expectedTokenCount": 286,
+      "readerHash": "#/torah/parsha/pinchas/4-29-12"
+    }
+  ],
   "vayelech": [
     {
       "number": 1,

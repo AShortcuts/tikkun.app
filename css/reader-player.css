@@ -306,7 +306,7 @@
 
   .floating-player:not(.mod-untimed)
     .floating-player-controls
-    [data-target-id='floating-next'] {
+    [data-target-id='floating-prev'] {
     order: 1;
   }
 
@@ -318,7 +318,7 @@
 
   .floating-player:not(.mod-untimed)
     .floating-player-controls
-    [data-target-id='floating-prev'] {
+    [data-target-id='floating-next'] {
     order: 3;
   }
 
@@ -1437,6 +1437,19 @@
     .floating-player.is-expanded .floating-player-details,
     .floating-player.mod-untimed.is-expanded .floating-player-details {
       display: none;
+    }
+  }
+
+  @media screen and (min-width: 551px) and (max-height: 550px) {
+    html[data-reader-isolated='true'] .floating-player:not(.is-expanded),
+    html[data-reader-isolated='true']
+      .floating-player:not(.is-expanded) .floating-player-controls {
+      flex-direction: row;
+    }
+
+    html[data-reader-isolated='true'] .floating-player {
+      top: auto;
+      bottom: max(0.85rem, env(safe-area-inset-bottom, 0px));
     }
   }
 

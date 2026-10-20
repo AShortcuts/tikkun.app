@@ -33,6 +33,7 @@ The Reader owns only the hash after `/reader/`.
 ```text
 /reader/#/torah/parsha/{parsha-slug}
 /reader/#/torah/parsha/{parsha-slug}/{book}-{chapter}-{verse}
+/reader/#/torah/parsha/{parsha-slug}/{book}-{chapter}-{verse}/aliyah/{index}
 ```
 
 Examples:
@@ -47,6 +48,13 @@ parsha divisions, and previous/next navigation follows Torah order. Vezot
 Haberacha has seven aliyot ending at Devarim 34:12; it does not include the
 Simchat Torah readings from Beresheet or Bamidbar. References outside the named
 parsha canonicalize to a plain Torah reference while preserving the verse.
+
+The optional `aliyah` suffix identifies an indexed division (`1` through `8`,
+where available, or `Maftir`). Both the division and its reference must belong
+to the named reading. This preserves overlapping seventh-aliyah and Maftir
+identities when sharing or using Back/Forward. Without the suffix, an exact
+aliyah-start match wins; otherwise the last containing division is selected.
+A parsha route without a reference opens its first division.
 
 ## Torah Page Routes
 
@@ -72,6 +80,7 @@ Valid Esther page range: `1-16`.
 ```text
 /reader/#/run/{date}:{service},{run-type}
 /reader/#/run/{date}:{service},{run-type}/{book}-{chapter}-{verse}
+/reader/#/run/{date}:{service},{run-type}/{book}-{chapter}-{verse}/aliyah/{index}
 ```
 
 These open the actual service for that date and calendar location, including
@@ -80,6 +89,12 @@ entries use this context; `#/next` selects the next dated service. Saving or
 resuming a service preserves its date. Simchat Torah can therefore have a
 different division from Vezot Haberacha in the parsha list, including an eighth
 aliyah when Simchat Torah falls on Shabbat in Israel.
+
+Phone Reading isolates the selected division for these reference-bearing
+parsha and service routes. Desktop, tablet, and Match open the same links in
+the continuous reader. Physical-page routes remain continuous on all devices.
+See [mobile Reading](mobile-reading.md) for eligibility, restoration, and the
+native compatibility gate.
 
 ## Torah Reference Routes
 

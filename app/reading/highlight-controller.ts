@@ -7,13 +7,15 @@ const ACTIVE_CLASS = 'is-active-word'
 const MAX_TOKEN_ELEMENT_CACHE_KEYS = 400
 const HIGHLIGHT_SCROLL_ROUNDING_EPSILON_PX = 0.5
 
-type HighlightActivationOptions = {
+export type HighlightActivationOptions = {
   scroll?: boolean
   scrollBehavior?: ScrollBehavior
+  preferredPlainTokenKey?: string | null
 }
 
 export class HighlightController {
   private activeTokenKey: string | null = null
+  private preferredPlainTokenKey: string | null = null
   private activeSequenceIndex = -1
   private activeElements: HTMLElement[] = []
   private pendingActivation: Promise<HTMLElement | null> | null = null
@@ -66,6 +68,7 @@ export class HighlightController {
     this.activeElements.forEach((element) => element.classList.remove(ACTIVE_CLASS))
     this.activeElements = []
     this.activeTokenKey = null
+    this.preferredPlainTokenKey = null
     this.activeSequenceIndex = -1
     this.pendingActivation = null
     this.pendingTokenKey = null
@@ -79,7 +82,9 @@ export class HighlightController {
 
   async activateCue(cue: WordCue, options?: HighlightActivationOptions) {
     const tokenKey = formatTokenKey(cue)
-    if (this.activeTokenKey === tokenKey) {
+    const passage = this.display?.viewModel.isolatedAliyah
+    if (passage && !passage.containsTokenKey(tokenKey)) return null
+    if (this.activeTokenKey === tokenKey && !passage) {
       return this.getVisibleTokenElement(tokenKey) ?? this.getPrimaryTokenElement(tokenKey)
     }
 
@@ -94,7 +99,7 @@ export class HighlightController {
       if (generation !== this.activationGeneration || display !== this.display) {
         return null
       }
-      return this.applyTokenKey(tokenKey, options, generation)
+      return this.applyTokenKey(tokenKey, { ...options, preferredPlainTokenKey: null }, generation)
     })()
 
     this.pendingTokenKey = tokenKey
@@ -110,10 +115,10 @@ export class HighlightController {
 
   async activateTokenKey(
     tokenKey: string,
-    { scroll = true, scrollBehavior = 'smooth' }: HighlightActivationOptions = {}
+    options: HighlightActivationOptions = {}
   ) {
     const generation = ++this.activationGeneration
-    return this.applyTokenKey(tokenKey, { scroll, scrollBehavior }, generation)
+    return this.applyTokenKey(tokenKey, options, generation)
   }
 
   private applyTokenKey(
@@ -121,15 +126,21 @@ export class HighlightController {
     {
       scroll = true,
       scrollBehavior = 'smooth',
+      preferredPlainTokenKey,
     }: HighlightActivationOptions = {},
     generation = this.activationGeneration
   ) {
     if (generation !== this.activationGeneration) return null
-    if (this.activeTokenKey === tokenKey) {
+    const passage = this.display?.viewModel.isolatedAliyah
+    if (passage && !passage.containsTokenKey(tokenKey)) return null
+    if (this.activeTokenKey === tokenKey && !passage) {
       return this.getPrimaryTokenElement(tokenKey)
     }
 
     this.activeElements.forEach((element) => element.classList.remove(ACTIVE_CLASS))
+    if (this.activeTokenKey !== tokenKey || preferredPlainTokenKey !== undefined) {
+      this.preferredPlainTokenKey = preferredPlainTokenKey ?? null
+    }
 
     const elements = this.getTokenElements(tokenKey)
     elements.forEach((element) => element.classList.add(ACTIVE_CLASS))
@@ -179,6 +190,18 @@ export class HighlightController {
   }
 
   private getTokenElements(tokenKey: string) {
+    const passage = this.display?.viewModel.isolatedAliyah
+    if (passage) {
+      if (!passage.containsTokenKey(tokenKey)) return []
+      const plain = this.book.dataset.readerSides !== 'two' &&
+        !this.book.classList.contains('mod-annotations-on')
+      const plainKeys = plain ? passage.tokenIdentity({ tokenKey, form: 'annotated' }).plainTokenKeys : []
+      const keys = plain ? this.preferredPlainTokenKey && plainKeys.includes(this.preferredPlainTokenKey)
+        ? [this.preferredPlainTokenKey] : plainKeys : [tokenKey]
+      // Presentation can change without replacing the selected passage.
+      return keys.flatMap(key => [...this.book.querySelectorAll<HTMLElement>(`[data-token-key="${key}"]`)])
+        .filter(element => !element.hidden)
+    }
     const cached = this.tokenElementsByKey.get(tokenKey)
     if (cached) {
       const connected = cached.filter((element) => element.isConnected)

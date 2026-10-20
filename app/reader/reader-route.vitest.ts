@@ -248,6 +248,58 @@ test('canonicalizes hashless startup before completing the first reader render',
   expect(host.pickerChanged).not.toHaveBeenCalled()
 })
 
+test('navigation readiness waits for the current render, including an unchanged hash', async () => {
+  setHash('#/torah/parsha/beresheet')
+  const host = createHost()
+  const { route, ready } = mountRoute({ host })
+  await ready
+  let finish!: () => void
+  vi.mocked(host.renderReader).mockReturnValue({
+    ...createRendering(),
+    complete: new Promise<void>(resolve => { finish = resolve }),
+  })
+  let settled = false
+  const navigation = route.navigateAndWait(window.location.hash).then(result => {
+    settled = true
+    return result
+  })
+  await flushRouteWork()
+  expect(settled).toBe(false)
+  finish()
+  expect(await navigation).toBe(true)
+})
+
+test('a superseded navigation cannot report successful restoration', async () => {
+  setHash('#/torah/parsha/beresheet')
+  const host = createHost()
+  const { route, ready } = mountRoute({ host })
+  await ready
+  let finishPrevious!: () => void
+  vi.mocked(host.renderReader).mockReturnValueOnce({
+    ...createRendering(),
+    complete: new Promise<void>(resolve => { finishPrevious = resolve }),
+  }).mockReturnValue(createRendering())
+  const previous = route.navigateAndWait(window.location.hash)
+  expect(await route.navigateAndWait('#/torah/parsha/noach')).toBe(true)
+  finishPrevious()
+  expect(await previous).toBe(false)
+  expect(route.snapshot().currentReaderHash).toBe('#/torah/parsha/noach')
+})
+
+test('rapid requests render only the latest destination and resolve only its readiness', async () => {
+  setHash('#/torah/parsha/beresheet')
+  const { host, route, ready } = mountRoute()
+  await ready
+  vi.mocked(host.renderReader).mockClear()
+  const previous = route.navigateAndWait('#/torah/parsha/noach')
+  const latest = route.navigateAndWait('#/torah/parsha/beshalach')
+  expect(await previous).toBe(false)
+  expect(await latest).toBe(true)
+  await new Promise(resolve => setTimeout(resolve, 30))
+  expect(host.renderReader).toHaveBeenCalledOnce()
+  expect(route.snapshot().currentReaderHash).toBe('#/torah/parsha/beshalach')
+})
+
 test.each([
   '#/torah/parsha/beshalach/2-15-1',
   '#/torah/2-15-1',
@@ -332,6 +384,20 @@ test('rejects startup when the current reading cannot finish positioning', async
   const rejection = expect(ready).rejects.toBe(failure)
   rejectPositioning(failure)
   await rejection
+})
+
+test('a handled passage failure leaves the reader shell available but navigation unsuccessful', async () => {
+  vi.spyOn(console, 'error').mockImplementation(() => {})
+  const failure = new Error('Missing ending verse')
+  const host = createHost({
+    ...createRendering(),
+    complete: Promise.reject(failure),
+    failureHandled: () => true,
+  })
+  const { ready, route, state } = mountRoute({ host })
+  await ready
+  expect(state.view).toBe('reader')
+  expect(await route.navigateAndWait(window.location.hash)).toBe(false)
 })
 
 test('ignores a superseded startup failure and waits for the current reading', async () => {

@@ -5,7 +5,7 @@
   import { nativeUpdatePromptDismissed, nativeUpdateState, updatesBusy } from './update-state.ts'
 
   let { prepare }: { prepare: () => void | Promise<void> } = $props()
-  const pending = $derived($nativeUpdateState.web.pending || $nativeUpdateState.content.pending)
+  const pending = $derived($nativeUpdateState.web.pending)
   const busy = $derived(updatesBusy($nativeUpdateState))
   onDestroy(cancelNativeUpdate)
 </script>

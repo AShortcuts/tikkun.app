@@ -159,6 +159,22 @@ test('uses one frame pump for immediate and layout-deferred work', () => {
   ])
 })
 
+test('completed resize layout publishes geometry and chrome together without another frame', () => {
+  const frames = createFrameHarness()
+  const present = vi.fn()
+  const scheduler = createReaderPresentationScheduler({ frame: frames.adapter, present })
+  scheduler.invalidateAfterLayout('reader-position')
+  scheduler.invalidate('viewport-title')
+  scheduler.flush()
+  expect(present).toHaveBeenCalledExactlyOnceWith({
+    revision: 1,
+    invalidations: ['viewport-title', 'reader-position'],
+  })
+  expect(frames.size()).toBe(0)
+  frames.flush()
+  expect(present).toHaveBeenCalledOnce()
+})
+
 test('destroy cancels pending work and makes future invalidation inert', () => {
   const frames = createFrameHarness()
   const present = vi.fn()
