@@ -45,13 +45,31 @@ await cp(source, assets, {
 const typescript = JSON.parse(await readFile(path.join(root, 'tsconfig.json'), 'utf8'))
 typescript.extends = './.svelte-kit-native/tsconfig.json'
 typescript.include = typescript.include.map((entry) => entry.replace('./.svelte-kit/', './.svelte-kit-native/'))
+typescript.exclude = [...(typescript.exclude ?? []).filter(entry => entry !== 'src/.routes-native/**'), 'src/routes/**']
 await writeFile(path.join(root, 'tsconfig.native.json'), `${JSON.stringify(typescript, null, 2)}\n`)
 
 for (const args of [
   ['scripts/build-system-calendar.mjs'],
   ['scripts/generate-torah-index.mjs'],
   ['--import', 'tsx', 'scripts/generate-public-reading-manifest.mjs'],
-  ['node_modules/vite/bin/vite.js', 'build', '--logLevel', 'warn'],
+]) {
+  const result = spawnSync(process.execPath, args, { cwd: root, env: environment, stdio: 'inherit' })
+  if (result.error) throw result.error
+  if (result.status !== 0) process.exit(result.status ?? 1)
+}
+
+// Keep the compiled identity and the archive's inspectable metadata identical.
+const metadata = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/release-build.ts',
+  ...(process.argv.includes('--web-release') ? ['--web-release'] : [])], {
+  cwd: root, env: environment, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'],
+})
+if (metadata.error) throw metadata.error
+if (metadata.status !== 0) process.exit(metadata.status ?? 1)
+environment.TIKKUN_APP_RELEASE = JSON.stringify(JSON.parse(metadata.stdout))
+await writeFile(path.join(assets, 'app-release.json'), `${environment.TIKKUN_APP_RELEASE}\n`)
+
+for (const args of [
+  ['scripts/build-production.mjs', '--logLevel', 'warn'],
   ['node_modules/typescript/bin/tsc', '--project', 'tsconfig.native.json', '--noEmit'],
 ]) {
   const result = spawnSync(process.execPath, args, {

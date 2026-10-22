@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { assertNativeTarget, readNativeTarget } from './native-update-target.ts'
 import { nativeUpdateContract } from './native-update-contract.mjs'
 import { inspectUpdateFeeds, restoreUpdateFeeds } from './update-feed-history.ts'
+import { allocateReleaseBuild } from './release-build.ts'
 
 type Environment = NodeJS.ProcessEnv
 type Run = (args: string[], environment: Environment) => Promise<void>
@@ -45,6 +46,9 @@ export async function buildPagesUpdates({ root, environment, run, log, fetcher }
   const history = await restoreUpdateFeeds(directory, 'https://tikkunreader.com', publicKey, { fetcher, manual: mode === 'manual' })
   log(history.bootstrap ? 'First automated release: retaining verified update files from Git.' : `Retained ${history.restored} published update files.`)
   if (target) {
+    const release = await allocateReleaseBuild(root, 'web', { local: true })
+    clean.TIKKUN_RELEASE_IDENTITY = JSON.stringify({ version: release.version, build: release.build })
+    log(`Preparing web release ${release.version} (${release.build}).`)
     await run(['run', 'verify:quick'], clean)
     await run(['run', 'build:native'], clean)
     // build:native also regenerates native resources, so recheck its final contract.
@@ -56,7 +60,8 @@ export async function buildPagesUpdates({ root, environment, run, log, fetcher }
       const signing = { ...clean, TIKKUN_UPDATE_PRIVATE_KEY_FILE: keyFile }
       await run(['run', 'updates:web', '--', '--native-build', target.nativeBuild, '--target-record', targetFile,
         '--rollout', rollout, '--approve-web-only'], signing)
-      await run(['run', 'updates:stage', '--', '--native-build', target.nativeBuild], clean)
+      await run(['run', 'updates:stage', '--', '--native-build', target.nativeBuild,
+        ...(target.nativeVersion ? ['--native-version', target.nativeVersion] : [])], clean)
     } finally {
       await rm(temporary, { recursive: true, force: true })
     }

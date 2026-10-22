@@ -26,6 +26,7 @@ export default {
       strict: true,
     }),
     files: {
+      routes: process.env.TIKKUN_PRODUCTION_ROUTES ?? 'src/routes',
       assets: native.enabled ? '.native-site' : 'site',
       appTemplate: process.env.VITEST ? 'src/app.test.html' : 'src/app.html',
     },

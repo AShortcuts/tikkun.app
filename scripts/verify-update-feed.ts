@@ -3,9 +3,10 @@ import { createHash, verify } from 'node:crypto'
 import { parseArgs } from 'node:util'
 import { verifyWebRelease } from '../app/updates/web-update.ts'
 import { updateConfig } from './update-config.mjs'
+import { nativeFeedKey } from '../app/updates/release-identity.ts'
 
 const { values } = parseArgs({ options: {
-  'native-build': { type: 'string' }, origin: { type: 'string', default: 'https://tikkunreader.com' },
+  'native-build': { type: 'string' }, 'native-version': { type: 'string' }, origin: { type: 'string', default: 'https://tikkunreader.com' },
 } })
 const build = values['native-build']
 if (!build || !/^\d+$/.test(build)) throw new Error('Use --native-build NUMBER [--origin HTTPS_ORIGIN]')
@@ -36,9 +37,10 @@ async function download(path: string, maxBytes: number) {
   return Buffer.concat(chunks)
 }
 
-const webPrefix = `/updates/web/${build}`
+const feed = nativeFeedKey({ nativeBuild: build, nativeVersion: values['native-version'] })
+const webPrefix = `/updates/web/${feed}`
 const web = await verifyWebRelease(JSON.parse((await download(`${webPrefix}/latest.json`, 16_384)).toString('utf8')), key)
-assert.equal(web.nativeBuild, build)
+assert.equal(nativeFeedKey(web), feed)
 const zip = await download(`${webPrefix}/${web.bundleId}.zip`, web.bytes)
 assert.equal(zip.length, web.bytes)
 assert.equal(createHash('sha256').update(zip).digest('hex'), web.checksum)

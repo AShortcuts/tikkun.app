@@ -49,9 +49,11 @@ test('verification covers the full Chromium suite and a WebKit critical path', a
   const packageJson = JSON.parse(await readFile(packageUrl, 'utf8'))
   const vitestConfig = await readFile(vitestConfigUrl, 'utf8')
 
-  expect(packageJson.scripts['verify:quick']).toContain(
-    'npm run generated:check'
-  )
+  // Generated-file tests are part of the complete Node suite; run them once.
+  expect(packageJson.scripts['verify:quick']).toBe('npm run check && npm run test:node')
+  expect(packageJson.scripts['test:node']).toBe('vitest run --project=node')
+  expect(vitestConfig).toContain("include: ['**/*.test.{ts,tsx,js,jsx}']")
+  expect(packageJson.scripts['generated:check']).toContain('app/data/generated-catalog-validation.test.ts')
   expect(packageJson.scripts.verify).toContain('npm run test:browser')
   expect(packageJson.scripts.verify).toContain('npm run test:browser:webkit')
   expect(packageJson.scripts['verify:release']).toBe(

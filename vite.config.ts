@@ -26,6 +26,7 @@ export const viteConfig = {
     'import.meta.env.TIKKUN_NATIVE_MEDIA_ORIGIN': JSON.stringify(native.mediaOrigin),
     'import.meta.env.TIKKUN_CONTENT_VERSION': JSON.stringify(contentVersion),
     'import.meta.env.TIKKUN_UPDATE_PUBLIC_KEY': JSON.stringify(updates.publicKey),
+    'import.meta.env.TIKKUN_APP_RELEASE': process.env.TIKKUN_APP_RELEASE === undefined ? 'undefined' : JSON.stringify(process.env.TIKKUN_APP_RELEASE),
   },
   server: {
     host: defaultViteHost,

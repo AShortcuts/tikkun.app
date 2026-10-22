@@ -43,6 +43,10 @@ npm run build
 
 `dist/` is a portable static artifact. A generic static host can serve the full product, but media seeking follows that host's Range support. The Cloudflare release deploys the project with `functions/audio/` alongside the static output; uploading `dist/` alone does not satisfy the verified `206 Partial Content` release gate.
 
+Both `npm run build` and `npm run build:native` exclude `/prototypes/` and `/old-v2.html` before compilation. These pages remain available through `npm run dev`. Build-only route copies live in ignored `src/.routes-web/` and `src/.routes-native/`; edit the originals in `src/routes/`. Web builds retain the marketing homepage. Native builds replace it with a small redirect to `/reader/`, preserving Home links while excluding the homepage's code and styles. Shared assets used by other pages remain included.
+
+`npm run verify:quick` runs type checks, lint, and the complete Node test suite. That suite includes the generated-file checks, so they run once. `npm run generated:check` remains available as a focused check.
+
 ### Sync audio library
 
 Normal development and builds do not require access to any external audio folders.

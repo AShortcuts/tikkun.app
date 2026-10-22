@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { generateKeyPairSync, sign } from 'node:crypto'
 import { get } from 'svelte/store'
+import type { WebRelease } from './web-update.ts'
 
 const bridge = vi.hoisted(() => ({
   ready: vi.fn(), getVersionCode: vi.fn(), getCurrentBundle: vi.fn(), getNextBundle: vi.fn(),
@@ -10,14 +11,19 @@ vi.mock('../platform/native.ts', () => ({ isNativeApp: () => true }))
 vi.mock('@capawesome/capacitor-live-update', () => ({ LiveUpdate: bridge }))
 const keys = generateKeyPairSync('rsa', { modulusLength: 2048 })
 const bundleId = 'a'.repeat(64)
-const payload = JSON.stringify({ schema: 1, channel: 'production', nativeBuild: '6', bundleId, checksum: bundleId,
-  signature: 'YWJj', bytes: 100, rollout: 100 })
-const signed = JSON.stringify({ payload, signature: sign('sha256', Buffer.from(payload), keys.privateKey).toString('base64') })
+const release: WebRelease = { schema: 1, channel: 'production', nativeBuild: '6', bundleId, checksum: bundleId,
+  signature: 'YWJj', bytes: 100, rollout: 100 }
+function signedRelease(value: unknown) {
+  const payload = JSON.stringify(value)
+  return JSON.stringify({ payload, signature: sign('sha256', Buffer.from(payload), keys.privateKey).toString('base64') })
+}
+const signed = signedRelease(release)
 let fetcher: ReturnType<typeof vi.fn>
 beforeEach(() => {
   vi.resetModules()
   vi.stubEnv('TIKKUN_UPDATE_PUBLIC_KEY', keys.publicKey.export({ type: 'spki', format: 'pem' }).toString())
   vi.stubEnv('TIKKUN_NATIVE_MEDIA_ORIGIN', 'https://tikkunreader.com')
+  vi.stubEnv('TIKKUN_APP_RELEASE', undefined)
   vi.stubGlobal('localStorage', { getItem: () => '0', setItem: vi.fn() })
   fetcher = vi.fn(async () => new Response(signed))
   vi.stubGlobal('fetch', fetcher)
@@ -39,12 +45,90 @@ test('startup stages silently; automatic checks throttle while manual checks byp
   const { nativeUpdateState } = await import('./update-state.ts')
   await runtime.nativeWebReady()
   expect(get(nativeUpdateState).web.pending).toBe(true)
+  expect(fetcher).toHaveBeenCalledWith('https://tikkunreader.com/updates/web/6/latest.json', expect.any(Object))
+  expect(bridge.getVersionCode).toHaveBeenCalledOnce()
   expect(bridge.reload).not.toHaveBeenCalled()
   await runtime.checkNativeWeb()
   expect(fetcher).toHaveBeenCalledTimes(1)
   await runtime.checkNativeWeb(true)
   expect(fetcher).toHaveBeenCalledTimes(2)
   expect(bridge.ready).toHaveBeenCalledTimes(1)
+})
+
+test.each([
+  undefined,
+  { version: '1.1', build: 8 },
+  { version: '1.1.0', build: 9 },
+  { version: '1.0.9', build: 10 },
+  { version: '1.1.1', build: 9 },
+])('fresh Sqim bundles ignore unnumbered, older, or equal web releases: %j', async identity => {
+  vi.stubEnv('TIKKUN_APP_RELEASE', JSON.stringify({ release: { version: '1.1', build: 9 }, target: { nativeBuild: '8' } }))
+  bridge.getVersionCode.mockResolvedValue({ versionCode: '9' })
+  fetcher.mockResolvedValue(new Response(signedRelease({ ...release, nativeBuild: '8', ...(identity ? { release: identity } : {}) })))
+  const { checkNativeWeb } = await import('./web-runtime.ts')
+  const { nativeUpdateState } = await import('./update-state.ts')
+  await checkNativeWeb()
+  expect(fetcher).toHaveBeenCalledWith('https://tikkunreader.com/updates/web/8/latest.json', expect.any(Object))
+  expect(get(nativeUpdateState).web).toMatchObject({ pending: false, phase: 'current' })
+  expect(bridge.downloadBundle).not.toHaveBeenCalled()
+  expect(bridge.setNextBundle).not.toHaveBeenCalled()
+  expect(bridge.reload).not.toHaveBeenCalled()
+})
+
+test('a higher web release stages from target 8 on a fresh Sqim build 9', async () => {
+  vi.stubEnv('TIKKUN_APP_RELEASE', JSON.stringify({ release: { version: '1.1', build: 9 }, target: { nativeBuild: '8' } }))
+  bridge.getVersionCode.mockResolvedValue({ versionCode: '9' })
+  fetcher.mockResolvedValue(new Response(signedRelease({ ...release, nativeBuild: '8', release: { version: '1.1.1', build: 10 } })))
+  const { checkNativeWeb } = await import('./web-runtime.ts')
+  const { nativeUpdateState } = await import('./update-state.ts')
+  await checkNativeWeb()
+  expect(fetcher).toHaveBeenCalledWith('https://tikkunreader.com/updates/web/8/latest.json', expect.any(Object))
+  expect(bridge.getVersionCode).not.toHaveBeenCalled()
+  expect(bridge.downloadBundle).toHaveBeenCalledWith(expect.objectContaining({
+    url: `https://tikkunreader.com/updates/web/8/${bundleId}.zip`,
+  }))
+  expect(bridge.setNextBundle).toHaveBeenCalledWith({ bundleId })
+  expect(get(nativeUpdateState).web).toMatchObject({ pending: true, phase: 'ready' })
+  expect(bridge.reload).not.toHaveBeenCalled()
+})
+
+test('a new native version with build 1 uses its versioned feed and ZIP paths', async () => {
+  vi.stubEnv('TIKKUN_APP_RELEASE', JSON.stringify({ release: { version: '1.2', build: 1 },
+    target: { nativeVersion: '1.2', nativeBuild: '1' } }))
+  bridge.getVersionCode.mockResolvedValue({ versionCode: '1' })
+  fetcher.mockResolvedValue(new Response(signedRelease({ ...release, nativeVersion: '1.2', nativeBuild: '1',
+    release: { version: '1.2.1', build: 2 } })))
+  const { checkNativeWeb } = await import('./web-runtime.ts')
+  await checkNativeWeb()
+  expect(fetcher).toHaveBeenCalledWith('https://tikkunreader.com/updates/web/1.2-1/latest.json', expect.any(Object))
+  expect(bridge.downloadBundle).toHaveBeenCalledWith(expect.objectContaining({
+    url: `https://tikkunreader.com/updates/web/1.2-1/${bundleId}.zip`,
+  }))
+  expect(bridge.setNextBundle).toHaveBeenCalledWith({ bundleId })
+})
+
+test('a versioned native build rejects a legacy manifest with the same build number', async () => {
+  vi.stubEnv('TIKKUN_APP_RELEASE', JSON.stringify({ release: { version: '1.2', build: 1 },
+    target: { nativeVersion: '1.2', nativeBuild: '1' } }))
+  fetcher.mockResolvedValue(new Response(signedRelease({ ...release, nativeBuild: '1', release: { version: '1.2.1', build: 2 } })))
+  const { checkNativeWeb } = await import('./web-runtime.ts')
+  const { nativeUpdateState } = await import('./update-state.ts')
+  await checkNativeWeb()
+  expect(get(nativeUpdateState).web).toMatchObject({ pending: false, phase: 'error' })
+  expect(bridge.downloadBundle).not.toHaveBeenCalled()
+  expect(bridge.setNextBundle).not.toHaveBeenCalled()
+})
+
+test.each(['', '{', JSON.stringify({ release: { version: '1.1', build: 9 } })])('invalid bundled identity fails without a legacy feed fallback: %j', async bundled => {
+  vi.stubEnv('TIKKUN_APP_RELEASE', bundled)
+  const { checkNativeWeb } = await import('./web-runtime.ts')
+  const { nativeUpdateState } = await import('./update-state.ts')
+  await checkNativeWeb()
+  expect(get(nativeUpdateState).web).toMatchObject({ pending: false, phase: 'error' })
+  expect(bridge.getVersionCode).not.toHaveBeenCalled()
+  expect(fetcher).not.toHaveBeenCalled()
+  expect(bridge.downloadBundle).not.toHaveBeenCalled()
+  expect(bridge.setNextBundle).not.toHaveBeenCalled()
 })
 test('failed network checks can retry and simultaneous manual checks share one download', async () => {
   const { checkNativeWeb } = await import('./web-runtime.ts')

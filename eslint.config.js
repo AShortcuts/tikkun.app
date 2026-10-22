@@ -17,6 +17,8 @@ export default [
   },
   {
     ignores: [
+      'src/.routes-web/',
+      'src/.routes-native/',
       'dist/',
       '.svelte-kit/',
       '.tsimp/',

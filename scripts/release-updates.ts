@@ -6,6 +6,8 @@ import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 import { verifyWebRelease } from '../app/updates/web-update.ts'
+import { nativeFeedKey, parseBundledAppRelease, updateFeedPath as feedPath } from '../app/updates/release-identity.ts'
+import { object } from '../app/updates/content-schema.ts'
 
 const rootDirectory = fileURLToPath(new URL('..', import.meta.url))
 const branch = 'develop'
@@ -50,11 +52,11 @@ interface Services {
   keyFile: string
 }
 
-async function preparedRelease(options: ReleaseOptions, root: string) {
+async function preparedRelease(options: ReleaseOptions, root: string, feed: string) {
   const key = await readFile(path.join(root, 'config/update-public-key.pem'), 'utf8')
-  const webRoot = `.asc/updates/web/${options.nativeBuild}`
+  const webRoot = `.asc/updates/web/${feed}`
   const web = await verifyWebRelease(JSON.parse(await readFile(path.join(root, webRoot, 'latest.json'), 'utf8')), key)
-  if (web.nativeBuild !== options.nativeBuild || web.rollout !== options.rollout) throw new Error('Prepared web release does not match the requested build/rollout.')
+  if (nativeFeedKey(web) !== feed || web.rollout !== options.rollout) throw new Error('Prepared web release does not match the requested build/rollout.')
   const zip = await readFile(path.join(root, webRoot, `${web.bundleId}.zip`))
   if (zip.length !== web.bytes || createHash('sha256').update(zip).digest('hex') !== web.checksum ||
       !verify('sha256', zip, key, Buffer.from(web.signature, 'base64'))) throw new Error('Prepared web ZIP failed signature/digest verification.')
@@ -73,8 +75,8 @@ export async function releaseUpdates(options: ReleaseOptions, services: Services
   }
   if (await git('branch', '--show-current') !== branch) throw new Error('Run from develop. No branch is switched automatically.')
   const changes = (await git('status', '--porcelain=v1', '-z', '--untracked-files=all')).split('\0').filter(Boolean)
-  const generatedFeed = /^site\/updates\/(?:web\/\d+\/(?:latest\.json|[a-f0-9]{64}\.zip)|content\/[a-f0-9]{64}\/(?:latest\.json|[a-f0-9]{64}\.json))$/
-  if (changes.some(entry => !['??', ' M'].includes(entry.slice(0, 2)) || !generatedFeed.test(entry.slice(3)))) {
+  if (changes.some(entry => !['??', ' M'].includes(entry.slice(0, 2)) ||
+    !entry.slice(3).startsWith('site/updates/') || !feedPath.test(entry.slice(16)))) {
     throw new Error('Working tree/index is not clean. Only unstaged generated update feeds may remain between runs. Review and commit intended source changes first; nothing is stashed, staged, or discarded automatically.')
   }
   const sourceSha = await head()
@@ -90,10 +92,20 @@ export async function releaseUpdates(options: ReleaseOptions, services: Services
   const archiveBuild = (await run('/usr/bin/plutil', ['-extract', 'CFBundleVersion', 'raw', '-o', '-', path.join(target, 'Info.plist')], true)).trim()
   if (archiveBuild !== options.nativeBuild) throw new Error('Target archive does not match the requested native build.')
   await stat(path.join(target, 'public/native-update-contract.json'))
+  let nativeVersion: string | undefined
+  let metadata: string | undefined
+  try { metadata = await readFile(path.join(target, 'public/app-release.json'), 'utf8') }
+  catch (error) { if (!object(error) || error.code !== 'ENOENT') throw error }
+  if (metadata !== undefined) {
+    const bundled = parseBundledAppRelease(JSON.parse(metadata))
+    if (bundled.target.nativeBuild !== options.nativeBuild) throw new Error('Use the released native archive, not a test build for an existing target')
+    nativeVersion = bundled.target.nativeVersion
+  }
+  const feed = nativeFeedKey({ nativeBuild: options.nativeBuild, nativeVersion })
   const commands = [
-    ['run', 'verify:release'], ['run', 'build:native'],
+    ['run', 'verify:release'], ['run', 'build:native', '--', '--web-release'],
     ['run', 'updates:web', '--', '--native-build', options.nativeBuild, '--target-archive', options.archive, '--rollout', String(options.rollout), '--approve-web-only'],
-    ['run', 'updates:stage', '--', '--native-build', options.nativeBuild],
+    ['run', 'updates:stage', '--', '--native-build', options.nativeBuild, ...(nativeVersion ? ['--native-version', nativeVersion] : [])],
     ['run', 'build'],
   ]
   log(`Source ${sourceSha}; build ${options.nativeBuild}; rollout ${options.rollout}%; local preparation only.`)
@@ -103,7 +115,7 @@ export async function releaseUpdates(options: ReleaseOptions, services: Services
     return { status: 'dry-run' }
   }
   for (const args of commands) { log(`Running npm ${args[1]}...`); await run('npm', args) }
-  const release = await preparedRelease(options, root)
+  const release = await preparedRelease(options, root, feed)
   if (await head() !== sourceSha || await git('branch', '--show-current') !== branch) {
     throw new Error('Branch/HEAD changed during preparation. Review local artifacts before using them.')
   }
@@ -116,7 +128,7 @@ export async function releaseUpdates(options: ReleaseOptions, services: Services
   log(`Prepared native build ${options.nativeBuild} at ${release.rollout}% rollout. Nothing Git-staged, committed, pushed, or published.`)
   log('Verified feeds copied into site/updates/. Latest manifests replaced; older immutable bundles retained.')
   log('Review, Git staging, committing, and publishing are manual steps owned by you.')
-  log(`After your deployment: npm run updates:verify -- --native-build ${options.nativeBuild}`)
+  log(`After your deployment: npm run updates:verify -- --native-build ${options.nativeBuild}${nativeVersion ? ` --native-version ${nativeVersion}` : ''}`)
   return { status: 'prepared', ...release }
 }
 

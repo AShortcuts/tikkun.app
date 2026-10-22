@@ -27,6 +27,8 @@ cypress/screenshots
 download
 dist
 dist-native/
+src/.routes-web/
+src/.routes-native/
 .native-site/
 .svelte-kit-native/
 native-bundle-report.json

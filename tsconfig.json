@@ -17,6 +17,7 @@
     "sourceMap": true,
     "allowImportingTsExtensions": true
   },
+  "exclude": ["src/.routes-web/**", "src/.routes-native/**"],
   "include": [
     "./.svelte-kit/ambient.d.ts",
     "./.svelte-kit/non-ambient.d.ts",

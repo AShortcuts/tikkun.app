@@ -1,29 +1,15 @@
 import { isNativeApp } from '../platform/native.ts'
 import { stageWebRelease, verifyWebRelease } from './web-update.ts'
 import { updateChannel } from './update-state.ts'
+import { nativeFeedKey, parseBundledAppRelease } from './release-identity.ts'
+import { readBoundedResponse } from './download-response.ts'
+
+export { readBoundedResponse } from './download-response.ts'
 
 let ready: Promise<void> | undefined
 let checking: Promise<void> | undefined
 let lastCheck = 0
 const supported = () => Boolean(import.meta.env.TIKKUN_UPDATE_PUBLIC_KEY) && isNativeApp()
-
-export async function readBoundedResponse(response: Response, limit: number): Promise<string> {
-  if (!response.ok || !response.body) throw new Error(`Update download failed (${response.status})`)
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder('utf-8', { fatal: true })
-  let bytes = 0
-  let result = ''
-  try {
-    for (;;) {
-      const chunk = await reader.read()
-      if (chunk.done) break
-      bytes += chunk.value.byteLength
-      if (bytes > limit) { await reader.cancel(); throw new Error('Update exceeds download limit') }
-      result += decoder.decode(chunk.value, { stream: true })
-    }
-    return result + decoder.decode()
-  } finally { reader.releaseLock() }
-}
 
 async function markReady() {
   return ready ??= (async () => {
@@ -48,13 +34,16 @@ export function checkNativeWeb(force = false): Promise<void> {
     await markReady()
     updateChannel('web', { phase: 'checking' })
     const { LiveUpdate } = await import('@capawesome/capacitor-live-update')
-    const { versionCode } = await LiveUpdate.getVersionCode()
-    if (!/^\d+$/.test(versionCode)) throw new Error('Invalid native build for web updates')
+    const bundledValue = import.meta.env.TIKKUN_APP_RELEASE
+    const bundled = bundledValue === undefined ? undefined : parseBundledAppRelease(JSON.parse(bundledValue))
+    const nativeBuild = bundled?.target.nativeBuild ?? (await LiveUpdate.getVersionCode()).versionCode
+    if (!/^\d+$/.test(nativeBuild)) throw new Error('Invalid native build for web updates')
+    const feedKey = nativeFeedKey(bundled?.target ?? { nativeBuild })
     const origin = import.meta.env.TIKKUN_NATIVE_MEDIA_ORIGIN
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 15_000)
     try {
-      const response = await fetch(`${origin}/updates/web/${versionCode}/latest.json`, {
+      const response = await fetch(`${origin}/updates/web/${feedKey}/latest.json`, {
         signal: controller.signal, cache: 'no-store', credentials: 'omit', redirect: 'error',
       })
       if (response.status === 404) {
@@ -70,7 +59,7 @@ export function checkNativeWeb(force = false): Promise<void> {
         localStorage.setItem(storageKey, String(bucket))
       }
       updateChannel('web', { phase: 'downloading' })
-      const result = await stageWebRelease(release, versionCode, bucket, origin, LiveUpdate)
+      const result = await stageWebRelease(release, nativeBuild, bucket, origin, LiveUpdate, bundled)
       lastCheck = Date.now()
       updateChannel('web', { phase: result === 'ready' ? 'ready' : 'current', checkedAt: lastCheck,
         ...(result === 'ready' ? { pending: true } : {}) })

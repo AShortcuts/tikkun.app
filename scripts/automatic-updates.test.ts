@@ -46,14 +46,16 @@ async function fixture() {
   await put('scripts/update-config.mjs', 'config')
   await put('ios/App/CapApp-SPM/Package.swift', 'plugins')
   await put('ios/App/App/Main.swift', 'native code')
+  await put('ios/App/App.xcodeproj/project.pbxproj', 'MARKETING_VERSION = 1.1;\nCURRENT_PROJECT_VERSION = 7;\n')
+  await put('config/app-release.json', JSON.stringify({ nativeVersion: '1.1', version: '1.1', build: 9 }))
   await put('package.json', JSON.stringify({ type: 'module', dependencies: { '@capacitor/core': '8.5.1' } }))
   const contract = await nativeUpdateContract(root, publicKey)
   const target: NativeUpdateTarget = { schema: 1, kind: 'native-update-target', nativeBuild: '7', contract: { ...contract, schema: 2 } }
   await put('config/native-update-target.json', envelope(target))
-  const feed = async (zip: string, build = '7', rollout = 100) => {
+  const feed = async (zip: string, build = '7', rollout = 100, release?: { version: string; build: number }) => {
     await put(`site/updates/web/${build}/${hash(zip)}.zip`, zip)
     await put(`site/updates/web/${build}/latest.json`, envelope({ schema: 1, channel: 'production', nativeBuild: build,
-      bundleId: hash(zip), checksum: hash(zip), bytes: Buffer.byteLength(zip), rollout,
+      bundleId: hash(zip), checksum: hash(zip), bytes: Buffer.byteLength(zip), rollout, ...(release ? { release } : {}),
       signature: sign('sha256', Buffer.from(zip), privateKey).toString('base64') }))
   }
   await feed('old ZIP')
@@ -84,7 +86,7 @@ async function fixture() {
     if (command === state.failure) throw new Error(`Failed ${command}`)
     if (command === 'build:native') await put('dist-native/native-update-contract.json', JSON.stringify({ ...contract,
       ...(state.changedNativeAfterBuild ? { nativeDigest: '0'.repeat(64) } : {}) }))
-    if (command === 'updates:stage') await feed('new ZIP')
+    if (command === 'updates:stage') await feed('new ZIP', '7', 100, JSON.parse(env.TIKKUN_RELEASE_IDENTITY!))
     if (command === 'build') await cp(directory, path.join(root, 'dist/updates'), { recursive: true })
   }
   const services = { root, environment, run, fetcher, log: vi.fn() }
@@ -125,7 +127,7 @@ test('target records require valid signatures and cannot authorize changed nativ
 test('actual web packager creates a verifiable ZIP from a target record without an archive or macOS tools', async () => {
   const f = await fixture()
   const repo = fileURLToPath(new URL('..', import.meta.url))
-  for (const file of ['build-web-release.ts', 'native-update-target.ts', 'update-config.mjs', 'sign-update.ts']) {
+  for (const file of ['build-web-release.ts', 'native-update-target.ts', 'update-config.mjs', 'sign-update.ts', 'release-build.ts', 'native-update-contract.mjs']) {
     await cp(path.join(repo, 'scripts', file), path.join(f.root, 'scripts', file))
   }
   await symlink(path.join(repo, 'node_modules'), path.join(f.root, 'node_modules'), 'dir')
@@ -133,6 +135,7 @@ test('actual web packager creates a verifiable ZIP from a target record without 
   await f.put('dist-native/reader/index.html', '<!doctype html><title>Test reader</title>')
   await f.put('dist-native/.well-known/test.json', '{"included":true}')
   await f.put('dist-native/native-update-contract.json', JSON.stringify(f.contract))
+  await f.put('dist-native/app-release.json', JSON.stringify({ release: { version: '1.1.1', build: 10 }, target: { nativeBuild: '7' } }))
   await f.put('private.pem', secret)
   execFileSync(process.execPath, ['--import', 'tsx', 'scripts/build-web-release.ts', '--native-build', '7',
     '--target-record', 'config/native-update-target.json', '--rollout', '100', '--approve-web-only'], {
@@ -149,6 +152,7 @@ test('actual web packager creates a verifiable ZIP from a target record without 
   expect(contents['reader/index.html']).toBe('<!doctype html><title>Test reader</title>')
   expect(contents['.well-known/test.json']).toBe('{"included":true}')
   expect(JSON.parse(contents['native-update-contract.json'])).toEqual(f.contract)
+  expect(JSON.parse(contents['app-release.json']).release).toEqual(release.release)
 })
 
 test.each([{ CF_PAGES: '1', CF_PAGES_BRANCH: 'feature' }, { CF_PAGES_BRANCH: 'develop' }])('preview and local builds never prepare or sign updates', async environment => {
@@ -167,7 +171,7 @@ test('automatic production builds retain downloads, including legacy content fee
   expect(await readFile(path.join(output, `web/7/${hash('old ZIP')}.zip`), 'utf8')).toBe('old ZIP')
   expect(await readFile(path.join(output, `content/${compatibility}/${hash(content)}.json`), 'utf8')).toBe(content)
   const latest = await verifyReleaseEnvelope(JSON.parse(await readFile(path.join(output, 'web/7/latest.json'), 'utf8')), publicKey)
-  expect(latest).toMatchObject({ bundleId: hash('new ZIP') })
+  expect(latest).toMatchObject({ bundleId: hash('new ZIP'), release: { version: '1.1.1', build: 10 } })
   expect(await verifyReleaseEnvelope(JSON.parse(await readFile(path.join(output, 'index.json'), 'utf8')), publicKey)).toEqual(await inspectUpdateFeeds(output, publicKey))
   for (const file of f.temporaryKeys) await expect(stat(file)).rejects.toMatchObject({ code: 'ENOENT' })
 })
@@ -180,6 +184,47 @@ test('manual fallback publishes locally prepared manifests while retaining remot
   expect(await readFile(path.join(f.root, `dist/updates/web/7/${hash('old ZIP')}.zip`), 'utf8')).toBe('old ZIP')
   const latest = await verifyReleaseEnvelope(JSON.parse(await readFile(path.join(f.root, 'dist/updates/web/7/latest.json'), 'utf8')), publicKey)
   expect(latest).toMatchObject({ bundleId: hash('manual ZIP'), rollout: 10 })
+})
+
+test('production advances beyond both the recorded tests and the published web release', async () => {
+  const f = await fixture()
+  await f.feed('latest ZIP', '7', 100, { version: '1.1.3', build: 20 })
+  const index = await inspectUpdateFeeds(f.directory, publicKey)
+  for (const file of index.files) f.files.set(file.path, await readFile(path.join(f.directory, file.path)))
+  f.files.set('index.json', Buffer.from(envelope(index)))
+  await buildPagesUpdates(f.services)
+  const latest = await verifyWebRelease(JSON.parse(await readFile(path.join(f.root, 'dist/updates/web/7/latest.json'), 'utf8')), publicKey)
+  expect(latest.release).toEqual({ version: '1.1.4', build: 21 })
+})
+
+test('version-qualified build-1 feeds coexist and retain the legacy feeds', async () => {
+  const f = await fixture()
+  for (const version of ['1.2', '1.3']) {
+    const zip = `native ${version} ZIP`
+    const prefix = `site/updates/web/${version}-1`
+    await f.put(`${prefix}/${hash(zip)}.zip`, zip)
+    await f.put(`${prefix}/latest.json`, envelope({ schema: 1, channel: 'production', nativeBuild: '1', nativeVersion: version,
+      release: { version: `${version}.1`, build: 2 }, bundleId: hash(zip), checksum: hash(zip), bytes: Buffer.byteLength(zip), rollout: 100,
+      signature: sign('sha256', Buffer.from(zip), privateKey).toString('base64') }))
+  }
+  const index = await inspectUpdateFeeds(f.directory, publicKey)
+  expect(index.files.filter(file => file.path.endsWith('/latest.json')).map(file => file.path)).toContain('web/7/latest.json')
+  expect(index.files.filter(file => file.path.startsWith('web/1.')).map(file => file.path)).toContain('web/1.2-1/latest.json')
+  expect(index.files.filter(file => file.path.startsWith('web/1.')).map(file => file.path)).toContain('web/1.3-1/latest.json')
+})
+
+test('new native archive exports its versioned target and refuses a test archive for an existing target', async () => {
+  const f = await fixture()
+  const app = 'archive/Products/Applications/App.app'
+  await f.put(`${app}/public/native-update-contract.json`, JSON.stringify(f.contract))
+  await f.put(`${app}/capacitor.config.json`, JSON.stringify({ plugins: { LiveUpdate: { publicKey } } }))
+  await f.put(`${app}/public/app-release.json`, JSON.stringify({ release: { version: '1.2', build: 1 }, target: { nativeVersion: '1.2', nativeBuild: '1' } }))
+  const plist = (_file: string, field: string) => field === 'CFBundleVersion' ? '1' : field === 'CFBundleShortVersionString' ? '1.2' : 'iPhoneOS'
+  expect(await targetFromArchive(path.join(f.root, 'archive'), '1', publicKey, plist)).toMatchObject({ nativeVersion: '1.2', nativeBuild: '1' })
+  await f.put(`${app}/public/app-release.json`, JSON.stringify({ release: { version: '1.1', build: 9 }, target: { nativeBuild: '7' } }))
+  await expect(targetFromArchive(path.join(f.root, 'archive'), '1', publicKey, plist)).rejects.toThrow('test build')
+  await f.put(`${app}/public/app-release.json`, '')
+  await expect(targetFromArchive(path.join(f.root, 'archive'), '1', publicKey, plist)).rejects.toThrow()
 })
 
 test.each(['native', 'secret', 'target'])('missing or incompatible %s stops before preparing the deployment', async kind => {

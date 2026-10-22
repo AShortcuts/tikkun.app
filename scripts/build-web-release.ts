@@ -5,6 +5,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { updateConfig } from './update-config.mjs'
 import { assertNativeTarget, readNativeTarget, targetFromArchive } from './native-update-target.ts'
+import { compareReleaseVersions, nativeFeedKey, parseBundledAppRelease } from '../app/updates/release-identity.ts'
+import { allocateReleaseBuild } from './release-build.ts'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const args = process.argv.slice(2)
@@ -26,6 +28,12 @@ const target = args.includes('--target-record')
   ? await readNativeTarget(path.resolve(option('--target-record')), config.publicKey)
   : await targetFromArchive(path.resolve(option('--target-archive')), nativeBuild, config.publicKey)
 assertNativeTarget(target, JSON.parse(await readFile(path.join(source, 'native-update-contract.json'), 'utf8')), config.publicKey, nativeBuild)
+const bundled = parseBundledAppRelease(JSON.parse(await readFile(path.join(source, 'app-release.json'), 'utf8')))
+if (nativeFeedKey(bundled.target) !== nativeFeedKey(target)) throw new Error('Bundled app release targets another native archive')
+const minimum = await allocateReleaseBuild(root, 'web', { local: true })
+if (bundled.release.build < minimum.build || compareReleaseVersions(bundled.release.version, minimum.version) < 0) {
+  throw new Error('Web release must advance its version and build beyond previous tests and releases; rebuild with --web-release')
+}
 let total = 0
 async function inspect(directory: string) {
   for (const entry of await readdir(directory)) {
@@ -38,7 +46,7 @@ async function inspect(directory: string) {
 }
 await inspect(source)
 if (total > 50 * 1024 * 1024) console.warn(`Web release is ${total} bytes unpacked; recommended budget is 50 MiB`)
-const output = path.join(root, '.asc/updates/web', nativeBuild)
+const output = path.join(root, '.asc/updates/web', nativeFeedKey(target))
 await mkdir(output, { recursive: true })
 const temporary = path.join(output, `package-${Date.now()}.zip`)
 // Pages includes Python, but its build image does not include the zip executable.
@@ -49,8 +57,9 @@ const bytes = await readFile(temporary)
 const checksum = createHash('sha256').update(bytes).digest('hex')
 const signature = sign('sha256', bytes, key).toString('base64')
 if (!verify('sha256', bytes, config.publicKey, Buffer.from(signature, 'base64'))) throw new Error('Release signature failed local verification')
-const payload = JSON.stringify({ schema: 1, channel: 'production', nativeBuild, bundleId: checksum,
+const payload = JSON.stringify({ schema: 1, channel: 'production', nativeBuild,
+  ...(target.nativeVersion ? { nativeVersion: target.nativeVersion } : {}), release: bundled.release, bundleId: checksum,
   checksum, signature, bytes: bytes.length, rollout })
 await rename(temporary, path.join(output, `${checksum}.zip`))
 await writeFile(path.join(output, 'latest.json'), `${JSON.stringify({ payload, signature: sign('sha256', Buffer.from(payload), key).toString('base64') })}\n`)
-console.log(JSON.stringify({ output, nativeBuild, checksum, bytes: bytes.length, rollout, published: false }))
+console.log(JSON.stringify({ output, nativeBuild, release: bundled.release, checksum, bytes: bytes.length, rollout, published: false }))

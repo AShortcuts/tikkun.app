@@ -4,9 +4,9 @@ import path from 'node:path'
 import { contentCompatibility, object, parseContentSnapshot } from '../app/updates/content-schema.ts'
 import { verifyReleaseEnvelope } from '../app/updates/release-signature.ts'
 import { verifyWebRelease } from '../app/updates/web-update.ts'
+import { nativeFeedKey, updateFeedPath as feedPath } from '../app/updates/release-identity.ts'
 
 const digestPattern = /^[a-f0-9]{64}$/
-const feedPath = /^(?:web\/\d+\/(?:latest\.json|[a-f0-9]{64}\.zip)|content\/[a-f0-9]{64}\/(?:latest|[a-f0-9]{64})\.json)$/
 const maxFileBytes = 25 * 1024 * 1024
 const maxIndexBytes = 2 * 1024 * 1024
 export interface FeedFile { path: string; bytes: number; checksum: string }
@@ -42,7 +42,7 @@ export async function inspectUpdateFeeds(directory: string, publicKey: string): 
     if (file.path.startsWith('web/')) {
       const release = await verifyWebRelease(envelope, publicKey)
       const zip = byPath.get(`${folder}/${release.bundleId}.zip`)
-      if (folder !== `web/${release.nativeBuild}` || zip?.bytes !== release.bytes || zip.checksum !== release.checksum) throw new Error(`Invalid web feed: ${file.path}`)
+      if (folder !== `web/${nativeFeedKey(release)}` || zip?.bytes !== release.bytes || zip.checksum !== release.checksum) throw new Error(`Invalid web feed: ${file.path}`)
       if (!verify('sha256', await readFile(path.join(directory, `${folder}/${release.bundleId}.zip`)), publicKey, Buffer.from(release.signature, 'base64'))) throw new Error(`Invalid web ZIP signature: ${file.path}`)
     } else {
       const release = await verifyReleaseEnvelope(envelope, publicKey)
