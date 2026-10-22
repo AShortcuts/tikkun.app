@@ -27,7 +27,7 @@ test.each([
   savedStorage = new Map(Object.entries(localStorage))
   localStorage.clear()
   localStorage.setItem('tikkun.reader-preferences', JSON.stringify({
-    readerTextLayout, readerSideMode,
+    readerTextLayout, readerSideMode, readerShow: 'parsha',
   }))
   frame = document.createElement('iframe')
   frame.title = 'Aliyah scroll stability'

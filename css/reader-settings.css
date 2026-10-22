@@ -306,25 +306,22 @@
 
   .settings-reader-presentation {
     display: grid;
-    gap: 0;
+    gap: 0.75rem;
   }
 
-  .settings-reader-choice {
+  .settings-reader-choice,
+  .settings-reader-tool {
     display: grid;
-    grid-template-columns: minmax(5.75rem, 0.62fr) minmax(0, 1.38fr);
+    grid-template-columns: minmax(4.75rem, 0.8fr) minmax(0, 2fr);
     align-items: center;
-    gap: 0.6rem;
+    gap: 0.75rem;
+    min-width: 0;
   }
 
-  .settings-reader-choice + .settings-reader-choice {
-    margin-top: 0.55rem;
-    padding-top: 0.55rem;
+  .settings-reader-presentation > * + * {
+    padding-top: 0.75rem;
     border-top: 1px solid
       color-mix(in srgb, var(--text-color) 9%, transparent);
-  }
-
-  .settings-reader-choice.mod-position {
-    grid-template-columns: minmax(6.6rem, 0.75fr) minmax(0, 1.25fr);
   }
 
   .settings-category-panel.mod-reading .settings-section {
@@ -338,16 +335,17 @@
     background: transparent;
   }
 
+  .settings-category-panel.mod-reading .settings-reader-presentation > .settings-field {
+    padding-top: 0.75rem;
+    border-top: 1px solid color-mix(in srgb, var(--text-color) 9%, transparent);
+  }
+
   .settings-field.mod-reader-controls {
     display: grid;
     gap: 0.55rem;
   }
 
   .settings-reader-tool {
-    display: grid;
-    grid-template-columns: minmax(5.75rem, 0.62fr) minmax(0, 1.38fr);
-    align-items: center;
-    gap: 0.6rem;
     padding-top: 0.55rem;
     border-top: 1px solid
       color-mix(in srgb, var(--text-color) 9%, transparent);
@@ -535,8 +533,10 @@
     width: 100%;
   }
 
+  /* :where() keeps this rule's specificity unchanged; the playback stepper
+     draws its own single border around its number field. */
   .settings-field
-    input:not([type='checkbox']):not([type='range']):not([type='color']),
+    input:not([type='checkbox']):not([type='range']):not([type='color']):where(:not(.settings-playback-stepper input)),
   .settings-field select {
     min-height: 2.35rem;
     padding: 0.5rem 0.65rem;
@@ -1017,6 +1017,33 @@
     font-variant-numeric: tabular-nums;
   }
 
+  .settings-number-input.mod-reading-font {
+    grid-template-columns: minmax(0, 1fr) 3.8rem;
+    min-width: 0;
+    gap: 0.5rem;
+  }
+
+  .settings-number-input.mod-reading-font input {
+    width: 100%;
+    min-width: 0;
+    min-height: 2.75rem;
+    margin: 0;
+  }
+
+  .settings-number-input.mod-reading-font > span:last-child {
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .reading-font-size-sample {
+    --reading-font-scale: 1;
+    position: absolute;
+    width: 1em;
+    height: 1em;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
   .settings-range-input {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 5.6rem;
@@ -1039,8 +1066,7 @@
   .settings-category-panel.mod-reading .settings-field.mod-switch {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    min-height: 4.25rem;
-    padding: 0.7rem 0.8rem;
+    min-height: 3.25rem;
     gap: 0.75rem;
   }
 
@@ -1162,8 +1188,8 @@
     }
 
     .settings-category-tab {
-      width: 2.4rem;
-      height: 2.4rem;
+      width: 2.75rem;
+      height: 2.75rem;
       border-radius: 10px;
     }
 
@@ -1181,18 +1207,13 @@
       gap: 0.42rem;
     }
 
-    .settings-reader-choice,
-    .settings-reader-tool {
-      grid-template-columns: minmax(4.65rem, 0.52fr) minmax(0, 1.48fr);
+    .settings-reader-choice {
+      grid-template-columns: minmax(0, 1fr);
       gap: 0.5rem;
     }
 
-    .settings-reader-choice.mod-position {
-      grid-template-columns: minmax(6.4rem, 0.72fr) minmax(0, 1.28fr);
-    }
-
     .settings-reader-tool {
-      grid-template-columns: minmax(6.2rem, 0.7fr) minmax(0, 1.3fr);
+      grid-template-columns: minmax(0, 1fr) auto;
     }
 
     .settings-range-input {

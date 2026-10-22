@@ -1,0 +1,115 @@
+{
+  "renderer": "Playwright Chromium; forced sRGB; opaque canvas",
+  "records": [
+    {
+      "placement": "header",
+      "width": 3840,
+      "height": 1646,
+      "safe": [
+        1097,
+        493,
+        1646,
+        661
+      ],
+      "device": {
+        "width": 650,
+        "x": 2150,
+        "y": 245,
+        "angle": 6,
+        "scale": 0.4421768707482993,
+        "source": "02-practice.png"
+      },
+      "practiceCrop": null,
+      "audioCrop": {
+        "source": "../captures/04-beresheet-first-verse-audio.png",
+        "x": 280,
+        "y": 400,
+        "width": 1000,
+        "height": 300
+      },
+      "fontLoaded": true,
+      "essential": [
+        {
+          "text": "Tikkun Reader",
+          "x": 1140,
+          "y": 510,
+          "width": 282.328125,
+          "height": 54,
+          "inside": true
+        },
+        {
+          "text": "Torah readingpractice.Listen. Follow. Practice.Hear the reading. Follow each word.Then practice without nekudot.",
+          "x": 1140,
+          "y": 625,
+          "width": 760,
+          "height": 414.75,
+          "inside": true
+        },
+        {
+          "text": "Follow the audio, word by word",
+          "x": 1935,
+          "y": 818,
+          "width": 780,
+          "height": 309,
+          "inside": true
+        }
+      ],
+      "filename": "tikkun-reader-header.png"
+    },
+    {
+      "placement": "search",
+      "width": 3840,
+      "height": 2560,
+      "safe": [
+        836,
+        765,
+        2168,
+        1030
+      ],
+      "device": {
+        "width": 790,
+        "x": 2160,
+        "y": 570,
+        "angle": 6,
+        "scale": 0.5374149659863946,
+        "source": "01-reader.png"
+      },
+      "practiceCrop": {
+        "source": "../captures/02-practice.png",
+        "x": 40,
+        "y": 560,
+        "width": 1240,
+        "height": 260
+      },
+      "audioCrop": null,
+      "fontLoaded": true,
+      "essential": [
+        {
+          "text": "Tikkun Reader",
+          "x": 905,
+          "y": 830,
+          "width": 309.171875,
+          "height": 58,
+          "inside": true
+        },
+        {
+          "text": "Torah readingpractice.Read with nekudot.Practice without them.",
+          "x": 905,
+          "y": 982,
+          "width": 1080,
+          "height": 483.875,
+          "inside": true
+        },
+        {
+          "text": "Without nekudot",
+          "x": 1810,
+          "y": 1415,
+          "width": 1140,
+          "height": 361,
+          "inside": true
+        }
+      ],
+      "filename": "tikkun-reader-search.png"
+    }
+  ]
+}

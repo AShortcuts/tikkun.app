@@ -27,6 +27,7 @@ const preferences: ReaderPreferences = {
   customBackgroundColor: '#eee6d6',
   customTextColor: '#3b3026',
   readerTextLayout: 'match',
+  readerShow: 'parsha',
   readingFontScale: 1,
   verseNumbers: true,
   readerSideMode: 'one',

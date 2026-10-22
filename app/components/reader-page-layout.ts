@@ -1,4 +1,5 @@
 import type { ReaderPagePresentation } from '../reader-presentation.ts'
+import { readerLayoutViewport } from '../adaptive/reader-viewport.ts'
 import { verseStartWordIndex } from '../reading/aliyah-token-sequence.ts'
 import { findReadingVerseStartWord } from '../reader/reading-verse-target.ts'
 import { applyAnnotationMode } from './annotation-rendering.ts'
@@ -522,8 +523,9 @@ function measureReadingAliyahBadges(
   const source = page.tikkunPage
   const book = page.closest<HTMLElement>('.tikkun-book')
   const view = page.ownerDocument.defaultView
-  if (!source || !book || !view || view.innerWidth <= 550 ||
-    page.ownerDocument.documentElement.dataset.readerIsolated === 'true') return []
+  const root = page.ownerDocument.documentElement
+  if (!source || !book || !view || readerLayoutViewport(view).width <= 550 ||
+    root.dataset.readerIsolated === 'true' && root.dataset.readerPhone === 'true') return []
 
   const container = sides === 'one' ? book : page.querySelector<HTMLElement>('.reader-reading-page')
   if (!container) return []

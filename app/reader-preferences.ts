@@ -12,13 +12,16 @@ import {
   type PersistedJsonRevision,
 } from './persistence/persisted-state.ts'
 import {
+  isReaderShowMode,
   isReaderSideMode,
   isReaderSideOrder,
   isReaderTextLayout,
+  type ReaderShowMode,
   type ReaderSideMode,
   type ReaderSideOrder,
   type ReaderTextLayout,
 } from './reader-presentation.ts'
+import { isMobileReaderViewport } from './adaptive/reader-viewport.ts'
 
 const STORAGE_KEY = 'tikkun.reader-preferences'
 export const readingFontScaleRange = { min: 0.8, max: 1.5, step: 0.05 } as const
@@ -67,6 +70,8 @@ export interface ReaderPreferences {
   savedThemes: SavedReaderTheme[]
   activeSavedThemeId: string | null
   readerTextLayout: ReaderTextLayout
+  /** Whole parsha scrolls continuously; one aliyah shows a single aliyah at a time. */
+  readerShow: ReaderShowMode
   readingFontScale: number
   /** Shows pasuk numbers beside the text in both Reading and Match. */
   verseNumbers: boolean
@@ -99,6 +104,7 @@ export const defaultReaderPreferences: ReaderPreferences = {
   savedThemes: [{ id: 'custom-theme-1', ...blankReaderThemeColors }],
   activeSavedThemeId: null,
   readerTextLayout: 'match',
+  readerShow: 'parsha',
   readingFontScale: 1,
   verseNumbers: true,
   readerSideMode: 'one',
@@ -110,6 +116,13 @@ function defaultReaderTextLayout(): ReaderTextLayout {
     return defaultReaderPreferences.readerTextLayout
   }
   return window.matchMedia('(max-width: 550px)').matches ? 'reading' : 'match'
+}
+
+// Like the line layout, the first-launch default follows the window size; a
+// saved choice then applies on every screen.
+function defaultReaderShow(): ReaderShowMode {
+  if (typeof window === 'undefined') return defaultReaderPreferences.readerShow
+  return isMobileReaderViewport(window) ? 'aliyah' : 'parsha'
 }
 
 function rootCssValue(name: string) {
@@ -133,6 +146,7 @@ export function getDefaultReaderPreferences(): ReaderPreferences {
     ...defaultReaderPreferences,
     savedThemes: defaultReaderPreferences.savedThemes.map((theme) => ({ ...theme })),
     readerTextLayout: defaultReaderTextLayout(),
+    readerShow: defaultReaderShow(),
     highlightFill: rootCssColor(
       '--reader-highlight-fill',
       defaultReaderPreferences.highlightFill
@@ -272,6 +286,9 @@ function normalizeReaderPreferences(
     readerTextLayout: isReaderTextLayout(candidate.readerTextLayout)
       ? candidate.readerTextLayout
       : defaults.readerTextLayout,
+    readerShow: isReaderShowMode(candidate.readerShow)
+      ? candidate.readerShow
+      : defaults.readerShow,
     readingFontScale: normalizedNumber(
       candidate.readingFontScale,
       defaults.readingFontScale,
@@ -385,6 +402,7 @@ export function applyReaderPreferences(preferences: ReaderPreferences) {
 
   root.dataset.readerTheme = preferences.themeMode
   root.dataset.readerTextLayout = preferences.readerTextLayout
+  root.dataset.readerShow = preferences.readerShow
   root.style.setProperty('--reading-font-scale', String(preferences.readingFontScale))
   root.dataset.verseNumbers = preferences.verseNumbers ? 'on' : 'off'
   root.dataset.readerSideMode = preferences.readerSideMode

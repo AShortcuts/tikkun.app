@@ -1,0 +1,37 @@
+{
+  "passed": true,
+  "assetCount": 2,
+  "assets": [
+    {
+      "file": "creative-assets/header/tikkun-reader-header.png",
+      "placement": "header",
+      "width": 3840,
+      "height": 1646,
+      "mode": "RGB",
+      "bitDepth": 8,
+      "alpha": false,
+      "interlaced": false,
+      "profile": "sRGB",
+      "bytes": 2150763,
+      "sha256": "cb1675ae49f3bff0ea291df6c6d310e282c2dacd189936d991914bda52599000"
+    },
+    {
+      "file": "creative-assets/search/tikkun-reader-search.png",
+      "placement": "search",
+      "width": 3840,
+      "height": 2560,
+      "mode": "RGB",
+      "bitDepth": 8,
+      "alpha": false,
+      "interlaced": false,
+      "profile": "sRGB",
+      "bytes": 3052817,
+      "sha256": "93709c154e0bdf0daf9eb96616b8dbe31884f6ded23084de937b02625d359dda"
+    }
+  ],
+  "essentialCopyAndPopoutWithinOfficialSafeAreas": true,
+  "publicationGates": [
+    "Current release capture review",
+    "Actual App Store Connect preview and eligibility"
+  ]
+}

@@ -266,6 +266,8 @@
   data-target-id="aliyah-navigation-layer-root"
 ></div>
 
+<!-- A zero-height anchor: the Return banner floats over the text without moving it. -->
+<div class="last-reading-prompt-anchor">
 <div
   class="last-reading-prompt u-hidden"
   data-target-id="last-reading-prompt"
@@ -284,6 +286,7 @@
     type="button"
     aria-label="Dismiss reading prompt"
   ></button>
+</div>
 </div>
 
 <div

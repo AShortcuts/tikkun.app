@@ -30,7 +30,9 @@ swift test --package-path ios/TikkunSystem --jobs 2
 npm run native:open
 ```
 
-Compare the packaged resource hashes across `dist-native`, the synced project and the built app/archive. In Xcode choose App, confirm signing/team, use a physical device for acceptance, then Any iOS Device for Product > Archive. Validate the archive before an authorized upload. `npm run native:branding` regenerates native assets from `site/favicon.svg` using installed Playwright/Chromium; no new dependency or asset service is needed.
+Compare the packaged resource hashes across `dist-native`, the synced project and the built app/archive. In Xcode choose the **Tikkun Reader** scheme, confirm signing/team, use a physical device for acceptance, then Any iOS Device for Product > Archive. Validate the archive before an authorized upload. `npm run native:branding` regenerates native assets from `site/favicon.svg` using installed Playwright/Chromium; no new dependency or asset service is needed.
+
+The shared **Tikkun Reader** scheme is the friendly Run/Archive name. Capacitor's internal `App` project, target, and `App.app` product remain stable for the existing build and update scripts. The iPhone home-screen name is **Tikkun**. Changing the scheme does not change the signed native-update contract or require replacing an uploaded build.
 
 ### Private Install Link Preflight (2026-09-10 Checkpoint)
 

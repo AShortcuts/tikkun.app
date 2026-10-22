@@ -298,6 +298,16 @@ export abstract class ScrollViewModel {
 
   /** Creates the appropriate `ScrollViewModel` subclass for the first leining on or after a date. */
   static forDate(generator: LeiningGenerator, date: Date) {
+    const targetRun = ScrollViewModel.runForDate(generator, date)
+    const model = ScrollViewModel.forId(generator, targetRun.id)
+    if (!model) {
+      throw new Error(`Unable to create a reader for supported run ${targetRun.id}`)
+    }
+    return model
+  }
+
+  /** The first supported reading on or after a date. */
+  static runForDate(generator: LeiningGenerator, date: Date): LeiningRun {
     // Collect all main leinings in the year containing the date.
     const allDates = generator.aroundDate(date)
 
@@ -311,12 +321,7 @@ export abstract class ScrollViewModel {
     if (!targetRun) {
       throw new Error('No supported leining found in the upcoming calendar window')
     }
-
-    const model = ScrollViewModel.forId(generator, targetRun.id)
-    if (!model) {
-      throw new Error(`Unable to create a reader for supported run ${targetRun.id}`)
-    }
-    return model
+    return targetRun
   }
 
   /** Creates the appropriate `ScrollViewModel` subclass for the first leining containing a פסוק. */
@@ -541,7 +546,7 @@ function getParshaRuns() {
 }
 
 /** A weekly-parsha service whose Torah reading is only its main portion. */
-function isOrdinaryShabbatReading(run: LeiningRun) {
+export function isOrdinaryShabbatReading(run: LeiningRun) {
   return run.leining.kind === 'service' && run.leining.isParsha &&
     run.type === LeiningRunType.Main &&
     run.leining.runs.filter(candidate => candidate.scroll === 'torah').length === 1

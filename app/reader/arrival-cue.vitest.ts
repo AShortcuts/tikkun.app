@@ -15,6 +15,7 @@ afterEach(() => {
   delete document.documentElement.dataset.readerTheme
   delete document.documentElement.dataset.readerReducedMotion
   delete document.documentElement.dataset.readerIsolated
+  delete document.documentElement.dataset.readerPhone
   vi.useRealTimers()
 })
 
@@ -77,7 +78,10 @@ test('replaces an earlier cue and removes all decoration after 1.6 seconds and u
 
 test.each([390, 1280])('arrival cue leaves One Side gutters in the book coordinate space at %ipx', async width => {
   await browser.viewport(width, 844)
-  if (width <= 550) document.documentElement.dataset.readerIsolated = 'true'
+  if (width <= 550) {
+    document.documentElement.dataset.readerIsolated = 'true'
+    document.documentElement.dataset.readerPhone = 'true'
+  }
   const { root, line, cue } = await setup({ layout: 'reading', sides: 'one' })
   const gutter = line.querySelector<HTMLElement>('.line-gutter.mod-verses')!
   const before = gutter.getBoundingClientRect().toJSON()

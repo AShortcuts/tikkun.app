@@ -365,6 +365,14 @@ html[data-reader-reduced-motion='on'] .word {
   vertical-align: var(--special-letter-baseline-shift, baseline);
 }
 
+/* One aliyah in Match: neighboring words on the passage's first and last
+   physical line keep their place, faded and inert. */
+.word.mod-passage-context {
+  opacity: 0.28;
+  pointer-events: none;
+  user-select: none;
+}
+
 .word.is-active-word {
   outline: none;
   z-index: auto;
@@ -776,6 +784,10 @@ html[data-reader-side-order='torah-right']
   margin-inline: auto;
   padding-block: 0;
   border-bottom: 0;
+}
+
+.tikkun-book[data-reader-layout='reading'] .tikkun-page,
+.reading-font-size-sample {
   font-size: calc(1.55rem * var(--reading-font-scale, 1));
 }
 
@@ -888,6 +900,10 @@ html[data-reader-side-order='torah-right']
 .tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
   .tikkun-page {
   width: min(100%, calc(76rem + 2 * var(--verse-column-width)));
+}
+
+.tikkun-book[data-reader-layout='reading'][data-reader-sides='two'] .tikkun-page,
+.reading-font-size-sample[data-reader-sides='two'] {
   font-size: calc(clamp(1rem, 1.55vw, 1.35rem) * var(--reading-font-scale, 1));
 }
 
@@ -1007,10 +1023,17 @@ html[data-reader-side-order='torah-right']
   display: flex !important;
 }
 
-/* Hidden in place, so the text never reflows when the setting changes. */
 html[data-verse-numbers='off']
   .line-gutter.mod-verses {
   visibility: hidden;
+}
+
+/* Reading can use the freed space; Match keeps its physical Torah rows. */
+@media screen and (max-width: 550px), screen and (max-height: 550px) {
+  html[data-verse-numbers='off'] .tikkun-book[data-reader-layout='reading'],
+  html[data-verse-numbers='off'] .tikkun-book[data-reader-layout='reading'] .tikkun-page {
+    --reading-verse-rail-width: 0px;
+  }
 }
 
 @media screen and (max-width: 920px) {
@@ -1028,11 +1051,11 @@ html[data-verse-numbers='off']
 }
 
 @media screen and (min-width: 551px) {
-  html:not([data-reader-isolated='true']) .tikkun-book[data-reader-layout='reading'][data-reader-sides] {
+  html:not([data-reader-isolated='true'][data-reader-phone='true']) .tikkun-book[data-reader-layout='reading'][data-reader-sides] {
     --reading-aliyah-rail-width: clamp(7rem, 9vw, 9rem);
   }
 
-  html:not([data-reader-isolated='true']) .tikkun-book[data-reader-layout='reading']
+  html:not([data-reader-isolated='true'][data-reader-phone='true']) .tikkun-book[data-reader-layout='reading']
     .line-gutter.mod-aliyot {
     position: absolute;
     inset: 0;
@@ -1041,12 +1064,12 @@ html[data-verse-numbers='off']
     pointer-events: none;
   }
 
-  html:not([data-reader-isolated='true']) .tikkun-book[data-reader-layout='reading']
+  html:not([data-reader-isolated='true'][data-reader-phone='true']) .tikkun-book[data-reader-layout='reading']
     .location-indicator.mod-aliyot {
     display: contents;
   }
 
-  html:not([data-reader-isolated='true']) .tikkun-book[data-reader-layout='reading']
+  html:not([data-reader-isolated='true'][data-reader-phone='true']) .tikkun-book[data-reader-layout='reading']
     .line-gutter.mod-aliyot .aliyah-badge {
     position: absolute;
     top: var(--reading-aliyah-gutter-top, 0);
@@ -1064,28 +1087,28 @@ html[data-verse-numbers='off']
     pointer-events: auto;
   }
 
-  html:not([data-reader-isolated='true']) .tikkun-book[data-reader-layout='reading']
+  html:not([data-reader-isolated='true'][data-reader-phone='true']) .tikkun-book[data-reader-layout='reading']
     .aliyah-badge.mod-with-audio {
     padding-left: 2.1rem;
   }
 
-  html:not([data-reader-isolated='true']) .tikkun-book[data-reader-layout='reading']
+  html:not([data-reader-isolated='true'][data-reader-phone='true']) .tikkun-book[data-reader-layout='reading']
     .aliyah-badge .aliyah-audio-button {
     top: 50%;
     transform: translateY(-50%);
   }
 
-  html:not([data-reader-isolated='true']) .tikkun-book[data-reader-layout='reading']
+  html:not([data-reader-isolated='true'][data-reader-phone='true']) .tikkun-book[data-reader-layout='reading']
     .aliyah-badge .aliyah-link {
     right: 0;
   }
 
-  html:not([data-reader-isolated='true']) .tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  html:not([data-reader-isolated='true'][data-reader-phone='true']) .tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
     .reader-reading-page {
     padding-inline: calc(var(--reading-verse-rail-width) + var(--reading-aliyah-rail-width));
   }
 
-  html:not([data-reader-isolated='true']) .tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
+  html:not([data-reader-isolated='true'][data-reader-phone='true']) .tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
     .line-gutter.mod-verses {
     right: var(--reading-aliyah-rail-width);
   }
@@ -1118,6 +1141,10 @@ html[data-verse-numbers='off']
   .tikkun-book[data-reader-layout='reading'] .tikkun-page {
     width: auto;
     padding-inline: 0;
+  }
+
+  .tikkun-book[data-reader-layout='reading'] .tikkun-page,
+  .reading-font-size-sample {
     font-size: calc(clamp(1.3rem, 6.2vw, 1.55rem) * var(--reading-font-scale, 1));
   }
 }

@@ -1,0 +1,90 @@
+{
+  "created": "2026-10-20",
+  "assets": [
+    {
+      "file": "creative-assets/header/tikkun-reader-header.png",
+      "placement": "header",
+      "width": 3840,
+      "height": 1646,
+      "mode": "RGB",
+      "bitDepth": 8,
+      "alpha": false,
+      "interlaced": false,
+      "profile": "sRGB",
+      "bytes": 1892534,
+      "sha256": "0392b7debac2d5e444a7d6dc80e14615a585672f3dc115df8208292c6630f12e"
+    },
+    {
+      "file": "creative-assets/search/tikkun-reader-search.png",
+      "placement": "search",
+      "width": 3840,
+      "height": 2560,
+      "mode": "RGB",
+      "bitDepth": 8,
+      "alpha": false,
+      "interlaced": false,
+      "profile": "sRGB",
+      "bytes": 2776888,
+      "sha256": "df39bc952f6a023a4e9d8eac76f2322abc2fb596f81e8ed503e793f1d8e88abc"
+    }
+  ],
+  "captures": [
+    {
+      "file": "captures/01-reader.png",
+      "sha256": "654cd7c831a23b5d57d6c773392dc47fff48930de126354d1f575ef5b68713ee",
+      "captured": "2026-09-11",
+      "build": "1.0 (2)",
+      "device": "iPhone 17 Pro Max"
+    },
+    {
+      "file": "captures/02-practice.png",
+      "sha256": "9f91b19c26ce99679f7a080c77cfe8dafc9f9acab8f6ef27a9463c77e4328e16",
+      "captured": "2026-09-11",
+      "build": "1.0 (2)",
+      "device": "iPhone 17 Pro Max"
+    },
+    {
+      "file": "captures/03-audio.png",
+      "sha256": "0f972e9f9de6c228d2d8a7b2b223e04fad2591635c500578698570c84ffa4141",
+      "captured": "2026-09-11",
+      "build": "1.0 (2)",
+      "device": "iPhone 17 Pro Max"
+    },
+    {
+      "file": "captures/04-beresheet-first-verse-audio.png",
+      "sha256": "8038736bf8f1b72d7c043ffab092d1e671421bfc16722790623ef968190d38dc",
+      "captured": "2026-10-20",
+      "build": "Public web release",
+      "device": "Chromium 440x956 at 3x; real playback"
+    }
+  ],
+  "safeAreas": {
+    "header": [
+      1097,
+      493,
+      1646,
+      661
+    ],
+    "search": [
+      836,
+      765,
+      2168,
+      1030
+    ]
+  },
+  "popoutCrop": {
+    "source": "../captures/02-practice.png",
+    "x": 40,
+    "y": 560,
+    "width": 1240,
+    "height": 260
+  },
+  "audioHighlightCrop": {
+    "source": "../captures/04-beresheet-first-verse-audio.png",
+    "x": 280,
+    "y": 400,
+    "width": 1000,
+    "height": 300
+  },
+  "status": "Local artwork exports; not uploaded or App Store Connect verified"
+}

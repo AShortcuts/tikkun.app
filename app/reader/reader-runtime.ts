@@ -34,6 +34,7 @@ import type { ViewportRange } from '../viewport-tracker.ts'
 import {
   createReaderViewport,
   isMobileReaderViewport,
+  readerLayoutViewport,
   type ReaderViewport,
 } from '../adaptive/reader-viewport.ts'
 import { TopBarTracker } from '../view-model/navigation/top-bar-model.ts'
@@ -315,7 +316,6 @@ export function startReaderRuntime({
   let explicitAliyahSelection: AliyahIdentity | null = null
   let explicitAliyahSelectionHash: string | null = null
   let isolatedReading: AliyahNavigationEntry | null = null
-  let readerSourceModel: ScrollViewModel | null = null
   let rememberReaderFocalPosition: ((word?: HTMLElement | null) => void) | null = null
   let readerRenderGeneration = 0
   let preservePlaybackDuringDisplayReplacement = false
@@ -497,11 +497,15 @@ export function startReaderRuntime({
     book.setAttribute('aria-busy', String(!error))
   }
 
+  /** The Show setting: one aliyah at a time, outside recording mode. */
+  function showsOneAliyah() {
+    return readerPreferences.readerShow === 'aliyah' && !recordingMode.enabled
+  }
+
   function renderReaderModel(
     source: ScrollViewModel,
     context?: { hash: string; aliyahTarget?: AliyahNavigationTarget },
   ): ReaderRouteRendering {
-    readerSourceModel = source
     const generation = ++readerRenderGeneration
     const hash = context?.hash ?? location.hash.split('?', 1)[0]
     const restoration = pendingReaderRestoration?.hash === hash ? pendingReaderRestoration : null
@@ -509,7 +513,7 @@ export function startReaderRuntime({
     const preservePlayback = restoration?.preservePlayback || playbackNavigationHash === hash
     playbackNavigationHash = null
     const wasIsolated = Boolean(isolatedReading)
-    isolatedReading = isMobileReaderViewport(window) && readerPreferences.readerTextLayout === 'reading' && !recordingMode.enabled
+    isolatedReading = showsOneAliyah()
       ? initialIsolatedEntry(source, restoration?.target ?? context?.aliyahTarget)
       : null
     const isCurrent = () => generation === readerRenderGeneration
@@ -597,6 +601,7 @@ export function startReaderRuntime({
         rememberReaderFocalPosition?.(getBook().querySelector<HTMLElement>('.is-active-word'))
       }
       if (isolatedReading) {
+        renderIsolatedAliyahEnd(isolatedReading)
         const ref = restoredIdentity?.ref ?? (!('pageNumber' in source.initialLocation) && !restoration
           ? source.initialLocation : isolatedReading.aliyah.start)
         readerRouteGlobal?.syncScrolledReading(generateAliyahUrl(
@@ -617,8 +622,48 @@ export function startReaderRuntime({
     }
   }
 
+  /** Ends One aliyah passages with links to the neighboring aliyot of the same reading. */
+  function renderIsolatedAliyahEnd(entry: AliyahNavigationEntry) {
+    const book = getBook()
+    book.querySelector('.isolated-aliyah-end')?.remove()
+    const entries = getAliyahNavigationEntriesForRun(entry.run)
+    const current = entries.findIndex(candidate =>
+      isSameAliyahNavigationTarget(targetForEntry(candidate), targetForEntry(entry)))
+    if (current < 0) return
+    const previous = entries[current - 1]
+    const next = entries[current + 1]
+    if (!previous && !next) return
+    const end = document.createElement('nav')
+    end.className = 'isolated-aliyah-end'
+    end.setAttribute('aria-label', 'Previous or next aliyah')
+    // Left to right like the rail: Previous on the left, Next on the right.
+    if (previous) end.append(isolatedAliyahEndButton(previous, 'previous'))
+    if (next) end.append(isolatedAliyahEndButton(next, 'next'))
+    book.append(end)
+  }
+
+  function isolatedAliyahEndButton(destination: AliyahNavigationEntry, direction: 'previous' | 'next') {
+    const target = targetForEntry(destination)
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = `isolated-aliyah-end-step mod-${direction}`
+    button.dataset.targetId = `isolated-aliyah-end-${direction}`
+    const name = document.createElement('span')
+    name.lang = 'he'
+    name.dir = 'rtl'
+    name.textContent = formatAliyahLabel(destination.aliyah.index, destination.run)
+    if (direction === 'previous') {
+      button.insertAdjacentHTML('beforeend', iconMarkup('arrowLeft'))
+      button.append('Previous: ', name)
+    } else {
+      button.append('Next: ', name)
+      button.insertAdjacentHTML('beforeend', iconMarkup('arrowRight'))
+    }
+    button.addEventListener('click', () => selectAndScrollToAliyah(target.runId, target.aliyahIndex))
+    return button
+  }
+
   function deactivateReaderRuntime() {
-    readerSourceModel = null
     readerRenderGeneration += 1
     isolatedReading = null
     pendingReaderRestoration = null
@@ -835,7 +880,7 @@ export function startReaderRuntime({
   const setAppHeight = () => {
     document.documentElement.style.setProperty(
       '--app-height',
-      `${window.innerHeight}px`
+      `${readerLayoutViewport(window).height}px`
     )
   }
 
@@ -1378,7 +1423,7 @@ export function startReaderRuntime({
   function jumpToCheckpoint(checkpoint: Checkpoint) {
     void (async () => {
       const hash = checkpoint.hash ?? location.hash
-      if (hash === location.hash && !isolatedReading && !isMobileReaderViewport(window)) {
+      if (hash === location.hash && !isolatedReading) {
         await jumpToTokenKey(checkpoint.tokenKey, { audioTime: checkpoint.timeStart })
         return
       }
@@ -2226,7 +2271,9 @@ export function startReaderRuntime({
       desktop: desktopSnapshot,
       compact: mobileSnapshot,
       authoringEnabled: cueAuthoringGlobal?.isActive() ?? false,
-      isolated: Boolean(isolatedReading),
+      // The compact < rail > row is phone chrome; wider windows keep the
+      // desktop rail, which selects aliyot in One aliyah mode too.
+      isolated: Boolean(isolatedReading) && isMobileReaderViewport(window),
     })
   }
 
@@ -2874,7 +2921,7 @@ export function startReaderRuntime({
   }
 
   function getFirstVisibleWord(line: HTMLElement) {
-    return [...line.querySelectorAll<HTMLElement>('.word')].find((word) => {
+    return [...line.querySelectorAll<HTMLElement>('.word:not(.mod-passage-context)')].find((word) => {
       const rect = word.getBoundingClientRect()
       return rect.width > 0 && rect.height > 0
     }) ?? null
@@ -3510,18 +3557,20 @@ export function startReaderRuntime({
   function updateReaderPreferencesFromSettings(
     updates: Partial<ReaderPreferences>
   ) {
-    const rebuildIsolation = isMobileReaderViewport(window) && !recordingMode.enabled &&
-      updates.readerTextLayout !== undefined && updates.readerTextLayout !== readerPreferences.readerTextLayout
+    const rebuildIsolation = !recordingMode.enabled &&
+      updates.readerShow !== undefined && updates.readerShow !== readerPreferences.readerShow
     if (rebuildIsolation && readerRouteGlobal?.snapshot().view === 'reader') {
       pendingReaderRestoration = captureLayoutRestoration(readerRouteGlobal.snapshot().currentReaderHash ?? location.hash)
     }
     const shouldSmoothRecenter =
       updates.focalPointMode !== undefined &&
       updates.focalPointMode !== readerPreferences.focalPointMode
-    const shouldResizeReadingText =
+    const shouldReflowReadingText =
       readerPreferences.readerTextLayout === 'reading' &&
-      updates.readingFontScale !== undefined &&
-      updates.readingFontScale !== readerPreferences.readingFontScale
+      ((updates.readingFontScale !== undefined &&
+        updates.readingFontScale !== readerPreferences.readingFontScale) ||
+      (updates.verseNumbers !== undefined &&
+        updates.verseNumbers !== readerPreferences.verseNumbers))
     const scrollTarget = shouldSmoothRecenter
       ? getReaderFocalPointScrollTarget(getBook())
       : null
@@ -3581,7 +3630,7 @@ export function startReaderRuntime({
       syncEffectiveReaderPagePresentation({
         beforeLayout: () => applyReaderPreferences(readerPreferences),
       })
-    } else if (shouldResizeReadingText && readerDisplaySessionGlobal) {
+    } else if (shouldReflowReadingText && readerDisplaySessionGlobal) {
       readerDisplaySessionGlobal.updateAnnotations(() => applyReaderPreferences(readerPreferences))
       readerDisplaySessionGlobal.invalidateProgressAnchors('text-layout')
       const activeSignal = readerDisplaySessionGlobal.capture()?.signal
@@ -3596,19 +3645,27 @@ export function startReaderRuntime({
     refreshReaderChrome()
   }
 
+  // Phone chrome (compact rail row, aliyah capsule) follows the window size,
+  // independently of the Show setting.
+  function syncReaderPhoneViewport() {
+    const phone = isMobileReaderViewport(window)
+    if (phone === (document.documentElement.dataset.readerPhone === 'true')) return
+    if (phone) document.documentElement.dataset.readerPhone = 'true'
+    else delete document.documentElement.dataset.readerPhone
+    if (isolatedReading) syncAliyahNavigationContent()
+  }
+
   function setupReaderViewportResize(scope: MountScope, book: HTMLElement) {
     let pendingScrollTarget: HTMLElement | null = null
     let pendingFocalOffset = 0
-    let width = window.innerWidth
-    let height = window.innerHeight
+    let { width, height } = readerLayoutViewport(window)
     let positionDirty = false
     let settledFrame = 0
-    let transitionRevision = 0
-    let restorationInFlight: typeof pendingReaderRestoration = null
     let focalPosition: { word: HTMLElement; offset: number; scrollTop: number } | null = null
     const rememberFocalPosition = (restoredWord?: HTMLElement | null, intendedOffset?: number) => {
       // A hidden reader (behind the Reading Index) has no measurable focal word.
-      if (width !== window.innerWidth || height !== window.innerHeight ||
+      const viewport = readerLayoutViewport(window)
+      if (width !== viewport.width || height !== viewport.height ||
         book.hasAttribute('aria-busy') || positionDirty || !book.clientHeight) return
       if (!restoredWord && focalPosition?.word.isConnected && focalPosition.scrollTop === book.scrollTop) return
       const word = restoredWord ?? getVisibleReaderFocalWord(book)
@@ -3621,9 +3678,10 @@ export function startReaderRuntime({
     book.addEventListener('scroll', () => rememberFocalPosition(), { passive: true, signal: scope.signal })
 
     const viewportLayout = observeReaderResize(window, 'viewport', () => {
-      if (width === window.innerWidth && height === window.innerHeight) return
-      width = window.innerWidth
-      height = window.innerHeight
+      const viewport = readerLayoutViewport(window)
+      if (width === viewport.width && height === viewport.height) return
+      width = viewport.width
+      height = viewport.height
       positionDirty = true
       const retained = focalPosition?.word.isConnected ? focalPosition : null
       pendingScrollTarget = retained?.word ?? getVisibleReaderFocalWord(book)
@@ -3634,25 +3692,13 @@ export function startReaderRuntime({
       document.documentElement.dataset.readerResizing = 'true'
       if (settledFrame) cancelAnimationFrame(settledFrame)
       setAppHeight()
-      const route = readerRouteGlobal?.snapshot()
-      const shouldIsolate = Boolean(isMobileReaderViewport(window) &&
-        readerPreferences.readerTextLayout === 'reading' && !recordingMode.enabled &&
-        readerSourceModel && initialIsolatedEntry(readerSourceModel))
-      if (route?.view === 'reader' && shouldIsolate !== Boolean(isolatedReading)) {
-        const hash = route.currentReaderHash ?? location.hash
-        const restoration = restorationInFlight?.hash === hash
-          ? restorationInFlight : captureLayoutRestoration(hash, pendingScrollTarget)
-        restorationInFlight = restoration
-        pendingReaderRestoration = restoration
-        pendingScrollTarget = null
-        syncEffectiveReaderPagePresentation({ rerender: false })
-        const revision = ++transitionRevision
-        void readerRouteGlobal!.navigateAndWait(location.hash).then(() => {
-          if (scope.signal.aborted || revision !== transitionRevision) return
-          restorationInFlight = null
-        }).catch(reportReadingNavigationError)
-      } else {
-        syncEffectiveReaderPagePresentation()
+      syncReaderPhoneViewport()
+      const focalTokenKey = pendingScrollTarget?.dataset.tokenKey
+      syncEffectiveReaderPagePresentation()
+      // A side change re-renders the pages; keep the same word as the focal target.
+      if (focalTokenKey && !pendingScrollTarget?.isConnected) {
+        pendingScrollTarget = book.querySelector<HTMLElement>(
+          `[data-reader-canonical="true"] .word[data-token-key="${CSS.escape(focalTokenKey)}"]:not([hidden])`)
       }
       readerSettingsGlobal?.sync()
     })
@@ -3692,11 +3738,11 @@ export function startReaderRuntime({
     }, { signal: scope.signal })
 
     setAppHeight()
+    syncReaderPhoneViewport()
     scope.own(() => {
       viewportLayout.destroy()
       positionLayout.destroy()
       pendingScrollTarget = null
-      restorationInFlight = null
       rememberReaderFocalPosition = null
       focalPosition = null
       if (settledFrame) cancelAnimationFrame(settledFrame)

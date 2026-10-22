@@ -61,7 +61,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-test.each([390, 1280])('adjusts Reading font size and retains it across layout changes at %ipx', async (width) => {
+test.each([320, 390, 1280])('adjusts Reading font size and retains it across layout changes at %ipx', async (width) => {
   await page.viewport(width, 900)
   const state = createState()
   let settings: ReaderSettings | null = null
@@ -71,15 +71,40 @@ test.each([390, 1280])('adjusts Reading font size and retains it across layout c
   required<HTMLButtonElement>('[data-reader-text-layout="reading"]').click()
   await vi.waitFor(() => expect(fixture.querySelector('[data-target-id="settings-reading-font-scale"]')).not.toBeNull())
   const slider = required<HTMLInputElement>('[data-target-id="settings-reading-font-scale"]')
-  slider.value = '1.25'
+  await vi.waitFor(() => expect(slider.disabled).toBe(false))
+  const basePixels = Number(slider.value)
+  expect(slider.getAttribute('aria-valuetext')).toMatch(/^\d+(\.\d+)? px$/)
+  slider.value = String(basePixels * 1.25)
   slider.dispatchEvent(new Event('input', { bubbles: true }))
-  await vi.waitFor(() => expect(slider.getAttribute('aria-valuetext')).toBe('125%'))
+  await vi.waitFor(() => expect(slider.getAttribute('aria-valuetext')).toBe(`${Number((basePixels * 1.25).toFixed(1))} px`))
   expect(state.preferences.readingFontScale).toBe(1.25)
+  const panel = required<HTMLElement>('[data-settings-panel="reading"]')
+  const labels = [...panel.querySelectorAll<HTMLElement>('.settings-field-label')]
+  for (const label of labels) expect(label.getBoundingClientRect().left).toBeCloseTo(labels[0].getBoundingClientRect().left, 1)
+  expect(panel.scrollWidth).toBeLessThanOrEqual(panel.clientWidth + 1)
+  expect(slider.getBoundingClientRect().height).toBeGreaterThanOrEqual(44)
   await page.screenshot({ path: `../../.vitest-attachments/reading-font-settings-${width}.png` })
   required<HTMLButtonElement>('[data-reader-text-layout="match"]').click()
   await vi.waitFor(() => expect(fixture.querySelector('[data-target-id="settings-reading-font-scale"]')).toBeNull())
   required<HTMLButtonElement>('[data-reader-text-layout="reading"]').click()
-  await vi.waitFor(() => expect(required<HTMLInputElement>('[data-target-id="settings-reading-font-scale"]').value).toBe('1.25'))
+  await vi.waitFor(() => expect(Number(required<HTMLInputElement>('[data-target-id="settings-reading-font-scale"]').value)).toBeCloseTo(basePixels * 1.25, 3))
+})
+
+test('reports CSS pixel sizes through rotation and saved Two Sided fallback', async () => {
+  await page.viewport(390, 844)
+  const state = createState()
+  state.preferences = { ...state.preferences, readerTextLayout: 'reading', readerSideMode: 'two', readingFontScale: 1.25 }
+  let settings: ReaderSettings | null = null
+  destroy = createMount()((scope) => { settings = createReaderSettings(scope, createOptions(state)) })
+  settings!.open()
+  const slider = required<HTMLInputElement>('[data-target-id="settings-reading-font-scale"]')
+  await vi.waitFor(() => expect(slider.getAttribute('aria-valuetext')).toBe('30.2 px'))
+  await page.viewport(844, 390)
+  await vi.waitFor(() => expect(slider.getAttribute('aria-valuetext')).toBe('20 px'))
+  await page.viewport(390, 844)
+  await vi.waitFor(() => expect(slider.getAttribute('aria-valuetext')).toBe('30.2 px'))
+  expect(state.preferences.readingFontScale).toBe(1.25)
+  expect(state.updatePreferences).not.toHaveBeenCalled()
 })
 
 test('replacement mounts keep one settings lifetime and preserve focus behavior', async () => {
@@ -332,7 +357,7 @@ test('switches four accessible icon-only settings categories', async () => {
   expect(sectionTitleStyle.textTransform).toBe('uppercase')
   expect(Number.parseFloat(sectionTitleStyle.letterSpacing)).toBeGreaterThan(0)
   const readingChoices = readingPanel.querySelectorAll('.settings-reader-choice')
-  expect(readingChoices).toHaveLength(3)
+  expect(readingChoices).toHaveLength(4)
   expect(
     focalPointMode.closest('.settings-reader-choice')?.classList
   ).toContain('mod-position')
@@ -348,9 +373,8 @@ test('switches four accessible icon-only settings categories', async () => {
     focalPointMode.compareDocumentPosition(disableShift) &
       Node.DOCUMENT_POSITION_FOLLOWING
   ).not.toBe(0)
-  expect(disableShift.closest('.settings-field')?.classList).toContain(
-    'mod-card'
-  )
+  expect(disableShift.closest('.settings-field')?.querySelector('.settings-field-label')?.getBoundingClientRect().left)
+    .toBeCloseTo(readingPanel.querySelector('.settings-field-label')!.getBoundingClientRect().left, 1)
   expect(fixture.querySelector('.settings-advanced-link')).toBeNull()
   expect(fixture.querySelector('.settings-instant-status')).toBeNull()
   expect(fixture.querySelector('.settings-selected-check')).toBeNull()

@@ -226,7 +226,7 @@
           {#if advancedOpen}
             <div id="print-advanced-options">
               <label class="toggle-row divine-names-option"><span>Use substitute spellings</span><input type="checkbox" role="switch" bind:checked={replaceDivineNames} aria-describedby="print-divine-names-hint" /></label>
-              <p class="hint" id="print-divine-names-hint">Uses <bdi lang="he">ידוד</bdi> and <bdi lang="he">אלקים</bdi> forms for Hashem's names.</p>
+              <p class="hint" id="print-divine-names-hint">Uses <bdi lang="he">ידוה</bdi> and <bdi lang="he">אלקים</bdi> forms for Hashem's names.</p>
               <label class="toggle-row credits-option"><span>Remove Credits</span><input type="checkbox" role="switch" bind:checked={removeCredits} /></label>
             </div>
           {/if}

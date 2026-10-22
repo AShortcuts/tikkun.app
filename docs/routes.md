@@ -84,17 +84,20 @@ Valid Esther page range: `1-16`.
 ```
 
 These open the actual service for that date and calendar location, including
-its additional Torah scrolls and special aliyah labels. Upcoming and Holiday
-entries use this context; `#/next` selects the next dated service. Saving or
+its additional Torah scrolls and special aliyah labels. Holiday entries, and
+Upcoming entries whose date changes the reading (special maftir, Rosh Chodesh,
+holidays), use this context. An ordinary Shabbat reading has the same text as
+its parsha, so Upcoming and `#/next` open it at its parsha route, exactly as
+the Reading Index does. Saving or
 resuming a service preserves its date. Simchat Torah can therefore have a
 different division from Vezot Haberacha in the parsha list, including an eighth
 aliyah when Simchat Torah falls on Shabbat in Israel.
 
-Phone Reading isolates the selected division for these reference-bearing
-parsha and service routes. Desktop, tablet, and Match open the same links in
-the continuous reader. Physical-page routes remain continuous on all devices.
-See [mobile Reading](mobile-reading.md) for eligibility, restoration, and the
-native compatibility gate.
+With **Show: One aliyah**, these reference-bearing parsha and service routes
+open the selected division by itself, in Reading and Match on any screen; with
+**Whole parsha** they open the continuous reader. Physical-page routes remain
+continuous. See [One aliyah at a time](mobile-reading.md) for defaults,
+restoration, and the native compatibility gate.
 
 ## Torah Reference Routes
 

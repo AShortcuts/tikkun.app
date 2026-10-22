@@ -13,7 +13,7 @@ import {
 import { listReadingSearchLeinings } from '../search/reading-catalog.ts'
 import { createReadingSearch } from '../search/reading-search.ts'
 import { isVezosHabracha } from '../view-model/scroll-view-model.ts'
-import { generateUrl } from '../view-model/navigation/url-parser.ts'
+import { generateUrl, preferredReadingRun } from '../view-model/navigation/url-parser.ts'
 import {
   canonicalParshaReadings,
   parshaReadingForLeining,
@@ -495,7 +495,8 @@ export function buildParshaPickerModel(
     .map((leining, index) => ({
       id: leiningKey(leining),
       label: renderLeiningTitle(leining, { forCalendar: true }),
-      href: index === 0 ? '#/next' : navigationHrefForLeining(leining),
+      // Same link as the Reading Index for an ordinary Shabbat parsha.
+      href: index === 0 ? '#/next' : generateUrl(preferredReadingRun(firstRunOf(leining))),
       date: leining.date.date,
     }))
     .reverse()

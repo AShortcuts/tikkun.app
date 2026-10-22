@@ -328,7 +328,7 @@ test('divine-name replacement updates both print forms in Match and Reader witho
     expect(toggle.checked).toBe(true)
     expectInvocations(paper, 'בס״ד')
     for (const form of ['torah', 'tikkun']) {
-      expect(plain(form)).toContain('ידוד')
+      expect(plain(form)).toContain('ידוה')
       expect(plain(form)).toContain('אלקים')
       expect(plain(form)).not.toMatch(/יהוה|אלהים/)
     }
@@ -342,7 +342,7 @@ test('divine-name replacement updates both print forms in Match and Reader witho
     expect(tokens('tikkun')).toEqual(selectedTokens)
     expect(pointings()).toEqual(marks)
     toggle.click()
-    await vi.waitFor(() => expect(plain('tikkun')).toContain('ידוד'))
+    await vi.waitFor(() => expect(plain('tikkun')).toContain('ידוה'))
     button('One Sided').click()
     await vi.waitFor(() => expect(paper.querySelector('.print-book[data-print-sides="one"]')).not.toBeNull())
     expectInvocations(paper, 'בס״ד')
@@ -350,4 +350,27 @@ test('divine-name replacement updates both print forms in Match and Reader witho
     button('Two Sided').click()
     await vi.waitFor(() => expect(paper.querySelector('.print-book[data-print-sides="two"]')).not.toBeNull())
   }
+})
+
+test('the top mark stays ב״ה when a name without a substitute spelling is printed', async () => {
+  frame = document.createElement('iframe')
+  frame.style.cssText = 'width:1280px;height:900px'
+  frame.src = '/prototypes/print/'
+  document.body.append(frame)
+  await vi.waitFor(() => expect(frame?.contentDocument?.querySelector('.preview-region[aria-busy="false"]')).not.toBeNull(), { timeout: 15000 })
+  const doc = frame.contentDocument!
+  const paper = required<HTMLIFrameElement>(doc, '.document-wrap iframe').contentDocument!
+  const select = (label: string, value: string) => {
+    const input = required<HTMLSelectElement>(doc, `[aria-label="${label}"]`)
+    input.value = value
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  }
+  expectInvocations(paper, 'בס״ד')
+  select('Ending chapter', '17')
+  select('Ending pasuk', '2')
+  select('Starting chapter', '17')
+  select('Starting pasuk', '1')
+  await vi.waitFor(() => expect(paper.querySelector('.paper-heading [lang="en"]')?.textContent).toBe('Beresheet 17:1–2'))
+  await vi.waitFor(() => expectInvocations(paper, 'ב״ה'))
+  expect([...paper.querySelectorAll<HTMLElement>('[data-print-selected="true"]')].some(word => word.textContent!.replace(/\p{M}/gu, '') === 'שדי')).toBe(true)
 })

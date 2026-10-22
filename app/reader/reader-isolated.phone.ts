@@ -29,11 +29,14 @@ afterEach(async () => {
   await page.viewport(390, 844)
 })
 
-async function openReader(hash: string, sides: 'one' | 'two' = 'one', layout = 'reading', bookmarks: ReaderBookmark[] = []) {
+async function openReader(hash: string, sides: 'one' | 'two' = 'one', layout = 'reading', bookmarks: ReaderBookmark[] = [],
+  show?: 'parsha' | 'aliyah') {
   await commands.emulatePhoneTouch()
   savedStorage = new Map(Object.entries(localStorage))
   localStorage.clear()
-  localStorage.setItem('tikkun.reader-preferences', JSON.stringify({ readerTextLayout: layout, readerSideMode: sides }))
+  localStorage.setItem('tikkun.reader-preferences', JSON.stringify({
+    readerTextLayout: layout, readerSideMode: sides, ...(show && { readerShow: show }),
+  }))
   if (bookmarks.length) localStorage.setItem(BOOKMARKS_STORAGE_KEY, JSON.stringify(bookmarks))
   frame = document.createElement('iframe')
   frame.title = 'Isolated aliyah phone acceptance'
@@ -50,6 +53,18 @@ async function openReader(hash: string, sides: 'one' | 'two' = 'one', layout = '
 }
 
 function button(doc: Document, target: string) {
+  return requiredButton(doc, target)
+}
+
+/** The remembered word stays on the focal row; words sharing that row tie for focus. */
+function expectFocalRow(book: HTMLElement, tokenKey: string | undefined, message: string) {
+  const focal = getVisibleReaderFocalWord(book)
+  const word = book.querySelector<HTMLElement>(`[data-reader-canonical="true"] .word[data-token-key="${tokenKey}"]:not([hidden])`)
+  expect(word, message).not.toBeNull()
+  expect(Math.abs(focal!.getBoundingClientRect().top - word!.getBoundingClientRect().top), message).toBeLessThan(2)
+}
+
+function requiredButton(doc: Document, target: string) {
   const result = doc.querySelector<HTMLButtonElement>(`[data-target-id="${target}"]`)
   if (!result) throw new Error(`Missing ${target}`)
   return result
@@ -104,7 +119,72 @@ test('a small non-touch viewport keeps isolated Reading and aliyah navigation', 
   await expectAliyah(doc, 2)
 })
 
-test('resizing a desktop window switches isolation at 550px and preserves the focal token, preference and history', async () => {
+test.each(['reading', 'match'])('pinch viewport changes do not resize the %s reading surface or change selection', async (layout) => {
+  const doc = await openReader('#/torah/parsha/lech-lecha/1-12-1/aliyah/1', 'one', layout)
+  await expectAliyah(doc, 1)
+  const view = doc.defaultView!
+  const book = doc.querySelector<HTMLElement>('.tikkun-book')!
+  const app = doc.querySelector<HTMLElement>('.app')!
+  const initial = { height: app.clientHeight, bookHeight: book.clientHeight, scrollTop: book.scrollTop, hash: view.location.hash, history: view.history.length }
+  const widthDescriptor = Object.getOwnPropertyDescriptor(view, 'innerWidth')!
+  const heightDescriptor = Object.getOwnPropertyDescriptor(view, 'innerHeight')!
+  try {
+    // WebKit reports the zoomed visible size through innerWidth/innerHeight.
+    // The document layout viewport remains 390 x 844 throughout a pinch.
+    for (const scale of [1.5, 2, 0.65, 1]) {
+      Object.defineProperty(view, 'innerWidth', { configurable: true, value: 390 / scale })
+      Object.defineProperty(view, 'innerHeight', { configurable: true, value: 844 / scale })
+      view.dispatchEvent(new Event('resize'))
+      view.visualViewport?.dispatchEvent(new Event('resize'))
+      await new Promise<void>(resolve => view.requestAnimationFrame(() => view.requestAnimationFrame(() => resolve())))
+      expect(app.clientHeight, `app height at ${scale}x`).toBe(initial.height)
+      expect(book.clientHeight, `reader height at ${scale}x`).toBe(initial.bookHeight)
+      expect(book.scrollTop).toBeCloseTo(initial.scrollTop, 0)
+      expect(doc.documentElement.dataset.readerPhone).toBe('true')
+      expect(view.location.hash).toBe(initial.hash)
+      expect(view.history.length).toBe(initial.history)
+    }
+  } finally {
+    Object.defineProperty(view, 'innerWidth', widthDescriptor)
+    Object.defineProperty(view, 'innerHeight', heightDescriptor)
+    view.dispatchEvent(new Event('resize'))
+  }
+})
+
+test('hiding pasuk numbers widens mobile Reading while retaining the focal word and pixel size', async () => {
+  const doc = await openReader('#/torah/parsha/lech-lecha/1-12-1/aliyah/1')
+  await expectAliyah(doc, 1)
+  await vi.waitFor(() => expect(doc.querySelector('[data-target-id="reader-boot-state"]')).toBeNull(), { timeout: 5000 })
+  const view = doc.defaultView!
+  const book = doc.querySelector<HTMLElement>('.tikkun-book')!
+  await doc.fonts.ready
+  book.scrollTop = 260
+  book.dispatchEvent(new Event('scroll'))
+  await new Promise<void>(resolve => view.requestAnimationFrame(() => view.requestAnimationFrame(() => resolve())))
+  const focal = getVisibleReaderFocalWord(book)!
+  const tokens = [...book.querySelectorAll<HTMLElement>('.word[data-token-key]')].map(word => word.dataset.tokenKey)
+  const historyLength = view.history.length
+  const originalInset = parseFloat(view.getComputedStyle(book).paddingRight)
+  const originalFont = view.getComputedStyle(doc.querySelector('.tikkun-page')!).fontSize
+  button(doc, 'settings-toggle').click()
+  await vi.waitFor(() => expect(doc.querySelector('[data-target-id="settings-verse-numbers"]')).not.toBeNull())
+  const toggle = doc.querySelector<HTMLInputElement>('[data-target-id="settings-verse-numbers"]')!
+  toggle.click()
+  await vi.waitFor(() => expect(parseFloat(view.getComputedStyle(book).paddingRight)).toBeLessThan(originalInset - 30))
+  await vi.waitFor(() => expectFocalRow(book, focal.dataset.tokenKey, 'pasuk-number reflow keeps the focal word'))
+  expect(view.getComputedStyle(doc.querySelector('.tikkun-page')!).fontSize).toBe(originalFont)
+  expect([...book.querySelectorAll<HTMLElement>('.word[data-token-key]')].map(word => word.dataset.tokenKey)).toEqual(tokens)
+  expect(view.history.length).toBe(historyLength)
+  expect(doc.querySelector<HTMLInputElement>('[data-target-id="settings-reading-font-scale"]')?.getAttribute('aria-valuetext')).toBe('24.2 px')
+  button(doc, 'settings-close').click()
+  await page.screenshot({ path: '../../.vitest-attachments/reading-pasuk-numbers-off.png' })
+  button(doc, 'settings-toggle').click()
+  toggle.click()
+  await vi.waitFor(() => expect(parseFloat(view.getComputedStyle(book).paddingRight)).toBe(originalInset))
+  await vi.waitFor(() => expectFocalRow(book, focal.dataset.tokenKey, 'restoring numbers keeps the focal word'))
+})
+
+test('resizing keeps One aliyah, switches only the phone chrome at 550px, and preserves the focal token, preference and history', async () => {
   const doc = await openReader('#/torah/parsha/beresheet/1-2-4/aliyah/2', 'two')
   await expectAliyah(doc, 2)
   const view = doc.defaultView!
@@ -122,18 +202,25 @@ test('resizing a desktop window switches isolation at 550px and preserves the fo
   }
   await resize(1200)
   await vi.waitFor(() => {
-    expect(doc.documentElement.dataset.readerIsolated).toBeUndefined()
+    expect(doc.documentElement.dataset.readerIsolated).toBe('true')
+    expect(doc.documentElement.dataset.readerPhone).toBeUndefined()
     expect(book.getAttribute('aria-busy')).toBeNull()
     expect(book.dataset.readerSides).toBe('two')
-    expect(doc.querySelector('.is-active-word')).not.toBeNull()
   }, { timeout: 15_000 })
-  const focalKey = doc.querySelector<HTMLElement>('.is-active-word')!.dataset.tokenKey
+  await expectAliyah(doc, 2)
+  expect(doc.querySelector('[data-target-id="isolated-aliyah-controls"]')).toBeNull()
+  // Mid-passage, so the focal word stays restorable at every width.
+  book.scrollTop = book.scrollHeight * 0.4
+  book.dispatchEvent(new Event('scroll'))
+  await new Promise(resolve => view.requestAnimationFrame(() => view.requestAnimationFrame(resolve)))
+  const focalKey = getVisibleReaderFocalWord(book)!.dataset.tokenKey
   await resize(550)
-  await vi.waitFor(() => expect(doc.documentElement.dataset.readerIsolated).toBe('true'))
+  await vi.waitFor(() => expect(doc.documentElement.dataset.readerPhone).toBe('true'))
   await expectAliyah(doc, 2)
   expect(doc.documentElement.dataset.readerIsolated).toBe('true')
-  expect(book.dataset.readerSides).toBe('one')
-  await vi.waitFor(() => expect(doc.querySelector<HTMLElement>('.is-active-word')?.dataset.tokenKey, 'enter isolation').toBe(focalKey))
+  await vi.waitFor(() => expect(book.dataset.readerSides).toBe('one'))
+  expect(doc.querySelector('[data-target-id="isolated-aliyah-controls"]')).not.toBeNull()
+  await vi.waitFor(() => expectFocalRow(book, focalKey, 'enter phone chrome'))
   const word = doc.querySelector('.word[data-token-key]')!
   await resize(430)
   await vi.waitFor(() => expect(view.innerWidth).toBe(430))
@@ -141,11 +228,12 @@ test('resizing a desktop window switches isolation at 550px and preserves the fo
   expect(word.isConnected).toBe(true)
   await resize(551)
   await vi.waitFor(() => {
-    expect(doc.documentElement.dataset.readerIsolated).toBeUndefined()
+    expect(doc.documentElement.dataset.readerPhone).toBeUndefined()
+    expect(doc.documentElement.dataset.readerIsolated).toBe('true')
     expect(book.getAttribute('aria-busy')).toBeNull()
     expect(book.dataset.readerSides).toBe('two')
   }, { timeout: 15_000 })
-  await vi.waitFor(() => expect(doc.querySelector<HTMLElement>('.is-active-word')?.dataset.tokenKey, 'leave isolation').toBe(focalKey))
+  await vi.waitFor(() => expectFocalRow(book, focalKey, 'leave phone chrome'))
   expect(view.history.length).toBe(historyLength)
   expect(JSON.parse(localStorage.getItem('tikkun.reader-preferences')!).readerSideMode).toBe('two')
 }, 30_000)
@@ -166,26 +254,26 @@ test('rapid viewport reversals settle on the latest size without stale passage r
   expect(doc.querySelector('.reader-passage-status')).toBeNull()
 }, 30_000)
 
-test('resizing after manual scrolling preserves the visible word instead of a paused highlight', async () => {
-  const doc = await openReader('#/torah/parsha/beresheet', 'two')
+test('Whole parsha stays continuous across resizes and preserves the visible word', async () => {
+  const doc = await openReader('#/torah/parsha/beresheet', 'two', 'reading', [], 'parsha')
   const book = doc.querySelector<HTMLElement>('.tikkun-book')!
   frame!.style.width = '1200px'
   await vi.waitFor(() => {
     expect(doc.documentElement.dataset.readerIsolated).toBeUndefined()
     expect(book.getAttribute('aria-busy')).toBeNull()
-    expect(doc.querySelector('.is-active-word')).not.toBeNull()
+    expect(book.dataset.readerSides).toBe('two')
   }, { timeout: 15_000 })
-  const pausedKey = doc.querySelector<HTMLElement>('.is-active-word')!.dataset.tokenKey
   book.scrollTop = book.scrollHeight * 0.65
   book.dispatchEvent(new Event('scroll'))
   await new Promise(resolve => doc.defaultView!.requestAnimationFrame(() => doc.defaultView!.requestAnimationFrame(resolve)))
   const focalKey = getVisibleReaderFocalWord(book)!.dataset.tokenKey
-  expect(focalKey).not.toBe(pausedKey)
   frame!.style.width = '390px'
   await vi.waitFor(() => {
-    expect(doc.documentElement.dataset.readerIsolated).toBe('true')
+    expect(doc.documentElement.dataset.readerPhone).toBe('true')
+    expect(doc.documentElement.dataset.readerIsolated).toBeUndefined()
     expect(book.getAttribute('aria-busy')).toBeNull()
-    expect(doc.querySelector<HTMLElement>('.is-active-word')?.dataset.tokenKey).toBe(focalKey)
+    expect(book.dataset.readerSides).toBe('one')
+    expect(getVisibleReaderFocalWord(book)?.dataset.tokenKey).toBe(focalKey)
   }, { timeout: 15_000 })
 }, 30_000)
 
@@ -251,14 +339,29 @@ test('rapid rail requests reveal only the latest selected aliyah', async () => {
   await expectAliyah(doc, 3)
 }, 30_000)
 
-test('phone Match remains continuous and has no isolated controls', async () => {
-  const doc = await openReader('#/torah/parsha/beresheet', 'one', 'match')
+test('Whole parsha Match on a phone stays continuous with no isolated controls', async () => {
+  const doc = await openReader('#/torah/parsha/beresheet', 'one', 'match', [], 'parsha')
   expect(doc.documentElement.dataset.readerIsolated).toBeUndefined()
   expect(doc.querySelector('[data-target-id="isolated-aliyah-controls"]')).toBeNull()
   expect(doc.defaultView!.location.hash).not.toContain('/aliyah/')
 }, 30_000)
 
-test('switching between Reading and Match preserves the selected reading and focal word without history entries', async () => {
+test('One aliyah Match fades neighboring words on shared physical lines and keeps them out of token lookups', async () => {
+  const doc = await openReader('#/torah/parsha/beresheet/1-2-20/aliyah/3', 'one', 'match')
+  await expectAliyah(doc, 3)
+  expect(doc.documentElement.dataset.readerIsolated).toBe('true')
+  expect(doc.querySelector('[data-target-id="isolated-aliyah-controls"]')).not.toBeNull()
+  const context = [...doc.querySelectorAll<HTMLElement>('.word.mod-passage-context')]
+  expect(context.length).toBeGreaterThan(0)
+  for (const word of context) {
+    expect(word.hasAttribute('data-token-key')).toBe(false)
+    expect(word.getAttribute('aria-hidden')).toBe('true')
+    expect(Number(getComputedStyle(word).opacity)).toBeLessThan(0.5)
+  }
+  expect(doc.querySelector('.word[data-token-key]')?.textContent?.trim().normalize('NFC')).toBe('וַיִּקְרָ֨א'.normalize('NFC'))
+}, 30_000)
+
+test('switching layout keeps One aliyah, and the Show setting switches views, preserving the focal word without history entries', async () => {
   const doc = await openReader('#/torah/parsha/beshalach/2-15-1/aliyah/4')
   await expectAliyah(doc, 4)
   const view = doc.defaultView!
@@ -266,6 +369,11 @@ test('switching between Reading and Match preserves the selected reading and foc
   button(doc, 'settings-toggle').click()
   await vi.waitFor(() => expect(doc.querySelector('[data-reader-text-layout="match"]')).not.toBeNull())
   doc.querySelector<HTMLButtonElement>('[data-reader-text-layout="match"]')!.click()
+  await vi.waitFor(() => expect(doc.querySelector<HTMLElement>('.tikkun-book')?.dataset.readerLayout).toBe('match'))
+  await expectAliyah(doc, 4)
+  expect(doc.documentElement.dataset.readerIsolated).toBe('true')
+  doc.querySelector<HTMLButtonElement>('[data-reader-text-layout="reading"]')!.click()
+  doc.querySelector<HTMLButtonElement>('[data-reader-show="parsha"]')!.click()
   await vi.waitFor(() => {
     expect(doc.documentElement.dataset.readerIsolated).toBeUndefined()
     expect(doc.querySelector('[data-target-id="tikkun-book"]')?.getAttribute('aria-busy')).toBeNull()
@@ -273,7 +381,7 @@ test('switching between Reading and Match preserves the selected reading and foc
   })
   const focal = doc.querySelector<HTMLElement>('.is-active-word')!.dataset.tokenKey
   expect(doc.querySelector('[data-target-id="isolated-aliyah-controls"]')).toBeNull()
-  doc.querySelector<HTMLButtonElement>('[data-reader-text-layout="reading"]')!.click()
+  doc.querySelector<HTMLButtonElement>('[data-reader-show="aliyah"]')!.click()
   await expectAliyah(doc, 4)
   expect(doc.querySelector(`.is-active-word[data-token-key="${focal}"]`)).not.toBeNull()
   expect(view.history.length).toBe(historyLength)

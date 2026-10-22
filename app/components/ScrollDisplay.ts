@@ -26,6 +26,7 @@ import {
 } from '../reader-presentation.ts'
 import { applyReaderPageLayout, applyReaderPageLayouts, readerPageFont } from './reader-page-layout.ts'
 import { observeReaderResize, type ReaderResizeSubscription } from '../adaptive/reader-resize.ts'
+import { readerLayoutViewport } from '../adaptive/reader-viewport.ts'
 import { findReadingVerseStartWord } from '../reader/reading-verse-target.ts'
 
 const { htmlToElement, purgeNode } = utils
@@ -327,7 +328,8 @@ export class ScrollDisplay {
 
   private layoutViewportSize() {
     const view = this.root.ownerDocument.defaultView!
-    return `${view.innerWidth}:${view.innerHeight}:${this.root.clientWidth}:${this.root.clientHeight}`
+    const { width, height } = readerLayoutViewport(view)
+    return `${width}:${height}:${this.root.clientWidth}:${this.root.clientHeight}`
   }
 
   private refreshMountedPageLayouts() {
@@ -1074,7 +1076,7 @@ function renderMessageNode(entry: RenderedMessageInfo) {
 
 function getFirstVisibleWord(line: HTMLElement) {
   return (
-    [...line.querySelectorAll<HTMLElement>('.word')].find((word) => {
+    [...line.querySelectorAll<HTMLElement>('.word:not(.mod-passage-context)')].find((word) => {
       const rect = word.getBoundingClientRect()
       return rect.width > 0 && rect.height > 0
     }) ?? null

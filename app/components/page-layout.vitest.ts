@@ -38,6 +38,43 @@ afterEach(() => {
   delete document.documentElement.dataset.readerSideOrder
   delete document.documentElement.dataset.readerTextLayout
   delete document.documentElement.dataset.readerIsolated
+  delete document.documentElement.dataset.readerPhone
+  delete document.documentElement.dataset.verseNumbers
+})
+
+test.each([
+  { width: 390, height: 844, layout: 'reading' as const, sides: 'one' as const, reclaim: true },
+  { width: 844, height: 390, layout: 'reading' as const, sides: 'two' as const, reclaim: true },
+  { width: 1280, height: 900, layout: 'reading' as const, sides: 'one' as const, reclaim: false },
+  { width: 390, height: 844, layout: 'match' as const, sides: 'one' as const, reclaim: false },
+])('hiding pasuk numbers reclaims mobile Reading space only: $layout/$sides at $width', async ({ width, height, layout, sides, reclaim }) => {
+  await page.viewport(width, height)
+  document.documentElement.dataset.readerSideOrder = 'tikkun-right'
+  const presentation = { layout, sides }
+  install(`<div class="tikkun-book mod-annotations-on" data-target-id="tikkun-book" data-reader-layout="${layout}" data-reader-sides="${sides}" dir="rtl">
+    <section class="tikkun-page">${Page(renderedPage(37, vayishlachPageJson), { presentation })}</section>
+  </div>`)
+  await document.fonts.ready
+  const member = required<HTMLElement>('.tikkun-page')
+  const book = required<HTMLElement>('.tikkun-book')
+  const measure = () => {
+    const container = sides === 'one' && layout === 'reading' ? book : required<HTMLElement>(layout === 'reading' ? '.reader-reading-page-side.mod-tikkun' : '.line-content')
+    const style = getComputedStyle(container)
+    return container.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+  }
+  applyReaderPageLayout(member, presentation)
+  const originalWidth = measure()
+  const tokens = requiredAll<HTMLElement>('.word[data-token-key]').map(word => word.dataset.tokenKey)
+  document.documentElement.dataset.verseNumbers = 'off'
+  applyReaderPageLayout(member, presentation)
+  if (reclaim) expect(measure()).toBeGreaterThan(originalWidth + 30)
+  else expect(measure()).toBeCloseTo(originalWidth, 1)
+  expect(getComputedStyle(required('.line-gutter.mod-verses')).visibility).toBe('hidden')
+  expect(requiredAll<HTMLElement>('.word[data-token-key]').map(word => word.dataset.tokenKey)).toEqual(tokens)
+  expect(book.scrollWidth).toBeLessThanOrEqual(book.clientWidth + 1)
+  document.documentElement.dataset.verseNumbers = 'on'
+  applyReaderPageLayout(member, presentation)
+  expect(measure()).toBeCloseTo(originalWidth, 1)
 })
 
 test.each(['light', 'dark', 'sepia', 'custom'])(
@@ -1275,6 +1312,7 @@ test.each([
 test.each([[390, 844], [844, 390]])('keeps isolated Reading gutters hidden at %ix%i', async (width, height) => {
   await page.viewport(width, height)
   document.documentElement.dataset.readerIsolated = 'true'
+  document.documentElement.dataset.readerPhone = 'true'
   document.documentElement.dataset.readerSideOrder = 'tikkun-right'
   const source = readingAliyahFixture()
   const presentation = { layout: 'reading', sides: width <= 550 ? 'one' : 'two' } as const

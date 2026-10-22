@@ -36,7 +36,7 @@ export function createArrivalCue(scope: MountScope, document: Document, view: Wi
       sides.add(side)
       const top = seed.getClientRects()[0]?.top
       if (top === undefined) continue
-      const rects = [...side.querySelectorAll<HTMLElement>('.word')]
+      const rects = [...side.querySelectorAll<HTMLElement>('.word:not(.mod-passage-context)')]
         .flatMap(word => [...word.getClientRects()])
         .filter(rect => rect.width > 0 && rect.height > 0 && Math.abs(rect.top - top) < 4)
       if (!rects.length) continue

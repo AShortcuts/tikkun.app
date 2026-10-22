@@ -42,6 +42,7 @@ afterEach(async () => {
   document.documentElement.style.removeProperty('--aliyah-rail-top')
   delete document.documentElement.dataset.aliyahRailVisibility
   delete document.documentElement.dataset.readerIsolated
+  delete document.documentElement.dataset.readerPhone
   if (stylesheet) {
     stylesheet.remove()
     stylesheet = null
@@ -183,6 +184,7 @@ test('isolated rail and smaller edge controls reserve clearance in portrait and 
   stylesheet.textContent = readerStyles
   document.head.append(stylesheet)
   document.documentElement.dataset.readerIsolated = 'true'
+  document.documentElement.dataset.readerPhone = 'true'
   fixture!.classList.add('app')
   required('[data-target-id="aliyah-navigation-layer-root"]').classList.add('aliyah-navigation-root')
   required('[data-target-id="reader"]').classList.add('app-body')
@@ -249,6 +251,7 @@ test('isolated rail and smaller edge controls reserve clearance in portrait and 
   await page.viewport(844, 390)
   navigation.syncContent({ desktop: completeSnapshot, compact: completeSnapshot, authoringEnabled: false })
   delete document.documentElement.dataset.readerIsolated
+  delete document.documentElement.dataset.readerPhone
   expect(getComputedStyle(rail).display).toBe('none')
   expect(requiredAll('.isolated-aliyah-controls')).toHaveLength(0)
   navigation.revealWide('expanded')

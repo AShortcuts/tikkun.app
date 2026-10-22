@@ -2,6 +2,7 @@
   import { flushSync, onMount } from 'svelte'
   import UiIcon from '../components/UiIcon.svelte'
   import { observeReaderResize } from '../adaptive/reader-resize.ts'
+  import { readerLayoutViewport } from '../adaptive/reader-viewport.ts'
   import type {
     FloatingPlayer,
     FloatingPlayerAction,
@@ -508,12 +509,13 @@
     const onLayout = () => {
       send({ type: 'layout' })
       if (!cornerControls) return
-      if (!snapshot.visible || view.innerWidth > 550) {
+      const { width, height } = readerLayoutViewport(view)
+      if (!snapshot.visible || width > 550) {
         cornerControls.style.removeProperty('--corner-controls-player-bottom')
         return
       }
       const top = requireElement(playerElement, 'its player element').getBoundingClientRect().top
-      cornerControls.style.setProperty('--corner-controls-player-bottom', `${Math.max(0, view.innerHeight - top) + 12}px`)
+      cornerControls.style.setProperty('--corner-controls-player-bottom', `${Math.max(0, height - top) + 12}px`)
     }
 
     view.addEventListener('pointermove', onPointerMove)

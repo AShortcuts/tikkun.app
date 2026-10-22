@@ -1,0 +1,33 @@
+{
+  "url": "https://tikkunreader.com/reader/#/torah/parsha/beresheet/1-1-1",
+  "date": "2026-10-20",
+  "source": "Public web reader; genuine paused playback; app default highlight CSS, no appearance overrides",
+  "viewport": {
+    "width": 440,
+    "height": 956
+  },
+  "deviceScaleFactor": 3,
+  "preferences": {},
+  "word": {
+    "text": "בְּרֵאשִׁ֖ית",
+    "tokenKey": "1:0:0:0",
+    "rect": {
+      "x": 290.59375,
+      "y": 144.796875,
+      "width": 89.40625,
+      "height": 37,
+      "top": 144.796875,
+      "right": 380,
+      "bottom": 181.796875,
+      "left": 290.59375
+    },
+    "color": "color(srgb 0.98311 0.959732 0.833276)",
+    "shadow": "color(srgb 0.98311 0.959732 0.833276) 0px 0px 0px 3.5px, rgb(255, 215, 0) 0px 0px 0px 5.5px, rgb(255, 215, 0) 0px 0px 3.5px 5.5px"
+  },
+  "playBounds": {
+    "x": 195.984375,
+    "y": 800.46875,
+    "width": 48,
+    "height": 48
+  }
+}

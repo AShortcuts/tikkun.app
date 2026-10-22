@@ -1,0 +1,69 @@
+{
+  "created": "2026-10-20",
+  "assets": [
+    {
+      "file": "creative-assets/header/tikkun-reader-header.png",
+      "placement": "header",
+      "width": 3840,
+      "height": 1646,
+      "mode": "RGB",
+      "bitDepth": 8,
+      "alpha": false,
+      "interlaced": false,
+      "profile": "sRGB",
+      "bytes": 1987134,
+      "sha256": "1284621fc4722966aafeaf5dcbb2e3eb301128915fca827c901d8706b3c42fbf"
+    },
+    {
+      "file": "creative-assets/search/tikkun-reader-search.png",
+      "placement": "search",
+      "width": 3840,
+      "height": 2560,
+      "mode": "RGB",
+      "bitDepth": 8,
+      "alpha": false,
+      "interlaced": false,
+      "profile": "sRGB",
+      "bytes": 2776887,
+      "sha256": "eea079d33f18bf1af502cbdcb71bd5e86d1eb23cf793cec8c1724ed39cbcc535"
+    }
+  ],
+  "captures": [
+    {
+      "file": "captures/01-reader.png",
+      "sha256": "654cd7c831a23b5d57d6c773392dc47fff48930de126354d1f575ef5b68713ee",
+      "captured": "2026-09-11",
+      "build": "1.0 (2)",
+      "device": "iPhone 17 Pro Max"
+    },
+    {
+      "file": "captures/02-practice.png",
+      "sha256": "9f91b19c26ce99679f7a080c77cfe8dafc9f9acab8f6ef27a9463c77e4328e16",
+      "captured": "2026-09-11",
+      "build": "1.0 (2)",
+      "device": "iPhone 17 Pro Max"
+    }
+  ],
+  "safeAreas": {
+    "header": [
+      1097,
+      493,
+      1646,
+      661
+    ],
+    "search": [
+      836,
+      765,
+      2168,
+      1030
+    ]
+  },
+  "popoutCrop": {
+    "source": "../captures/02-practice.png",
+    "x": 40,
+    "y": 560,
+    "width": 1240,
+    "height": 260
+  },
+  "status": "Local artwork exports; not uploaded or App Store Connect verified"
+}

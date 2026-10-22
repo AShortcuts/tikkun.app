@@ -1441,13 +1441,13 @@
   }
 
   @media screen and (min-width: 551px) and (max-height: 550px) {
-    html[data-reader-isolated='true'] .floating-player:not(.is-expanded),
-    html[data-reader-isolated='true']
+    html[data-reader-isolated='true'][data-reader-phone='true'] .floating-player:not(.is-expanded),
+    html[data-reader-isolated='true'][data-reader-phone='true']
       .floating-player:not(.is-expanded) .floating-player-controls {
       flex-direction: row;
     }
 
-    html[data-reader-isolated='true'] .floating-player {
+    html[data-reader-isolated='true'][data-reader-phone='true'] .floating-player {
       top: auto;
       bottom: max(0.85rem, env(safe-area-inset-bottom, 0px));
     }

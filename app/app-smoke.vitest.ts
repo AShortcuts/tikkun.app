@@ -430,10 +430,12 @@ test('offers the previous reading after mobile Library navigation', async () => 
     { timeout: 10_000, interval: 50 }
   )
   click(frameDocument, '[data-mobile-book="1"]')
-  const noachRow = () => Array.from(frameDocument.querySelectorAll<HTMLButtonElement>('[data-mobile-parsha]'))
+  const noachRow = () => Array.from(frameDocument.querySelectorAll<HTMLElement>('[data-mobile-parsha]'))
     .find(row => row.querySelector('[lang="en"]')?.textContent === 'Noach')
   await vi.waitFor(() => expect(noachRow()).toBeDefined())
-  noachRow()!.click()
+  noachRow()!.parentElement!
+    .querySelector<HTMLButtonElement>('.mobile-parsha-aliyah-toggle')!
+    .click()
   const firstAliyah = '.mobile-aliyah-links a[href^="#/torah/parsha/noach/"]'
   await vi.waitFor(() => expect(frameDocument.querySelector(firstAliyah)).not.toBeNull())
   click(frameDocument, firstAliyah)

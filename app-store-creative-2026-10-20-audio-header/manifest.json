@@ -1,0 +1,83 @@
+{
+  "created": "2026-10-20",
+  "assets": [
+    {
+      "file": "creative-assets/header/tikkun-reader-header.png",
+      "placement": "header",
+      "width": 3840,
+      "height": 1646,
+      "mode": "RGB",
+      "bitDepth": 8,
+      "alpha": false,
+      "interlaced": false,
+      "profile": "sRGB",
+      "bytes": 2150763,
+      "sha256": "cb1675ae49f3bff0ea291df6c6d310e282c2dacd189936d991914bda52599000"
+    },
+    {
+      "file": "creative-assets/search/tikkun-reader-search.png",
+      "placement": "search",
+      "width": 3840,
+      "height": 2560,
+      "mode": "RGB",
+      "bitDepth": 8,
+      "alpha": false,
+      "interlaced": false,
+      "profile": "sRGB",
+      "bytes": 3052817,
+      "sha256": "93709c154e0bdf0daf9eb96616b8dbe31884f6ded23084de937b02625d359dda"
+    }
+  ],
+  "captures": [
+    {
+      "file": "captures/01-reader.png",
+      "sha256": "654cd7c831a23b5d57d6c773392dc47fff48930de126354d1f575ef5b68713ee",
+      "captured": "2026-09-11",
+      "build": "1.0 (2)",
+      "device": "iPhone 17 Pro Max"
+    },
+    {
+      "file": "captures/02-practice.png",
+      "sha256": "9f91b19c26ce99679f7a080c77cfe8dafc9f9acab8f6ef27a9463c77e4328e16",
+      "captured": "2026-09-11",
+      "build": "1.0 (2)",
+      "device": "iPhone 17 Pro Max"
+    },
+    {
+      "file": "captures/03-audio.png",
+      "sha256": "0f972e9f9de6c228d2d8a7b2b223e04fad2591635c500578698570c84ffa4141",
+      "captured": "2026-09-11",
+      "build": "1.0 (2)",
+      "device": "iPhone 17 Pro Max"
+    }
+  ],
+  "safeAreas": {
+    "header": [
+      1097,
+      493,
+      1646,
+      661
+    ],
+    "search": [
+      836,
+      765,
+      2168,
+      1030
+    ]
+  },
+  "popoutCrop": {
+    "source": "../captures/02-practice.png",
+    "x": 40,
+    "y": 560,
+    "width": 1240,
+    "height": 260
+  },
+  "audioHighlightCrop": {
+    "source": "../captures/03-audio.png",
+    "x": 40,
+    "y": 820,
+    "width": 1240,
+    "height": 390
+  },
+  "status": "Local artwork exports; not uploaded or App Store Connect verified"
+}

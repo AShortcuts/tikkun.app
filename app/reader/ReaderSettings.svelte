@@ -97,6 +97,29 @@
   let themeTransferId = 0
   let compactViewportMedia: MediaQueryList | null = null
   let compactViewport = $state(false)
+  let fontSizeSample = $state<HTMLSpanElement>()
+  let readingBaseFontPx = $state(0)
+
+  // Use the renderer's CSS sizing, including viewport and side-mode changes.
+  $effect(() => {
+    if (!fontSizeSample) return
+    const sample = fontSizeSample
+    const measure = () => {
+      readingBaseFontPx = Number.parseFloat(view.getComputedStyle(sample).fontSize)
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(sample)
+    return () => observer.disconnect()
+  })
+
+  function readingFontPixels(scale: number) {
+    return Number((readingBaseFontPx * scale).toFixed(4))
+  }
+
+  const readingFontLabel = $derived(
+    `${Number(readingFontPixels(preferences.readingFontScale).toFixed(1))} px`
+  )
   let paneElement: HTMLDivElement
   let panePosition = $state<{ left: number; top: number } | null>(null)
   let defaultPanePosition: { left: number; top: number } | null = null
@@ -991,28 +1014,68 @@
           </div>
             </div>
 
+            <div class="settings-reader-choice">
+              <span class="settings-field-label">Show</span>
+          <div
+            class="settings-segmented-control"
+            data-target-id="settings-reader-show"
+          >
+            <button
+              class="settings-segmented-option"
+              class:is-active={preferences.readerShow === 'parsha'}
+              type="button"
+              data-reader-show="parsha"
+              aria-pressed={preferences.readerShow === 'parsha'}
+              onclick={() =>
+                updatePreferences({ readerShow: 'parsha' })}
+            >
+              <span>Whole parsha</span>
+              <small>Continuous</small>
+            </button>
+            <button
+              class="settings-segmented-option"
+              class:is-active={preferences.readerShow === 'aliyah'}
+              type="button"
+              data-reader-show="aliyah"
+              aria-pressed={preferences.readerShow === 'aliyah'}
+              onclick={() =>
+                updatePreferences({ readerShow: 'aliyah' })}
+            >
+              <span>One aliyah</span>
+              <small>At a time</small>
+            </button>
+          </div>
+            </div>
+
             {#if preferences.readerTextLayout === 'reading'}
-              <label class="settings-field">
+              <label class="settings-reader-choice">
                 <span class="settings-field-label">Font size</span>
-                <span class="settings-number-input">
+                <span class="settings-number-input mod-reading-font">
+                  <span
+                    bind:this={fontSizeSample}
+                    class="reading-font-size-sample"
+                    data-reader-sides={compactViewport ? 'one' : preferences.readerSideMode}
+                    aria-hidden="true"
+                  ></span>
                   <input
                     data-target-id="settings-reading-font-scale"
                     type="range"
-                    min={readingFontScaleRange.min}
-                    max={readingFontScaleRange.max}
-                    step={readingFontScaleRange.step}
-                    value={preferences.readingFontScale}
-                    aria-valuetext={`${Math.round(preferences.readingFontScale * 100)}%`}
+                    min={readingFontPixels(readingFontScaleRange.min)}
+                    max={readingFontPixels(readingFontScaleRange.max)}
+                    step={readingFontPixels(readingFontScaleRange.step)}
+                    value={readingFontPixels(preferences.readingFontScale)}
+                    disabled={!readingBaseFontPx}
+                    aria-valuetext={readingFontLabel}
                     oninput={(event) =>
-                      updateFiniteNumber(event.currentTarget.value, (readingFontScale) =>
-                        updatePreferences({ readingFontScale }))}
+                      updateFiniteNumber(event.currentTarget.value, (pixels) =>
+                        updatePreferences({ readingFontScale: Number((pixels / readingBaseFontPx).toFixed(6)) }))}
                   />
-                  <span aria-hidden="true">{Math.round(preferences.readingFontScale * 100)}%</span>
+                  <span aria-hidden="true">{readingFontLabel}</span>
                 </span>
               </label>
             {/if}
 
-            <label class="settings-field mod-checkbox mod-card mod-switch">
+            <label class="settings-field mod-checkbox mod-switch">
               <span class="settings-field-copy">
                 <span class="settings-field-label">Pasuk numbers</span>
                 <span class="settings-field-helper">Show each pasuk's number beside it.</span>
@@ -1117,7 +1180,7 @@
             </div>
           </div>
 
-          <label class="settings-field mod-checkbox mod-card mod-switch">
+          <label class="settings-field mod-checkbox mod-switch">
             <span class="settings-field-copy">
               <span class="settings-field-label">Disable Shift for Nekudot</span>
               <span class="settings-field-helper"

@@ -5,7 +5,7 @@ import type { PrintOptions } from './print-model.ts'
 import { loadPrintPassage, passageTitle, paperSize } from './print-model.ts'
 import { compareRefs } from '../calendar-model/ref-utils.ts'
 import type { ReaderPagePresentation } from '../reader-presentation.ts'
-import { replacePrintDivineNames } from './print-divine-names.ts'
+import { containsDivineName, replacePrintDivineNames } from './print-divine-names.ts'
 import { printColumnNumbers, printDetailsTitles } from './print-details.ts'
 
 function createBook(options: PrintOptions) {
@@ -31,7 +31,6 @@ function newSheet(root: HTMLElement, options: PrintOptions, pageIndex: number, k
   invocation.className = 'paper-invocation'
   invocation.lang = 'he'
   invocation.dir = 'rtl'
-  invocation.textContent = options.replaceDivineNames ? 'בס״ד' : 'ב״ה'
   const heading = document.createElement('header')
   heading.className = 'paper-heading'
   heading.dir = 'ltr'
@@ -291,6 +290,12 @@ export async function renderPrintDocument(root: HTMLElement, options: PrintOptio
   if (options.detailsPage && options.scaling > 0) {
     appendDetailsPage(root, options, pageCount++, pages.map(page => page.pageNumber))
   }
+  // Faded surrounding text is printed too, so it counts; hidden sides and omitted words do not.
+  const printsName = [...root.querySelectorAll<HTMLElement>('.paper-sheet .word')].some(word =>
+    containsDivineName(word.dataset.annotationsOnText ?? '') && word.checkVisibility({ visibilityProperty: true }))
+  root.querySelectorAll<HTMLElement>('.paper-invocation').forEach(invocation => {
+    invocation.textContent = printsName ? 'ב״ה' : 'בס״ד'
+  })
   root.querySelectorAll<HTMLElement>('.paper-number').forEach((number, index) => {
     number.textContent = `${index + 1}/${pageCount}`
     number.setAttribute('aria-label', `Page ${index + 1} of ${pageCount}`)

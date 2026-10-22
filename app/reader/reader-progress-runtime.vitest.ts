@@ -88,9 +88,9 @@ test('toggles the focal measure from lazily loaded reader settings', async () =>
 }, 30_000)
 
 test('replaces the URL when aliyah starts cross the focal point and restores that aliyah after reload', async () => {
-  // Phone-width Reading is the isolated view; Match keeps continuous scrolling.
+  // URL checkpoints belong to continuous scrolling (Show: Whole parsha).
   const savedPreferences = localStorage.getItem('tikkun.reader-preferences')
-  localStorage.setItem('tikkun.reader-preferences', JSON.stringify({ readerTextLayout: 'match' }))
+  localStorage.setItem('tikkun.reader-preferences', JSON.stringify({ readerTextLayout: 'match', readerShow: 'parsha' }))
   onTestFinished(() => {
     if (savedPreferences === null) localStorage.removeItem('tikkun.reader-preferences')
     else localStorage.setItem('tikkun.reader-preferences', savedPreferences)

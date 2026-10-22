@@ -819,3 +819,79 @@ html[data-reader-isolated='true'] .reader-passage-status button:focus-visible {
   outline: 2px solid var(--text-color);
   outline-offset: 3px;
 }
+
+/* One aliyah: continue to the next aliyah from the end of the passage. */
+.tikkun-page:has(+ .isolated-aliyah-end) {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+/* Wherever the desktop aliyah rail peeks over the top of the reader, start the
+   text below it. This shows wherever the reader can reach its very top: One
+   aliyah passages, Beresheet, and readings shown on their own pages. */
+@media screen and (min-width: 551px) {
+  html:not([data-reader-isolated='true'][data-reader-phone='true']):not([data-recording-mode='true'])
+    .tikkun-book {
+    padding-top: calc(1em + 2.4rem);
+  }
+}
+
+.isolated-aliyah-end {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 2rem 1rem 8rem;
+  direction: ltr;
+}
+
+/* Phones step back with the rail row's previous button. */
+html[data-reader-phone='true'] .isolated-aliyah-end-step.mod-previous {
+  display: none;
+}
+
+html[data-reader-phone='true'] .isolated-aliyah-end:not(:has(.mod-next)) {
+  display: none;
+}
+
+.isolated-aliyah-end-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  padding: 0.5rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--text-color) 18%, transparent);
+  border-radius: 999px;
+  background: var(--light-accent-color);
+  color: var(--text-color);
+  font: inherit;
+  font-family: var(--ui-font-family, 'Noto Sans Hebrew UI', sans-serif);
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: transform var(--reader-motion-fast) var(--reader-ease-out);
+}
+
+.isolated-aliyah-end-step [lang='he'] {
+  font-family: var(--hebrew-ui-font-family, inherit);
+  font-weight: 700;
+}
+
+.isolated-aliyah-end-step .ui-icon {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.isolated-aliyah-end-step:active {
+  transform: scale(var(--reader-control-press-scale));
+}
+
+.isolated-aliyah-end-step:focus-visible {
+  outline: 2px solid var(--reader-focus-color);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .isolated-aliyah-end-step:hover {
+    background: var(--medium-accent-color);
+  }
+}

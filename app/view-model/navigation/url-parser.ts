@@ -12,8 +12,8 @@ import {
   isIndexedReference,
   isValidScrollPageNumber,
 } from '../../location.ts'
-import { ScrollViewModel } from '../scroll-view-model.ts'
-import { generateParshaUrl, resolveParshaRun } from './parsha-routes.ts'
+import { isOrdinaryShabbatReading, ScrollViewModel } from '../scroll-view-model.ts'
+import { generateParshaUrl, parshaReadingForLeining, resolveParshaRun } from './parsha-routes.ts'
 
 export type AppRoute =
   | {
@@ -42,6 +42,16 @@ export function generateUrl(run: LeiningRun, initialRef?: RefWithScroll) {
   if (!initialRef) return `#/run/${run.id}`
 
   return `#/run/${run.id}/${initialRef.b}-${initialRef.c}-${initialRef.v}`
+}
+
+/**
+ * An ordinary Shabbat reading has the same text as its parsha, so it opens as
+ * that parsha from every list. Readings the date changes (special maftir, Rosh
+ * Chodesh, holidays) keep their dated identity.
+ */
+export function preferredReadingRun(run: LeiningRun): LeiningRun {
+  if (!isOrdinaryShabbatReading(run)) return run
+  return parshaReadingForLeining(run.leining)?.runs[0] ?? run
 }
 
 /** Generates an explicit aliyah link without changing its reading context. */
@@ -115,10 +125,14 @@ const pathHandlers: Record<
   /** Opens the current calendar reading. */
   next(generator, pathParts, options) {
     if (pathParts.length !== 0) return null
-    return {
-      view: 'reader',
-      model: ScrollViewModel.forDate(generator, options?.now ?? new Date()),
+    const run = preferredReadingRun(ScrollViewModel.runForDate(generator, options?.now ?? new Date()))
+    if (run.leining.kind === 'parsha') {
+      // Open the parsha itself while the address stays `#/next`.
+      const route = parseUrl(generator, generateUrl(run).slice(1), options)
+      return route?.view === 'reader' ? { view: 'reader', model: route.model } : route
     }
+    const model = ScrollViewModel.forId(generator, run.id)
+    return model ? { view: 'reader', model } : null
   },
   torah(generator, pathParts, options) {
     return parseTorahRoute(generator, pathParts, options)

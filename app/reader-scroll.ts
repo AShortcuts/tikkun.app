@@ -30,7 +30,7 @@ export function getVisibleReaderFocalWord(root: HTMLElement): HTMLElement | null
   let closest: HTMLElement | null = null
   let distance = Number.POSITIVE_INFINITY
   for (const word of root.querySelectorAll<HTMLElement>(
-    '[data-reader-canonical="true"] .word:not([hidden])',
+    '[data-reader-canonical="true"] .word:not([hidden]):not(.mod-passage-context)',
   )) {
     const rect = word.getBoundingClientRect()
     if (!rect.width || !rect.height) continue

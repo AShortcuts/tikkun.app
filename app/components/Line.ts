@@ -70,9 +70,15 @@ const renderWords = ({
       ? renderUnannotatedSpecialLetters(sourceUnannotatedWord.text)
       : ''
     const tokenKey = `${pageNumber}:${lineIndex}:${fragmentIndex}:${wordIndex}`
-    const annotatedWord = !wordSelection || wordSelection.annotated.has(tokenKey) ? sourceAnnotatedWord : undefined
+    const selectedAnnotatedWord = !wordSelection || wordSelection.annotated.has(tokenKey) ? sourceAnnotatedWord : undefined
     const unannotatedSelection = pairedReading ? wordSelection?.annotated : wordSelection?.unannotated
-    const unannotatedWord = !unannotatedSelection || unannotatedSelection.has(tokenKey) ? sourceUnannotatedWord : undefined
+    const selectedUnannotatedWord = !unannotatedSelection || unannotatedSelection.has(tokenKey) ? sourceUnannotatedWord : undefined
+    // Match keeps physical Torah lines intact: neighboring words on a passage's
+    // first and last line stay in place, faded and outside every token lookup.
+    const contextWord = !readingLayout && Boolean(wordSelection) &&
+      !selectedAnnotatedWord && !selectedUnannotatedWord
+    const annotatedWord = contextWord ? sourceAnnotatedWord : selectedAnnotatedWord
+    const unannotatedWord = contextWord ? sourceUnannotatedWord : selectedUnannotatedWord
     if (!annotatedWord && !unannotatedWord) return ''
     const annotatedMarkup = annotatedWord ? sourceAnnotatedMarkup : ''
     const unannotatedMarkup = unannotatedWord ? sourceUnannotatedMarkup : ''
@@ -89,12 +95,12 @@ const renderWords = ({
     const decorationOnly = isInvertedNun(sourceAnnotatedWord?.text ?? '') ||
       Boolean(wordSelection && !annotatedWord && isInvertedNun(unannotatedWord?.text ?? ''))
     return `<span
-        class="word ${activeWord?.isKri ? 'ktiv-kri' : ''}${endsPasuk ? ' mod-sof-pasuk' : ''}"
-        ${decorationOnly ? '' : `data-token-key="${tokenKey}"`}
-        data-page-number="${pageNumber}"
+        class="word ${activeWord?.isKri ? 'ktiv-kri' : ''}${endsPasuk ? ' mod-sof-pasuk' : ''}${contextWord ? ' mod-passage-context' : ''}"
+        ${decorationOnly || contextWord ? '' : `data-token-key="${tokenKey}"`}
+        ${contextWord ? 'aria-hidden="true"' : `data-page-number="${pageNumber}"
         data-line-index="${lineIndex}"
         data-fragment-index="${fragmentIndex}"
-        data-word-index="${wordIndex}"
+        data-word-index="${wordIndex}"`}
         data-annotations-mode="${annotationsEnabled ? 'on' : 'off'}"
         data-annotations-alternate="${escapeAttribute(alternateMarkup)}"
         data-annotations-on-text="${escapeAttribute(annotatedWord?.text ?? '')}"

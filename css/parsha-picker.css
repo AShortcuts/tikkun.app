@@ -1029,18 +1029,43 @@
   .mobile-parsha-card-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
+    align-items: stretch;
+    transition: transform var(--reader-motion-fast) var(--reader-ease-out);
+  }
+
+  .mobile-parsha-card-link {
+    display: flex;
     align-items: center;
-    gap: 0.75rem;
-    width: 100%;
+    grid-column: 1 / -1;
+    grid-row: 1;
+    min-width: 0;
     min-height: 4rem;
     padding: 0.72rem 0.85rem;
+    border-radius: inherit;
+    color: var(--mobile-parsha-text-color);
+    text-decoration: none;
+  }
+
+  /* The chevron owns its own tap area at the trailing edge; the rest of the
+     row opens the parsha at its first aliyah. */
+  .mobile-parsha-card-link:has(+ .mobile-parsha-aliyah-toggle) {
+    grid-column: 1;
+    padding-inline-end: 0.25rem;
+  }
+
+  .mobile-parsha-aliyah-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    grid-column: 2;
+    grid-row: 1;
+    width: 3.25rem;
+    padding: 0 0.85rem 0 0.5rem;
     border: 0;
     background: transparent;
     color: var(--mobile-parsha-text-color);
     cursor: pointer;
     font: inherit;
-    text-align: left;
-    transition: transform var(--reader-motion-fast) var(--reader-ease-out);
   }
 
   .mobile-parsha-title {
@@ -1049,6 +1074,7 @@
     align-items: baseline;
     direction: ltr;
     gap: 0.65rem;
+    flex: 1 1 auto;
     min-width: 0;
     font-size: 1rem;
     line-height: 1.4;
@@ -1079,7 +1105,7 @@
     line-height: inherit;
   }
 
-  .mobile-parsha-card-row > .ui-icon {
+  .mobile-parsha-aliyah-toggle > .ui-icon {
     width: 1.15rem;
     height: 1.15rem;
     color: var(--light-text-color);
@@ -1087,13 +1113,12 @@
     transition: transform 160ms cubic-bezier(0.77, 0, 0.175, 1);
   }
 
-  .mobile-parsha-card-row[aria-expanded='true'] > .ui-icon {
+  .mobile-parsha-aliyah-toggle[aria-expanded='true'] > .ui-icon {
     color: inherit;
     transform: rotate(0deg);
   }
 
-  .mobile-parsha-card-row:focus-visible,
-  .mobile-parsha-card-row:focus-visible > .ui-icon {
+  .mobile-parsha-aliyah-toggle:focus-visible > .ui-icon {
     transition: none;
   }
 
@@ -1101,6 +1126,17 @@
     display: grid;
     gap: 0.7rem;
     padding: 0 0.7rem 0.75rem;
+  }
+
+  .mobile-aliyah-choices-heading {
+    margin: 0;
+    color: var(--light-text-color);
+    font-size: 0.72rem;
+    font-weight: 780;
+    letter-spacing: 0.11em;
+    line-height: 1.2;
+    text-align: center;
+    text-transform: uppercase;
   }
 
   .mobile-aliyah-groups {
@@ -1130,8 +1166,8 @@
   }
 
   .mobile-aliyah-links {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 0.38rem;
   }
 
@@ -1139,6 +1175,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    grid-column: span 2;
     min-height: 2.6rem;
     padding: 0.6rem 0.72rem;
     border: 1px solid color-mix(in srgb, var(--mobile-parsha-text-color) 28%, transparent);
@@ -1146,11 +1183,23 @@
     color: var(--mobile-parsha-text-color);
     font-size: 0.75rem;
     line-height: 1.25;
+    text-align: center;
     text-decoration: none;
     transition:
       background-color var(--reader-motion-color) var(--reader-ease-standard),
       border-color var(--reader-motion-color) var(--reader-ease-standard),
       transform var(--reader-motion-fast) var(--reader-ease-out);
+  }
+
+  /* Three capsules per row; a short final row stretches to the full width
+     (for example שביעי and מפטיר side by side). */
+  .mobile-aliyah-links a:nth-child(3n + 1):nth-last-child(2),
+  .mobile-aliyah-links a:nth-child(3n + 2):last-child {
+    grid-column: span 3;
+  }
+
+  .mobile-aliyah-links a:nth-child(3n + 1):last-child {
+    grid-column: 1 / -1;
   }
 
   .mobile-simple-reading-list a {
@@ -1253,7 +1302,7 @@
   .mobile-library-destination:active,
   .mobile-coming-up a:active,
   .mobile-library-more button:active,
-  .mobile-parsha-card-row:active,
+  .mobile-parsha-card-row:has(:active),
   .mobile-aliyah-links a:active,
   .mobile-reference-grid button:active,
   .mobile-reference-grid a:active,
@@ -1271,7 +1320,8 @@
     .mobile-library-destination:hover,
     .mobile-coming-up a:hover,
     .mobile-library-more button:hover,
-    .mobile-parsha-card-row[aria-expanded='false']:hover,
+    .mobile-parsha-card:not(.is-expanded) .mobile-parsha-card-link:hover,
+    .mobile-parsha-card:not(.is-expanded) .mobile-parsha-aliyah-toggle:hover,
     .mobile-aliyah-links a:hover,
     .mobile-reference-grid button:hover,
     .mobile-reference-grid a:hover,
@@ -1296,7 +1346,7 @@
     .mobile-coming-up a,
     .mobile-library-more button,
     .mobile-parsha-card-row,
-    .mobile-parsha-card-row > .ui-icon,
+    .mobile-parsha-aliyah-toggle > .ui-icon,
     .mobile-aliyah-links a,
     .mobile-reference-grid button,
     .mobile-reference-grid a,
@@ -1309,7 +1359,7 @@
     .mobile-library-destination:active,
     .mobile-coming-up a:active,
     .mobile-library-more button:active,
-    .mobile-parsha-card-row:active,
+    .mobile-parsha-card-row:has(:active),
     .mobile-aliyah-links a:active,
     .mobile-reference-grid button:active,
     .mobile-reference-grid a:active,

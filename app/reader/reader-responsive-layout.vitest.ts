@@ -71,6 +71,7 @@ test.each(['match'] as const)('anchors mobile aliyah overlays to their first let
   localStorage.clear()
   localStorage.setItem('tikkun.reader-preferences', JSON.stringify({
     readerTextLayout,
+    readerShow: 'parsha',
     readerSideMode: 'one',
   }))
   frame = document.createElement('iframe')

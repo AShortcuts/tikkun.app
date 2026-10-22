@@ -4,6 +4,7 @@ import {
   COMPACT_READER_QUERY,
   createReaderViewport,
   isMobileReaderViewport,
+  readerLayoutViewport,
   type ReaderViewport,
 } from './reader-viewport.ts'
 
@@ -38,6 +39,17 @@ test.each([
 
 test('mobile eligibility needs neither physical screen nor touch detection', () => {
   expect(isMobileReaderViewport({ innerWidth: 390, innerHeight: 844 })).toBe(true)
+})
+
+test.each([0.65, 1, 2, 3])('pinching to %sx does not change layout size or phone eligibility', (scale) => {
+  const document = { documentElement: { clientWidth: 390, clientHeight: 844 } }
+  const view = { document, innerWidth: 390 / scale, innerHeight: 844 / scale }
+  expect(readerLayoutViewport(view)).toEqual({ width: 390, height: 844 })
+  expect(isMobileReaderViewport(view)).toBe(true)
+  document.documentElement.clientWidth = 1024
+  document.documentElement.clientHeight = 768
+  expect(readerLayoutViewport(view)).toEqual({ width: 1024, height: 768 })
+  expect(isMobileReaderViewport(view)).toBe(false)
 })
 
 test('landscape mobile eligibility stays independent from the compact width breakpoint', () => {

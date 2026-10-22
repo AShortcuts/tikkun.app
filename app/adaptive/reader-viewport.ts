@@ -2,10 +2,25 @@ import type { Destroy, MountScope } from '../lifecycle/mount.ts'
 
 export const COMPACT_READER_QUERY = '(max-width: 550px)'
 
+interface ReaderViewportWindow {
+  readonly innerWidth: number
+  readonly innerHeight: number
+  readonly document?: { readonly documentElement: Pick<Element, 'clientWidth' | 'clientHeight'> }
+}
+
+/** WebKit's inner dimensions change during pinch zoom; CSS layout dimensions do not. */
+export function readerLayoutViewport(view: ReaderViewportWindow) {
+  const root = view.document?.documentElement
+  return {
+    width: root?.clientWidth ?? view.innerWidth,
+    height: root?.clientHeight ?? view.innerHeight,
+  }
+}
+
 export function isMobileReaderViewport(
-  view: Pick<Window, 'innerWidth' | 'innerHeight'>
+  view: ReaderViewportWindow
 ): boolean {
-  const { innerWidth: width, innerHeight: height } = view
+  const { width, height } = readerLayoutViewport(view)
   return (
     Number.isFinite(width) &&
     Number.isFinite(height) &&

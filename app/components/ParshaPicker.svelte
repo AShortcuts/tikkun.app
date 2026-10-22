@@ -737,27 +737,38 @@
                     class="mobile-parsha-card"
                     class:is-expanded={mobileExpandedEntryId === entry.id}
                   >
-                    <button
-                      class="mobile-parsha-card-row"
-                      type="button"
-                      data-mobile-parsha={entry.id}
-                      aria-label={`Choose aliyah for ${entry.label}`}
-                      aria-expanded={mobileExpandedEntryId === entry.id}
-                      aria-controls={`${entry.id}-mobile-aliyot`}
-                      onclick={() => toggleMobileAliyot(entry)}
-                    >
-                      <span class="mobile-parsha-title">
-                        <span lang="en" dir="ltr" title={entry.englishLabel}>{entry.englishLabel}</span>
-                        <strong lang="he" dir="rtl">{entry.label}</strong>
-                      </span>
-                      <UiIcon name="chevronDown" />
-                    </button>
+                    <div class="mobile-parsha-card-row">
+                      <a
+                        class="mobile-parsha-card-link"
+                        href={entry.href}
+                        data-mobile-parsha={entry.id}
+                        onclick={(event) => navigateLink(event, entry.href)}
+                      >
+                        <span class="mobile-parsha-title">
+                          <span lang="en" dir="ltr" title={entry.englishLabel}>{entry.englishLabel}</span>
+                          <strong lang="he" dir="rtl">{entry.label}</strong>
+                        </span>
+                      </a>
+                      {#if entry.aliyahGroups.length}
+                        <button
+                          class="mobile-parsha-aliyah-toggle"
+                          type="button"
+                          aria-label={`Choose aliyah for ${entry.label}`}
+                          aria-expanded={mobileExpandedEntryId === entry.id}
+                          aria-controls={`${entry.id}-mobile-aliyot`}
+                          onclick={() => toggleMobileAliyot(entry)}
+                        >
+                          <UiIcon name="chevronDown" />
+                        </button>
+                      {/if}
+                    </div>
                     {#if mobileExpandedEntryId === entry.id}
                       {@const activeGroup = entry.aliyahGroups[mobileGroupIndex] ?? entry.aliyahGroups[0]}
                       <div
                         class="mobile-aliyah-choices"
                         id={`${entry.id}-mobile-aliyot`}
                       >
+                        <h3 class="mobile-aliyah-choices-heading">Choose Aliyah</h3>
                         {#if entry.aliyahGroups.length > 1}
                           <div
                             class="mobile-aliyah-groups"

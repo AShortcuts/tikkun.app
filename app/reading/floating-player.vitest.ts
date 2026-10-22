@@ -20,6 +20,7 @@ afterEach(async () => {
   document.documentElement.removeAttribute('data-mobile-player-expanded')
   document.documentElement.removeAttribute('data-mobile-player-minimized')
   document.documentElement.removeAttribute('data-reader-isolated')
+  document.documentElement.removeAttribute('data-reader-phone')
   if (stylesheet) {
     stylesheet.remove()
     stylesheet = null
@@ -252,6 +253,7 @@ test('isolated landscape player clears navigation and keeps transport and speed 
   document.head.append(stylesheet)
   await page.viewport(844, 390)
   document.documentElement.dataset.readerIsolated = 'true'
+  document.documentElement.dataset.readerPhone = 'true'
   fixture = document.createElement('section')
   fixture.className = 'app'
   fixture.innerHTML = `
@@ -348,6 +350,7 @@ test('isolated landscape player clears navigation and keeps transport and speed 
   }
 
   document.documentElement.removeAttribute('data-reader-isolated')
+  document.documentElement.removeAttribute('data-reader-phone')
   for (const [width, height] of [[844, 390], [1280, 900]]) {
     await page.viewport(width, height)
     expect(getComputedStyle(root).flexDirection).toBe('column')

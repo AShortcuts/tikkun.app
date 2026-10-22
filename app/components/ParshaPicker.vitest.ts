@@ -331,7 +331,7 @@ test.each([320, 390])('aligns bilingual mobile parsha titles with matching typog
   }
 })
 
-test.each([320, 390])('opens aliyot from the whole mobile row and centers capsule labels at %ipx', async (width) => {
+test.each([320, 390])('opens the first aliyah from the mobile row and aliyot from its chevron at %ipx', async (width) => {
   await page.viewport(width, 844)
   setCompactLibrarySupport(true)
   const navigate = vi.fn()
@@ -341,29 +341,53 @@ test.each([320, 390])('opens aliyot from the whole mobile row and centers capsul
   try {
     requiredButton(picker, '[data-mobile-book="1"]').click()
     await tick()
-    const row = requiredButton(picker, '[data-mobile-parsha]')
-    const icon = row.querySelector<SVGElement>('.ui-icon')!
-    expect(row.querySelectorAll('a, button')).toHaveLength(0)
-    expect(getComputedStyle(row).borderWidth).toBe('0px')
+    const row = picker.querySelector<HTMLAnchorElement>('a[data-mobile-parsha]')!
+    const toggle = requiredButton(row.parentElement!, '.mobile-parsha-aliyah-toggle')
+    const icon = toggle.querySelector<SVGElement>('.ui-icon')!
     expect(getComputedStyle(icon).transform).toBe('matrix(0, -1, 1, 0, 0, 0)')
-    for (const selector of ['[lang="en"]', '[lang="he"]', '.ui-icon']) {
-      row.querySelector(selector)!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-      await tick()
-      expect(row.getAttribute('aria-expanded')).toBe('true')
-      expect(navigate).not.toHaveBeenCalled()
-      await document.fonts.ready
-      const links = picker.querySelectorAll<HTMLAnchorElement>('.mobile-aliyah-links a')
-      expect(links.length).toBeGreaterThan(6)
-      for (const link of links) {
-        const capsule = link.getBoundingClientRect()
-        const label = link.querySelector('span')!.getBoundingClientRect()
-        expect(Math.abs(label.top + label.height / 2 - capsule.top - capsule.height / 2)).toBeLessThan(1)
-      }
-      row.click()
-      await tick()
-      expect(row.getAttribute('aria-expanded')).toBe('false')
+    const rowBox = row.getBoundingClientRect()
+    const toggleBox = toggle.getBoundingClientRect()
+    expect(toggleBox.width).toBeGreaterThanOrEqual(44)
+    expect(toggleBox.height).toBeGreaterThanOrEqual(44)
+    expect(Math.abs(toggleBox.left - rowBox.right)).toBeLessThan(1)
+
+    row.querySelector<HTMLElement>('[lang="he"]')!.click()
+    expect(navigate).toHaveBeenCalledExactlyOnceWith(row.getAttribute('href'))
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    navigate.mockClear()
+
+    toggle.click()
+    await tick()
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    expect(navigate).not.toHaveBeenCalled()
+    const heading = picker.querySelector<HTMLElement>('.mobile-aliyah-choices-heading')!
+    expect(heading.textContent).toBe('Choose Aliyah')
+    await document.fonts.ready
+    const links = [...picker.querySelectorAll<HTMLAnchorElement>('.mobile-aliyah-links a')]
+    expect(links).toHaveLength(8)
+    expect(heading.getBoundingClientRect().bottom).toBeLessThanOrEqual(links[0]!.getBoundingClientRect().top)
+    const boxes = links.map((link) => link.getBoundingClientRect())
+    const rows = [...new Set(boxes.map((box) => Math.round(box.top)))]
+    expect(rows).toHaveLength(3)
+    const container = picker.querySelector('.mobile-aliyah-links')!.getBoundingClientRect()
+    const gap = boxes[1]!.left - boxes[0]!.right
+    for (const [index, box] of boxes.entries()) {
+      const perRow = index < 6 ? 3 : 2
+      const expectedWidth = (container.width - (perRow - 1) * gap) / perRow
+      expect(Math.abs(box.width - expectedWidth), links[index]!.textContent ?? '').toBeLessThan(1)
+      const label = links[index]!.querySelector('span')!.getBoundingClientRect()
+      expect(Math.abs(label.left + label.width / 2 - box.left - box.width / 2)).toBeLessThan(1)
+      expect(Math.abs(label.top + label.height / 2 - box.top - box.height / 2)).toBeLessThan(1)
     }
-    row.click()
+    expect(Math.abs(boxes[6]!.left - container.left)).toBeLessThan(1)
+    expect(Math.abs(boxes[7]!.right - container.right)).toBeLessThan(1)
+    expect(links[0]!.textContent).toContain('ראשון')
+    expect(links[7]!.textContent).toContain('מפטיר')
+
+    toggle.click()
+    await tick()
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    toggle.click()
     await tick()
     const choice = picker.querySelector<HTMLAnchorElement>('.mobile-aliyah-links a')!
     choice.click()

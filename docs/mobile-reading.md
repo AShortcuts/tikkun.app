@@ -1,18 +1,26 @@
-# Isolated mobile Reading
+# One aliyah at a time
 
-Indexed Torah readings show one complete aliyah in Reading mode when the shorter browser viewport dimension is at most 550 CSS pixels. Eligibility uses `window.innerWidth` and `window.innerHeight`, never physical screen dimensions or touch capability. Narrowing a desktop window or tablet split-screen enters the same isolated Reading view. Larger viewports, Match, physical pages, and unindexed readings retain continuous rendering. Crossing the breakpoint preserves the focal word, selected aliyah, playback, and saved side preference without adding history entries.
+The **Show** reading setting chooses between **Whole parsha** (continuous) and **One aliyah**. One aliyah shows a single complete aliyah of an indexed Torah reading, in both Reading and Match, on every screen size. Physical-page routes, unindexed readings, and recording mode stay continuous.
 
-Resize updates share one ordered animation-frame transaction: viewport eligibility and side mode, toolbar/player/rail geometry, page layout, then markers and focal positioning. Repeated window and visual-viewport events coalesce, and passage text is rebuilt only when its isolation or side mode changes. Page measurements finish before progress and focal positioning are published.
+Until the reader saves a choice, the default follows the window when the reader opens: One aliyah when the shorter viewport dimension is at most 550 CSS pixels, otherwise Whole parsha. Eligibility uses the document's layout viewport (`documentElement.clientWidth` and `clientHeight`), never physical screen dimensions or touch capability. Resizing or rotating never switches the view; it only changes the chrome. Pinch zoom leaves the layout dimensions, selected aliyah, and focal restoration alone. The page can magnify and return to its normal size, with a minimum scale of 1.
+
+The phone chrome (`html[data-reader-phone]`, the same 550-pixel rule) shows the compact rail row with its previous and next buttons and the aliyah capsule. Wider windows keep the desktop rail, toolbar aliyah controls, and side labels. Every One aliyah passage ends with a **Next** link to the following aliyah of the same reading.
+
+In Match, a physical Torah line can hold the end of one aliyah and the start of the next. Those neighboring words stay in place, faded, so justified lines keep their shape. They carry no token key and are excluded from highlighting, focal tracking, progress, selection, and playback.
+
+Resize updates share one ordered animation-frame transaction: phone chrome and side mode, toolbar/player/rail geometry, page layout, then markers and focal positioning. Repeated window and visual-viewport events coalesce, and passage text is rebuilt only when its side mode changes. Page measurements finish before progress and focal positioning are published.
 
 Continuous desktop Reading retains its canonical side labels, Play buttons, and permalinks in both side modes. These reuse the same rendered badges, exact-start token resolver, word-form mapping, and playback actions as Match. Their positions participate in the shared layout transaction, including annotation changes and side swaps. Isolated Reading continues to use its rail and toolbar controls.
 
 Reading centers its text column with balanced side margins and keeps the verse and aliyah controls outside the text. Hebrew stays right-aligned without justification, each pasuk starts a new line, and longer pesukim wrap naturally. Two Sided Reading has no vertical column divider; Match retains its existing layout and divider.
 
+Turning off Pasuk numbers in mobile Reading removes the reserved number gutter and gives the text more line space. The current focal word is preserved through that reflow. Desktop and Match keep their existing geometry when numbers are hidden. Font size is displayed and adjusted in CSS pixels, measured from the same responsive CSS rules as the reading text; the existing saved scale remains compatible across rotations and side modes.
+
 The rail includes every indexed division, including Maftir and special service
-divisions. Beneath it, the left chevron advances and the right chevron goes back.
-Their visible surfaces are 32 pixels, icons 16 pixels, and targets 44 pixels.
-Endpoints are disabled. The rail can scroll horizontally. Landscape keeps the
-rail, chevrons, player, and picker. A saved Two Sided preference falls back to
+divisions, left to right. On phones it shares one row with the previous button
+at the left edge and the next button at the right edge. Their visible surfaces
+are 32 pixels, icons 16 pixels, and targets 44 pixels. Endpoints are disabled.
+The rail can scroll horizontally. A saved Two Sided preference falls back to
 One Side in portrait and returns in landscape without rewriting preferences.
 
 ## Rendering and selection
