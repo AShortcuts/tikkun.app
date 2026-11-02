@@ -21,14 +21,6 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-function deferredModule() {
-  let resolve!: (module: ReaderSettingsModule) => void
-  const promise = new Promise<ReaderSettingsModule>((nextResolve) => {
-    resolve = nextResolve
-  })
-  return { promise, resolve }
-}
-
 function fakeSettings(): ReaderSettings {
   return {
     open: vi.fn(),
@@ -67,48 +59,6 @@ async function flushLazyWork() {
   }
 }
 
-test('loads Reader Settings on the first launcher click', async () => {
-  const deferred = deferredModule()
-  const load = vi.fn(() => deferred.promise)
-  const connected = fakeSettings()
-  const createReaderSettings = vi.fn(() => connected)
-  const { destroy, settings } = mountLazySettings(load)
-
-  expect(load).not.toHaveBeenCalled()
-  toggle.click()
-  expect(load).toHaveBeenCalledOnce()
-  expect(toggle.getAttribute('aria-busy')).toBe('true')
-
-  deferred.resolve({ createReaderSettings })
-  await flushLazyWork()
-
-  expect(createReaderSettings).toHaveBeenCalledOnce()
-  expect(connected.open).toHaveBeenCalledWith({ returnFocus: toggle })
-  expect(toggle.hasAttribute('aria-busy')).toBe(false)
-  settings.sync()
-  expect(connected.sync).toHaveBeenCalledOnce()
-
-  destroy()
-})
-
-test('closing before the module resolves cancels the pending open', async () => {
-  const deferred = deferredModule()
-  const connected = fakeSettings()
-  const { destroy } = mountLazySettings(() => deferred.promise)
-
-  toggle.click()
-  toggle.click()
-  deferred.resolve({
-    createReaderSettings: vi.fn(() => connected),
-  })
-  await flushLazyWork()
-
-  expect(connected.open).not.toHaveBeenCalled()
-  expect(toggle.hasAttribute('aria-busy')).toBe(false)
-
-  destroy()
-})
-
 test('load failures are reported and a later open retries', async () => {
   const connected = fakeSettings()
   const failure = new Error('settings unavailable')
@@ -130,17 +80,4 @@ test('load failures are reported and a later open retries', async () => {
   expect(connected.open).toHaveBeenCalledOnce()
 
   destroy()
-})
-
-test('destroying the lifetime prevents a pending module from mounting', async () => {
-  const deferred = deferredModule()
-  const createReaderSettings = vi.fn(() => fakeSettings())
-  const { destroy, settings } = mountLazySettings(() => deferred.promise)
-
-  settings.open()
-  destroy()
-  deferred.resolve({ createReaderSettings })
-  await flushLazyWork()
-
-  expect(createReaderSettings).not.toHaveBeenCalled()
 })

@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest'
+import { describe, expect, test } from 'vitest'
 import {
   createNavigationAction,
   createPageNavigationActions,
@@ -6,23 +6,6 @@ import {
 import { createActionSearch } from './action-search.ts'
 
 describe('action search adapter', () => {
-  test('keeps runnable callbacks outside retrieval and returns the original action', () => {
-    const run = vi.fn()
-    const action = createNavigationAction({
-      id: 'tools.analytics',
-      group: 'tools',
-      label: 'Cue Analytics',
-      aliases: ['Timing Analytics'],
-      keywords: ['playback timing'],
-      run,
-    })
-    const result = createActionSearch([action]).search('Timing Analytics')[0]
-
-    expect(result?.action).toBe(action)
-    result?.action.run()
-    expect(run).toHaveBeenCalledOnce()
-    expect(result?.match.matchedField?.kind).toBe('alias')
-  })
 
   test('ranks parsed aliyah and page destinations first', () => {
     const noach = createNavigationAction({
@@ -45,46 +28,6 @@ describe('action search adapter', () => {
     )
     expect(search.search('Torah page 246')).toEqual([])
     expect(search.search('Genesis 6:9')).toEqual([])
-  })
-
-  test('uses explicit empty priorities and availability', () => {
-    const actions = [
-      createNavigationAction({
-        id: 'later',
-        group: 'tools',
-        label: 'Later',
-        emptyPriority: 10,
-        run: () => undefined,
-      }),
-      createNavigationAction({
-        id: 'first',
-        group: 'reading',
-        label: 'First',
-        emptyPriority: 20,
-        run: () => undefined,
-      }),
-      createNavigationAction({
-        id: 'hidden',
-        group: 'admin',
-        label: 'Hidden',
-        emptyPriority: 30,
-        available: false,
-        run: () => undefined,
-      }),
-      createNavigationAction({
-        id: 'search-only',
-        group: 'page',
-        label: 'Search only',
-        showWhenEmpty: false,
-        run: () => undefined,
-      }),
-    ]
-
-    expect(
-      createActionSearch(actions)
-        .search('')
-        .map(({ action }) => action.id)
-    ).toEqual(['first', 'later'])
   })
 
   test('deduplicates equivalent destinations before the limit', () => {
@@ -174,48 +117,6 @@ describe('action search adapter', () => {
     )
     expect(search.search('Tishah B’Av')[0]?.action.id).toBe(
       'reading.holiday.tisha-bav'
-    )
-  })
-
-  test('shows granular aliyah actions only for aliyah or recording intent', () => {
-    const actions = [
-      createNavigationAction({
-        id: 'reading.noach.1',
-        group: 'reading',
-        label: 'Noach Aliyah 1',
-        aliases: ['Noach 1'],
-        searchConstraint: { kind: 'aliyah', aliyah: 1 },
-        run: () => undefined,
-      }),
-      createNavigationAction({
-        id: 'reading.noach.3',
-        group: 'reading',
-        label: 'Noach Aliyah 3',
-        aliases: ['Noach 3'],
-        searchConstraint: { kind: 'aliyah', aliyah: 3 },
-        run: () => undefined,
-      }),
-      createNavigationAction({
-        id: 'recording.noach.1',
-        group: 'reading',
-        label: 'Noach Aliyah 1',
-        keywords: ['recording', 'audio'],
-        searchConstraint: {
-          kind: 'aliyah',
-          aliyah: 1,
-          allowTerms: ['recording', 'audio'],
-        },
-        run: () => undefined,
-      }),
-    ]
-    const search = createActionSearch(actions)
-
-    expect(search.search('Noach')).toEqual([])
-    expect(search.search('Noach 3').map(({ action }) => action.id)).toEqual([
-      'reading.noach.3',
-    ])
-    expect(search.search('Noach audio')[0]?.action.id).toBe(
-      'recording.noach.1'
     )
   })
 

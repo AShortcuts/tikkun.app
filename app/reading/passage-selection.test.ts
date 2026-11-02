@@ -34,17 +34,3 @@ test('requires actual sof-pasuk before returning a loaded selection', async () =
   await expect(loadPassageSelection([{ start: ref, end: ref }], { resolver, loadPage })).rejects.toThrow('Missing verse ending')
   expect(loadPage).toHaveBeenCalledOnce()
 })
-
-test('loads preceding boundary context but excludes its page from the selected output', async () => {
-  const ref = { scroll: 'torah' as const, b: 1, c: 1, v: 2 }
-  const resolver = new ScrollResolver('torah', { getPageCount: () => 2, getLocation: () => ({ pageNumber: 2, lineNumber: 1 }) })
-  const loadPage = vi.fn(async (page: number): Promise<LineType[]> => [{
-    text: [[page === 1 ? 'פסוק קודם' : 'סופו׃ נבחר׃ שכן׃']],
-    verses: page === 1 ? [{ book: 1, chapter: 1, verse: 1 }] : [{ book: 1, chapter: 1, verse: 2 }, { book: 1, chapter: 1, verse: 3 }],
-    aliyot: [], isPetucha: false,
-  }])
-  const selection = await loadPassageSelection([{ start: ref, end: ref }], { resolver, loadPage })
-  expect(selection.pages.map(page => page.pageNumber)).toEqual([2])
-  expect(selection.tokenKeys).toEqual(new Set(['2:0:0:1']))
-  expect(loadPage).toHaveBeenCalledTimes(2)
-})

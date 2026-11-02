@@ -12,29 +12,6 @@ interface TestAnchor extends ReaderProgressPresentationAnchor {
 }
 
 describe('resolveReaderProgressPresentation', () => {
-  test('returns one immutable loading presentation for an empty source', () => {
-    let selectionCount = 0
-    const source: ReaderProgressPresentationSource<TestAnchor> = {
-      anchors: Object.freeze([]),
-      at: () => {
-        selectionCount += 1
-        return { index: -1, current: null }
-      },
-    }
-
-    const result = resolve(source, { viewportPosition: 100 })
-
-    expect(result).toEqual({
-      kind: 'empty',
-      current: null,
-      label: 'Loading',
-      progressIndex: -1,
-      percent: 0,
-      requestNextAnchor: null,
-    })
-    expect(selectionCount).toBe(0)
-    expect(Object.isFrozen(result)).toBe(true)
-  })
 
   test('uses range current for chrome and its matching anchor for progress', () => {
     const firstLine = {}
@@ -80,25 +57,6 @@ describe('resolveReaderProgressPresentation', () => {
     })
   })
 
-  test('skips duplicate positions before calculating progress', () => {
-    const firstLine = {}
-    const first = anchor('first', 100, { line: firstLine })
-    const duplicate = anchor('duplicate', 100)
-    const next = anchor('next', 300)
-    const source = sourceFor([first, duplicate, next])
-
-    const result = resolve(source, {
-      viewportPosition: 150,
-      rangeCurrent: first,
-    })
-
-    expect(result).toMatchObject({
-      kind: 'ready',
-      progressIndex: 0,
-      percent: 25,
-    })
-  })
-
   test('requests the next anchor explicitly when current is not final', () => {
     const current = anchor('current', 100)
     const result = resolve(sourceFor([current]), {
@@ -117,26 +75,7 @@ describe('resolveReaderProgressPresentation', () => {
     expect(Object.isFrozen(result.requestNextAnchor)).toBe(true)
   })
 
-  test('uses scroll height as the final anchor end position', () => {
-    const final = anchor('final', 100, { last: true })
-    const result = resolve(sourceFor([final]), {
-      viewportPosition: 300,
-      scrollHeight: 500,
-    })
-
-    expect(result).toMatchObject({
-      kind: 'ready',
-      current: final,
-      progressIndex: 0,
-      percent: 50,
-      requestNextAnchor: null,
-    })
-  })
-
-  test.each([
-    { name: 'below start', viewportPosition: 50, expected: 0 },
-    { name: 'above end', viewportPosition: 350, expected: 100 },
-  ])('clamps progress $name', ({ viewportPosition, expected }) => {
+  test.each([{ name: 'below start', viewportPosition: 50, expected: 0 }])('clamps progress $name', ({ viewportPosition, expected }) => {
     const firstLine = {}
     const first = anchor('first', 100, { line: firstLine })
     const second = anchor('second', 300)

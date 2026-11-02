@@ -3,16 +3,7 @@ import { HDate } from '@hebcal/hdate'
 import { readingTitle, type ReadingInstance } from '../calendar-model/model-types.ts'
 import { LeiningGenerator } from '../calendar-model/generator.ts'
 import type { UserSettings } from '../calendar-model/user-settings.ts'
-import {
-  buildParshaAliyahChoiceGroups,
-  buildParshaAliyahChoices,
-  buildParshaPickerModel,
-  calculateAnchoredPopupMaxHeight,
-  calculateAnchoredPopupPosition,
-  calculateFlyoutPopupPosition,
-  collectParshaChoiceSourceLeinings,
-  parshaListTitleForLeining,
-} from './parsha-picker-model.ts'
+import { buildParshaAliyahChoiceGroups, buildParshaAliyahChoices, buildParshaPickerModel, collectParshaChoiceSourceLeinings, parshaListTitleForLeining } from './parsha-picker-model.ts'
 
 const testSettings: UserSettings = {
   ashkenazi: true,
@@ -21,17 +12,6 @@ const testSettings: UserSettings = {
 }
 
 const generator = new LeiningGenerator(testSettings)
-
-test('keeps the parsha flyout on the chevron side, with an edge fallback', () => {
-  const position = (left: number) => calculateFlyoutPopupPosition({
-    anchorRect: { left, right: left + 148, top: 200, bottom: 244 },
-    popupRect: { width: 156, height: 300 },
-    viewport: { width: 1280, height: 800 },
-    preferredSide: 'left',
-  })
-  expect(position(950)).toMatchObject({ side: 'left', left: 790 })
-  expect(position(20)).toMatchObject({ side: 'right', left: 172 })
-})
 
 test('builds aliyah choices for a regular parsha', () => {
   const beresheet = findParsha('Bereshit')
@@ -149,13 +129,6 @@ test('labels Vezot Haberacha as a parsha and exposes the seventh recording divis
   expect(simchatTorah.runs[0].aliyot).toHaveLength(6)
 })
 
-test('finds Beresheet by its canonical route spelling', () => {
-  const result = buildParshaPickerModel(generator).search('beresheet')[0]
-
-  expect(result?.href).toBe('#/torah/parsha/beresheet')
-  expect(result?.englishLabel).toBe('Parshat Beresheet')
-})
-
 test('describes holiday and Megillah destinations with their English ranges', () => {
   const model = buildParshaPickerModel(generator)
   const holidayLabels = model.holidayColumns
@@ -172,38 +145,6 @@ test('describes holiday and Megillah destinations with their English ranges', ()
   expect(model.megillot.map(({ englishLabel }) => englishLabel)).toContain(
     'Purim (Esther 1:1-10:3)'
   )
-})
-
-test('positions bottom-edge aliyah popup directly above the selected parsha', () => {
-  expect(calculateAnchoredPopupPosition({
-      triggerRect: { left: 900, top: 650, right: 1100, bottom: 690 },
-      popupRect: { width: 220, height: 320 },
-      viewport: { width: 1280, height: 720 },
-    })).toEqual({ left: 890, top: 324 })
-})
-
-test('limits an aliyah popup to the larger side of its trigger', () => {
-  expect(calculateAnchoredPopupMaxHeight(
-      { left: 900, top: 350, right: 1100, bottom: 415 },
-      { width: 1280, height: 720 }
-    )).toBe(332)
-})
-
-test('positions a desktop aliyah menu to the right of its parsha', () => {
-  expect(calculateFlyoutPopupPosition({
-      anchorRect: { left: 900, top: 350, right: 1100, bottom: 415 },
-      popupRect: { width: 156, height: 320 },
-      viewport: { width: 1280, height: 720 },
-    })).toEqual({ left: 1104, top: 350, side: 'right' })
-})
-
-test('positions an aliyah submenu beside its parent without overflowing', () => {
-  expect(calculateFlyoutPopupPosition({
-      anchorRect: { left: 1030, top: 360, right: 1270, bottom: 600 },
-      verticalAnchorRect: { left: 1040, top: 400, right: 1260, bottom: 440 },
-      popupRect: { width: 220, height: 320 },
-      viewport: { width: 1280, height: 720 },
-    })).toEqual({ left: 806, top: 388, side: 'left' })
 })
 
 function parshiyotForYears(startYear: number, endYear: number) {

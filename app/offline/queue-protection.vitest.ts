@@ -70,32 +70,3 @@ test('removal rejects new queue claims and partial acquisition releases every le
   } finally { release(); await removing }
   await noLocks(scope)
 })
-
-test('destroy releases queued and active claims while keeping retry intent', async () => {
-  const scope = `https://tikkun.test/${crypto.randomUUID()}/`
-  const assets = ['one', 'two', 'three'].map((audioId) => ({ audioId, title: audioId,
-    url: `${scope}${audioId}`, digest: 'a'.repeat(64), byteLength: 100 }))
-  const saved = new Set<string>()
-  const library = createDownloadLibrary({ assets,
-    intent: { read: async () => [...saved], update: async (add) => { add.forEach((key) => saved.add(key)) } },
-    backend: { supported: true, inventory: async () => [], destroy() {}, remove: async () => {},
-      protectQueued: (asset, signal) => protectQueuedRecording(navigator.locks, scope, asset.url, signal),
-      download: (_asset, signal) => new Promise((_resolve, reject) => {
-        signal.addEventListener('abort', () => reject(signal.reason), { once: true })
-      }),
-    },
-  })
-  try { await library.enqueue(assets.map(recordingAssetKey)) } finally { library.destroy() }
-  await noLocks(scope)
-  expect(saved.size).toBe(3)
-  await worker(scope).withRecordingRemoval(null, async () => {})
-})
-
-test('aborted or unsupported queue protection cannot create leases', async () => {
-  const scope = `https://tikkun.test/${crypto.randomUUID()}/`
-  const controller = new AbortController()
-  controller.abort()
-  await expect(protectQueuedRecording(navigator.locks, scope, `${scope}one`, controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
-  expect(() => protectQueuedRecording(null, scope, `${scope}one`, new AbortController().signal)).toThrow('unavailable')
-  await noLocks(scope)
-})

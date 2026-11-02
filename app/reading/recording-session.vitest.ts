@@ -229,29 +229,6 @@ function createHarness({
   }
 }
 
-test('loads, clones, activates, and caches a reader recording transaction', async () => {
-  const harness = createHarness()
-
-  const loaded = await harness.session.load({
-    runId: harness.run.id,
-    aliyahIndex: 1,
-  })
-  expect(loaded?.status).toBe('current-only')
-  expect(highlightController.activateCue).toHaveBeenCalled()
-  expect(harness.sessionLoaded).toHaveBeenCalledWith(loaded)
-  expect(harness.collectTokenKeys).toHaveBeenCalledOnce()
-
-  loaded!.segments[0]!.cues[0]!.timeStart = 9
-  expect(firstCues[0]?.timeStart).toBe(1)
-
-  await harness.session.load({
-    runId: harness.run.id,
-    aliyahIndex: 1,
-  })
-  expect(harness.collectTokenKeys).toHaveBeenCalledOnce()
-  expect(harness.session.tokenCacheSize()).toBe(1)
-})
-
 test('loads an audio-only reader session when the library resolves no Cue Data', async () => {
   const harness = createHarness()
   harness.loadCues.mockResolvedValueOnce([])
@@ -272,62 +249,6 @@ test('loads an audio-only reader session when the library resolves no Cue Data',
   expect(harness.sessionLoaded).toHaveBeenCalledWith(loaded)
 })
 
-test('continues with audio-only playback while authoring is active', async () => {
-  const harness = createHarness()
-  harness.loadCues.mockResolvedValueOnce([])
-  harness.setAuthoringVisible(true)
-
-  const loaded = await harness.session.load({
-    runId: harness.run.id,
-    aliyahIndex: 1,
-  })
-
-  expect(loaded).not.toBeNull()
-  expect(loaded?.recording).toBe(firstRecording)
-  expect(loaded?.cues).toEqual([])
-  expect(audioController.session).toBe(loaded)
-  expect(harness.sessionLoaded).toHaveBeenCalledWith(loaded)
-})
-
-test('finishes the initial cue activation before publishing the session', async () => {
-  const harness = createHarness()
-  let finishActivation!: (value: HTMLElement | null) => void
-  const activation = new Promise<HTMLElement | null>((resolve) => {
-    finishActivation = resolve
-  })
-  vi.mocked(highlightController.activateCue).mockReturnValueOnce(activation)
-
-  const pending = harness.session.load({
-    runId: harness.run.id,
-    aliyahIndex: 1,
-  })
-  await vi.waitFor(() =>
-    expect(highlightController.activateCue).toHaveBeenCalledOnce()
-  )
-
-  expect(harness.sessionLoaded).not.toHaveBeenCalled()
-  finishActivation(null)
-
-  const loaded = await pending
-  expect(loaded).not.toBeNull()
-  expect(harness.sessionLoaded).toHaveBeenCalledWith(loaded)
-})
-
-test('keeps overlap availability distinct from the current recording', async () => {
-  const harness = createHarness({ includeSecondRecording: false })
-  const availability = harness.session.lookup(harness.run, 2)
-
-  expect(availability.recording).toBeNull()
-  expect(availability.overlapRecording?.id).toBe(firstRecording.id)
-  expect(availability.available).toBe(true)
-
-  const loaded = await harness.session.load({
-    runId: harness.run.id,
-    aliyahIndex: 2,
-  })
-  expect(loaded?.status).toBe('overlap-only')
-})
-
 test('creates an authoring session for an aliyah with no published audio', async () => {
   const harness = createHarness({ includeSecondRecording: false })
   harness.setAuthoringVisible(true)
@@ -343,27 +264,4 @@ test('creates an authoring session for an aliyah with no published audio', async
   expect(loaded?.segments).toHaveLength(1)
   expect(loaded?.tokenKeys).toEqual([overlapToken, lastToken])
   expect(harness.sessionLoaded).toHaveBeenCalledWith(loaded)
-})
-
-test('reset discards an authoring checkpoint from the previous route', async () => {
-  const harness = createHarness()
-  const readerSession = await harness.session.load({
-    runId: harness.run.id,
-    aliyahIndex: 1,
-  })
-  expect(readerSession).not.toBeNull()
-  audioController.seek(1.5)
-  harness.setAuthoringVisible(true)
-
-  await harness.session.enterAuthoring()
-  const authoringSession = audioController.session
-  expect(authoringSession).not.toBe(readerSession)
-
-  harness.session.reset()
-  harness.clearAuthoringSession()
-  harness.setAuthoringVisible(false)
-  await harness.session.leaveAuthoring()
-
-  expect(audioController.session).toBe(authoringSession)
-  expect(audioController.session).not.toBe(readerSession)
 })

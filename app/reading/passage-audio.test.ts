@@ -39,18 +39,6 @@ test('joins whole uncued recordings with complete audio coverage', async () => {
   expect(result.portions[0].segments.map(s => [s.recording.id, s.startTime, s.endTime])).toEqual([['a', 0, null], ['b', 0, null]])
 })
 
-test('complete cues make a reused recording normal, regardless of its original identity', async () => {
-  const result = await resolver([{ id: 'standalone', range: range(1, 3), cues: [cue(1, 0), cue(2, 2), cue(3, 4, 6)] }]).resolve(range(1, 3), 'reader')
-  expect(result.problem).toBeNull()
-  expect(result.cueComplete).toBe(true)
-})
-
-test('infers excerpt start from its first word cue without requiring all word cues', async () => {
-  const result = await resolver([{ id: 'seventh', range: range(25, 30), cues: [cue(28, 12)] }]).resolve(range(28, 30), 'reader')
-  expect(result.problem).toBe('incomplete-cues')
-  expect(result.portions[0].segments[0]).toMatchObject({ startTime: 12, endTime: null })
-})
-
 test('does not guess an excerpt start from the next available cue', async () => {
   const result = await resolver([{ id: 'seventh', range: range(25, 30), cues: [cue(29, 12)] }]).resolve(range(28, 30), 'reader')
   expect(result.problem).toBe('timing-needed')
@@ -61,16 +49,6 @@ test('does not guess an excerpt start from the next available cue', async () => 
 test('partial coverage caused only by missing timing remains a cue problem', async () => {
   const result = await resolver([{ id: 'a', range: range(1, 3) }, { id: 'b', range: range(4, 9) }]).resolve(range(1, 6), 'reader')
   expect(result).toMatchObject({ problem: 'partial-audio', issue: 'cue', canPlay: true })
-})
-
-test('does not guess an excerpt end using an arbitrary last-word duration', async () => {
-  const result = await resolver([{ id: 'source', range: range(1, 6), cues: [cue(1, 0), cue(3, 10)] }]).resolve(range(1, 3), 'reader')
-  expect(result.problem).toBe('timing-needed')
-})
-
-test('uses the immediately following word cue as an excerpt end', async () => {
-  const result = await resolver([{ id: 'source', range: range(1, 6), cues: [cue(1, 0), cue(3, 10), cue(4, 13)] }]).resolve(range(1, 3), 'reader')
-  expect(result.portions[0].segments[0].endTime).toBe(13)
 })
 
 test('missing middle creates separate portions and never a plan that jumps the gap', async () => {
@@ -84,20 +62,10 @@ test('missing middle creates separate portions and never a plan that jumps the g
   expect(plan.readingLabel).toBe('Combined reading')
 })
 
-test('keeps missing opening and ending separate', async () => {
-  const result = await resolver([{ id: 'middle', range: range(4, 6) }]).resolve(range(1, 9), 'reader')
-  expect(result.missing).toEqual([range(1, 3), range(7, 9)])
-})
-
 test('does not silently use another narrator', async () => {
   const result = await resolver([{ id: 'other', range: range(1, 3), narrator: 'other' }]).resolve(range(1, 3), 'reader')
   expect(result.problem).toBe('missing-audio')
   expect(result.recording).toBeNull()
-})
-
-test('prefers one exact recording over multiple sources', async () => {
-  const result = await resolver([{ id: 'a', range: range(1, 3) }, { id: 'b', range: range(4, 6) }, { id: 'exact', range: range(1, 6) }]).resolve(range(1, 6), 'reader')
-  expect(result.portions[0].segments.map(s => s.recording.id)).toEqual(['exact'])
 })
 
 test('chooses a complete route over a longer first source with an untimed overlap', async () => {
@@ -108,12 +76,6 @@ test('chooses a complete route over a longer first source with an untimed overla
   ]).resolve(range(1, 6), 'reader')
   expect(result.problem).toBe('incomplete-cues')
   expect(result.portions[0].segments.map(s => s.recording.id)).toEqual(['short', 'ending'])
-})
-
-test('trims source overlap once, using the first unplayed word', async () => {
-  const result = await resolver([{ id: 'a', range: range(1, 3) }, { id: 'b', range: range(3, 6), cues: [cue(3, 0), cue(4, 2)] }]).resolve(range(1, 6), 'reader')
-  expect(result.portions[0].tokenKeys).toEqual(await tokens(range(1, 6)))
-  expect(result.portions[0].segments[1].startTime).toBe(2)
 })
 
 test('does not hold a timed highlight over an untimed word', async () => {

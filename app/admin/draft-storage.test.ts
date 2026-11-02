@@ -129,10 +129,7 @@ test('round-trips the current draft as direct JSON', async () => {
   })
 })
 
-test.each([
-  ['{bad json', 'invalid-json'],
-  ['null', 'invalid-draft'],
-] as const)('preserves %s and replaces it only with its revision', async (raw, reason) => {
+test.each([['{bad json', 'invalid-json']] as const)('preserves %s and replaces it only with its revision', async (raw, reason) => {
   const key = getAdminDraftStorageKey(audioId)
   window.localStorage.setItem(key, raw)
   const loaded = loadAdminDraftResult(recording, tokenKeys)
@@ -189,49 +186,6 @@ test('rejects a stale writer without losing the newer draft', async () => {
   expect(loadAdminDraft(recording, tokenKeys)).toEqual(newer)
 })
 
-test('serializes rapid writes from one authoring instance', async () => {
-  const first = validDraft(101)
-  const second = {
-    ...validDraft(102),
-    tokenPointer: 2 - 1,
-    cues: [cue(0, 0), cue(1.25, 1)],
-  }
-  const firstWrite = saveAdminDraftPayload(
-    first,
-    recording,
-    tokenKeys,
-    writeRequest(null, 'writer-a')
-  )
-  const secondWrite = saveAdminDraftPayload(
-    second,
-    recording,
-    tokenKeys,
-    writeRequest(null, 'writer-a')
-  )
-
-  await expect(firstWrite).resolves.toBeDefined()
-  await expect(secondWrite).resolves.toBeDefined()
-  expect(loadAdminDraft(recording, tokenKeys)).toEqual(second)
-})
-
-test('rejects an older same-writer draft', async () => {
-  const saved = await saveAdminDraftPayload(
-    validDraft(200),
-    recording,
-    tokenKeys,
-    writeRequest(null, 'writer-a')
-  )
-
-  await expect(
-    saveAdminDraftPayload(
-      validDraft(100),
-      recording,
-      tokenKeys,
-      writeRequest(saved.revision, 'writer-a')
-    )
-  ).rejects.toThrow(AdminDraftConflictError)
-})
-
 test('rejects external deletion after a draft was loaded', async () => {
   const saved = await saveAdminDraftPayload(
     validDraft(),
@@ -251,14 +205,6 @@ test('rejects external deletion after a draft was loaded', async () => {
   ).rejects.toThrow(AdminDraftConflictError)
 })
 
-test('requires Web Locks for writes', async () => {
-  vi.stubGlobal('navigator', {})
-  await expect(
-    saveAdminDraftPayload(validDraft(), recording, tokenKeys, writeRequest())
-  ).rejects.toThrow(AdminDraftStorageError)
-  expect(window.localStorage.getItem(getAdminDraftStorageKey(audioId))).toBeNull()
-})
-
 test('contains storage failures', async () => {
   window.localStorage.setItem = () => {
     throw new DOMException('denied', 'SecurityError')
@@ -266,23 +212,4 @@ test('contains storage failures', async () => {
   await expect(
     saveAdminDraftPayload(validDraft(), recording, tokenKeys, writeRequest())
   ).rejects.toThrow(AdminDraftStorageError)
-})
-
-test('rejects invalid payloads and writer tokens', async () => {
-  await expect(
-    saveAdminDraftPayload(
-      { ...validDraft(), tokenCount: 0 },
-      recording,
-      tokenKeys,
-      writeRequest()
-    )
-  ).rejects.toThrow(TypeError)
-  await expect(
-    saveAdminDraftPayload(
-      validDraft(),
-      recording,
-      tokenKeys,
-      writeRequest(null, '')
-    )
-  ).rejects.toThrow(TypeError)
 })

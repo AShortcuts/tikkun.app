@@ -12,6 +12,10 @@ export interface NativeMediaPlugin {
   clearTemporary(): Promise<void>
   readIntent(): Promise<unknown>
   updateIntent(options: { add: readonly string[]; remove: readonly string[] }): Promise<void>
+  // Recordings and cues published by the website, saved for offline use.
+  readContent(options: { name: string }): Promise<unknown>
+  writeContent(options: { name: string; value: string }): Promise<void>
+  pruneContent(options: { keep: readonly string[] }): Promise<void>
   addListener(event: 'progress', callback: (value: unknown) => void): Promise<PluginListenerHandle>
 }
 

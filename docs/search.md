@@ -52,7 +52,7 @@ Full-text Torah, commentary, semantic, and audio-content search remain intention
 Unit and browser tests cover mixed-provider ranking, cross-provider deduplication, both placements, bold ranges, keyboard selection, query-first Escape, repeated Cmd-K focus, one-active-instance routing, dynamic refresh, lazy retry/cancellation, cleanup, and the real Reader bootstrap.
 
 The release gate is `npm run verify`, which includes typecheck, lint, Node,
-Chromium, the WebKit critical path, deterministic generation, build, and budgets.
+Chromium, the WebKit set, deterministic generation, build, and budgets.
 Run `npm run search:measure` when search data, normalization, ranking, or its
 dependencies change.
 

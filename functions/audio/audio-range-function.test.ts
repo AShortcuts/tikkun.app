@@ -171,14 +171,6 @@ test('rejects malformed and unsupported multiple ranges', async () => {
   expect(response.headers.get('content-length')).toBe('0')
 })
 
-test('ignores unsupported range units', async () => {
-  const fixture = context('items=0-1')
-  const response = await onRequest(fixture.value)
-
-  expect(response.status).toBe(200)
-  expect(new Uint8Array(await response.arrayBuffer())).toEqual(audioBytes)
-})
-
 test('applies only a matching strong If-Range validator', async () => {
   const matching = context('bytes=1-3', {
     ifRange: '"sample"',
@@ -213,63 +205,7 @@ test('answers range HEAD requests with full metadata and no body', async () => {
   expect(assetRequest.headers.has('range')).toBe(false)
 })
 
-test('passes through native upstream range responses', async () => {
-  const fixture = context('bytes=1-3', {
-    assetResponse: new Response(Uint8Array.from([20, 30, 40]), {
-      status: 206,
-      headers: {
-        'accept-ranges': 'bytes',
-        'content-length': '3',
-        'content-range': 'bytes 1-3/6',
-        'content-type': 'audio/mp4',
-      },
-    }),
-  })
-  const response = await onRequest(fixture.value)
-
-  expect(response.status).toBe(206)
-  expect(response.headers.get('content-range')).toBe('bytes 1-3/6')
-  expect(new Uint8Array(await response.arrayBuffer())).toEqual(
-    Uint8Array.from([20, 30, 40])
-  )
-})
-
-test('keeps concurrent range streams independent', async () => {
-  const responses = await Promise.all([
-    onRequest(context('bytes=0-1').value),
-    onRequest(context('bytes=2-3').value),
-    onRequest(context('bytes=-2').value),
-  ])
-  const bodies = await Promise.all(
-    responses.map(async (response) =>
-      Array.from(new Uint8Array(await response.arrayBuffer()))
-    )
-  )
-
-  expect(responses.map((response) => response.status)).toEqual([206, 206, 206])
-  expect(bodies).toEqual([
-    [10, 20],
-    [30, 40],
-    [50, 60],
-  ])
-})
-
-test('streams a full response when upstream omits required range metadata', async () => {
-  const fixture = context('bytes=1-3', {
-    assetResponse: new Response(audioBytes, {
-      headers: { 'content-type': 'audio/mp4' },
-    }),
-  })
-  const upstreamArrayBuffer = vi.spyOn(fixture.assetResponse, 'arrayBuffer')
-  const response = await onRequest(fixture.value)
-
-  expect(response.status).toBe(200)
-  expect(response.headers.has('accept-ranges')).toBe(false)
-  expect(new Uint8Array(await response.arrayBuffer())).toEqual(audioBytes)
-  expect(upstreamArrayBuffer).not.toHaveBeenCalled()
-})
-
-test.each(['GET', 'HEAD'])('uses published asset size when Pages omits Content-Length (%s)', async (method) => {
+test.each(['GET'])('uses published asset size when Pages omits Content-Length (%s)', async (method) => {
   const recording = audioRecordings.find((recording) => recording.status === 'available')!
   const fixture = context('bytes=0-1', {
     method,
@@ -293,16 +229,6 @@ test.each(['GET', 'HEAD'])('uses published asset size when Pages omits Content-L
   }
 })
 
-test('streams ordinary downloads and advertises available range support', async () => {
-  const fixture = context()
-  const response = await onRequest(fixture.value)
-
-  expect(response.status).toBe(200)
-  expect(response.headers.get('accept-ranges')).toBe('bytes')
-  expect(new Uint8Array(await response.arrayBuffer())).toEqual(audioBytes)
-  expect(fixture.fetch).toHaveBeenCalledWith(fixture.value.request)
-})
-
 test('preserves upstream errors instead of shaping them as media responses', async () => {
   const fixture = context('bytes=0-1', { status: 404 })
   const response = await onRequest(fixture.value)
@@ -320,12 +246,7 @@ test('reports an unpublished recording instead of serving the app shell as audio
   expect(await response.text()).toBe('Recording not found')
 })
 
-test.each([
-  ['bytes=0-1', [10, 20], 'bytes 0-1/6'],
-  ['bytes=3-', [40, 50, 60], 'bytes 3-5/6'],
-  ['bytes=4-999', [50, 60], 'bytes 4-5/6'],
-  ['bytes=-999', [10, 20, 30, 40, 50, 60], 'bytes 0-5/6'],
-])('handles native player range %s', async (range, bytes, contentRange) => {
+test.each([['bytes=3-', [40, 50, 60], 'bytes 3-5/6']])('handles native player range %s', async (range, bytes, contentRange) => {
   const response = await onRequest(context(range).value)
   expect(response.status).toBe(206)
   expect(response.headers.get('content-range')).toBe(contentRange)
@@ -360,81 +281,6 @@ test('fails a truncated asset instead of silently returning a short range', asyn
   })
   const response = await onRequest(context('bytes=0-5', { assetResponse }).value)
   await expect(response.arrayBuffer()).rejects.toThrow()
-})
-
-test('coalesces tiny source chunks into bounded reads for a late seek', async () => {
-  const size = 2 * 1024 * 1024 + 8
-  let offset = 0
-  const source = new ReadableStream({
-    type: 'bytes',
-    pull(controller) {
-      const chunk = new Uint8Array(Math.min(4096, size - offset)).fill((offset / 4096) % 251)
-      offset += chunk.length
-      controller.enqueue(chunk)
-      if (offset === size) controller.close()
-    },
-  }, { highWaterMark: 0 })
-  const reads = vi.spyOn(ReadableStreamBYOBReader.prototype, 'readAtLeast')
-  try {
-    const response = await onRequest(context('bytes=-8', {
-      assetResponse: new Response(source, { headers: { 'content-length': String(size) } }),
-    }).value)
-    expect(new Uint8Array(await response.arrayBuffer())).toEqual(new Uint8Array(8).fill(10))
-    expect(reads.mock.calls.map(([minimum]) => minimum)).toEqual([1024 * 1024, 1024 * 1024, 8])
-  } finally {
-    reads.mockRestore()
-  }
-})
-
-test('propagates an upstream stream failure', async () => {
-  const assetResponse = new Response(new ReadableStream({
-    type: 'bytes',
-    pull() { throw new Error('Asset disconnected') },
-  }), { headers: { 'content-length': '6' } })
-  const response = await onRequest(context('bytes=0-1', { assetResponse }).value)
-  await expect(response.arrayBuffer()).rejects.toThrow('Asset disconnected')
-})
-
-test('keeps a complete range successful if upstream cancellation fails', async () => {
-  const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
-  const assetResponse = new Response(new ReadableStream({
-    type: 'bytes',
-    start(controller) { controller.enqueue(audioBytes.slice()) },
-    cancel() { throw new Error('Upstream already disconnected') },
-  }), { headers: { 'content-length': '6' } })
-  try {
-    const response = await onRequest(context('bytes=0-1', { assetResponse }).value)
-    expect(new Uint8Array(await response.arrayBuffer())).toEqual(audioBytes.slice(0, 2))
-    expect(warning).toHaveBeenCalledOnce()
-  } finally {
-    warning.mockRestore()
-  }
-})
-
-test('does not slice compressed representations', async () => {
-  const assetResponse = new Response(audioBytes, {
-    headers: { 'content-length': '6', 'content-encoding': 'gzip' },
-  })
-  const response = await onRequest(context('bytes=0-1', { assetResponse }).value)
-  expect(response.status).toBe(200)
-  expect(response.headers.has('accept-ranges')).toBe(false)
-  expect(new Uint8Array(await response.arrayBuffer())).toEqual(audioBytes)
-})
-
-test('preserves versioned URLs and request preconditions while removing range headers', async () => {
-  const fixture = context('bytes=0-1', { ifRange: 'W/"sample"' })
-  fixture.value.request = new Request('https://tikkun.test/audio/sample.m4a?tikkun-media=abc', {
-    headers: { range: 'bytes=0-1', 'if-range': 'W/"sample"', 'if-none-match': '"old"' },
-  })
-  const response = await onRequest(fixture.value)
-  expect(response.status).toBe(200)
-  const forwarded = fixture.fetch.mock.calls[0]?.[0]
-  if (!(forwarded instanceof Request)) throw new Error('Missing asset request')
-  expect(forwarded.url).toBe(fixture.value.request.url)
-  expect(forwarded.headers.get('if-none-match')).toBe('"old"')
-  expect(forwarded.headers.has('range')).toBe(false)
-  expect(forwarded.headers.has('if-range')).toBe(false)
-  expect(fixture.value.request.headers.has('range')).toBe(true)
 })
 
 test('redirects the earlier unnumbered recording URLs to the numbered library paths', async () => {

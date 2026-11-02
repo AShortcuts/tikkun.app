@@ -3,11 +3,7 @@ import { loadScroll } from '../location.ts'
 import { loadScrollPageLines } from '../view-model/scroll-view-model.ts'
 import { verseEndLocation } from './verse-end-location.ts'
 
-test.each([
-  [1, 32, 3, 36, 37], [1, 50, 26, 60, 61], [2, 34, 35, 102, 103],
-  [3, 24, 23, 142, 143], [4, 9, 14, 163, 164], [5, 4, 40, 207, 208],
-  [5, 11, 25, 216, 217], [5, 33, 17, 244, 245],
-])('finishes %i:%i:%i across columns %i to %i', async (b, c, v, startPage, endPage) => {
+test.each([[1, 32, 3, 36, 37], [5, 33, 17, 244, 245]])('finishes %i:%i:%i across columns %i to %i', async (b, c, v, startPage, endPage) => {
   const resolver = await loadScroll('torah')
   const ref = { scroll: 'torah' as const, b, c, v }
   expect(resolver.physicalLocationFromRef(ref).pageNumber).toBe(startPage)

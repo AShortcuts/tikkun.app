@@ -7,6 +7,7 @@ import {
   audioNarrators,
 } from '../../generated/audio-manifest.ts'
 import { audioRecordings } from '../data/audio-catalog.ts'
+import { activeContent } from '../updates/content-runtime.ts'
 import type { AudioNarrator, AudioRecording, WordCue } from './types.ts'
 import { normalizeFirstCueStart } from './normalize-first-cue.ts'
 import { TOKENIZATION_VERSION } from './cue-schema.ts'
@@ -18,7 +19,7 @@ export {
 } from './recording-lookup.ts'
 
 export function listNarrators(): AudioNarrator[] {
-  return audioNarrators
+  return activeContent()?.narrators ?? audioNarrators
 }
 
 export function listRecordings(): AudioRecording[] {

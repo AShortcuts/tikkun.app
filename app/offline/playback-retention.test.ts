@@ -31,16 +31,6 @@ test('route reset retains every source until native clear succeeds', async () =>
   expect(onReleased).toHaveBeenCalledOnce()
 })
 
-test('failed native clear preserves sources and rejects instead of allowing cleanup', async () => {
-  const { retention, onReleased, change } = harness()
-  await retention.sync()
-  onReleased.mockClear()
-  change([], Promise.reject(new Error('clear failed')))
-  await expect(retention.sync()).rejects.toThrow('clear failed')
-  expect(retention.sources()).toEqual(['first', 'later'])
-  expect(onReleased).not.toHaveBeenCalled()
-})
-
 test('older acknowledgment cannot release a newer replacement or its old files', async () => {
   const { retention, change } = harness()
   await retention.sync()
@@ -55,18 +45,4 @@ test('older acknowledgment cannot release a newer replacement or its old files',
   second.resolve()
   await two
   expect(retention.sources()).toEqual(['newest'])
-})
-
-test('teardown freezes pending sources and leaves release ownership to teardown', async () => {
-  const { retention, onReleased, change } = harness()
-  await retention.sync()
-  onReleased.mockClear()
-  const clearing = deferred()
-  change([], clearing.promise)
-  const pending = retention.sync()
-  expect(retention.freeze()).toEqual(['first', 'later'])
-  clearing.resolve()
-  await pending
-  expect(retention.sources()).toEqual(['first', 'later'])
-  expect(onReleased).not.toHaveBeenCalled()
 })

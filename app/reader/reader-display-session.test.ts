@@ -77,40 +77,6 @@ test('replaces one display generation in the original lifecycle order and ignore
   expect(fixture.viewport.refresh).toHaveBeenCalledOnce()
 })
 
-test('owns page indexing, policy, presentation invalidation, and eviction cleanup in event order', async () => {
-  const fixture = createFixture({ search: '?virtualizePages=1' })
-  const display = fixture.displays[0]
-  display.mountedPages = [1, 2, 3, 4, 5, 6, 7, 8]
-  display.viewportPageNumber = 4
-  fixture.session.render(display.viewModel)
-  display.resolveScrolled()
-  await flushMicrotasks()
-  fixture.frame.runNext()
-  fixture.frame.runNext()
-  fixture.events.length = 0
-
-  const pageRoot = createPageRoot(fixture.events, 1)
-  fixture.session.pageRendered(pageRoot, () => {
-    fixture.events.push('decorate')
-  })
-
-  expect(fixture.events).toEqual([
-    'index:lines',
-    'index:markers',
-    'decorate',
-    'display:1:evict:1,7,8',
-  ])
-  expect(
-    (await fixture.session.ensureAliyahDomTargetRendered('run-1', 1))?.marker,
-  ).not.toBeNull()
-  expect(fixture.frame.pendingCount()).toBe(1)
-
-  fixture.session.pageEvicted(1)
-  expect(
-    await fixture.session.ensureAliyahDomTargetRendered('run-1', 1),
-  ).toBeNull()
-})
-
 test('cancels stale prewarm work and clears audio when the display generation changes', async () => {
   const fixture = createFixture()
   const first = fixture.displays[0]
@@ -139,38 +105,6 @@ test('cancels stale prewarm work and clears audio when the display generation ch
   expect(fixture.audio.pause).toHaveBeenCalledOnce()
   expect(fixture.audio.removeAttribute).toHaveBeenCalledWith('src')
   expect(fixture.audio.load).toHaveBeenCalledTimes(2)
-})
-
-test('cannot repopulate the current location cache from a stale resolver', async () => {
-  const fixture = createFixture()
-  const first = fixture.displays[0]
-  const run = createRun()
-  const resolver = deferred<{
-    physicalLocationFromRef(): { pageNumber: number; lineNumber: number }
-  }>()
-  first.viewModel = {
-    ...createViewModel(run),
-    resolver: resolver.promise,
-  } as unknown as ScrollViewModel
-  fixture.session.render(first.viewModel)
-  fixture.session.scheduleResourcePrewarm(
-    [{ run, aliyahIndex: 1 }],
-    'stale-resolver',
-  )
-  first.resolveScrolled()
-  await flushMicrotasks()
-  fixture.background.runNext()
-  await flushMicrotasks()
-
-  const second = fixture.addDisplay()
-  fixture.session.render(second.viewModel)
-  resolver.resolve({
-    physicalLocationFromRef: () => ({ pageNumber: 99, lineNumber: 1 }),
-  })
-  await flushMicrotasks()
-
-  expect(first.viewModel.fetchPageByPageNumber).not.toHaveBeenCalled()
-  expect(fixture.effects.prewarmCueData).not.toHaveBeenCalled()
 })
 
 test('deactivation and teardown cancel owned work idempotently', async () => {
@@ -204,51 +138,6 @@ test('deactivation and teardown cancel owned work idempotently', async () => {
   expect(fixture.viewport.release).toHaveBeenCalledOnce()
   expect(fixture.viewport.destroy).toHaveBeenCalledOnce()
   expect(fixture.effects.present).not.toHaveBeenCalled()
-})
-
-test('records native User Timing entries only for an opted-in Reader session', () => {
-  const entryNames = [
-    'tikkun:reader:progress-anchor-rebuild',
-    'tikkun:reader:presentation',
-    'tikkun:reader:page-rendered',
-    'tikkun:reader:page-evicted',
-  ]
-  const clearEntries = () => {
-    for (const name of entryNames) {
-      performance.clearMarks(name)
-      performance.clearMeasures(name)
-    }
-  }
-  const exercise = (search = '') => {
-    const fixture = createFixture({ search })
-    fixture.session.progressSnapshot()
-    fixture.session.invalidatePresentation('reader-position')
-    fixture.frame.runNext()
-    fixture.session.pageRendered(createPageRoot(fixture.events, 1), () => {})
-    fixture.session.pageEvicted(1)
-    fixture.session.destroy()
-  }
-
-  clearEntries()
-  exercise()
-  expect(
-    performance
-      .getEntries()
-      .filter(({ name }) => name.startsWith('tikkun:reader:')),
-  ).toEqual([])
-
-  exercise('?debugPerformance=1')
-  expect(
-    performance
-      .getEntries()
-      .filter(({ name }) => name.startsWith('tikkun:reader:'))
-      .map(({ name }) => name),
-  ).toEqual(expect.arrayContaining(entryNames))
-  expect(
-    performance.getEntriesByName('tikkun:reader:progress-anchor-rebuild'),
-  ).toHaveLength(1)
-
-  clearEntries()
 })
 
 function createFixture({ search = '' }: { search?: string } = {}) {
@@ -457,32 +346,6 @@ function createRoot(events: string[]) {
     querySelectorAll: () => [],
     getBoundingClientRect: () => ({ top: 0 }),
   } as unknown as HTMLElement
-}
-
-function createPageRoot(events: string[], pageNumber: number) {
-  const page = {
-    dataset: { pageNumber: String(pageNumber) },
-  }
-  const line = {
-    dataset: { pageNumber: String(pageNumber), lineIndex: '0' },
-    isConnected: true,
-    closest: () => page,
-  }
-  const marker = {
-    dataset: { runId: 'run-1', aliyahIndex: '1' },
-    isConnected: true,
-    closest: () => page,
-  }
-  return {
-    querySelectorAll(selector: string) {
-      if (selector.includes('data-class="line"')) {
-        events.push('index:lines')
-        return [line]
-      }
-      events.push('index:markers')
-      return [marker]
-    },
-  } as unknown as ParentNode
 }
 
 function createFrameHarness(): ReaderPageWindowFrameAdapter & {

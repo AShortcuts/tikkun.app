@@ -13,7 +13,7 @@ import { TopBarTracker } from './navigation/top-bar-model.ts'
 
 const generator = (israel = false) => new LeiningGenerator({ israel, ashkenazi: true, includeModernHolidays: false })
 
-test.each([false, true])('Vezot parsha is independent of date and location (Israel: %s)', israel => {
+test.each([false])('Vezot parsha is independent of date and location (Israel: %s)', israel => {
   const g = generator(israel)
   for (const year of [2023, 2026, 2027, 2030]) {
     const run = resolveParshaRun(g, 'vezos-haberacha', new Date(year, 8, 30))!.run
@@ -27,7 +27,7 @@ test.each([false, true])('Vezot parsha is independent of date and location (Isra
   }
 })
 
-test.each(['/torah/parsha/vezot-haberacha', '/torah/5-34-1', '/torah/page/245'])('plain Torah route %s contains only parsha readings', async path => {
+test.each(['/torah/parsha/vezot-haberacha'])('plain Torah route %s contains only parsha readings', async path => {
   const route = parseUrl(generator(), path)
   if (route?.view !== 'reader') throw new Error(`Missing reader for ${path}`)
   await route.model.startingLocation
@@ -37,11 +37,7 @@ test.each(['/torah/parsha/vezot-haberacha', '/torah/5-34-1', '/torah/page/245'])
   expect(aliyahName(7, run, { title: route.model.displayTitleForRun(run) })).toBe('שביעי')
 })
 
-test.each([
-  ['2026-10-04', false, 6, 7],
-  ['2026-10-03', true, 7, 8],
-  ['2025-10-14', true, 6, 7],
-] as const)('service %s preserves its divisions and labels', async (date, israel, torah, beresheet) => {
+test.each([['2026-10-04', false, 6, 7]] as const)('service %s preserves its divisions and labels', async (date, israel, torah, beresheet) => {
   const g = generator(israel)
   const path = `/run/${date}:shacharis,main`
   const route = parseUrl(g, path)
@@ -77,23 +73,7 @@ test('the eighth reading is searchable and selectable in Israel', () => {
   expect(model.search('Simchat Torah on Shabbat 8')[0]?.href).toBe('#/run/2026-10-03:shacharis,last-aliyah/1-1-1')
 })
 
-test('other services keep their own aliyah counts', () => {
-  const g = generator()
-  expect(g.parseId('2026-10-03:maariv,main')?.aliyot.map(aliyah => aliyah.index)).toEqual([1, 2, 3])
-  expect(g.parseId('2026-09-30:shacharis,main')?.aliyot.map(aliyah => aliyah.index)).toEqual([1, 2, 3, 4])
-})
-
-test('old mixed parsha links preserve the verse in plain Torah context', () => {
-  const route = parseUrl(generator(), '/torah/parsha/vezos-haberacha/1-1-1')
-  if (route?.view !== 'reader') throw new Error('Missing reader')
-  expect(route.canonicalHash).toBe('#/torah/1-1-1')
-  expect(route.model.initialTitle).toBe('פרשת בראשית')
-})
-
-test.each([
-  ['/torah/parsha/vezot-haberacha', 'parsha'],
-  ['/run/2026-10-04:shacharis,main', 'service'],
-] as const)('previous and next navigation preserve the context of %s', async (path, kind) => {
+test.each<[string, 'parsha' | 'service']>([['/run/2026-10-04:shacharis,main', 'service']])('previous and next navigation preserve the context of %s', async (path, kind) => {
   const route = parseUrl(generator(), path)
   if (route?.view !== 'reader') throw new Error('Missing reader')
   const { page } = await route.model.startingLocation

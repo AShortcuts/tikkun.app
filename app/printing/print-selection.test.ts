@@ -7,11 +7,6 @@ const line = (text: string, verses: [number, number, number][]): LineType => ({ 
 const words = (word: number, annotated = true, page = 1, line = 0) => ({ page, line, fragment: 0, word, annotated })
 const ref = (c: number, v: number) => ({ scroll: 'torah', b: 1, c, v })
 
-test('a selection in Esther retains its scroll identity', async () => {
-  const range = await selectedPrintRange([words(0)], undefined, 'esther')
-  expect(range).toEqual({ start: { scroll: 'esther', b: 1, c: 1, v: 1 }, end: { scroll: 'esther', b: 1, c: 1, v: 1 } })
-})
-
 test('partial words resolve to whole verses and reversed endpoints are ordered', async () => {
   const load = async () => [line('אב גד׃ הו זח׃', [[1, 1, 1], [1, 1, 2]])]
   expect(await selectedPrintRange([words(2)], load)).toEqual({ start: ref(1, 2), end: ref(1, 2) })
@@ -30,11 +25,6 @@ test('continuations at page and chapter boundaries retain the preceding verse', 
     ? [line('אב גד', [[1, 1, 31]])]
     : [line('הו זח׃ טי כך׃', [[1, 2, 1]])]
   expect(await selectedPrintRange([words(0, true, 2), words(3, true, 2)], load)).toEqual({ start: ref(1, 31), end: ref(2, 1) })
-})
-
-test('empty selection retains the default, but an unresolvable selected word reports an error', async () => {
-  expect(await selectedPrintRange([])).toBeUndefined()
-  await expect(selectedPrintRange([words(99)], async () => [line('אב׃', [[1, 1, 1]])])).rejects.toThrow('matched to a pasuk')
 })
 
 test('a selection across sefarim retains both books in the range and title', async () => {

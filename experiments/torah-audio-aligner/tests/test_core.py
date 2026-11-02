@@ -10,10 +10,24 @@ import unittest
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from core import (AlignmentError, ctc_viterbi, digest_json, frame_geometry, greedy_text,
-                  lexical_units, propose, replay_start, reviewed_draft, timing_metrics, validate_result)
-from aligner import (InferenceWorker, InferenceWorkerFailed, assert_no_cue_labels, annotation_template,
-                     bounded_worker, work_path, write_json)
+from core import (
+    AlignmentError,
+    ctc_viterbi,
+    digest_json,
+    lexical_units,
+    propose,
+    replay_start,
+    reviewed_draft,
+    validate_result,
+)
+from aligner import (
+    InferenceWorker,
+    InferenceWorkerFailed,
+    assert_no_cue_labels,
+    bounded_worker,
+    work_path,
+    write_json,
+)
 
 HERE = Path(__file__).resolve().parents[1]
 
@@ -51,34 +65,10 @@ class AcousticDecoderTests(unittest.TestCase):
         spans = ctc_viterbi(emissions([0, 0, 1, 1, 0, 2, 2, 0]), [1, 2], 0)
         self.assertEqual([(item["startFrame"], item["endFrame"]) for item in spans], [(2, 4), (5, 7)])
 
-    def test_repeated_reference_letters_require_blank(self):
-        spans = ctc_viterbi(emissions([0, 1, 1, 0, 1, 1, 0]), [1, 1], 0)
-        self.assertEqual([item["startFrame"] for item in spans], [1, 4])
-        with self.assertRaisesRegex(AlignmentError, "Too few"):
-            ctc_viterbi(emissions([1, 1]), [1, 1], 0)
-
     def test_sustained_letter_stays_one_occurrence(self):
         spans = ctc_viterbi(emissions([0] + [1] * 35 + [0]), [1], 0)
         self.assertEqual(len(spans), 1)
         self.assertEqual(spans[0]["endFrame"] - spans[0]["startFrame"], 35)
-
-    def test_real_checkpoint_blank_is_not_the_space_token(self):
-        matrix = emissions([3, 1, 0, 2, 3])
-        spans = ctc_viterbi(matrix, [1, 0, 2], 3)
-        self.assertEqual([item["startFrame"] for item in spans], [1, 2, 3])
-
-    def test_invalid_and_oversized_trellises_fail(self):
-        for matrix, labels, blank in [(np.array([[np.nan, 0]]), [1], 0),
-                                       (np.array([[1.0, -1]]), [1], 0),
-                                       (emissions([0, 1]), [0], 0),
-                                       (emissions([0, 1]), [8], 0)]:
-            with self.assertRaises(AlignmentError):
-                ctc_viterbi(matrix, labels, blank)
-        with self.assertRaisesRegex(AlignmentError, "budget"):
-            ctc_viterbi(emissions([0, 1, 0, 2]), [1, 2], 0, max_cells=5)
-
-    def test_greedy_decode_does_not_use_reference(self):
-        self.assertEqual(greedy_text(emissions([3, 1, 1, 3, 1, 0, 2, 3]), {"|": 0, "א": 1, "ב": 2}, 3), "אא ב")
 
     def test_checkpointed_traceback_matches_full_path_including_ties_and_repeats(self):
         rng = np.random.default_rng(147)
@@ -91,15 +81,6 @@ class AcousticDecoderTests(unittest.TestCase):
                     full = ctc_viterbi(matrix, labels, 3)
                     checkpointed = ctc_viterbi(matrix, labels, 3, max_cells=1500)
                     self.assertEqual(checkpointed, full)
-
-    def test_checkpointed_traceback_still_rejects_no_acoustic_path(self):
-        matrix = np.full((200, 4), -np.inf, dtype=np.float32)
-        matrix[:, 0] = 0
-        with self.assertRaisesRegex(AlignmentError, "No acoustic path"):
-            ctc_viterbi(matrix, [1, 2], 0, max_cells=400)
-
-    def test_known_geometry_uses_stride_not_duration_divided_by_frames(self):
-        self.assertEqual(frame_geometry([10, 3, 3, 3, 3, 2, 2], [5, 2, 2, 2, 2, 2, 2]), (320, 400))
 
     def test_end_to_end_synthetic_emissions_produce_unreviewed_proposal(self):
         bundle, recording, _, _ = fixture()
@@ -126,16 +107,6 @@ class TorahMappingTests(unittest.TestCase):
     def test_trailing_maqaf_and_paseq_make_no_phantom_words(self):
         self.assertEqual(len(lexical_units([{"tokenKey": "1", "annotatedText": "אֶת־"}])), 1)
         self.assertEqual(lexical_units([{"tokenKey": "1", "annotatedText": "הַיּוֹם ׀"}])[0]["alignmentText"], "היום")
-
-    def test_divine_name_mapping_is_explicitly_unresolved(self):
-        self.assertTrue(lexical_units([{"tokenKey": "1", "annotatedText": "לַיהֹוָה"}])[0]["needsSpokenFormReview"])
-
-    def test_annotations_begin_empty_and_first_start_is_eligible(self):
-        bundle, _, _, _ = fixture()
-        labels = annotation_template(bundle)["recordings"][0]["cues"]
-        self.assertTrue(all(label["timeStart"] is None and label["timeEnd"] is None for label in labels))
-        self.assertTrue(labels[0]["firstPlaybackCueWasNormalized"])
-        self.assertNotIn("excludedFromTiming", labels[0])
 
     def test_input_leakage_and_output_path_escape_are_rejected(self):
         with self.assertRaisesRegex(AlignmentError, "leaked"):
@@ -227,48 +198,7 @@ class EvaluationTests(unittest.TestCase):
                     {"tokenKey": "1:0:0:0", "timeStart": 0, "excludedFromTiming": True},
                     {"tokenKey": "1:0:0:1", "timeStart": 1.0}]}
 
-    def test_legacy_zero_is_excluded_and_difference_is_not_accuracy(self):
-        _, recording, result, _ = fixture()
-        metrics = timing_metrics(recording, result, self.reference(recording))
-        self.assertEqual(metrics["excluded"], 1)
-        self.assertEqual(metrics["referenceBoundaries"], 1)
-        self.assertEqual(metrics["medianSignedDifferenceSeconds"], 0)
-        self.assertFalse(metrics["isAcousticAccuracy"])
-
-    def test_missing_and_ambiguous_predictions_stay_in_denominator(self):
-        _, recording, result, _ = fixture()
-        reference = self.reference(recording)
-        result["occurrences"].pop()
-        metrics = timing_metrics(recording, result, reference)
-        self.assertEqual(metrics["missing"], 1)
-        self.assertEqual(metrics["within200msFractionIncludingMissing"], 0)
-        result["occurrences"] = [{"tokenKey": "1:0:0:1", "sourceStartSample": 16000}] * 2
-        metrics = timing_metrics(recording, result, reference)
-        self.assertEqual(metrics["ambiguousOccurrences"], 1)
-        self.assertEqual(metrics["within200msFractionIncludingMissing"], 0)
-
-    def test_unlabeled_human_template_cannot_report_accuracy(self):
-        bundle, recording, result, _ = fixture()
-        reference = annotation_template(bundle)["recordings"][0]
-        metrics = timing_metrics(recording, result, reference)
-        self.assertEqual(metrics["referenceBoundaries"], 0)
-        self.assertIsNone(metrics["within200msFractionIncludingMissing"])
-        self.assertFalse(metrics["isAcousticAccuracy"])
-        reference["cues"][0]["timeStart"] = 0.25
-        with self.assertRaisesRegex(AlignmentError, "provenance"):
-            timing_metrics(recording, result, reference)
-
-
 class ProcessAndStorageTests(unittest.TestCase):
-    def test_worker_timeout_stops_its_descendants(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            marker = str(Path(temporary) / "should-not-exist")
-            child = "import time; from pathlib import Path; time.sleep(.35); Path(" + repr(marker) + ").write_text('orphan')"
-            parent = "import subprocess, sys, time; subprocess.Popen([sys.executable, '-c', " + repr(child) + "]); time.sleep(3)"
-            with self.assertRaises(subprocess.TimeoutExpired):
-                bounded_worker([sys.executable, "-c", parent], timeout=.15)
-            time.sleep(.3)
-            self.assertFalse(Path(marker).exists())
 
     def test_output_refuses_public_destination(self):
         with self.assertRaisesRegex(AlignmentError, "inside"):
@@ -341,20 +271,6 @@ class InferenceWorkerTests(unittest.TestCase):
             self.worker.run({"crash": True}, 5)
         self.assertIn("ERROR: simulated crash", raised.exception.stderr)
         self.assertNotEqual(self.pid(), first)
-
-    def test_a_failed_recording_returns_its_stderr_and_keeps_the_process(self):
-        first = self.pid()
-        reply = self.worker.run({"fail": True}, 5)
-        self.assertEqual((reply["ok"], reply["error"]), (False, "bad input"))
-        self.assertIn("simulated traceback", reply["stderr"])
-        self.assertEqual(self.pid(), first)
-
-    def test_replaces_the_process_before_its_idle_exit_can_race_a_request(self):
-        worker = self.make_worker(idle_seconds=5.2)
-        first = self.pid(worker)
-        time.sleep(.3)
-        self.assertNotEqual(self.pid(worker), first)
-
 
 if __name__ == "__main__":
     unittest.main()

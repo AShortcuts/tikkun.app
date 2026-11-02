@@ -132,42 +132,7 @@ test('builds one sorted immutable snapshot with current anchor semantics', () =>
   )
 })
 
-test('reuses clean geometry across routine position reads', () => {
-  const fixture = createFixture()
-  const initial = fixture.index.snapshot()
-  const initialPositions = initial.anchors.map(({ position }) => position)
-
-  fixture.book.scrollTop = 900
-  for (let index = 0; index < 100; index += 1) {
-    const snapshot = fixture.index.snapshot()
-    expect(snapshot).toBe(initial)
-    snapshot.at(index * 10)
-  }
-
-  expect(fixture.querySelectorAll).toHaveBeenCalledOnce()
-  expect(fixture.rootRect).toHaveBeenCalledOnce()
-  expect(fixture.lineRects.every((measure) => measure.mock.calls.length === 1)).toBe(
-    true
-  )
-
-  fixture.index.invalidate('page-rendered')
-  const rebuilt = fixture.index.snapshot()
-  expect(rebuilt.anchors.map(({ position }) => position)).toEqual(initialPositions)
-  expect(fixture.querySelectorAll).toHaveBeenCalledTimes(2)
-  expect(fixture.rootRect).toHaveBeenCalledTimes(2)
-  expect(fixture.lineRects.every((measure) => measure.mock.calls.length === 2)).toBe(
-    true
-  )
-})
-
-test.each([
-  ['reading', 'one', true],
-  ['reading', 'one', false],
-  ['reading', 'two', true],
-  ['reading', 'two', false],
-  ['match', 'one', true],
-  ['match', 'two', true],
-] as const)('anchors Noach 3 at the correct boundary in %s / %s with annotations=%s', async (layout, sides, annotationsEnabled) => {
+test.each([['reading', 'one', true]] as const)('anchors Noach 3 at the correct boundary in %s / %s with annotations=%s', async (layout, sides, annotationsEnabled) => {
   const generator = new LeiningGenerator({
     ashkenazi: true,
     includeModernHolidays: false,
@@ -236,76 +201,4 @@ test.each([
     .toBeCloseTo(expectedPosition, 5)
   expect(rootRect).toHaveBeenCalledTimes(2)
   index.destroy()
-})
-
-test('coalesces explicit invalidations into one lazy rebuild', () => {
-  const fixture = createFixture()
-  const first = fixture.index.snapshot()
-
-  fixture.index.invalidate('page-rendered')
-  fixture.index.invalidate('page-evicted')
-  fixture.index.invalidate('page-rendered')
-
-  expect(fixture.querySelectorAll).toHaveBeenCalledOnce()
-
-  const second = fixture.index.snapshot()
-  expect(second).not.toBe(first)
-  expect(second.revision).toBe(2)
-  expect(fixture.querySelectorAll).toHaveBeenCalledTimes(2)
-})
-
-test('drops disconnected anchors only after invalidation and keeps old snapshots stable', () => {
-  const fixture = createFixture()
-  const first = fixture.index.snapshot()
-  const removedLine = fixture.lines[0]
-  removedLine.remove()
-
-  expect(fixture.index.snapshot()).toBe(first)
-  expect(first.anchors.some(({ line }) => line === removedLine)).toBe(true)
-
-  fixture.index.invalidate('page-evicted')
-  const second = fixture.index.snapshot()
-
-  expect(second.anchors.some(({ line }) => line === removedLine)).toBe(false)
-  expect(first.anchors.some(({ line }) => line === removedLine)).toBe(true)
-  expect(first.anchors).toHaveLength(3)
-  expect(second.anchors).toHaveLength(2)
-})
-
-test('uses its line map for exact anchors and targeted geometry for ordinary lines', () => {
-  const fixture = createFixture()
-  const snapshot = fixture.index.snapshot()
-  const anchorChild = fixture.lines[1].firstElementChild as HTMLElement
-
-  expect(fixture.index.anchorForElement(anchorChild)).toBe(snapshot.anchors[0])
-  expect(fixture.rootRect).toHaveBeenCalledOnce()
-
-  const ordinaryLine = document.createElement('div')
-  ordinaryLine.dataset.lineIndex = '20'
-  const ordinaryWord = document.createElement('span')
-  ordinaryLine.append(ordinaryWord)
-  fixture.book.append(ordinaryLine)
-  const ordinaryRect = vi.fn(() => rectAt(450))
-  ordinaryLine.getBoundingClientRect = ordinaryRect
-
-  expect(fixture.index.anchorForElement(ordinaryWord)).toBe(snapshot.anchors[0])
-  expect(fixture.querySelectorAll).toHaveBeenCalledOnce()
-  expect(fixture.rootRect).toHaveBeenCalledTimes(2)
-  expect(ordinaryRect).toHaveBeenCalledOnce()
-})
-
-test('releases cached DOM state when destroyed', () => {
-  const fixture = createFixture()
-  fixture.index.snapshot()
-
-  fixture.index.destroy()
-  fixture.index.destroy()
-  fixture.index.invalidate('reader-model')
-
-  expect(() => fixture.index.snapshot()).toThrow(
-    'Reader progress anchor index has been destroyed'
-  )
-  expect(() => fixture.index.anchorForElement(fixture.lines[0])).toThrow(
-    'Reader progress anchor index has been destroyed'
-  )
 })

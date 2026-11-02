@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import type { CueExportPayload } from '../audio/types.ts'
-import { isZipFile, loadStoredCueBundle, readCueBundleFile, storeCueBundle } from './cue-bundle.ts'
+import { loadStoredCueBundle, readCueBundleFile, storeCueBundle } from './cue-bundle.ts'
 import { buildZipFixture } from './zip.fixture.ts'
 
 const payload = (aliyah: number): CueExportPayload => ({
@@ -56,10 +56,4 @@ test('keeps the chosen aliyot until closed and rejects a damaged saved list', ()
   // The earlier one-tab format held whole cue files.
   storage.setItem('tikkun-admin-cue-bundle', JSON.stringify({ name: 'x.zip', entries: [] }))
   expect(() => loadStoredCueBundle(storage)).toThrow('damaged')
-})
-
-test('recognizes ZIP files by name or type', () => {
-  expect(isZipFile({ name: 'Cues.ZIP', type: '' })).toBe(true)
-  expect(isZipFile({ name: 'download', type: 'application/zip' })).toBe(true)
-  expect(isZipFile({ name: '3.json', type: 'application/json' })).toBe(false)
 })

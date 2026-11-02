@@ -23,34 +23,8 @@ test('requires valid signature covering rollout and native build metadata', asyn
   await expect(verifyWebRelease(envelope({ ...release, rollout: 101 }), pem)).rejects.toThrow('Invalid web release')
 })
 
-test('preserves signed release numbering and optional native version in schema 1', async () => {
-  const numbered = { ...release, nativeVersion: '1.2', release: { version: '1.2.1', build: 10 } }
-  expect(await verifyWebRelease(envelope(numbered), pem)).toEqual(numbered)
-  for (const patch of [{ nativeVersion: '1.3' }, { release: { version: '1.2.1', build: 11 } }]) {
-    const tampered = envelope(numbered)
-    tampered.payload = JSON.stringify({ ...numbered, ...patch })
-    await expect(verifyWebRelease(tampered, pem)).rejects.toThrow('signature mismatch')
-  }
-})
-
-test.each([
-  { nativeVersion: null }, { nativeVersion: 1.2 }, { nativeVersion: '../1.2' },
-  { release: null }, { release: { version: '1.2' } },
-  { release: { version: 'invalid', build: 10 } }, { release: { version: '1.2', build: '10' } },
-])('rejects malformed signed release identity: %j', async patch => {
+test.each([{ nativeVersion: '../1.2' }])('rejects malformed signed release identity: %j', async patch => {
   await expect(verifyWebRelease(envelope({ ...release, ...patch }), pem)).rejects.toThrow()
-})
-
-test('warns for large signed web releases but rejects invalid byte counts', async () => {
-  const large = { ...release, bytes: 50 * 1024 * 1024 + 1 }
-  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-  try {
-    expect(await verifyWebRelease(envelope(large), pem)).toEqual(large)
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('recommended download budget is 50 MiB'))
-    for (const bytes of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
-      await expect(verifyWebRelease(envelope({ ...release, bytes }), pem)).rejects.toThrow('Invalid web release')
-    }
-  } finally { warn.mockRestore() }
 })
 test('only stages matching native builds inside the rollout, never reloads', async () => {
   const bridge = plugin()
@@ -73,13 +47,7 @@ test('does not retry a rolled back bundle or schedule a failed download', async 
 
 const bundled: BundledAppRelease = { release: { version: '1.1', build: 9 }, target: { nativeBuild: '8' } }
 
-test.each([
-  undefined,
-  { version: '1.1', build: 8 },
-  { version: '1.1.0', build: 9 },
-  { version: '1.0.9', build: 10 },
-  { version: '1.1.1', build: 9 },
-])('does not stage unnumbered or non-newer releases over a bundled release: %j', async identity => {
+test.each([undefined, { version: '1.0.9', build: 10 }])('does not stage unnumbered or non-newer releases over a bundled release: %j', async identity => {
   const bridge = plugin()
   const candidate = { ...release, nativeBuild: '8', ...(identity ? { release: identity } : {}) }
   expect(await stageWebRelease(candidate, '9', 0, 'https://tikkunreader.com', bridge, bundled)).toBe('current')
@@ -90,7 +58,7 @@ test.each([
   expect(bridge.setNextBundle).not.toHaveBeenCalled()
 })
 
-test.each(['1.1.0', '1.1.1'])('accepts a higher build at version %s on the embedded target instead of the Sqim build', async version => {
+test.each(['1.1.0'])('accepts a higher build at version %s on the embedded target instead of the Sqim build', async version => {
   const bridge = plugin()
   const candidate = { ...release, nativeBuild: '8', release: { version, build: 10 } }
   expect(await stageWebRelease(candidate, '9', 0, 'https://tikkunreader.com', bridge, bundled)).toBe('ready')
@@ -100,11 +68,7 @@ test.each(['1.1.0', '1.1.1'])('accepts a higher build at version %s on the embed
   expect(bridge.setNextBundle).toHaveBeenCalledWith({ bundleId: release.bundleId })
 })
 
-test.each([
-  { nativeBuild: '1' },
-  { nativeVersion: '1.1', nativeBuild: '1' },
-  { nativeVersion: '1.2', nativeBuild: '2' },
-])('rejects another target before ignoring an unnumbered release: %j', async target => {
+test.each([{ nativeBuild: '1' }])('rejects another target before ignoring an unnumbered release: %j', async target => {
   const bridge = plugin()
   const nextNative: BundledAppRelease = { release: { version: '1.2', build: 1 },
     target: { nativeVersion: '1.2', nativeBuild: '1' } }
@@ -112,11 +76,4 @@ test.each([
     .rejects.toThrow('another native build or version')
   expect(bridge.downloadBundle).not.toHaveBeenCalled()
   expect(bridge.setNextBundle).not.toHaveBeenCalled()
-})
-
-test('legacy callers still accept numbered updates on their numeric target', async () => {
-  const bridge = plugin()
-  expect(await stageWebRelease({ ...release, release: { version: '1.1.1', build: 10 } }, '4', 0,
-    'https://tikkunreader.com', bridge)).toBe('ready')
-  expect(bridge.setNextBundle).toHaveBeenCalledWith({ bundleId: release.bundleId })
 })

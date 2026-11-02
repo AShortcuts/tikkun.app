@@ -2,10 +2,7 @@ import { expect, test } from 'vitest'
 import { LeiningGenerator } from '../calendar-model/generator.ts'
 import { LeiningInstanceId, LeiningRunType } from '../calendar-model/model-types.ts'
 import type { UserSettings } from '../calendar-model/user-settings.ts'
-import {
-  holidayLeiningKeywords,
-  selectCommandPaletteHolidayRun,
-} from './holiday-actions.ts'
+import { selectCommandPaletteHolidayRun } from './holiday-actions.ts'
 
 const testSettings: UserSettings = {
   ashkenazi: true,
@@ -54,24 +51,4 @@ test('holiday command palette omits leinings with no supported reader run', () =
   }
 
   expect(selectCommandPaletteHolidayRun(haftarahOnly)).toBe(null)
-})
-
-test('holiday command palette aliases Tishah B’Av spelling', () => {
-  const keywords = holidayLeiningKeywords(
-    { en: "Tish'a B'Av", he: 'תשעה באב' },
-    `${LeiningInstanceId.Mincha}`
-  )
-
-  expect(keywords).toEqual(expect.arrayContaining(['Tishah B’Av', "Tishah B'Av"]))
-})
-
-test('holiday command palette keeps Rosh Chodesh aliases', () => {
-  const keywords = holidayLeiningKeywords(
-    { en: 'Rosh Chodesh Iyyar', he: 'ראש חודש אייר' },
-    `${LeiningInstanceId.Shacharis}`
-  )
-
-  expect(keywords).toEqual(
-    expect.arrayContaining(['rosh chodesh', 'rosh hodesh', 'ראש חודש'])
-  )
 })

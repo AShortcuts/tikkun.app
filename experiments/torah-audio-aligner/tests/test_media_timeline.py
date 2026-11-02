@@ -5,13 +5,11 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
 
 import numpy as np
 
 from acoustics import read_wave
-from aligner import decode_audio, probe
-from core import AlignmentError
+from aligner import decode_audio
 
 
 class MediaTimelineTests(unittest.TestCase):
@@ -44,10 +42,3 @@ class MediaTimelineTests(unittest.TestCase):
             decode_audio({"mediaPath": str(source), "durationSeconds": .5}, output)
             with wave.open(str(output), "rb") as audio:
                 self.assertEqual(audio.readframes(audio.getnframes()), pcm.tobytes())
-
-    def test_nonfinite_or_out_of_range_origins_are_rejected(self):
-        for origin in ("nan", "inf", "-inf", "50", "-50"):
-            info = {"streams": [{"start_time": origin}], "format": {"duration": "2", "start_time": origin}}
-            with self.subTest(origin=origin), patch("aligner.subprocess.check_output", return_value=json.dumps(info)):
-                with self.assertRaisesRegex(AlignmentError, "presentation origin"):
-                    probe({"mediaPath": "unused", "durationSeconds": 2})

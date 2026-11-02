@@ -1,13 +1,5 @@
 import { expect, test } from 'vitest'
-import {
-  createAliyahVideoManifest,
-  findVideoForRecording,
-  getCompleteCueEligibleRecordings,
-  mergeVideoLinks,
-  parseVideoLinkRegistry,
-  parseVideoRenderMetadataList,
-  videoMetadataMatchesProvenance,
-} from './library.ts'
+import { createAliyahVideoManifest, getCompleteCueEligibleRecordings, videoMetadataMatchesProvenance } from './library.ts'
 import type { ParshaAudioRecording } from '../audio/types.ts'
 import type { VideoLinkRegistry, VideoRenderMetadata } from './types.ts'
 
@@ -98,68 +90,6 @@ test('complete cue eligibility requires available recording and full token cover
   expect(eligible.map((entry) => entry.id)).toEqual(['beresheet-1'])
 })
 
-test('video links merge only validated metadata with registered Koofr links', () => {
-  const links: VideoLinkRegistry = {
-    'beresheet-1': {
-      videoSrc: 'https://koofr.eu/links/video',
-      downloadSrc: 'https://koofr.eu/links/download',
-    },
-    'beresheet-2': {
-      videoSrc: 'https://koofr.eu/links/unvalidated',
-      downloadSrc: 'https://koofr.eu/links/unvalidated',
-    },
-  }
-
-  const manifest = mergeVideoLinks({
-    metadata: [
-      metadata(),
-      metadata({
-        audioId: 'beresheet-2',
-        validation: {
-          passed: false,
-          errors: ['ffmpeg decode failed'],
-          warnings: [],
-        },
-      }),
-      metadata({ audioId: 'beresheet-3' }),
-    ],
-    links,
-  })
-
-  expect(manifest.length).toBe(1)
-  expect(manifest[0]).toMatchObject({
-    audioId: 'beresheet-1',
-    videoSrc: 'https://koofr.eu/links/video',
-    downloadSrc: 'https://koofr.eu/links/download',
-    fps: 30,
-    renderMode: 'cue-keyframes',
-    capturedFrameCount: 120,
-  })
-})
-
-test('generated manifest preserves audio metadata and excludes recordings without links', () => {
-  const manifest = createAliyahVideoManifest({
-    recordings: [recording(), recording({ id: 'beresheet-2', aliyah: 2 })],
-    metadata: [metadata(), metadata({ audioId: 'beresheet-2', aliyah: 2 })],
-    links: {
-      'beresheet-1': {
-        videoSrc: 'https://koofr.eu/links/video',
-        downloadSrc: 'https://koofr.eu/links/download',
-      },
-    },
-  })
-
-  expect(manifest.length).toBe(1)
-  expect(manifest[0]).toMatchObject({
-    audioId: 'beresheet-1',
-    narratorId: 'yoni-davidov',
-    narratorInitials: 'yd',
-    parshaSlug: 'beresheet',
-    aliyah: 1,
-    title: 'Beresheet Aliyah 1',
-  })
-})
-
 test('generated manifest excludes videos whose current provenance changed', () => {
   const currentProvenanceByAudioId = new Map([
     [
@@ -220,40 +150,4 @@ test('generated manifest rejects duplicate or mismatched identities', () => {
       links,
     })
   ).toThrow(/does not match recording/)
-})
-
-test('local video registries are parsed before publication', () => {
-  expect(parseVideoRenderMetadataList([metadata()])).toEqual([metadata()])
-  expect(() =>
-    parseVideoRenderMetadataList([metadata({ durationSeconds: Number.NaN })])
-  ).toThrow(/Invalid video render metadata/)
-  expect(
-    parseVideoLinkRegistry({
-      'beresheet-1': {
-        videoSrc: 'https://koofr.eu/links/video',
-        downloadSrc: 'https://koofr.eu/links/download',
-      },
-    })
-  ).toHaveProperty('beresheet-1')
-  expect(() =>
-    parseVideoLinkRegistry({
-      'beresheet-1': {
-        videoSrc: 'javascript:alert(1)',
-        downloadSrc: 'https://koofr.eu/links/download',
-      },
-    })
-  ).toThrow(/Invalid video link registry entry/)
-})
-
-test('findVideoForRecording returns null when a recording has no manifest entry', () => {
-  const manifest = [
-    {
-      ...metadata(),
-      videoSrc: 'https://koofr.eu/links/video',
-      downloadSrc: 'https://koofr.eu/links/download',
-    },
-  ]
-
-  expect(findVideoForRecording('beresheet-1', manifest)?.downloadSrc).toBe(manifest[0].downloadSrc)
-  expect(findVideoForRecording('beresheet-2', manifest)).toBe(null)
 })

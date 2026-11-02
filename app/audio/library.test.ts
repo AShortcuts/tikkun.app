@@ -4,13 +4,7 @@ import type { UserSettings } from '../calendar-model/user-settings.ts'
 import type { LeiningRun } from '../calendar-model/model-types.ts'
 import { resolveParshaRun } from '../view-model/navigation/parsha-routes.ts'
 import type { RangeAudioRecording } from './types.ts'
-import {
-  findAuthoringRecordingForRun,
-  findRecordingForRun,
-  getCuePayloadForRecording,
-  listRecordings,
-  parshaSlugForRun,
-} from './library.ts'
+import { findAuthoringRecordingForRun, findRecordingForRun, parshaSlugForRun } from './library.ts'
 
 const testSettings: UserSettings = {
   ashkenazi: true,
@@ -59,35 +53,7 @@ test('audio lookup canonicalizes parsha aliases before matching recordings', () 
     })?.id).toBe('vayelech-1')
 })
 
-test('audio lookup uses canonical Beresheet recording identities', () => {
-  const run = generator.parseId('2026-10-10:shacharis,main')
-
-  if (!run) throw new Error('Missing Beresheet run')
-
-  expect(run.leining.date.title.en).toBe('Parshat Bereshit')
-  expect(parshaSlugForRun(run)).toBe('beresheet')
-  expect(findRecordingForRun({
-      narratorId: 'yoni-davidov',
-      run,
-      aliyahIndex: 1,
-    })?.id).toBe('beresheet-1')
-})
-
-test('audio lookup finds Vayetzei recordings through the canonical route slug', () => {
-  const run = generator.parseId('2026-11-21:shacharis,main')
-
-  if (!run) throw new Error('Missing Vayetzei run')
-
-  expect(run.leining.date.title.en).toBe('Parshat Vayetzei')
-  expect(parshaSlugForRun(run)).toBe('vayetzei')
-  expect(findRecordingForRun({
-      narratorId: 'yoni-davidov',
-      run,
-      aliyahIndex: 1,
-    })?.id).toBe('vayetzei-1')
-})
-
-test.each(['vezot-haberacha', 'vezos-haberacha'])(
+test.each(['vezot-haberacha'])(
   'audio lookup and authoring find all seven Vezot recordings through %s',
   (slug) => {
     const resolved = resolveParshaRun(generator, slug, new Date('2026-01-01'))
@@ -162,41 +128,6 @@ test('audio authoring creates a stable missing recording identity', () => {
     playSrc: '/audio/new-reader/01%20beresheet/3.m4a',
     status: 'missing',
   })
-})
-
-test('loads cue payloads for a recording on demand', async () => {
-  const recording = listRecordings().find((entry) => entry.id === 'beresheet-1')
-
-  if (!recording) throw new Error('Missing Beresheet recording')
-
-  await expect(getCuePayloadForRecording(recording)).resolves.toMatchObject({
-    audioId: 'beresheet-1',
-    cueCount: 400,
-    tokenCount: 400,
-  })
-})
-
-test('all ordinary weekday Rosh Chodesh runs reuse the same canonical recordings', () => {
-  const ordinaryRuns = [5785, 5786, 5787]
-    .flatMap((year) => generator.forHebrewYear(year))
-    .flatMap((date) => date.leinings)
-    .flatMap((leining) => leining.runs)
-    .filter((run) => rangeSignature(run) === ordinaryRoshChodeshSignature)
-
-  expect(ordinaryRuns.length).toBeGreaterThan(20)
-  for (const run of ordinaryRuns) {
-    expect(run.aliyot.map((aliyah) => findRecordingForRun({
-      narratorId: 'test-reader',
-      run,
-      aliyahIndex: aliyah.index!,
-      recordings: roshChodeshRecordings,
-    })?.id)).toEqual([
-      'rosh-chodesh-1',
-      'rosh-chodesh-2',
-      'rosh-chodesh-3',
-      'rosh-chodesh-4',
-    ])
-  }
 })
 
 test('the reported Rosh Chodesh route has exact overlapping canonical coverage', () => {

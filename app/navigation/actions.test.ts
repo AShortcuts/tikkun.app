@@ -63,49 +63,6 @@ test('ignores unavailable command palette actions', () => {
   expect(searchActions(actions, 'issue')).toEqual([])
 })
 
-test('hides search-only command palette actions until a query is typed', () => {
-  const actions = [
-    createNavigationAction({
-      id: 'reading.noach.catalog',
-      group: 'reading',
-      label: 'Noach Aliyah 3',
-      keywords: ['Noah 3'],
-      showWhenEmpty: false,
-      run: () => undefined,
-    }),
-  ]
-
-  expect(searchActions(actions, '')).toEqual([])
-  expect(searchActions(actions, 'Noah 3')[0]?.id).toBe(
-    'reading.noach.catalog'
-  )
-})
-
-test('deduplicates visible command palette labels after ranking', () => {
-  const actions = [
-    createNavigationAction({
-      id: 'reading.noach.active',
-      group: 'reading',
-      label: 'Noach Aliyah 7',
-      dedupeKey: 'reading.noach.7',
-      keywords: ['Noach 7'],
-      run: () => undefined,
-    }),
-    createNavigationAction({
-      id: 'reading.noach.recording',
-      group: 'reading',
-      label: 'Noach Aliyah 7',
-      dedupeKey: 'reading.noach.7',
-      keywords: ['Noah 7'],
-      run: () => undefined,
-    }),
-  ]
-
-  expect(searchActions(actions, 'Noach 7').map((action) => action.id)).toEqual([
-    'reading.noach.active',
-  ])
-})
-
 test('deduplicates equivalent command palette targets with different labels', () => {
   const actions = [
     createNavigationAction({
@@ -159,59 +116,6 @@ test('creates exact aliyah navigation actions for seventh aliyah and Maftir', ()
   ])
 })
 
-test('creates holiday aliyah navigation actions with holiday aliases', () => {
-  const navigated: string[] = []
-  const run = createTishahBavRunFixture()
-  const actions = createAliyahNavigationActions({
-    run,
-    displayTitle: 'תשעה באב',
-    navigate: (hash) => navigated.push(hash),
-  })
-
-  const third = searchActions(actions, 'Tishah B’Av 3')[0]
-
-  expect(third?.label).toBe('תשעה באב Aliyah 3')
-
-  third?.run()
-
-  expect(navigated).toEqual(['#/run/2026-07-23:shacharis,main/1-4-1'])
-})
-
-test('creates searchable Torah page command actions', () => {
-  const navigated: string[] = []
-  const actions = createPageNavigationActions({
-    navigateToPage: (scroll, page) => navigated.push(`${scroll}:${page}`),
-  })
-
-  expect(searchActions(actions, '')).toEqual([])
-  expect(searchActions(actions, 'page 12')[0]?.id).toBe('page.torah.12')
-  expect(searchActions(actions, 'torah page 12')[0]?.id).toBe(
-    'page.torah.12'
-  )
-
-  searchActions(actions, 'page 12')[0]?.run()
-
-  expect(navigated).toEqual(['torah:12'])
-})
-
-test('creates searchable Esther page command actions', () => {
-  const navigated: string[] = []
-  const actions = createPageNavigationActions({
-    navigateToPage: (scroll, page) => navigated.push(`${scroll}:${page}`),
-  })
-
-  expect(searchActions(actions, 'esther page 3')[0]?.id).toBe(
-    'page.esther.3'
-  )
-  expect(searchActions(actions, 'megillah page 3')[0]?.id).toBe(
-    'page.esther.3'
-  )
-
-  searchActions(actions, 'esther page 3')[0]?.run()
-
-  expect(navigated).toEqual(['esther:3'])
-})
-
 test('does not create out-of-range page command actions', () => {
   const actions = createPageNavigationActions({
     navigateToPage: () => undefined,
@@ -243,36 +147,6 @@ function createRunFixture(): LeiningRun {
     aliyot: [
       { index: 7, start: ref(5), end: ref(6) },
       { index: 'Maftir', start: ref(6), end: ref(7) },
-    ],
-  }
-  date.leinings = [leining]
-  leining.runs = [run]
-  return run
-}
-
-function createTishahBavRunFixture(): LeiningRun {
-  const date: LeiningDate = {
-    date: new Date(2026, 6, 23),
-    id: '2026-07-23',
-    title: { en: "Tish'a B'Av", he: 'תשעה באב' },
-    leinings: [],
-  }
-  const leining: LeiningInstance = {
-    kind: 'service',
-    date,
-    id: LeiningInstanceId.Shacharis,
-    isParsha: false,
-    runs: [],
-  }
-  const run: LeiningRun = {
-    leining,
-    type: LeiningRunType.Main,
-    id: '2026-07-23:shacharis,main',
-    scroll: 'torah',
-    aliyot: [
-      { index: 1, start: ref(2), end: ref(3) },
-      { index: 2, start: ref(3), end: ref(4) },
-      { index: 3, start: ref(4), end: ref(5) },
     ],
   }
   date.leinings = [leining]

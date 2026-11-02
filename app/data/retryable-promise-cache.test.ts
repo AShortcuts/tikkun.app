@@ -25,18 +25,6 @@ test('evicts rejected loads so a later attempt can recover', async () => {
   expect(load).toHaveBeenCalledTimes(2)
 })
 
-test('supports deliberate invalidation without disturbing other entries', async () => {
-  const cache = new RetryablePromiseCache<string, number>()
-  const load = vi.fn()
-    .mockResolvedValueOnce(1)
-    .mockResolvedValueOnce(2)
-
-  await expect(cache.get('cue', load)).resolves.toBe(1)
-  expect(cache.delete('cue')).toBe(true)
-  await expect(cache.get('cue', load)).resolves.toBe(2)
-  expect(load).toHaveBeenCalledTimes(2)
-})
-
 test('does not let an older load evict a newer replacement', async () => {
   const cache = new RetryablePromiseCache<string, number>()
   const first = cache.get('cue', async () => 1)

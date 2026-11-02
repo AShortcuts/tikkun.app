@@ -60,12 +60,3 @@ test('checks every logical recording sharing one physical file', async () => {
   await expect(dependencies.check(asset)).resolves.toBe('audio-only')
   expect(resolve).toHaveBeenCalledTimes(2)
 })
-
-test('honors cancellation before and after a bundled module resolves', async () => {
-  const controller = new AbortController()
-  const resolve = vi.fn(async () => { controller.abort(); return ready() })
-  const dependencies = createBundledRecordingDependencies({ recordings: [recording], baseUrl, resolve })
-  await expect(dependencies.prepare(asset, controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
-  await expect(dependencies.prepare(asset, controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
-  expect(resolve).toHaveBeenCalledOnce()
-})

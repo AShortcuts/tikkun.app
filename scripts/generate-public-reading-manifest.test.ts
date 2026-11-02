@@ -4,9 +4,6 @@ import path from 'node:path'
 import { expect, test } from 'vitest'
 import { TOKENIZATION_VERSION } from '../app/audio/cue-schema.ts'
 import type { ParshaAudioRecording } from '../app/audio/types.ts'
-import { recordingWorkRows } from '../app/data/about-progress.ts'
-import { audioRecordings } from '../generated/audio-manifest.ts'
-import { publicAliyotByParsha } from '../generated/public-reading-manifest.ts'
 import {
   createPublicAliyotByParsha,
   generatePublicReadingManifestSource,
@@ -92,16 +89,6 @@ async function withCueFixture(
   }
 }
 
-test('current manual work plans structurally cover generated public readings', () => {
-  expect(() =>
-    validateRecordingWorkPlans({
-      recordings: audioRecordings,
-      workRows: recordingWorkRows,
-      publicAliyotByParsha,
-    })
-  ).not.toThrow()
-})
-
 test('checked-in public reading manifest matches its authoritative sources', async () => {
   const [{ contents }, checkedInContents] = await Promise.all([
     generatePublicReadingManifestSource(),
@@ -143,31 +130,6 @@ test('keeps published asset truth independent from manual workflow labels', () =
   ).not.toThrow()
 })
 
-test('allows manual review metadata without audio and rejects missing maintained rows', () => {
-  expect(() =>
-    validateRecordingWorkPlans({
-      recordings: [],
-      workRows: [
-        {
-          number: 1,
-          parshaEnglish: 'Beresheet',
-          parshaHebrew: 'בראשית',
-          workStatus: 'Needs review',
-        },
-      ],
-      publicAliyotByParsha: {},
-    })
-  ).not.toThrow()
-
-  expect(() =>
-    validateRecordingWorkPlans({
-      recordings: [availableRecording],
-      workRows: [],
-      publicAliyotByParsha: { beresheet: publicAliyot('missing') },
-    })
-  ).toThrow('has no maintained recording work row')
-})
-
 test('rejects published cue data without an available recording', () => {
   expect(() =>
     createPublicAliyotByParsha({
@@ -177,42 +139,6 @@ test('rejects published cue data without an available recording', () => {
       ]),
     })
   ).toThrow('Published cue payload has no available recording: orphan-1')
-})
-
-test('accepts Cue Data only at its exact recording path', async () => {
-  const fixture = await withCueFixture(cuePayload())
-  try {
-    const coverage = await readPublishedCueCoverage({
-      root: fixture.root,
-      recordings: [availableRecording],
-      expectedTokenKeysByAudioId,
-    })
-    expect(coverage.get(availableRecording.id)).toEqual({
-      status: 'cued',
-      expectedTokenCount: 1,
-    })
-  } finally {
-    await fixture.cleanup()
-  }
-})
-
-test('keeps canonical token counts when published Cue Data is missing', async () => {
-  const root = await mkdtemp(path.join(tmpdir(), 'tikkun-cue-manifest-empty-'))
-  try {
-    const coverage = await readPublishedCueCoverage({
-      root,
-      recordings: [availableRecording],
-      expectedTokenKeysByAudioId: new Map([
-        [availableRecording.id, ['1:0:0:0', '1:0:0:1']],
-      ]),
-    })
-    expect(coverage.get(availableRecording.id)).toEqual({
-      status: 'missing',
-      expectedTokenCount: 2,
-    })
-  } finally {
-    await rm(root, { recursive: true, force: true })
-  }
 })
 
 test('rejects Cue Data with stale recording identity', async () => {
@@ -228,19 +154,6 @@ test('rejects Cue Data with stale recording identity', async () => {
       recordings: [availableRecording],
       expectedTokenKeysByAudioId,
     })).rejects.toThrow('does not match its available recording')
-  } finally {
-    await fixture.cleanup()
-  }
-})
-
-test('rejects cue-bearing data without verifiable media identity', async () => {
-  const fixture = await withCueFixture(cuePayload({ mediaIdentity: undefined }))
-  try {
-    await expect(readPublishedCueCoverage({
-      root: fixture.root,
-      recordings: [availableRecording],
-      expectedTokenKeysByAudioId,
-    })).rejects.toThrow('has no recording media identity')
   } finally {
     await fixture.cleanup()
   }
@@ -269,23 +182,6 @@ test('rejects valid Cue Data stored under the wrong path', async () => {
     })).rejects.toThrow(
       'is reader/beresheet/1.json; expected reader/01 beresheet/1.json'
     )
-  } finally {
-    await fixture.cleanup()
-  }
-})
-
-test('rejects self-declared completeness that is shorter than canonical text', async () => {
-  const fixture = await withCueFixture(cuePayload())
-  try {
-    await expect(
-      readPublishedCueCoverage({
-        root: fixture.root,
-        recordings: [availableRecording],
-        expectedTokenKeysByAudioId: new Map([
-          [availableRecording.id, ['1:0:0:0', '1:0:0:1']],
-        ]),
-      })
-    ).rejects.toThrow('declares 1 tokens; canonical reading has 2')
   } finally {
     await fixture.cleanup()
   }

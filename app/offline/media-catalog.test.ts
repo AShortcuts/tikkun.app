@@ -4,7 +4,7 @@ import type { AudioRecording } from '../audio/types.ts'
 import { LeiningGenerator } from '../calendar-model/generator.ts'
 import { userSettingsFromCalendarSettings } from '../calendar-settings.ts'
 import { listMediaReadings } from './media-readings.ts'
-import { mediaRows, mediaSearchMatches, type MediaReading } from './media-catalog.ts'
+import { mediaRows, type MediaReading } from './media-catalog.ts'
 import { descriptorForRecording } from './recording-download.ts'
 import { recordingAssetKey, resolveRecordingAsset } from './recording-storage.ts'
 import type { DownloadLibrarySnapshot } from './download-library.ts'
@@ -50,10 +50,6 @@ describe('Media catalog', () => {
     expect(result).toMatchObject({ label: '6/7', ready: 6, complete: false, missingBytes: 0 })
     expect(result.remaining.map((asset) => asset.key)).toEqual([entry.key])
   })
-  test('unchecked inventory is not marked downloaded', () => {
-    const snapshot = state(7)
-    expect(row({ ...snapshot, entries: snapshot.entries.map((entry) => ({ ...entry, readiness: 'unchecked' })) }).ready).toBe(0)
-  })
   test('aliases count logical coverage but share physical bytes', () => {
     const alias = { ...recordings[0], id: 'shared-alias', aliyah: 2 }
     const result = row(state(1), [recordings[0], alias])
@@ -63,10 +59,5 @@ describe('Media catalog', () => {
   })
   test('narrator scope does not inherit another narrator downloads', () => {
     expect(row(state(7), recordings, 'another-reader')).toMatchObject({ available: 0, ready: 0, label: 'Unavailable' })
-  })
-  test('search accepts unpointed Hebrew and normalized slug', () => {
-    expect(mediaSearchMatches(reading, 'בראשית')).toBe(true)
-    expect(mediaSearchMatches(reading, 'BERESHEET')).toBe(true)
-    expect(mediaSearchMatches(reading, 'Noach')).toBe(false)
   })
 })

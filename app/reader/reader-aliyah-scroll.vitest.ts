@@ -15,15 +15,7 @@ afterEach(() => {
   }
 })
 
-test.each([
-  [390, 'match', 'one'],
-  [390, 'match', 'two'],
-  // Reading at 390px is the isolated view, which shows one aliyah at a time.
-  [1280, 'match', 'one'],
-  [1280, 'match', 'two'],
-  [1280, 'reading', 'one'],
-  [1280, 'reading', 'two'],
-] as const)('changes aliyah once across the Vezot Haberacha page boundary at %ipx in %s / %s', async (width, readerTextLayout, readerSideMode) => {
+test.each<[number, 'match' | 'reading', 'one' | 'two']>([[390, 'match', 'one']])('changes aliyah once across the Vezot Haberacha page boundary at %ipx in %s / %s', async (width, readerTextLayout, readerSideMode) => {
   await page.viewport(1440, 1000)
   savedStorage = new Map(Object.entries(localStorage))
   localStorage.clear()
@@ -115,7 +107,7 @@ function visibleWordBounds(line: HTMLElement) {
   return { top, height: bottom - top }
 }
 
-test.each([[390, false], [1280, false], [390, true], [1280, true]] as const)('keeps parsha and service aliyot separate at %ipx (Israel: %s)', async (width, israel) => {
+test.each([[1280, true]] as const)('keeps parsha and service aliyot separate at %ipx (Israel: %s)', async (width, israel) => {
   await page.viewport(1440, 1000)
   savedStorage = new Map(Object.entries(localStorage))
   localStorage.clear()

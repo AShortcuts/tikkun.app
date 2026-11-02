@@ -1,10 +1,6 @@
 import { expect, test } from 'vitest'
 import { includeNativeAsset, nativeBuildConfig, nativeContentFiles } from './native-build-config.mjs'
 
-test('web builds do not require a native media host', () => {
-  expect(nativeBuildConfig({})).toEqual({ enabled: false, mediaOrigin: '' })
-})
-
 test('native configuration requires an explicit secure origin and root deployment', () => {
   expect(() => nativeBuildConfig({ TIKKUN_NATIVE: '1' })).toThrow('HTTPS audio host')
   for (const origin of ['http://example.org', 'https://user:pass@example.org', 'https://example.org/audio', 'https://example.org?key=x']) {

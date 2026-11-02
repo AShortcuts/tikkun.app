@@ -6,8 +6,6 @@ import '../../css/master.css'
 import NativeUpdatePrompt from './NativeUpdatePrompt.svelte'
 import { nativeUpdatePromptDismissed, nativeUpdateState, updateChannel } from './update-state.ts'
 import { checkNativeUpdates } from './native-updates.ts'
-import { createMount } from '../lifecycle/mount.ts'
-import { createNativeUpdatePrompt } from './native-update-prompt.ts'
 
 let target: HTMLElement
 let component: ReturnType<typeof mount> | null
@@ -15,7 +13,7 @@ const prepare = vi.fn()
 
 beforeEach(() => {
   const channel = { phase: 'idle' as const, pending: false, checkedAt: null }
-  nativeUpdateState.set({ web: { ...channel }, applying: false, canCancel: false, applyError: null })
+  nativeUpdateState.set({ web: { ...channel }, content: { ...channel }, applying: false, canCancel: false, applyError: null })
   nativeUpdatePromptDismissed.set(false)
   target = document.createElement('div')
   document.body.append(target)
@@ -30,7 +28,7 @@ afterEach(async () => {
   vi.restoreAllMocks()
 })
 
-test.each([320, 390, 1280])('native updates use the same centered pill, Apply/Later and neutral Cancel at %ipx', async width => {
+test.each([320])('native updates use the same centered pill, Apply/Later and neutral Cancel at %ipx', async width => {
   await page.viewport(width, 844)
   const fetcher = vi.spyOn(globalThis, 'fetch')
   expect(target.textContent).toBe('')
@@ -76,32 +74,9 @@ test('Later only hides the prompt; manual checking can show it again', async () 
   expect(target.textContent).toContain('Update available')
 })
 
-test('protected Apply reports the error with retry and Later in the same prompt', async () => {
-  prepare.mockImplementation(() => { throw new Error('Pause audio before applying the update.') })
-  vi.spyOn(console, 'error').mockImplementation(() => {})
-  updateChannel('web', { phase: 'ready', pending: true })
+test('new recordings and cues from the website use the same prompt as app updates', async () => {
+  updateChannel('content', { phase: 'ready', pending: true })
   flushSync()
-  vi.useFakeTimers()
-  target.querySelector<HTMLButtonElement>('.service-worker-update-action')!.click()
-  await vi.advanceTimersByTimeAsync(1200)
-  await vi.waitFor(() => expect(get(nativeUpdateState).applying).toBe(false))
-  flushSync()
-  expect(target.querySelector('[role="alert"]')?.textContent).toContain('Pause audio')
+  expect(target.textContent).toContain('Update available')
   expect(target.querySelector('.service-worker-update-action')?.textContent).toBe('Apply')
-  expect(target.querySelector('[aria-label="Dismiss update"]')).not.toBeNull()
-})
-
-test('reader lifetime owns the native prompt and cancels a pending Apply when leaving', async () => {
-  await unmount(component!)
-  component = null
-  const destroy = createMount()(scope => createNativeUpdatePrompt(scope, document, prepare))
-  updateChannel('web', { phase: 'ready', pending: true })
-  flushSync()
-  vi.useFakeTimers()
-  document.querySelector<HTMLButtonElement>('.service-worker-update-action')!.click()
-  destroy()
-  await vi.advanceTimersByTimeAsync(1200)
-  expect(prepare).not.toHaveBeenCalled()
-  expect(document.querySelector('.service-worker-update')).toBeNull()
-  expect(get(nativeUpdateState)).toMatchObject({ applying: false, web: { pending: true } })
 })

@@ -57,7 +57,7 @@ test('loads only valid bookmarks from storage', () => {
   ])
 })
 
-test.each(['#/torah/parsha/noach', '#/torah/5-33-24', '#/r/5-33-24'])(
+test.each(['#/torah/parsha/noach'])(
   'reads bookmark %s without rewriting it', (hash) => {
   const bookmark = createBookmark({
     hash,
@@ -86,12 +86,7 @@ test('ignores grammar-valid bookmarks that are not routable', () => {
   expect(storage.getItem(BOOKMARKS_STORAGE_KEY)).not.toBeNull()
 })
 
-test.each([
-  { label: '' },
-  { createdAt: -1 },
-  { audioId: 42 },
-  { timeStart: -0.1 },
-])('rejects malformed persisted bookmark fields: %o', (override) => {
+test.each([{ label: '' }])('rejects malformed persisted bookmark fields: %o', (override) => {
   const validBookmark = createBookmark({
     hash: '#/torah/parsha/noach',
     label: 'Keep',

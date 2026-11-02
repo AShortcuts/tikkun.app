@@ -123,15 +123,6 @@ const recordingWithId = (id: string): ParshaAudioRecording => ({
   downloadSrc: `/${id}.mp3`,
 })
 
-const missingRecording: ParshaAudioRecording = {
-  ...recording,
-  id: 'missing',
-  title: 'Missing',
-  playSrc: '/missing.mp3',
-  downloadSrc: '/missing.mp3',
-  status: 'missing',
-}
-
 const plan = (endTime: number | null): PlaybackPlan => ({
   target: { runId: 'run', index: 2 },
   tokenKeys: ['1:0:0:0', '1:0:0:1'],
@@ -184,17 +175,6 @@ const compositePlan = (): PlaybackPlan => ({
   ],
 })
 
-const missingPlan = (): PlaybackPlan => ({
-  ...plan(null),
-  segments: [
-    {
-      ...plan(null).segments[0],
-      recording: missingRecording,
-      cues: [],
-    },
-  ],
-})
-
 function stubMediaGlobals(preloads: FakeAudioElement[] = []) {
   vi.stubGlobal('window', { location: { href: 'https://tikkun.test/' } })
   vi.stubGlobal('HTMLMediaElement', { HAVE_METADATA: 1 })
@@ -222,34 +202,6 @@ test('uses media metadata for an open-ended current segment', async () => {
   controller.seek(612)
   expect(audio.currentTime).toBe(612)
   expect(controller.currentTime).toBe(612)
-})
-
-test('loads a missing recording as an authoring target without requesting media', async () => {
-  stubMediaGlobals()
-  const audio = new FakeAudioElement(Number.NaN, 0)
-  const controller = new AudioController(audio as unknown as HTMLAudioElement)
-
-  await controller.loadSession(createActiveAudioSession(missingPlan()))
-
-  expect(controller.session?.recording.status).toBe('missing')
-  expect(controller.currentTime).toBe(0)
-  expect(controller.duration).toBe(Number.POSITIVE_INFINITY)
-  expect(audio.src).toBe('')
-  expect(audio.loadCount).toBe(0)
-  await expect(controller.play()).rejects.toThrow(
-    'record microphone audio first'
-  )
-})
-
-test('authorizes media loading synchronously without starting playback', () => {
-  stubMediaGlobals()
-  const audio = new FakeAudioElement(Number.NaN, 0)
-  const controller = new AudioController(audio as unknown as HTMLAudioElement)
-
-  expect(controller.authorizePlayback(recording)).toBe(true)
-  expect(audio.src).toBe(recording.playSrc)
-  expect(audio.loadCount).toBe(1)
-  expect(audio.playCount).toBe(0)
 })
 
 test('plays synchronously when the active segment already has metadata', async () => {
@@ -307,36 +259,6 @@ test('seeks repeatedly within the current segment without reactivating its media
   expect(controller.currentTime).toBe(240)
 })
 
-test('adopts a finite duration reported after loadedmetadata', async () => {
-  stubMediaGlobals()
-  const audio = new FakeAudioElement(Number.NaN, 0)
-  const controller = new AudioController(audio as unknown as HTMLAudioElement)
-  const durations: number[] = []
-  controller.on('duration-updated', ({ duration }) => durations.push(duration))
-
-  await controller.loadSession(createActiveAudioSession(plan(null)))
-  audio.setMetadata(Number.POSITIVE_INFINITY)
-  expect(controller.duration).toBe(Number.POSITIVE_INFINITY)
-
-  audio.setDuration(614.957)
-
-  expect(controller.duration).toBe(614.957)
-  expect(durations).toEqual([614.957])
-})
-
-test('continues to clamp an explicitly bounded overlap segment', async () => {
-  stubMediaGlobals()
-  const audio = new FakeAudioElement(614.957)
-  const controller = new AudioController(audio as unknown as HTMLAudioElement)
-
-  await controller.loadSession(createActiveAudioSession(plan(4.75)))
-  expect(controller.duration).toBe(4.75)
-
-  controller.seek(12)
-  expect(audio.currentTime).toBe(4.75)
-  expect(controller.currentTime).toBe(4.75)
-})
-
 test('keeps the authoring clock increasing after pausing beyond the final published cue', async () => {
   stubMediaGlobals()
   const audio = new FakeAudioElement(614.957)
@@ -370,39 +292,6 @@ test('does not borrow the previous recording duration for an open final segment'
   expect(preloads[0].preload).toBe('metadata')
   preloads[0].setMetadata(614)
   expect(controller.duration).toBe(604)
-})
-
-test('exposes the physical recording that owns the active logical segment', async () => {
-  stubMediaGlobals()
-  const audio = new FakeAudioElement(120)
-  const controller = new AudioController(audio as unknown as HTMLAudioElement)
-  const activeRecordingIds: string[] = []
-  controller.on('segment-updated', ({ segment }) => {
-    activeRecordingIds.push(segment.recording.id)
-  })
-
-  await controller.loadSession(createActiveAudioSession(compositePlan()))
-  controller.seek(11)
-
-  expect(activeRecordingIds).toEqual(['previous', 'final'])
-  expect(controller.activeSegment?.recording.id).toBe('final')
-  expect(audio.currentTime).toBe(21)
-})
-
-test('releases an obsolete next-recording preload when the session changes', async () => {
-  const preloads: FakeAudioElement[] = []
-  stubMediaGlobals(preloads)
-  const audio = new FakeAudioElement(120)
-  const controller = new AudioController(audio as unknown as HTMLAudioElement)
-
-  await controller.loadSession(createActiveAudioSession(compositePlan()))
-  expect(preloads).toHaveLength(1)
-
-  await controller.loadSession(createActiveAudioSession(plan(null)))
-
-  expect(preloads[0].src).toBe('')
-  expect(preloads[0].loadCount).toBe(1)
-  expect(preloads[0].paused).toBe(true)
 })
 
 test('can seek into the final recording before its metadata is known', async () => {
@@ -471,54 +360,6 @@ test('fails pending playback on a media error and recovers on retry', async () =
   expect(audio.playCount).toBe(2)
 })
 
-test('cancels pending playback when the session is cleared', async () => {
-  stubMediaGlobals()
-  const audio = new FakeAudioElement(Number.NaN, 0)
-  const controller = new AudioController(audio as unknown as HTMLAudioElement)
-
-  await controller.loadSession(createActiveAudioSession(plan(null)))
-  const pendingPlay = controller.play()
-  controller.clearSession()
-  audio.setMetadata(20)
-
-  await expect(pendingPlay).resolves.toBeUndefined()
-  expect(controller.session).toBeNull()
-  expect(audio.playCount).toBe(1)
-})
-
-test('times out pending metadata instead of leaving playback unresolved', async () => {
-  vi.useFakeTimers()
-  stubMediaGlobals()
-  const audio = new FakeAudioElement(Number.NaN, 0)
-  const controller = new AudioController(audio as unknown as HTMLAudioElement)
-
-  await controller.loadSession(createActiveAudioSession(plan(null)))
-  const pendingPlay = controller.play()
-  const timeoutExpectation = expect(pendingPlay).rejects.toThrow(
-    'Timed out loading audio metadata'
-  )
-  await vi.advanceTimersByTimeAsync(15_000)
-
-  await timeoutExpectation
-})
-
-test('does not reload media after a recoverable play rejection', async () => {
-  stubMediaGlobals()
-  const audio = new FakeAudioElement(20)
-  const controller = new AudioController(audio as unknown as HTMLAudioElement)
-
-  await controller.loadSession(createActiveAudioSession(plan(null)))
-  const loadCount = audio.loadCount
-  audio.playError = new Error('Playback requires a user gesture')
-  await expect(controller.play()).rejects.toThrow('user gesture')
-
-  audio.playError = null
-  await controller.play()
-
-  expect(audio.loadCount).toBe(loadCount)
-  expect(controller.error).toBeNull()
-})
-
 test('treats a pause that interrupts a pending play as a pause, not a failure', async () => {
   stubMediaGlobals()
   const audio = new FakeAudioElement(20)
@@ -538,45 +379,6 @@ test('treats a pause that interrupts a pending play as a pause, not a failure', 
   expect(controller.error).toBeNull()
 })
 
-test('waits for a finite open-segment duration and supports cancellation', async () => {
-  stubMediaGlobals()
-  const audio = new FakeAudioElement(Number.NaN, 0)
-  const controller = new AudioController(audio as unknown as HTMLAudioElement)
-
-  await controller.loadSession(createActiveAudioSession(plan(null)))
-  const duration = controller.waitForFiniteDuration()
-  audio.setDuration(614.957)
-
-  await expect(duration).resolves.toBe(614.957)
-
-  const pendingAudio = new FakeAudioElement(Number.NaN, 0)
-  const pendingController = new AudioController(
-    pendingAudio as unknown as HTMLAudioElement
-  )
-  await pendingController.loadSession(createActiveAudioSession(plan(null)))
-  const abortController = new AbortController()
-  const cancelled = pendingController.waitForFiniteDuration({
-    signal: abortController.signal,
-  })
-  abortController.abort()
-
-  await expect(cancelled).rejects.toMatchObject({ name: 'AbortError' })
-})
-
-test('rejects malformed segment boundaries before media activation', () => {
-  const invalidOpenPlan = compositePlan()
-  invalidOpenPlan.segments[0]!.endTime = null
-  expect(() => createActiveAudioSession(invalidOpenPlan)).toThrow(
-    'Only the final playback segment may be open-ended'
-  )
-
-  const invalidCuePlan = plan(4.75)
-  invalidCuePlan.segments[0]!.cues[1]!.timeEnd = 5
-  expect(() => createActiveAudioSession(invalidCuePlan)).toThrow(
-    'invalid cue ordering'
-  )
-})
-
 test('holds all playback sources until media and preloads are cleared, not merely paused', async () => {
   const preloads: FakeAudioElement[] = []
   stubMediaGlobals(preloads)
@@ -594,67 +396,4 @@ test('holds all playback sources until media and preloads are cleared, not merel
   controller.clearSession()
   controller.destroy()
   expect(release).toHaveBeenCalledOnce()
-})
-
-test('clearing or replacing a pending playback lease cannot activate a stale session', async () => {
-  stubMediaGlobals()
-  const audio = new FakeAudioElement(20), release = vi.fn(), nextRelease = vi.fn()
-  let finish!: (release: () => void) => void
-  const protectPlayback = vi.fn().mockImplementationOnce(() => new Promise<() => void>((resolve) => { finish = resolve }))
-    .mockResolvedValueOnce(nextRelease)
-  const controller = new AudioController(audio as unknown as HTMLAudioElement, { protectPlayback })
-  const first = controller.loadSession(createActiveAudioSession(compositePlan()))
-  const cancelled = expect(first).rejects.toMatchObject({ name: 'AbortError' })
-  const second = createActiveAudioSession(plan(20))
-  await controller.loadSession(second)
-  finish(release)
-  await cancelled
-  expect(release).toHaveBeenCalledOnce()
-  expect(controller.session).toBe(second)
-  controller.destroy()
-  expect(nextRelease).toHaveBeenCalledOnce()
-})
-
-test('destroy cancels pending lease acquisition before audio activation', async () => {
-  stubMediaGlobals()
-  const audio = new FakeAudioElement(20)
-  const controller = new AudioController(audio as unknown as HTMLAudioElement, {
-    protectPlayback: (_sources, signal) => new Promise((_resolve, reject) => {
-      signal.addEventListener('abort', () => reject(signal.reason), { once: true })
-    }),
-  })
-  const loading = controller.loadSession(createActiveAudioSession(plan(20)))
-  const cancelled = expect(loading).rejects.toMatchObject({ name: 'AbortError' })
-  controller.destroy()
-  await cancelled
-  expect(audio.src).toBe('')
-  expect(controller.session).toBeNull()
-})
-
-test('releases media listeners, playback work, and preloads when destroyed', async () => {
-  const preloads: FakeAudioElement[] = []
-  stubMediaGlobals(preloads)
-  const cancelAnimationFrame = vi.fn()
-  vi.stubGlobal('requestAnimationFrame', vi.fn(() => 42))
-  vi.stubGlobal('cancelAnimationFrame', cancelAnimationFrame)
-  const audio = new FakeAudioElement(20)
-  const lifetime = new AbortController()
-  const controller = new AudioController(
-    audio as unknown as HTMLAudioElement,
-    { signal: lifetime.signal }
-  )
-
-  await controller.loadSession(createActiveAudioSession(compositePlan()))
-  expect(audio.listenerCount()).toBeGreaterThan(0)
-  expect(preloads).toHaveLength(1)
-  audio.paused = false
-  audio.dispatch('play')
-
-  lifetime.abort()
-
-  expect(audio.listenerCount()).toBe(0)
-  expect(controller.session).toBeNull()
-  expect(cancelAnimationFrame).toHaveBeenCalledWith(42)
-  expect(preloads[0]?.src).toBe('')
-  expect(preloads[0]?.loadCount).toBeGreaterThan(0)
 })

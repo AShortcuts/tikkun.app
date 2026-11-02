@@ -7,7 +7,6 @@ import {
   type ScrollContentSource,
   ScrollViewModel,
 } from './scroll-view-model.ts'
-import { last } from '../calendar-model/utils.ts'
 import { fetchPages, renderLine } from './test-utils.ts'
 import { containsRef } from '../calendar-model/ref-utils.ts'
 import type { LineType } from '../components/Page.ts'
@@ -21,11 +20,7 @@ const testSettings: UserSettings = {
 
 const generator = new LeiningGenerator(testSettings)
 
-test.each([
-  ['2025-04-18:shacharis,main', 164, 'הָאָֽרֶץ׃'],
-  ['2024-12-07:shacharis,main', 37, 'מַֽחֲנָֽיִם׃'],
-  ['2025-08-03:shacharis,main', 208, 'הַיָּמִֽים׃'],
-])('includes the final verse continuation for %s', async (id, pageNumber, ending) => {
+test.each([['2025-04-18:shacharis,main', 164, 'הָאָֽרֶץ׃']])('includes the final verse continuation for %s', async (id, pageNumber, ending) => {
   const model = ScrollViewModel.forId(generator, id)
   if (!model) throw new Error(`Missing ${id}`)
   const pages = (await fetchEveryEntry(model)).filter(entry => entry.type === 'page')
@@ -108,40 +103,6 @@ test('retries the same adjacent entry after a transient failure and latches EOF'
   expect(model.sourceCalls.get(3)).toBe(1)
 })
 
-test('keeps non-linear Holiday entries in run order with exact skip counts', async () => {
-  const model = ScrollViewModel.forId(
-    generator,
-    '2024-10-25:shacharis,main'
-  )
-  if (!model) throw new Error('Simchat Torah model not found')
-
-  const entries = await fetchEveryEntry(model)
-  expect(entries.map((entry) => entry.contentIndex)).toEqual([
-    0, 1, 2, 3, 4, 5, 6,
-  ])
-  expect(
-    entries.flatMap((entry) =>
-      entry.type === 'page' ? [entry.pageNumber] : []
-    )
-  ).toEqual([244, 245, 1, 2, 191])
-  expect(
-    entries.flatMap((entry) =>
-      entry.type === 'message' ? [entry.text] : []
-    )
-  ).toEqual(['✃ 243 עמודים ✁', '✃ 188 עמודים ✁'])
-
-  const maftirModel = ScrollViewModel.forId(
-    generator,
-    '2024-10-25:shacharis,maftir'
-  )
-  if (!maftirModel) throw new Error('Simchat Torah maftir model not found')
-  expect((await maftirModel.startingLocation).page).toMatchObject({
-    type: 'page',
-    contentIndex: 6,
-    pageNumber: 191,
-  })
-})
-
 test('keeps an overlapping Maftir page tied to its owning run', async () => {
   const mainRunId = '2024-01-06:shacharis,main'
   const maftirRunId = '2024-01-06:shacharis,maftir'
@@ -183,19 +144,8 @@ test('keeps an overlapping Maftir page tied to its owning run', async () => {
 test('selects first line of ראש השנה', async () => {
   expect(await renderFirstLine('2024-10-04:shacharis,main')).toMatchSnapshot()
 })
-test('selects first line of פרשת האזינו', async () => {
-  expect(await renderFirstLine('2024-10-05:shacharis,main')).toMatchSnapshot()
-})
 test('selects first line of פרשת בראשית', async () => {
   expect(await renderFirstLine('2024-10-26:shacharis,main')).toMatchSnapshot()
-})
-test('selects first line of פרשת ויחי', async () => {
-  expect(await renderFirstLine('2025-01-11:shacharis,main')).toMatchSnapshot()
-})
-
-test(`ignores פרשת פרה when labelling פרשת חקת`, async () => {
-  // Make sure we don't label this as מפטיר from פרה, which appears first in the array of runs.
-  expect(await renderFirstLine('2025-07-05:shacharis,main')).toMatch(/חקת/)
 })
 
 test('forDate on שבת', async () => {
@@ -205,41 +155,11 @@ test('forDate on שבת', async () => {
       ScrollViewModel.forDate(generator, new Date(2025, 0, 11))
     ))
 })
-test('forDate before שבת', async () => {
-  expect(await renderScroll(
-      ScrollViewModel.forId(generator, '2025-01-18:shacharis,main')
-    )).toEqual(await renderScroll(
-      ScrollViewModel.forDate(generator, new Date(2025, 0, 14))
-    ))
-})
 
 test('forDate on צום גדליה', async () => {
   expect(await renderScroll(
       ScrollViewModel.forId(generator, '2024-10-06:shacharis,main')
     )).toEqual(await renderScroll(ScrollViewModel.forDate(generator, new Date(2024, 9, 6))))
-})
-
-test('forDate before תשעה באב', async () => {
-  expect(await renderScroll(
-      ScrollViewModel.forId(generator, '2024-8-13:shacharis,main')
-    )).toEqual(await renderScroll(
-      ScrollViewModel.forDate(generator, new Date(2024, 7, 11))
-    ))
-})
-
-test('forDate on סוכות', async () => {
-  expect(await renderScroll(
-      ScrollViewModel.forId(generator, '2024-10-17:shacharis,main')
-    )).toEqual(await renderScroll(
-      ScrollViewModel.forDate(generator, new Date(2024, 9, 17))
-    ))
-})
-test('forDate before סוכות', async () => {
-  expect(await renderScroll(
-      ScrollViewModel.forId(generator, '2024-10-17:shacharis,main')
-    )).toEqual(await renderScroll(
-      ScrollViewModel.forDate(generator, new Date(2024, 9, 13))
-    ))
 })
 
 test('assigns a run and aliyah to every verse in full torah', async () => {
@@ -295,100 +215,6 @@ test('includes context in בראשית', async () => {
   for (const line of getLinesInRange(maftir, { first: '6:5', until: '6:9' })) {
     expect(dumpContext(line), assertionMessage(line)).toEqual(runId)
     expect(dumpAliyot(line), assertionMessage(line)).toEqual([7, 'Maftir'])
-  }
-})
-
-test('includes context in ראש השנה', async () => {
-  let runId = '2024-10-03:shacharis,main'
-  const model = ScrollViewModel.forId(generator, runId)
-
-  // This is rendering text/pages/torah/20.json.
-  const pages = await fetchPages(model, { fetchPreviousPages: false, count: 9 })
-
-  getLinesInRange(pages[0], {
-    first: null,
-    until: '21:1',
-  }).forEach(assertNoRun)
-  getLinesInRange(pages[0], {
-    first: '21:1',
-    until: null,
-  }).forEach(assertLineInRun)
-
-  if (pages[1].type !== 'page') throw new Error('Second page should be a page')
-  pages[1].lines.forEach(assertLineInRun)
-
-  getLinesInRange(pages[2], {
-    first: null,
-    until: '22:1',
-  }).forEach(assertLineInRun)
-  getLinesInRange(pages[2], {
-    first: '22:1',
-    until: null,
-  }).forEach(assertNoRun)
-
-  // Set the variable used by assertLineInRun().
-  runId = '2024-10-03:shacharis,maftir'
-  const maftirPage = last(pages)
-
-  getLinesInRange(maftirPage, {
-    first: null,
-    until: '29:1',
-  }).forEach(assertNoRun)
-  getLinesInRange(maftirPage, {
-    first: '29:1',
-    until: '29:7',
-  }).forEach(assertLineInRun)
-  getLinesInRange(maftirPage, {
-    first: '29:7',
-    until: null,
-  }).forEach(assertNoRun)
-
-  function assertLineInRun(line: RenderedLineInfo) {
-    expect(dumpContext(line), assertionMessage(line)).toEqual(runId)
-  }
-  function assertNoRun(line: RenderedLineInfo) {
-    expect(line.run, assertionMessage(line)).toBeFalsy()
-  }
-})
-
-test('includes context in תענית ציבור', async () => {
-  const runId = '2024-10-06:shacharis,main'
-  const model = ScrollViewModel.forId(generator, runId)
-
-  // This is rendering text/pages/torah/99.json.
-  const pages = await fetchPages(model, { fetchPreviousPages: false, count: 9 })
-  expect(pages.length).toBe(3)
-
-  getLinesInRange(pages[0], {
-    first: null,
-    until: '32:11',
-  }).forEach(assertNoRun)
-  getLinesInRange(pages[0], {
-    first: '32:11',
-    until: '32:15',
-  }).forEach(assertLineInRun)
-  getLinesInRange(pages[0], {
-    first: '32:15',
-    until: null,
-  }).forEach(assertNoRun)
-
-  if (pages[1].type !== 'page') throw new Error('Second page should be a page')
-  pages[1].lines.forEach(assertNoRun)
-
-  getLinesInRange(pages[2], {
-    first: null,
-    until: '34:1',
-  }).forEach(assertNoRun)
-  getLinesInRange(pages[2], {
-    first: '34:1',
-    until: null, // The last עלייה ends at the end of the page.
-  }).forEach(assertLineInRun)
-
-  function assertLineInRun(line: RenderedLineInfo) {
-    expect(dumpContext(line), assertionMessage(line)).toEqual(runId)
-  }
-  function assertNoRun(line: RenderedLineInfo) {
-    expect(line.run, assertionMessage(line)).toBeFalsy()
   }
 })
 

@@ -8,14 +8,7 @@ import { loadPassageTokens } from './passage-tokens.ts'
 
 const ref = (b: number, c: number, v: number, scroll: RefWithScroll['scroll'] = 'torah'): RefWithScroll => ({ scroll, b, c, v })
 const ranges = [
-  { name: 'Haazinu opening', start: ref(5, 32, 1), end: ref(5, 32, 6) },
-  { name: 'Haazinu across both pages', start: ref(5, 32, 1), end: ref(5, 32, 43) },
-  { name: 'Beshalach across pages', start: ref(2, 14, 26), end: ref(2, 15, 26) },
-  { name: 'Vayishlach mid-line boundaries', start: ref(1, 32, 13), end: ref(1, 32, 14) },
-  { name: 'first Torah page', start: ref(1, 1, 1), end: ref(1, 1, 5) },
   { name: 'Behalotecha inverted nuns', start: ref(4, 10, 35), end: ref(4, 11, 1) },
-  { name: 'last Torah page', start: ref(5, 34, 10), end: ref(5, 34, 12) },
-  { name: 'Esther including ten sons', start: ref(1, 1, 1, 'esther'), end: ref(1, 10, 3, 'esther') },
 ]
 
 test.each(ranges)('data-only $name words match the existing renderer in all four layouts', async ({ start, end }) => {

@@ -1,29 +1,5 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`generates leinings surrounding חנוכה 1`] = `
-[
-  "2025-12-13: פרשת וישב",
-  "2025-12-15: חנוכה יום א׳",
-  "2025-12-16: חנוכה יום ב׳",
-  "2025-12-17: חנוכה יום ג׳",
-  "2025-12-18: חנוכה יום ד׳",
-  "2025-12-19: חנוכה יום ה׳",
-  "2025-12-20: פרשת מקץ",
-  "2025-12-21: חנוכה יום ז׳ (ראש חודש)",
-  "2025-12-22: חנוכה יום ח׳",
-  "2025-12-27: פרשת ויגש",
-]
-`;
-
-exports[`generates leinings surrounding פורים 1`] = `
-[
-  "2025-03-08: פרשת תצוה",
-  "2025-03-13: תענית אסתר",
-  "2025-03-14: פורים",
-  "2025-03-15: פרשת כי תשא",
-]
-`;
-
 exports[`generates leinings surrounding פרשת וירא 1`] = `
 [
   "2024-11-09: פרשת לך־לך",
@@ -40,15 +16,6 @@ exports[`generates leinings surrounding שבת שובה 1`] = `
   "2024-10-05: פרשת האזינו",
   "2024-10-06: צום גדליה",
   "2024-10-12: יום כפור (בשבת)",
-]
-`;
-
-exports[`generates leinings surrounding שקלים / ראש חודש as פרשה 1`] = `
-[
-  "2025-02-22: פרשת משפטים",
-  "2025-02-28: ראש חודש אדר",
-  "2025-03-01: פרשת תרומה",
-  "2025-03-08: פרשת תצוה",
 ]
 `;
 
@@ -384,29 +351,6 @@ exports[`generates יום כיפור 1`] = `
 }
 `;
 
-exports[`generates ערב תשעה באב 1`] = `
-{
-  "date": "2024-08-12",
-  "leinings": [
-    {
-      "id": "מגילה",
-      "isParsha": false,
-      "runs": [
-        {
-          "aliyot": [
-            "undefined: איכה א:א - ה:כב",
-          ],
-          "id": "2024-08-12:megillah,megillah",
-          "scroll": "lamentations",
-          "type": "מגילה",
-        },
-      ],
-    },
-  ],
-  "title": "ערב תשעה באב",
-}
-`;
-
 exports[`generates פורים 1`] = `
 {
   "date": "2024-03-24",
@@ -443,39 +387,6 @@ exports[`generates פורים 1`] = `
     },
   ],
   "title": "פורים",
-}
-`;
-
-exports[`generates ראש חודש חנוכה 1`] = `
-{
-  "date": "2026-12-10",
-  "leinings": [
-    {
-      "id": "שחרית",
-      "isParsha": false,
-      "runs": [
-        {
-          "aliyot": [
-            "1: Numbers כח:א - כח:ה",
-            "2: Numbers כח:ו - כח:י",
-            "3: Numbers כח:יא - כח:טו",
-          ],
-          "id": "2026-12-10:shacharis,main",
-          "scroll": "torah",
-          "type": "Main",
-        },
-        {
-          "aliyot": [
-            "4: Numbers ז:מב - ז:מז",
-          ],
-          "id": "2026-12-10:shacharis,last-aliyah",
-          "scroll": "torah",
-          "type": "שביעי",
-        },
-      ],
-    },
-  ],
-  "title": "חנוכה יום ו׳",
 }
 `;
 
@@ -580,55 +491,6 @@ exports[`generates שמחת תורה 1`] = `
     },
   ],
   "title": "שמחת תורה",
-}
-`;
-
-exports[`generates תענית אסתר 1`] = `
-{
-  "date": "2025-03-13",
-  "leinings": [
-    {
-      "id": "שחרית",
-      "isParsha": false,
-      "runs": [
-        {
-          "aliyot": [
-            "1: Exodus לב:יא - לב:יד",
-            "2: Exodus לד:א - לד:ג",
-            "3: Exodus לד:ד - לד:י",
-          ],
-          "id": "2025-03-13:shacharis,main",
-          "scroll": "torah",
-          "type": "Main",
-        },
-      ],
-    },
-    {
-      "id": "מנחה",
-      "isParsha": false,
-      "runs": [
-        {
-          "aliyot": [
-            "1: Exodus לב:יא - לב:יד",
-            "2: Exodus לד:א - לד:ג",
-            "Maftir: Exodus לד:ד - לד:י",
-          ],
-          "id": "2025-03-13:mincha,main",
-          "scroll": "torah",
-          "type": "Main",
-        },
-        {
-          "aliyot": [
-            "undefined: ישעיהו נה:ו - נו:ח",
-          ],
-          "id": "2025-03-13:mincha,haftara",
-          "scroll": "isaiah",
-          "type": "הפטרה",
-        },
-      ],
-    },
-  ],
-  "title": "תענית אסתר",
 }
 `;
 

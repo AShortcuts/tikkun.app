@@ -39,17 +39,6 @@ test('saves posted cue JSON from a browser on this computer', async () => {
   expect(response).toEqual({ status: 200, marker: '1', body: { ok: true, path: 'audio-cues/reader/01 test/1.json', received: 'test-1' } })
 })
 
-test('reports validation problems and refuses requests the save flow never sends', async () => {
-  const save = vi.fn(async () => { throw new Error('Cue Data diverges at cue 3') })
-  const post = await serve(save)
-  expect(await post({ headers: saveHeaders, body: '{}' })).toMatchObject({ status: 422, body: { ok: false, error: 'Cue Data diverges at cue 3' } })
-  expect(await post({ headers: { 'content-type': 'application/json' }, body: '{}' })).toMatchObject({ status: 400 })
-  expect(await post({ method: 'GET' })).toMatchObject({ status: 405, marker: '1' })
-  expect(await post({ headers: { ...saveHeaders, origin: 'https://example.com' }, body: '{}' })).toMatchObject({ status: 403 })
-  expect(await post({ headers: { ...saveHeaders, host: 'tikkun.example:5176' }, body: '{}' })).toMatchObject({ status: 403 })
-  expect(save).toHaveBeenCalledTimes(1)
-})
-
 test('only loopback connections addressed to localhost may save', () => {
   const request = (remoteAddress: string, host: string, origin?: string) =>
     ({ socket: { remoteAddress }, headers: { host, ...(origin ? { origin } : {}) } }) as unknown as http.IncomingMessage

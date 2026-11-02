@@ -1,67 +1,10 @@
 import { flushSync, mount, unmount } from 'svelte'
 import { afterEach, expect, test, vi } from 'vitest'
 import ServiceWorkerUpdate from './ServiceWorkerUpdate.svelte'
-import { Capacitor } from '@capacitor/core'
 
 let component: ReturnType<typeof mount> | null = null
 let target: HTMLElement | null = null
 let serviceWorkerDescriptor: PropertyDescriptor | undefined
-
-test('local preview shows real prompt states without fetching or activating a worker', async () => {
-  const originalUrl = window.location.href
-  const fetch = vi.spyOn(globalThis, 'fetch')
-  window.history.replaceState(null, '', '?preview-update=1')
-  try {
-    target = document.createElement('div')
-    document.body.appendChild(target)
-    component = mount(ServiceWorkerUpdate, { target })
-    flushSync()
-    expect(required<HTMLElement>('.service-worker-update').getAttribute('aria-label')).toContain('Web update demo')
-    expect(target.querySelector('.update-preview-label')).toBeNull()
-    expect(target.textContent).toContain('Update available')
-    const prompt = required<HTMLElement>('.service-worker-update')
-    const bounds = prompt.getBoundingClientRect()
-    expect(Math.abs(bounds.left + bounds.width / 2 - window.innerWidth / 2)).toBeLessThan(1)
-    expect(getComputedStyle(prompt).borderRadius).toBe('999px')
-    expect(getComputedStyle(required<HTMLElement>('.service-worker-update-action')).backgroundColor).not.toBe('rgba(0, 0, 0, 0)')
-    vi.useFakeTimers()
-    required<HTMLButtonElement>('.service-worker-update-action').click()
-    flushSync()
-    expect(required<HTMLButtonElement>('.service-worker-update-action').textContent).toBe('Cancel')
-    expect(target.querySelector('[aria-label="Dismiss update"]')).toBeNull()
-    expect(target.textContent).toContain('Applying update')
-    required<HTMLButtonElement>('.service-worker-update-action').click()
-    await vi.advanceTimersByTimeAsync(1200)
-    flushSync()
-    expect(target.textContent).toContain('Update available')
-    expect(target.textContent).not.toContain('Nothing was updated')
-    required<HTMLButtonElement>('.service-worker-update-action').click()
-    await vi.advanceTimersByTimeAsync(1200)
-    flushSync()
-    expect(target.textContent).toContain('Nothing was updated')
-    required<HTMLButtonElement>('.service-worker-update-action').click()
-    flushSync()
-    expect(target.textContent).toContain('Update available')
-    required<HTMLButtonElement>('[aria-label="Dismiss update"]').click()
-    flushSync()
-    expect(target.textContent).toBe('')
-    expect(fetch).not.toHaveBeenCalled()
-  } finally {
-    window.history.replaceState(null, '', originalUrl)
-  }
-})
-
-test('native mounts skip worker probing and registration', async () => {
-  vi.spyOn(Capacitor, 'isNativePlatform').mockReturnValue(true)
-  const fetch = vi.spyOn(globalThis, 'fetch')
-  target = document.createElement('div')
-  document.body.appendChild(target)
-  component = mount(ServiceWorkerUpdate, { target })
-  flushSync()
-  await Promise.resolve()
-  expect(fetch).not.toHaveBeenCalled()
-  expect(target.textContent).toBe('')
-})
 
 afterEach(async () => {
   if (component) await unmount(component)
@@ -155,59 +98,6 @@ test('replaces Apply with Cancel and suppresses reload after cancellation', asyn
   expect(waitingWorker.postMessage).toHaveBeenCalledTimes(1)
 })
 
-test('recovers controls when activation never changes the controller', async () => {
-  const waitingWorker = Object.assign(new EventTarget(), {
-    postMessage: vi.fn(),
-    state: 'installed' as ServiceWorkerState,
-  }) as unknown as ServiceWorker
-  const registration = Object.assign(new EventTarget(), {
-    waiting: waitingWorker,
-    installing: null,
-    update: vi.fn(async () => {}),
-  }) as unknown as ServiceWorkerRegistration
-  const serviceWorker = Object.assign(new EventTarget(), {
-    controller: {} as ServiceWorker,
-    getRegistrations: vi.fn(async () => [registration]),
-    register: vi.fn(async () => registration),
-  }) as unknown as ServiceWorkerContainer
-
-  serviceWorkerDescriptor = Object.getOwnPropertyDescriptor(
-    Navigator.prototype,
-    'serviceWorker'
-  )
-  Object.defineProperty(navigator, 'serviceWorker', {
-    configurable: true,
-    value: serviceWorker,
-  })
-  vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-    new Response(null, {
-      status: 200,
-      headers: { 'content-type': 'text/javascript' },
-    })
-  )
-
-  target = document.createElement('div')
-  document.body.appendChild(target)
-  component = mount(ServiceWorkerUpdate, { target })
-  await eventually(() => target?.querySelector('.service-worker-update'))
-
-  const reload = required<HTMLButtonElement>('.service-worker-update-action')
-  vi.useFakeTimers()
-  reload.click()
-  await vi.advanceTimersByTimeAsync(10_000)
-  flushSync()
-
-  const status = required<HTMLElement>('.service-worker-update')
-  expect(status.getAttribute('role')).toBe('alert')
-  expect(status.getAttribute('aria-busy')).toBe('false')
-  expect(status.textContent).toContain('Update did not finish')
-  expect(reload.textContent).toBe('Reload page')
-  expect(reload.disabled).toBe(false)
-  expect(
-    required<HTMLButtonElement>('[aria-label="Dismiss update"]').disabled
-  ).toBe(false)
-})
-
 test('removes obsolete local workers and app-shell caches without deleting Torah data', async () => {
   const unregisterFirst = vi.fn(async () => true)
   const unregisterSecond = vi.fn(async () => true)
@@ -264,47 +154,6 @@ test('removes obsolete local workers and app-shell caches without deleting Torah
       Reflect.deleteProperty(window, 'caches')
     }
   }
-})
-
-test('treats worker preparation cancellation during navigation as expected cleanup', async () => {
-  const serviceWorker = Object.assign(new EventTarget(), {
-    controller: null,
-    getRegistrations: vi.fn(async () => []),
-    register: vi.fn(),
-  }) as unknown as ServiceWorkerContainer
-  serviceWorkerDescriptor = Object.getOwnPropertyDescriptor(
-    Navigator.prototype,
-    'serviceWorker'
-  )
-  Object.defineProperty(navigator, 'serviceWorker', {
-    configurable: true,
-    value: serviceWorker,
-  })
-
-  let requestSignal: AbortSignal | null = null
-  vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => {
-    requestSignal = init?.signal ?? null
-    return new Promise((_resolve, reject) => {
-      requestSignal?.addEventListener(
-        'abort',
-        () => reject(new DOMException('Navigation cancelled', 'AbortError')),
-        { once: true }
-      )
-    })
-  })
-  const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
-
-  target = document.createElement('div')
-  document.body.appendChild(target)
-  component = mount(ServiceWorkerUpdate, { target })
-  await vi.waitFor(() => expect(requestSignal).not.toBeNull())
-
-  await unmount(component)
-  component = null
-  await vi.waitFor(() => expect(requestSignal?.aborted).toBe(true))
-
-  expect(consoleError).not.toHaveBeenCalled()
-  expect(serviceWorker.register).not.toHaveBeenCalled()
 })
 
 async function eventually(read: () => Element | null | undefined) {

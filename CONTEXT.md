@@ -194,3 +194,29 @@ _Avoid_: System print dialog, printer settings
 **Optional Feature**:
 A route or tool that is not needed for the core reader and is loaded only when requested, such as About, Cue Analytics, or Cue Authoring.
 _Avoid_: Reader Settings, Command Palette, Parsha Picker, deferred data
+
+### Releases
+
+**Release Version**:
+The single version of Tikkun, defined by the website: every push that deploys to production successfully is a new Release Version, written `2026.11-r3` for the third release of November 2026. The release number restarts at r1 each month and never repeats, even after a rollback; failed deploys get no number.
+_Avoid_: Web version, app version, build number
+
+**App Store Version**:
+The version of the native iPhone app shell, such as 1.1, changed only when native work ships that the website cannot deliver, such as push notifications or the print plugin. It is not the version people think in.
+_Avoid_: App version, marketing version, Release Version
+
+**Minimum App Store Version**:
+The oldest App Store Version that a Release Version can run on. Apps at or above it receive every Release Version; older apps keep their last compatible release and see the App Store Update Prompt. It is raised only when a release truly cannot run on older apps; the first minimum is 1.1.
+_Avoid_: Native target, required build
+
+**App Store Update Prompt**:
+The in-app message, shown on launch, that asks someone to update the iPhone app from its App Store page because their App Store Version is below the Minimum App Store Version or a newer one is available.
+_Avoid_: Update available pill, web update prompt
+
+**Web Update**:
+A signed over-the-air update that installs a new Release Version's web code, text, recordings and cues inside an installed iPhone app, without the App Store.
+_Avoid_: App update, OTA, live update, web channel
+
+**App Store Update**:
+A new App Store Version installed from Apple's App Store, needed only for native changes.
+_Avoid_: App update, native update

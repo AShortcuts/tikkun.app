@@ -1,5 +1,9 @@
 # Tikkun Update Delivery
 
+Every App Store build receives web updates: 2026-11-02. A web update is no longer limited to App Store builds whose iOS code matches the current source. Production publishes every web update to the channel of the installed App Store build recorded in `config/native-update-target.json` (build 8, App Store version 1.1), and web code checks for any native capability it needs: printing explains that the app needs updating, the analytics device lookup is skipped, and the on-phone recording and cue storage stays off. The only remaining requirement is the signing key built into that app. App Store version 1.1 is the first Minimum App Store Version; build 7 (App Store version 1.0) keeps its frozen feed. Raise the minimum only when a web update truly cannot run on older apps.
+
+Recordings and cues from the website: 2026-11-02. The recording list and cue files reach installed apps from the website, so publishing a recording or a cue needs only a website deploy. Every website build publishes `/content/v1/latest.json` plus fingerprinted cue files; the app checks them at launch and on return, keeps the last verified copy on the phone for offline use, and falls back to the copy it was built with. Signed app updates still carry code and Torah text. The phone stores its copy through new `TikkunMedia` methods, so this starts with the next native release; build 8 keeps the October 20 behavior below.
+
 Single update path: 2026-10-20. Each signed app update now carries the Reader's text, cues and recording catalog inside its web bundle, so there is one feed per native build at `/updates/web/<build>/`. The separate content feed, its compatibility contract and the native content store were removed. Builds 6 and 7 still read their published content feeds; those files stay in `site/updates/content/` and are retained and re-verified by every Pages build, but no new content feed is produced. Build 8 deletes the unused saved snapshot (`Application Support/TikkunContent`) on first launch. This change includes native code, so the next eligible OTA target is a new native archive (build 8) and its exported target record; neither the current source nor the last commit matches build 7's native contract.
 
 Preparation checkpoint: 2026-10-07. Automatic Pages preparation and the local manual backup are implemented. Native archive `1.0 (7)` was built and its signature, native contract and 492 bundled files were verified; its signed public record is `config/native-update-target.json`. The real production preparation flow passed locally, producing a 1,873,823-byte web ZIP and a separate 3,950,716-byte content snapshot while retaining older downloads. Saved setup and activation records confirm that Cloudflare was configured at 2026-10-07T23:21Z to use `node scripts/build-pages.mjs`, production automatic mode, 100% rollout and a production-only encrypted signing secret. These records describe the verified configuration at that time, not a fresh live check. Git publication, native distribution and physical-device acceptance remain separate.
@@ -17,9 +21,10 @@ build-6 native contract; the existing Sqim binary predates this UI revision.
 ## One Update Path
 
 A signed app update replaces the Reader's HTML/CSS/JavaScript, which also contains
-every text page, cue file and the recording catalog. Text corrections, new cues and
-new recordings therefore ship exactly like code changes. Audio is not packaged;
-recordings stream or download from the site as before.
+every text page and a built-in copy of the cue files and recording list. Text
+corrections ship exactly like code changes; new recordings and cues come from the
+website, described next. Audio is not packaged; recordings stream or download from
+the site as before.
 
 The app checks after startup and when returning to the foreground or reconnecting,
 at most once per 15 minutes after a successful check. It verifies a signed release
@@ -31,6 +36,35 @@ reloading. There is no paid cloud dependency or vendor update-service account.
 Builds 6 and 7 also check `/updates/content/<compatibility>/`. Those published
 files are kept unchanged so those builds keep working; they report "up to date"
 for content because no newer content feed is published.
+
+## Recordings And Cues From The Website
+
+The website is the source of truth for which recordings exist and for their cue
+files. `scripts/published-content.ts` builds `/content/v1/latest.json` from
+`generated/audio-manifest.ts` and `audio-cues/` during `npm run build`, plus one
+file per cue at `/content/v1/cues/<sha256>.json`. The catalog lists narrators,
+recordings, each cue file's SHA-256 and a fingerprint of the Torah word positions
+that cues point at (`textLayout`). Adding or retiming recordings never changes that
+fingerprint, so older apps keep receiving them.
+
+Native builds embed the same summary of the content they were built with. On launch
+the app uses its saved copy if it was saved against this exact app bundle; then,
+after the Reader is ready, it checks the website alongside app updates (same
+15-minute interval, foreground, reconnect and **Check for Updates**). A changed
+catalog downloads only cue files that differ from the app's own copy, verifies each
+fingerprint, saves them in `Application Support/TikkunPublishedContent`, and shows
+the usual **Update available** prompt. **Apply** reloads the Reader; otherwise the
+next launch uses it. One launch always sees one catalog.
+
+The app ignores a catalog whose `textLayout` differs from its own, because those
+cues would highlight the wrong words; that content arrives with the app update that
+carries the new text. If a launch with new content never reaches a ready Reader, the
+next launch sets that catalog aside and returns to the last working copy. An app
+update discards saved content and checks again. The website itself is unchanged: its
+deploy already carries the newest copy.
+
+Change `/content/v1/` only for an incompatible catalog format, and keep publishing
+the old directory while installed apps still read it.
 
 ## Manual Checking
 
@@ -97,11 +131,18 @@ OTA must not hide functionality from App Review.
   not rewritten or removed by an update.
 - Offline launch does not wait for the server. Network checks start after Reader
   readiness. No service worker is registered in the iOS app; web/PWA behavior is unchanged.
+- Published recordings and cues are checked against SHA-256 fingerprints when
+  downloaded and again when read from the phone. Saved copies are excluded from
+  backup and pruned to the files the working and pending catalogs need.
 
 ## Feed Hosting
 
 Feeds need real JSON/ZIP responses, not the site's HTML fallback, and CORS for
 `capacitor://localhost`. `site/_headers` contains the required update-path CORS/cache headers.
+It also allows `capacitor://localhost` to read `/content/*`, revalidates
+`/content/v1/latest.json` and marks fingerprinted cue files immutable. Before the
+first publish the site returns its HTML page for `latest.json`; the app treats that
+as nothing published.
 `functions/updates/[[path]].ts` also prevents Cloudflare Pages from returning its
 HTML fallback for absent feeds, returns a real 404, and sets native CORS plus
 no-store caching for manifests. Hash-named artifacts are immutable.
@@ -173,7 +214,7 @@ npm run updates:target -- --native-build BUILD_NUMBER --target-archive .asc/arti
 
 This reads the archive's actual build number, device platform, embedded native contract and pinned verification key. It writes `config/native-update-target.json`, signed with the existing update key. The record contains only the build number and contract fingerprints; no account details, private key, archive path or signing certificates. Review and commit that file with the matching source. Export from the archive intended for distribution, never reconstruct the record from current source. Exporting does not upload or distribute the native app.
 
-Every production preparation verifies the record's signature and compares its contract with the current native source both before and after `build:native`. Changed native code, Capacitor settings, plugins, generated native calendar resources or verification key require a new matching iOS archive and target record. The portable schema-2 contract excludes machine-local Xcode state and generated Capacitor JSON, while including the plugin package and resolved native dependencies. Old schema-1 archives can still be inspected; they cannot authorize schema-2 bundles. Initial automation therefore requires a fresh native build. Web changes can subsequently publish from pushes without another archive.
+Every production preparation verifies the record's signature and that the web build embeds the same verification key, both before and after `build:native`. Changed native code no longer blocks web updates; new native features must check that they exist, as printing does. Export a new target record only when raising the Minimum App Store Version, because that moves every web update to the new build's channel and leaves older apps on their last web update. Sqim test builds with changed native code still use their own channel.
 
 ### Retaining Existing Downloads
 
@@ -263,7 +304,7 @@ npm run native:share
 ```
 
 This rebuilds and syncs web assets **before** asking Sqim to archive and upload.
-Running Sqim alone does not refresh Capacitor's copied web files. The configured production Pages build prepares eligible signed updates automatically, but it does not build or distribute a new iOS binary. New native releases still need their own archive, distribution and exported compatibility record.
+Running Sqim alone does not refresh Capacitor's copied web files. The configured production Pages build prepares eligible signed updates automatically, but it does not build or distribute a new iOS binary. A new App Store build embeds the existing update channel and receives the same web updates as older apps at or above the Minimum App Store Version.
 
 Every release changes the version. A new native release normally starts at build 1; Sqim test builds keep the current version and advance the build. Web releases advance both the patch version and the build, above all preceding tests and web releases for that native version. For example: native `1.2 (1)`, test `1.2 (2)`, test `1.2 (3)`, web release `1.2.1 (4)`, test `1.2.1 (5)`. A later native release can start at `1.3 (1)`.
 

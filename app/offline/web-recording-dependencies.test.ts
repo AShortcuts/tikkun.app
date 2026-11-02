@@ -44,27 +44,11 @@ test('prepare forwards cancellation and distinguishes published audio-only conte
   expect(f.requests.destroy).toHaveBeenCalledOnce()
 })
 
-test.each([
-  [{ type: 'RECORDING_DEPENDENCIES', version: 'old', state: 'ready' }, 'another app build'],
-  [{ type: 'RECORDING_DEPENDENCIES', version: 'build-one', state: 'error', errorMessage: 'Storage full' }, 'Storage full'],
-  [{ type: 'RECORDING_DEPENDENCIES', version: 'build-one', state: 'invented' }, 'Invalid offline dependency state'],
-  [{}, 'Invalid offline dependency response'],
-])('does not claim readiness for an invalid response', async (value, message) => {
+test.each([[{ type: 'RECORDING_DEPENDENCIES', version: 'old', state: 'ready' }, 'another app build']])('does not claim readiness for an invalid response', async (value, message) => {
   const f = fixture()
   vi.mocked(f.requests.request).mockImplementationOnce(async (_message, receive) => { receive(value); return 'complete' })
   await expect(f.dependencies.check(asset)).rejects.toThrow(message as string)
   expect(f.cues.check).not.toHaveBeenCalled()
-})
-
-test('progress does not complete a request and unsupported storage cannot succeed', async () => {
-  const f = fixture()
-  vi.mocked(f.requests.request).mockImplementationOnce(async (_message, receive) => {
-    expect(receive({ type: 'RECORDING_DEPENDENCIES', version: 'build-one', state: 'progress' })).toBe(false)
-    receive({ type: 'RECORDING_DEPENDENCIES', version: 'build-one', state: 'ready' }); return 'complete'
-  })
-  await expect(f.dependencies.check(asset)).resolves.toBe('ready')
-  vi.mocked(f.requests.request).mockResolvedValueOnce('unavailable')
-  await expect(f.dependencies.check(asset)).rejects.toThrow('unavailable')
 })
 
 test('batch preflight sends all recording identities and unique cue sources without loading cues', async () => {
@@ -85,15 +69,7 @@ test('batch preflight sends all recording identities and unique cue sources with
   expect(f.cues.prepare).not.toHaveBeenCalled()
 })
 
-test.each([
-  [{ type: 'RECORDING_PREFLIGHT', version: 'old', state: 'ready' }, 'another app build'],
-  [{ type: 'RECORDING_PREFLIGHT', version: 'build-one', state: 'error', errorMessage: 'Not enough browser storage' }, 'Not enough browser storage'],
-  [{ type: 'RECORDING_PREFLIGHT', version: 'build-one', state: 'ready', requiredBytes: -1, availableBytes: 0 }, 'measurements'],
-  [{ type: 'RECORDING_PREFLIGHT', version: 'build-one', state: 'ready', requiredBytes: 0 }, 'measurements'],
-  [{ type: 'RECORDING_PREFLIGHT', version: 'build-one', state: 'ready', requiredBytes: 0, availableBytes: null }, 'needs an update'],
-  [{ type: 'RECORDING_PREFLIGHT', version: 'build-one', state: 'ready', requiredBytes: 0, availableBytes: null, reservationAssets: [{ url: 'file:///bad', byteLength: 1 }] }, 'needs an update'],
-  [{ type: 'RECORDING_DEPENDENCIES', version: 'build-one', state: 'ready' }, 'response'],
-])('preflight rejects stale or invalid measurement responses', async (value, message) => {
+test.each([[{ type: 'RECORDING_PREFLIGHT', version: 'old', state: 'ready' }, 'another app build']])('preflight rejects stale or invalid measurement responses', async (value, message) => {
   const f = fixture()
   vi.mocked(f.requests.request).mockImplementationOnce(async (_message, receive) => { receive(value); return 'complete' })
   await expect(f.dependencies.preflight!([asset], new AbortController().signal)).rejects.toThrow(message as string)

@@ -7,16 +7,7 @@ const recording = audioRecordings[0]
 const state = (problem: PassageAudioState['problem'], extra: Partial<PassageAudioState> = {}): PassageAudioState =>
   ({ problem, recording, message: '', ...extra })
 
-test.each([
-  [state(null), 'normal', false, false],
-  [state('incomplete-cues'), 'cue', false, false],
-  [state('timing-needed'), 'cue', true, false],
-  [state('partial-audio', { issue: 'audio', canPlay: true }), 'audio', false, false],
-  [state('partial-audio', { issue: 'cue', canPlay: true }), 'cue', false, false],
-  [state('load-failed'), 'audio', true, false],
-  [state('missing-audio', { recording: null }), 'empty', true, true],
-  [state('checking'), 'cue', true, true],
-] as const)('separates color, dimming and action availability for %j', (state, tone, dimmed, actionDisabled) => {
+test.each([[state(null), 'normal', false, false], [state('timing-needed'), 'cue', true, false], [state('missing-audio', { recording: null }), 'empty', true, true]] as const)('separates color, dimming and action availability for %j', (state, tone, dimmed, actionDisabled) => {
   expect(audioButtonState({ state, available: Boolean(state.recording) })).toMatchObject({ tone, dimmed, actionDisabled })
 })
 

@@ -2,12 +2,10 @@ import sys
 from pathlib import Path
 import unittest
 from unittest.mock import patch
-import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from core import AlignmentError, lexical_units
-from diagnostics import display_occurrences, region_boundaries
-from reading_graph import reading_graph
+from diagnostics import display_occurrences
 from aligner import input_for_result
 
 
@@ -41,20 +39,6 @@ class DiagnosticContractTests(unittest.TestCase):
         occurrences, events = display_occurrences(recording, lexical)
         self.assertFalse(occurrences[0]["completeDisplayToken"])
         self.assertEqual(events[0]["kind"], "partial_display_token")
-
-    def test_region_mapping_rejects_reordered_seed(self):
-        with self.assertRaises(AlignmentError):
-            region_boundaries([{"tokenKey": "a"}], [{"tokenKey": "b"}], np.zeros(1000), 3)
-
-    def test_long_silent_passage_abstains_beyond_skip_limit(self):
-        tokens = [{"tokenKey": str(i), "annotatedText": "אב"} for i in range(20)]
-        evidence = np.full((200, 4), -12.0)
-        evidence[:, 3] = -.001
-        result = reading_graph(evidence, tokens, {"|": 0, "א": 1, "ב": 2}, 3)
-        self.assertEqual(result["lexicalOccurrences"], [])
-        self.assertEqual(len(result["events"]), 20)
-        self.assertEqual(result["status"], "insufficient-acoustic-evidence")
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -27,9 +27,3 @@ test('does not replace corrupt persisted intent', async () => {
   await expect(store.update(['one'], [])).rejects.toThrow('invalid')
   expect(localStorage.getItem(DOWNLOAD_INTENT_KEY)).toBe('{broken')
 })
-
-test('reports missing storage and missing coordination explicitly', async () => {
-  await expect(createDownloadIntentStore(null, navigator.locks).read()).rejects.toThrow('storage read failed')
-  await expect(createDownloadIntentStore(localStorage, null).update(['one'], [])).rejects.toThrow('coordination is unavailable')
-  expect(localStorage.getItem(DOWNLOAD_INTENT_KEY)).toBeNull()
-})

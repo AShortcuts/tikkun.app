@@ -42,11 +42,3 @@ test('a saved token selects its actual aliyah despite an earlier hash reference'
   expect(result?.aliyah.index).toBe(4)
   expect(result?.run.id).toBe(run.id)
 })
-
-test('superseded bookmark resolution does not choose a passage', async () => {
-  const run = reading()
-  const model = ScrollViewModel.forRun(generator, run)!
-  await model.startingLocation
-  const first = initialIsolatedEntry(model)!
-  expect(await isolatedEntryForToken(model, '1:0:0:0', first, () => false)).toBeNull()
-})

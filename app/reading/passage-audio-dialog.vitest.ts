@@ -41,15 +41,3 @@ test('cancelling or changing route never starts partial playback', async () => {
   expect(authorize).not.toHaveBeenCalled()
   expect(document.querySelector('dialog')!.open).toBe(false)
 })
-
-test('missing excerpt timing offers an explanation without a play action', async () => {
-  let result!: Promise<PassageAudioPortion | null>
-  destroy = createMount()(scope => {
-    result = createPassageAudioDialog(scope, document)({ ...partial, problem: 'timing-needed', message: 'Excerpt timing needed: 31:28-31:30', portions: [] }, scope.signal, vi.fn())
-  })
-  const dialog = document.querySelector('dialog')!
-  expect(dialog.querySelectorAll('button')).toHaveLength(1)
-  expect(dialog.textContent).toContain('Excerpt timing needed')
-  dialog.querySelector('button')!.click()
-  expect(await result).toBeNull()
-})

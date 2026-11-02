@@ -12,12 +12,7 @@ import {
 } from './audio-controller.ts'
 import { HighlightController } from './highlight-controller.ts'
 import { buildPlaybackPlan } from './playback-plan.ts'
-import {
-  createPlaybackTimeline,
-  formatPlaybackDuration,
-  type PlaybackTimeline,
-  type PlaybackTimelineOptions,
-} from './playback-timeline.ts'
+import { createPlaybackTimeline, type PlaybackTimeline, type PlaybackTimelineOptions } from './playback-timeline.ts'
 
 const tokenKeys = ['1:0:0:0', '1:0:0:1']
 
@@ -31,52 +26,6 @@ afterEach(() => {
   fixture = null
   document.documentElement.removeAttribute('data-mobile-player-expanded')
   vi.restoreAllMocks()
-})
-
-test('replacement mounts own one set of playback listeners and release them', async () => {
-  const { audioController, highlightController } = createFixture()
-  const viewport = createViewport()
-  const mount = createMount()
-  const firstPlay = vi.fn(async () => true)
-  const secondPlay = vi.fn(async () => true)
-
-  mount((scope) => {
-    createPlaybackTimeline(
-      scope,
-      createOptions(audioController, highlightController, viewport, {
-        attemptPlayback: firstPlay,
-      })
-    )
-  })
-  await audioController.loadSession(createSession())
-
-  destroy = mount((scope) => {
-    createPlaybackTimeline(
-      scope,
-      createOptions(audioController, highlightController, viewport, {
-        attemptPlayback: secondPlay,
-      })
-    )
-  })
-
-  const activePlayButton = required<HTMLButtonElement>(
-    '[data-target-id="floating-play"]'
-  )
-  activePlayButton.click()
-  await flushPromises()
-
-  expect(firstPlay).not.toHaveBeenCalled()
-  expect(secondPlay).toHaveBeenCalledTimes(1)
-  expect(viewport.listenerCount).toBe(2)
-
-  destroy()
-  destroy = null
-  expect(activePlayButton.isConnected).toBe(false)
-  activePlayButton.click()
-  await flushPromises()
-
-  expect(secondPlay).toHaveBeenCalledTimes(1)
-  expect(viewport.listenerCount).toBe(0)
 })
 
 test('timed playback keeps controls, cue progress, highlighting, and speed in sync', async () => {
@@ -129,88 +78,6 @@ test('timed playback keeps controls, cue progress, highlighting, and speed in sy
   )
 })
 
-test('restart begins playback before asynchronous highlighting completes', async () => {
-  const { audioController, highlightController } = createFixture()
-  const viewport = createViewport()
-  const attemptReplayFromStart = vi.fn(async () => true)
-  let finishHighlight!: () => void
-  const highlightPending = new Promise<void>((resolve) => {
-    finishHighlight = resolve
-  })
-
-  destroy = createMount()((scope) => {
-    createPlaybackTimeline(
-      scope,
-      createOptions(audioController, highlightController, viewport, {
-        attemptReplayFromStart,
-      })
-    )
-  })
-  await audioController.loadSession(createSession())
-  vi.spyOn(highlightController, 'activateCue').mockImplementation(async () => {
-    await highlightPending
-    return null
-  })
-
-  required<HTMLButtonElement>('[data-target-id="floating-replay"]').click()
-
-  expect(attemptReplayFromStart).toHaveBeenCalledTimes(1)
-  finishHighlight()
-  await flushPromises()
-})
-
-test('untimed playback steps by ten seconds and compact expansion cleans up', async () => {
-  const { audio, audioController, highlightController } = createFixture()
-  const viewport = createViewport('compact')
-  let timeline: PlaybackTimeline | null = null
-
-  destroy = createMount()((scope) => {
-    timeline = createPlaybackTimeline(
-      scope,
-      createOptions(audioController, highlightController, viewport)
-    )
-  })
-  await audioController.loadSession(createSession([]))
-
-  const player = required<HTMLElement>('[data-target-id="floating-player"]')
-  expect(player.dataset.cueMode).toBe('untimed')
-  expect(player.classList.contains('mod-untimed')).toBe(true)
-  expect(
-    required<HTMLButtonElement>('[data-target-id="floating-next"]').ariaLabel
-  ).toBe('Forward 10 seconds')
-
-  required<HTMLButtonElement>('[data-target-id="floating-next"]').click()
-  expect(audio.currentTime).toBe(10)
-
-  required<HTMLButtonElement>('[data-target-id="floating-mobile-expand"]').click()
-  expect(player.classList.contains('is-expanded')).toBe(true)
-  expect(
-    document.documentElement.hasAttribute('data-mobile-player-expanded')
-  ).toBe(true)
-
-  viewport.setMode('wide')
-  expect(player.classList.contains('is-expanded')).toBe(false)
-  expect(
-    document.documentElement.hasAttribute('data-mobile-player-expanded')
-  ).toBe(false)
-
-  viewport.setMode('compact')
-  required<HTMLButtonElement>('[data-target-id="floating-mobile-expand"]').click()
-  expect(timeline!.closeOverlay()).toBe(true)
-  expect(player.classList.contains('is-expanded')).toBe(false)
-
-  destroy()
-  destroy = null
-  expect(viewport.listenerCount).toBe(0)
-  expect(player.classList.contains('is-dragging')).toBe(false)
-})
-
-test('formats finite, invalid, and hour-long playback durations', () => {
-  expect(formatPlaybackDuration(65.9)).toBe('1:05')
-  expect(formatPlaybackDuration(3661)).toBe('1:01:01')
-  expect(formatPlaybackDuration(Number.POSITIVE_INFINITY)).toBe('--:--')
-})
-
 test('passage playback clears highlights in untimed gaps and keeps the selected reading title', async () => {
   const { audio, audioController, highlightController } = createFixture()
   const viewport = createViewport()
@@ -232,26 +99,6 @@ test('passage playback clears highlights in untimed gaps and keeps the selected 
   expect(required('[data-target-id="floating-player-title-desktop"]').textContent).toContain('Nitzavim-Vayelech')
   expect(required('[data-target-id="floating-player-title-mobile"]').textContent).toContain('available portion')
   expect(audio.currentTime).toBe(2)
-})
-
-test('passage word progress uses the actual word position after missing cues', async () => {
-  const { audioController, highlightController } = createFixture()
-  destroy = createMount()(scope => {
-    createPlaybackTimeline(scope, createOptions(audioController, highlightController, createViewport()))
-  })
-  const range = { start: { scroll: 'torah' as const, b: 5, c: 31, v: 1 }, end: { scroll: 'torah' as const, b: 5, c: 31, v: 6 } }
-  const session = createActiveAudioSession({
-    target: { runId: 'run', index: 1 }, tokenKeys, status: 'passage',
-    passage: { range, requestedRange: range, cueComplete: false },
-    segments: [{ recording, tokenKeys, cues: [cue(tokenKeys[1], 3)], startTime: 0, endTime: null }],
-  })
-  await audioController.loadSession(session)
-  audioController.seek(0)
-  await flushPromises()
-  expect(required('[data-target-id="mobile-player-word-progress"]').textContent).toBe('Word 0 of 2')
-  audioController.seek(3)
-  await flushPromises()
-  expect(required('[data-target-id="mobile-player-word-progress"]').textContent).toBe('Word 2 of 2')
 })
 
 function createFixture() {

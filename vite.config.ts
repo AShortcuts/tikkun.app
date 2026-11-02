@@ -9,6 +9,7 @@ import { nativeBuildConfig } from './scripts/native-build-config.mjs'
 import { contentInventoryPlugin } from './scripts/content-inventory-plugin.ts'
 import { audioAssetsPlugin } from './scripts/audio-assets-plugin.ts'
 import { cueFileSavePlugin } from './scripts/cue-file-save-plugin.ts'
+import { buildPublishedContent, publishedContentPlugin } from './scripts/published-content.ts'
 import { updateConfig } from './scripts/update-config.mjs'
 import { analyticsConfig } from './app/analytics/config.ts'
 import analyticsPublic from './config/analytics-public.json' with { type: 'json' }
@@ -19,6 +20,8 @@ export const buildIdentifier = resolveBuildIdentifier()
 const native = nativeBuildConfig()
 const contentVersion = randomUUID()
 const updates = native.enabled ? updateConfig() : { enabled: false, publicKey: '' }
+// Native apps compare this summary of their built-in recordings and cues with the website's catalog.
+const builtInContent = native.enabled ? buildPublishedContent(projectRoot).builtIn : null
 
 export const viteConfig = {
   plugins: [
@@ -28,10 +31,12 @@ export const viteConfig = {
     audioAssetsPlugin(projectRoot),
     sveltekit(),
     contentInventoryPlugin(contentVersion),
+    publishedContentPlugin(projectRoot, { native: native.enabled }),
   ],
   define: {
     __TIKKUN_BUILD_ID__: JSON.stringify(buildIdentifier),
     __TIKKUN_ANALYTICS_CONFIG__: JSON.stringify(analyticsConfig({ ...analyticsPublic, ...process.env })),
+    __TIKKUN_BUILT_IN_CONTENT__: JSON.stringify(builtInContent),
     'import.meta.env.TIKKUN_NATIVE_MEDIA_ORIGIN': JSON.stringify(native.mediaOrigin),
     'import.meta.env.TIKKUN_CONTENT_VERSION': JSON.stringify(contentVersion),
     'import.meta.env.TIKKUN_UPDATE_PUBLIC_KEY': JSON.stringify(updates.publicKey),

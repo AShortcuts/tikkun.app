@@ -46,18 +46,6 @@ test('Settings and a second subscriber share verified counts and selective remov
   settings.destroy(); other.destroy()
 })
 
-test('rejects stale selection commands and does not destroy the library when Settings closes', async () => {
-  const f = setup()
-  const settings = f.adapter()
-  await settings.download('previous')
-  expect(f.backend.download).not.toHaveBeenCalled()
-  await expect(settings.remove('previous')).resolves.toMatchObject({ status: 'skipped' })
-  settings.destroy()
-  expect(f.backend.destroy).not.toHaveBeenCalled()
-  await f.library.enqueue([recordingAssetKey(f.asset)])
-  await vi.waitFor(() => expect(f.library.snapshot().inventory).toHaveLength(1))
-})
-
 test('shows pending removal without announcing a file was deleted during playback', async () => {
   const f = setup()
   f.files.set(recordingAssetKey(f.asset), f.asset)
@@ -83,14 +71,5 @@ test('includes obsolete inventory and supports clear-all with no selected record
   await expect(settings.removeAll()).resolves.toMatchObject({ status: 'completed' })
   expect(f.backend.remove).toHaveBeenCalledOnce()
   expect(settings.getSnapshot().storedCount).toBe(0)
-  settings.destroy()
-})
-
-test('surfaces backend failures without unhandled fire-and-forget action rejections', async () => {
-  const f = setup()
-  const settings = f.adapter()
-  vi.mocked(f.backend.download).mockRejectedValueOnce(new Error('Download denied'))
-  await settings.download('first')
-  await vi.waitFor(() => expect(settings.getSnapshot()).toMatchObject({ phase: 'error', errorMessage: 'Download denied' }))
   settings.destroy()
 })

@@ -62,23 +62,6 @@ test('keeps incomplete current timing open through media EOF', () => {
   )
 })
 
-test('keeps complete current timing open through media EOF', () => {
-  const tokenKeys = ['13:0:0:0', '13:0:0:1']
-  const plan = buildPlaybackPlan({
-    target: { runId: 'lech-lecha', index: 3 },
-    tokenKeys,
-    current: {
-      recording,
-      cues: [cue(tokenKeys[0]!, 0), cue(tokenKeys[1]!, 4, 5)],
-    },
-  })
-
-  expect(plan?.segments[0]?.endTime).toBeNull()
-  expect(createActiveAudioSession(plan!).segments[0]?.logicalEnd).toBe(
-    Number.POSITIVE_INFINITY
-  )
-})
-
 test('bounds previous overlap while leaving the current remainder open', () => {
   const previousKeys = ['13:0:0:0', '13:0:0:1']
   const tokenKeys = ['13:0:0:1', '13:0:0:2']

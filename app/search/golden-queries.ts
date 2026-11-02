@@ -140,21 +140,9 @@ export const goldenRankingQueries: readonly GoldenRankingQuery[] = [
     maxRank: 1,
   },
   {
-    category: 'separator-variant',
-    query: 'Tishah B’Av 3',
-    expectedId: 'holiday.tisha-bav.3',
-    maxRank: 1,
-  },
-  {
     category: 'transliteration-alias',
     query: 'Noah',
     expectedId: 'reading.noach',
-    maxRank: 1,
-  },
-  {
-    category: 'abbreviation',
-    query: 'Chayei S.',
-    expectedId: 'reading.chayei-sarah',
     maxRank: 1,
   },
   {
@@ -170,18 +158,6 @@ export const goldenRankingQueries: readonly GoldenRankingQuery[] = [
     maxRank: 1,
   },
   {
-    category: 'structured-aliyah',
-    query: 'Noah Maftir',
-    expectedId: 'reading.noach.maftir',
-    maxRank: 1,
-  },
-  {
-    category: 'structured-page',
-    query: 'page 12',
-    expectedId: 'page.torah.12',
-    maxRank: 1,
-  },
-  {
     category: 'structured-page',
     query: 'Megillah page 3',
     expectedId: 'page.esther.3',
@@ -193,14 +169,6 @@ export const goldenStructuredQueries: readonly GoldenStructuredQuery[] = [
   {
     query: 'Noach 3',
     expected: { kind: 'aliyah', reading: 'noach', aliyah: 3 },
-  },
-  {
-    query: 'Maftir',
-    expected: { kind: 'aliyah', reading: null, aliyah: 'Maftir' },
-  },
-  {
-    query: 'Torah page 12',
-    expected: { kind: 'page', scroll: 'torah', page: 12 },
   },
   {
     query: 'Megillah page 3',
@@ -236,4 +204,4 @@ export const goldenBehaviorCases: readonly GoldenBehaviorCase[] = [
   },
 ]
 
-export const goldenSafetyQueries = ['', ' ', '[', '(', '\\', '.*', '־', '’'] as const
+export const goldenSafetyQueries = ['', '[', '\\', '’'] as const

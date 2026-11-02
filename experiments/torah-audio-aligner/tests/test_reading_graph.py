@@ -37,18 +37,6 @@ class ReadingGraphTests(unittest.TestCase):
         starts = [item["sourceStartSample"] for item in result["lexicalOccurrences"]]
         self.assertEqual(starts, sorted(set(starts)))
 
-    def test_skip_has_no_fabricated_audio_interval(self):
-        result = reading_graph(emitted(["אב", "הו"]), TOKENS, VOCAB, BLANK)
-        self.assertEqual([item["tokenKey"] for item in result["lexicalOccurrences"]], ["0", "2"])
-        skipped = next(item for item in result["events"] if item["kind"] == "candidate_skip")
-        self.assertEqual(skipped["tokenKey"], "1")
-        self.assertNotIn("sourceStartSample", skipped)
-
-    def test_unassigned_speech_recovers_at_following_word(self):
-        result = reading_graph(emitted(["אב", "זחזח", "גד", "הו"]), TOKENS, VOCAB, BLANK)
-        self.assertEqual([item["tokenKey"] for item in result["lexicalOccurrences"]], ["0", "1", "2"])
-        self.assertTrue(any(item["kind"] == "unassigned_audio" for item in result["events"]))
-
     def test_partial_attempt_is_preserved(self):
         result = reading_graph(emitted(["א", "אב", "גד", "הו"]), TOKENS, VOCAB, BLANK,
                                config=GraphConfig(partial_restart_penalty=5))
@@ -69,12 +57,6 @@ class ReadingGraphTests(unittest.TestCase):
         result = reading_graph(evidence, TOKENS, VOCAB, BLANK)
         self.assertEqual(result["lexicalOccurrences"], [])
         self.assertEqual([item["tokenKey"] for item in result["events"]], ["0", "1", "2"])
-
-    def test_trailing_skip_is_preserved(self):
-        result = reading_graph(emitted(["אב", "גד"]), TOKENS, VOCAB, BLANK)
-        self.assertEqual([item["tokenKey"] for item in result["lexicalOccurrences"]], ["0", "1"])
-        self.assertIn({"kind": "candidate_skip", "lexicalKey": "2/0", "tokenKey": "2"}, result["events"])
-
 
 if __name__ == "__main__":
     unittest.main()

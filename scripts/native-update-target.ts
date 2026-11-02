@@ -39,13 +39,15 @@ export async function readNativeTarget(file: string, publicKey: string): Promise
     ...(value.nativeVersion ? { nativeVersion: value.nativeVersion } : {}), contract: parseContract(value.contract) }
 }
 
+// Every installed App Store build at or above the Minimum App Store Version receives
+// every web update; web code checks for the native capabilities it needs. Only the
+// signing key must match, because each app verifies web updates with its built-in key.
 export function assertNativeTarget(target: NativeUpdateTarget, source: unknown, publicKey: string, nativeBuild = target.nativeBuild) {
   const contract = parseContract(source)
   if (target.nativeBuild !== nativeBuild) throw new Error('Native target does not match the selected native build')
-  if (target.contract.publicKeyDigest !== createHash('sha256').update(publicKey.trim()).digest('hex')) throw new Error('Signing key is not installed in the native target')
-  if (target.contract.schema !== contract.schema || target.contract.nativeDigest !== contract.nativeDigest || target.contract.publicKeyDigest !== contract.publicKeyDigest) {
-    throw new Error(`Native code, configuration or signing key differs from build ${nativeBuild}; ship a matching iOS build and export its target record`)
-  }
+  const key = createHash('sha256').update(publicKey.trim()).digest('hex')
+  if (target.contract.publicKeyDigest !== key) throw new Error('Signing key is not installed in the native target')
+  if (contract.publicKeyDigest !== key) throw new Error(`The web build embeds a different signing key than build ${nativeBuild}`)
 }
 
 type ReadPlist = (file: string, field: string) => string

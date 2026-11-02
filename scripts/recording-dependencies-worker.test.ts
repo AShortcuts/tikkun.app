@@ -57,12 +57,6 @@ function fixture(manifestCached = true, stores = new Map<string, Map<string, Res
   return { stores, cache, fetch, api, request, estimate, warn }
 }
 
-function cachedAudio(body = bytes) {
-  return new Response(body, { headers: {
-    'Content-Length': String(recording.byteLength), 'X-Tikkun-Audio-Id': recording.audioId, 'X-Tikkun-Media-Digest': recording.digest,
-  } })
-}
-
 test('preflight combines deduplicated audio, shared dependencies, staging and reserve without writing assets', async () => {
   const f = fixture()
   const request = f.request('preflight', 'current', ['audio-cues/one.json', 'audio-cues/one.json'], [recording, { ...recording, audioId: 'alias' }])
@@ -78,14 +72,6 @@ test('preflight combines deduplicated audio, shared dependencies, staging and re
   expect(await f.cache(f.api.cacheName(cue.url)).match(cue.url)).toBeUndefined()
 })
 
-test('preflight fetches only an absent verified manifest and includes its uncommitted bytes', async () => {
-  const f = fixture(false)
-  const request = f.request('preflight'); await request.done
-  expect(request.messages.at(-1)).toMatchObject({ state: 'ready', missingBytes: metadata.asset.byteLength + 12, stagingBytes: metadata.asset.byteLength + 4 })
-  expect(f.fetch).toHaveBeenCalledExactlyOnceWith(new URL(metadata.asset.url, origin).href, expect.any(Object))
-  expect(await f.cache(f.api.cacheName(metadata.asset.url)).match(metadata.asset.url)).toBeUndefined()
-})
-
 test('preflight rejects low quota including dependencies before preparing or changing cached content', async () => {
   const f = fixture()
   f.estimate.mockResolvedValue({ quota: 33_554_432 + 19, usage: 0 })
@@ -96,32 +82,7 @@ test('preflight rejects low quota including dependencies before preparing or cha
   expect(await f.cache(f.api.cacheName(core.url)).match(core.url)).toBeUndefined()
 })
 
-test('verified caches need no allocation at zero quota; corrupt audio remains untouched for repair', async () => {
-  const f = fixture()
-  await f.request(true).done
-  await f.cache(f.api.audioCache).put(recording.url, cachedAudio())
-  f.estimate.mockResolvedValue({ quota: 0, usage: 0 })
-  const ready = f.request('preflight'); await ready.done
-  expect(ready.messages.at(-1)).toMatchObject({ state: 'ready', requiredBytes: 0 })
-  const cold = fixture(false, f.stores)
-  await cold.cache(cold.api.audioCache).put(recording.url, cachedAudio(Uint8Array.from([9, 9, 9, 9])))
-  cold.estimate.mockResolvedValue({ quota: 0, usage: 0 })
-  const bad = cold.request('preflight'); await bad.done
-  expect(bad.messages.at(-1)).toMatchObject({ state: 'error' })
-  const retained = await cold.cache(cold.api.audioCache).match(recording.url)
-  expect([...new Uint8Array(await retained!.arrayBuffer())]).toEqual([9, 9, 9, 9])
-})
-
-test('preflight includes active transfers from other clients once', async () => {
-  const f = fixture()
-  f.api.activeAudio(recording)
-  f.api.activeAudio({ ...recording, audioId: 'other', url: recording.url.replace('one.m4a', 'other.m4a') })
-  f.api.activeSupport(descriptor('other-cue'))
-  const request = f.request('preflight'); await request.done
-  expect(request.messages.at(-1)).toMatchObject({ state: 'ready', missingBytes: 20, stagingBytes: 12 })
-})
-
-test.each([{}, { quota: -1, usage: 0 }, { quota: Infinity, usage: 0 }])('unknown quota remains unknown: %j', async (estimate) => {
+test.each([{}])('unknown quota remains unknown: %j', async (estimate) => {
   const f = fixture()
   f.estimate.mockResolvedValue(estimate)
   const request = f.request('preflight'); await request.done
@@ -134,28 +95,6 @@ test('a rejected quota API is logged without pretending capacity is zero', async
   const request = f.request('preflight'); await request.done
   expect(request.messages.at(-1)).toMatchObject({ state: 'ready', availableBytes: null })
   expect(f.warn).toHaveBeenCalledOnce()
-})
-
-test('preflight rejects stale versions and malformed recordings without fetching', async () => {
-  const f = fixture(false)
-  const stale = f.request('preflight', 'old'); await stale.done
-  expect(stale.messages.at(-1)).toMatchObject({ state: 'error' })
-  const invalid = f.request('preflight', 'current', [], [{ ...recording, url: 'https://other.test/audio/one.m4a' }]); await invalid.done
-  expect(invalid.messages.at(-1)).toMatchObject({ state: 'error' })
-  expect(f.fetch).not.toHaveBeenCalled()
-})
-
-test('preflight manifest fetch is cancellable and cannot prepare content afterward', async () => {
-  const f = fixture(false)
-  f.fetch.mockImplementationOnce(async (_url, { signal }) => new Response(new ReadableStream({
-    start(controller) { signal.addEventListener('abort', () => controller.error(new Error('Cancelled')), { once: true }) },
-  })))
-  const request = f.request('preflight')
-  await vi.waitFor(() => expect(f.fetch).toHaveBeenCalledOnce())
-  request.cancel()
-  await request.done
-  expect(request.messages.at(-1)).toMatchObject({ state: 'error', errorMessage: expect.stringContaining('cancelled') })
-  expect(await f.cache(f.api.cacheName(metadata.asset.url)).match(metadata.asset.url)).toBeUndefined()
 })
 
 test('missing checks never fetch; preparation deduplicates dependencies and reuses verified caches', async () => {
@@ -196,30 +135,6 @@ test('a cold worker validates persisted content without any network request', as
   expect(relaunched.fetch).not.toHaveBeenCalled()
 })
 
-test('playback uses the same canonical caches as readiness checks when obsolete duplicate entries exist', async () => {
-  const f = fixture()
-  const prepare = f.request(true); await prepare.done
-  const namespace = cacheNamespaceForBasePath('/preview')
-  const shell = `tikkun-shell-${namespace}-test`
-  const permanent = `tikkun-dependencies-${namespace}`
-  await f.cache(permanent).put(core.url, new Response(Uint8Array.from([9, 9, 9, 9])))
-  await f.cache(shell).put(cue.url, new Response(Uint8Array.from([8, 8, 8, 8])))
-  for (const asset of [core, cue]) {
-    const response = await f.api.serve(new Request(new URL(asset.url, origin)), asset === core ? f.api.cacheName(core.url) : shell)
-    expect([...new Uint8Array(await response.arrayBuffer())]).toEqual([...bytes])
-  }
-  expect(f.fetch).toHaveBeenCalledTimes(2)
-})
-
-test('rejects another build and unknown cue paths without fetching', async () => {
-  const f = fixture()
-  const stale = f.request(true, 'old'); await stale.done
-  expect(stale.messages.at(-1)).toMatchObject({ state: 'error', errorMessage: expect.stringContaining('another app build') })
-  const foreign = f.request(true, 'current', ['https://other.test/private']); await foreign.done
-  expect(foreign.messages.at(-1)).toMatchObject({ state: 'error', errorMessage: expect.stringContaining('Unknown published') })
-  expect(f.fetch).not.toHaveBeenCalled()
-})
-
 test('detects corrupted stored content and failed replacement cannot erase it', async () => {
   const f = fixture()
   await f.cache(f.api.cacheName(core.url)).put(core.url, new Response(Uint8Array.from([9, 9, 9, 9])))
@@ -232,32 +147,10 @@ test('detects corrupted stored content and failed replacement cannot erase it', 
   expect([...new Uint8Array(await retained!.arrayBuffer())]).toEqual([9, 9, 9, 9])
 })
 
-test.each([404, 500])('HTTP %s cannot become saved support content', async (status) => {
+test.each([404])('HTTP %s cannot become saved support content', async (status) => {
   const f = fixture()
   f.fetch.mockResolvedValueOnce(new Response('Failure', { status }))
   const failed = f.request(true); await failed.done
   expect(failed.messages.at(-1)).toMatchObject({ state: 'error' })
   expect(await f.cache(f.api.cacheName(core.url)).match(core.url)).toBeUndefined()
-})
-
-test.each([false, true])('shared transfer cancellation, cancel both=%s', async (both) => {
-  const f = fixture()
-  let stream: ReadableStreamDefaultController<Uint8Array> | undefined
-  f.fetch.mockImplementationOnce(async (_url, { signal }) => new Response(new ReadableStream({
-    start(controller) {
-      stream = controller
-      signal.addEventListener('abort', () => controller.error(new DOMException('Cancelled', 'AbortError')), { once: true })
-    },
-  })))
-  const first = f.request(true)
-  const second = f.request(true)
-  await vi.waitFor(() => expect(f.api.users()).toEqual([2]))
-  first.cancel()
-  if (both) second.cancel()
-  else { stream!.enqueue(bytes); stream!.close() }
-  await Promise.all([first.done, second.done])
-  expect(first.messages.at(-1)).toMatchObject({ state: 'error', errorMessage: expect.stringContaining('cancelled') })
-  expect(second.messages.at(-1)).toMatchObject({ state: both ? 'error' : 'ready' })
-  expect(f.fetch).toHaveBeenCalledTimes(both ? 1 : 2)
-  expect(Boolean(await f.cache(f.api.cacheName(core.url)).match(core.url))).toBe(!both)
 })

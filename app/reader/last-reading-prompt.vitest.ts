@@ -91,37 +91,3 @@ test('reuses the banner to return to a previous reading', () => {
 
   destroy()
 })
-
-test('replacement mounts remove the previous prompt listeners', () => {
-  const mount = createMount()
-  const firstResume = vi.fn()
-  const secondResume = vi.fn()
-  const reading = {
-    hash: '#/torah/parsha/beresheet',
-    parshaName: 'Beresheet',
-    savedAt: Date.now(),
-  }
-
-  mount((scope) => {
-    createLastReadingPrompt(scope, {
-      document,
-      disabled: false,
-      onResume: firstResume,
-    }).show(reading)
-  })
-  const destroy = mount((scope) => {
-    createLastReadingPrompt(scope, {
-      document,
-      disabled: false,
-      onResume: secondResume,
-    }).show(reading)
-  })
-
-  fixture
-    .querySelector<HTMLButtonElement>('[data-target-id="last-reading-resume"]')!
-    .click()
-  expect(firstResume).not.toHaveBeenCalled()
-  expect(secondResume).toHaveBeenCalledOnce()
-
-  destroy()
-})

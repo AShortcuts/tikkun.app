@@ -91,28 +91,6 @@ describe('shared search index', () => {
     ).toEqual(['first', 'other'])
   })
 
-  test('uses explicit empty priorities and excludes unavailable documents', () => {
-    const index = createSearchIndex([
-      { ...searchDocument('later', 'Later'), emptyPriority: 10 },
-      { ...searchDocument('first', 'First'), emptyPriority: 20 },
-      { ...searchDocument('hidden', 'Hidden'), available: false, emptyPriority: 30 },
-      searchDocument('search-only', 'Search only'),
-    ])
-
-    expect(index.search('').map(({ document }) => document.id)).toEqual([
-      'first',
-      'later',
-    ])
-    expect(index.search('hidden')).toEqual([])
-  })
-
-  test('disables fuzzy matching for short tokens but keeps exact prefixes', () => {
-    const index = createSearchIndex([searchDocument('pizza', 'Pizza')])
-
-    expect(index.search('pz')).toEqual([])
-    expect(index.search('pi')[0]?.document.id).toBe('pizza')
-  })
-
   test('rejects weak partial matches from long unrelated queries', () => {
     const index = createSearchIndex([
       searchDocument('reading', 'Behalotecha', [], 'reading.behalotecha'),

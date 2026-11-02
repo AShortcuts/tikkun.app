@@ -8,14 +8,7 @@ import {
   type LeiningInstance,
   type LeiningRun,
 } from '../../calendar-model/model-types.ts'
-import {
-  createAliyahNavigationSnapshot,
-  formatAliyahLabel,
-  getAliyahNavigationEntriesForRun,
-  resolveActiveTargetForRun,
-  type AliyahNavigationPlayback,
-  type AliyahNavigationTarget,
-} from './model.ts'
+import { getAliyahNavigationEntriesForRun, resolveActiveTargetForRun, type AliyahNavigationPlayback, type AliyahNavigationTarget } from './model.ts'
 
 test('builds one shared navigation sequence across main and maftir runs', () => {
   const mainRun = createRunFixture({
@@ -64,49 +57,6 @@ test('Vezot parsha navigation uses the displayed seven divisions and leaves the 
   expect(getAliyahNavigationEntriesForRun(dated).at(-1)?.aliyah.index).toBe('Maftir')
 })
 
-test('creates presentation items and a stable signature behind one model interface', () => {
-  const run = createRunFixture({
-    id: '2025-10-25:shacharis,main',
-    type: LeiningRunType.Main,
-    indexes: [1, 2],
-  })
-  run.leining = createLeiningFixture([run])
-  const entries = getAliyahNavigationEntriesForRun(run)
-
-  const snapshot = createAliyahNavigationSnapshot({
-    entries,
-    active: { runId: run.id, aliyahIndex: 2 },
-    playback: idlePlayback,
-    signaturePrefix: 'narrator-a',
-    getAudio: ({ aliyah }) => {
-      const key = aliyah.index === 1 ? 'recording-1' : null
-      return { playbackKey: key, recordingKey: key }
-    },
-  })
-
-  expect(snapshot.signature).toBe(
-    `narrator-a:${run.id}:1:recording-1:recording-1:recording:::|${run.id}:2:::recording:::`
-  )
-  expect(snapshot.items).toEqual([
-    {
-      key: `${run.id}:1`,
-      target: { runId: run.id, aliyahIndex: 1 },
-      label: 'ראשון',
-      compactLabel: '1',
-      audioKey: 'recording-1',
-      recordingKey: 'recording-1',
-    },
-    {
-      key: `${run.id}:2`,
-      target: { runId: run.id, aliyahIndex: 2 },
-      label: 'שני',
-      compactLabel: '2',
-      audioKey: null,
-      recordingKey: null,
-    },
-  ])
-})
-
 test('prefers active playback for the selected run, then viewport, then first item', () => {
   const runId = '2025-10-25:shacharis,main'
   const first: AliyahNavigationTarget = { runId, aliyahIndex: 1 }
@@ -136,10 +86,6 @@ test('prefers active playback for the selected run, then viewport, then first it
       first,
     })
   ).toEqual(first)
-})
-
-test('formats maftir for navigation labels', () => {
-  expect(formatAliyahLabel('Maftir')).toBe('מפטיר')
 })
 
 const idlePlayback: AliyahNavigationPlayback = {

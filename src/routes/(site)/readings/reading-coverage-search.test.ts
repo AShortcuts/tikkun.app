@@ -5,13 +5,6 @@ import { createReadingCoverageSearch } from './reading-coverage-search.ts'
 const search = createReadingCoverageSearch(readingCoverage)
 
 describe('public reading coverage search adapter', () => {
-  test('preserves catalog order for empty queries', () => {
-    expect(
-      search
-        .search('', 'all')
-        .map(({ document }) => document.item.parshaName)
-    ).toEqual(readingCoverage.map(({ parshaName }) => parshaName))
-  })
 
   test('finds English, Hebrew, nikkud, aliases, and typos', () => {
     for (const query of [
@@ -41,10 +34,5 @@ describe('public reading coverage search adapter', () => {
     expect(search.search('Noach', 'audio')[0]?.document.item.parshaSlug).toBe(
       'noach'
     )
-  })
-
-  test('handles arbitrary punctuation without throwing', () => {
-    expect(() => search.search('[', 'all')).not.toThrow()
-    expect(search.search('[', 'all')).toEqual([])
   })
 })

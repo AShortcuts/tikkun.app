@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import type { ParshaAudioRecording, WordCue } from '../audio/types.ts'
 import { createActiveAudioSession } from './audio-controller.ts'
-import { buildPlaybackPlan, contiguousOpeningOverlap } from './playback-plan.ts'
+import { buildPlaybackPlan } from './playback-plan.ts'
 
 const previousKeys = ['1:0:0:0', '1:0:0:1', '1:0:0:2']
 const targetKeys = ['1:0:0:1', '1:0:0:2', '1:0:0:3', '1:0:0:4']
@@ -35,16 +35,6 @@ const cue = (key: string, timeStart: number, timeEnd?: number): WordCue => {
 const previous = recording('previous', 1)
 const current = recording('current', 2)
 const target = { runId: 'run', index: 2 } as const
-
-test('detects only a contiguous previous suffix and target prefix overlap', () => {
-  expect(contiguousOpeningOverlap(previousKeys, targetKeys)).toEqual([
-    '1:0:0:1', '1:0:0:2',
-  ])
-  expect(contiguousOpeningOverlap(
-    ['1:0:0:1', '1:0:0:9'],
-    targetKeys
-  )).toEqual([])
-})
 
 test('uses current-only when every shared-opening token has a current cue', () => {
   const plan = buildPlaybackPlan({

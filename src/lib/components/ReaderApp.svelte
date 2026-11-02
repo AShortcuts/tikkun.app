@@ -7,6 +7,7 @@
   import type { ReaderAppOptions } from '../../../app/index.ts'
   import '../../../css/master.css'
   import readerTheme from '../../../css/reader-theme.css?raw'
+  import { nativeContentReady, prepareNativeContent } from '../../../app/updates/content-runtime.ts'
   import { nativeWebReady } from '../../../app/updates/web-runtime.ts'
   import { checkNativeUpdates } from '../../../app/updates/native-updates.ts'
   import { isNativeApp } from '../../../app/platform/native.ts'
@@ -88,6 +89,9 @@
       await nativeLinks?.ready
       if (disposed || revision !== bootRevision) return
       if (nativeLinks) completeStep('launch')
+      // The Reader reads the recording list once, so the saved website copy must load first.
+      await prepareNativeContent()
+      if (disposed || revision !== bootRevision) return
       app = await loadApp()
       if (disposed || revision !== bootRevision) return
       completeStep('module')
@@ -110,6 +114,7 @@
       if (disposed || revision !== bootRevision) return
       bootProgress = 1
       bootState = 'ready'
+      void nativeContentReady()
       void nativeWebReady()
     } catch (error) {
       if (disposed || revision !== bootRevision) return

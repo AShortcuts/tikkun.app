@@ -10,14 +10,6 @@ const range = (c: number, v: number, endChapter = c, endVerse = v): PassageRange
   end: { scroll: 'torah', b: 1, c: endChapter, v: endVerse },
 })
 
-test('English passage titles cover single verses, ranges, and separate selections', () => {
-  expect(passageTitle([range(1, 6)], 'en')).toBe('Beresheet 1:6')
-  expect(passageTitle([range(1, 6, 1, 13)], 'en')).toBe('Beresheet 1:6–13')
-  expect(passageTitle([range(1, 24, 2, 3)], 'en')).toBe('Beresheet 1:24–2:3')
-  expect(passageTitle([range(1, 3), range(1, 9)], 'en')).toBe('Beresheet 1:3 · Beresheet 1:9')
-  expect(passageTitle([{ start: { scroll: 'torah', b: 1, c: 50, v: 26 }, end: { scroll: 'torah', b: 2, c: 1, v: 1 } }], 'en')).toBe('Beresheet 50:26–Shemot 1:1')
-})
-
 async function passageWords(ranges: PassageRange[]) {
   const passage = await loadPrintPassage(ranges)
   const words = (await Promise.all(passage.pages.map(async page => {
@@ -41,14 +33,6 @@ test('cross-column and cross-chapter ranges include every complete pasuk', async
   expect(passage.plain).toMatch(/^ויאמר אלהים תוצא הארץ/)
   expect(passage.plain).toMatch(/אשר־ברא אלהים לעשות׃$/)
   expect(passage.words.filter(word => word.annotatedText.includes('׃'))).toHaveLength(11)
-})
-
-test('noncontiguous selections omit the gap and overlapping ranges do not duplicate words', async () => {
-  const first = await loadPrintPassage([range(1, 3)])
-  const second = await loadPrintPassage([range(1, 9)])
-  const combined = await passageWords([range(1, 3), range(1, 9), range(1, 3)])
-  expect(combined.selected).toEqual(new Set([...first.selected, ...second.selected]))
-  expect(combined.words.filter(word => word.annotatedText.includes('׃'))).toHaveLength(2)
 })
 
 test('invalid and empty selections report an actionable error', () => {

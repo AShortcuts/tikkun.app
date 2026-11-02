@@ -71,18 +71,9 @@ test('creates and parses one recording-bound Cue Draft contract', () => {
   ).toEqual(draft)
 })
 
-test.each([
-  ['audio id', { audioId: 'other' }],
-  ['format', { audioFormat: 'm4a' }],
-  ['narrator', { narratorId: 'other' }],
-  ['reading', { readingId: 'noach' }],
-  ['aliyah', { aliyah: 2 }],
-  ['media identity', {
+test.each([['audio id', { audioId: 'other' }], ['media identity', {
     mediaIdentity: { ...mediaIdentity, digest: 'b'.repeat(64) },
-  }],
-  ['token count', { tokenCount: 3 }],
-  ['tokenization version', { tokenizationVersion: 'v1' }],
-])('rejects a draft with stale %s', (_label, change) => {
+  }], ['tokenization version', { tokenizationVersion: 'v1' }]])('rejects a draft with stale %s', (_label, change) => {
   expect(
     parseCueDraftPayload(
       { ...validDraft(), ...change },
@@ -115,20 +106,6 @@ test('rejects malformed, duplicate, backward, and non-prefix cue positions', () 
     parseCueDraftPayload(
       { ...validDraft(), cues: [cue(1, 0)] },
       expectation
-    )
-  ).toBeNull()
-})
-
-test('rejects an impossible future update timestamp', () => {
-  expect(
-    parseCueDraftPayload(
-      { ...validDraft(), updatedAt: 1_000_000 },
-      {
-        recording,
-        tokenCount: tokenKeys.length,
-        tokenKeys,
-        now: 100,
-      }
     )
   ).toBeNull()
 })

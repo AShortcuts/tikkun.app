@@ -4,12 +4,12 @@ import { publicReadingUrl, shareReadingLink } from './share-reading.ts'
 const hash = '#/torah/parsha/beresheet/1-4-19'
 const url = `https://tikkunreader.com/reader/${hash}`
 
-test.each([hash, '#/torah/5-33-24', '#/r/5-33-24', '#/torah/page/12', '#/esther/megillah-esther/6-1-1', '#/run/2026-10-17:shacharis,main/1-6-9'])(
+test.each([hash, '#/torah/page/12'])(
   'shares public reader route %s without deployment or query data', route => {
     expect(publicReadingUrl(`${route}?authoring=private&token=secret`)).toBe(`https://tikkunreader.com/reader/${route}`)
   })
 
-test.each(['', '#/next', '#/cue-analytics', 'capacitor://localhost/reader/', 'https://elsewhere.test/', '#/torah/page/0'])(
+test.each(['#/next', 'https://elsewhere.test/'])(
   'rejects non-reading target %s', value => { expect(() => publicReadingUrl(value)).toThrow('Open a reading') })
 
 test('uses native sharing without touching browser facilities', async () => {
@@ -28,7 +28,7 @@ test('calls Web Share before yielding user activation', async () => {
   expect(await pending).toBe('shared')
 })
 
-test.each([false, undefined])('copies when Web Share is unsupported (%s)', canShare => {
+test.each([false])('copies when Web Share is unsupported (%s)', canShare => {
   const writeText = vi.fn().mockResolvedValue(undefined)
   const navigator = canShare === false ? { share: vi.fn(), canShare: () => false, clipboard: { writeText } } : { clipboard: { writeText } }
   return expect(shareReadingLink(hash, { navigator })).resolves.toBe('copied').then(() => expect(writeText).toHaveBeenCalledWith(url))

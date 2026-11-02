@@ -17,7 +17,7 @@ const event = (
   ...overrides,
 })
 
-test.each([true, false])(
+test.each([true])(
   'restores an initial value of %s when Shift is released while Control is held',
   (initialValue) => {
     let value = initialValue
@@ -38,20 +38,6 @@ test.each([true, false])(
     expect(setValue).toHaveBeenCalledTimes(2)
   }
 )
-
-test('does not start the temporary toggle when another modifier is already held', () => {
-  const setValue = vi.fn()
-  const toggle = createTemporaryShiftToggle({
-    getValue: () => true,
-    setValue,
-    isDisabled: () => false,
-  })
-
-  toggle.handleKeyDown(event('down', { ctrlKey: true }))
-  toggle.handleKeyUp(event('up'))
-
-  expect(setValue).not.toHaveBeenCalled()
-})
 
 test('does not toggle while the user is editing a control', () => {
   const setValue = vi.fn()

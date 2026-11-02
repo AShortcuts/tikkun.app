@@ -79,7 +79,7 @@ export async function publishedRelease(root: string, target: NativeReleaseTarget
 }
 
 export async function allocateReleaseBuild(root: string, kind: 'test' | 'web', options: { local?: boolean; fetcher?: typeof fetch } = {}) {
-  const { release: project, target } = await bundledAppRelease(root)
+  const { release: project, target } = await bundledAppRelease(root, undefined, kind === 'test')
   const previous = await readReleaseBuildState(root)
   const { publicKey, enabled } = configuration(root)
   const candidates = enabled ? await Promise.all([
@@ -105,8 +105,11 @@ export async function bundledAppRelease(root: string, identity?: ReleaseIdentity
     try { existing = await readNativeTarget(path.join(root, 'config/native-update-target.json'), publicKey) }
     catch (error) { if (!object(error) || error.code !== 'ENOENT') throw error }
     const contract = await nativeUpdateContract(root, publicKey)
-    if (existing && existing.contract.nativeDigest === contract.nativeDigest &&
-        existing.contract.publicKeyDigest === contract.publicKeyDigest && existing.contract.schema === contract.schema) {
+    const sameKey = existing?.contract.publicKeyDigest === contract.publicKeyDigest
+    const sameNative = sameKey && existing?.contract.nativeDigest === contract.nativeDigest && existing.contract.schema === contract.schema
+    // Web updates keep using the installed App Store build's channel after native changes,
+    // so its phones receive them. Sqim tests of new native code keep their own channel.
+    if (existing && (testBuild ? sameNative : sameKey)) {
       target = { nativeBuild: existing.nativeBuild, ...(existing.nativeVersion ? { nativeVersion: existing.nativeVersion } : {}) }
     }
   }

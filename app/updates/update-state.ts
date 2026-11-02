@@ -8,34 +8,38 @@ export interface UpdateChannelState {
 }
 export interface NativeUpdateState {
   web: UpdateChannelState
+  // Recordings and cues published by the website.
+  content: UpdateChannelState
   applying: boolean
   canCancel: boolean
   applyError: string | null
 }
 const initialChannel = (): UpdateChannelState => ({ phase: 'idle', pending: false, checkedAt: null })
 export const nativeUpdateState = writable<NativeUpdateState>({
-  web: initialChannel(), applying: false, canCancel: false, applyError: null,
+  web: initialChannel(), content: initialChannel(), applying: false, canCancel: false, applyError: null,
 })
 export const nativeUpdatePromptDismissed = writable(false)
-export function updateChannel(channel: 'web', update: Partial<UpdateChannelState>) {
+export function updateChannel(channel: 'web' | 'content', update: Partial<UpdateChannelState>) {
   nativeUpdateState.update(state => ({ ...state, [channel]: { ...state[channel], ...update } }))
 }
 export function updatePending() {
-  return get(nativeUpdateState).web.pending
+  const state = get(nativeUpdateState)
+  return state.web.pending || state.content.pending
 }
 export function updatesBusy(state: NativeUpdateState) {
-  return state.applying || ['checking', 'downloading'].includes(state.web.phase)
+  return state.applying || [state.web, state.content].some(channel => ['checking', 'downloading'].includes(channel.phase))
 }
 export function updateStatusText(state: NativeUpdateState) {
-  const { phase } = state.web
+  const channels = [state.web, state.content]
+  const any = (phase: UpdatePhase) => channels.some(channel => channel.phase === phase)
   if (state.applyError) return state.applyError
   if (state.applying) return 'Applying update...'
-  if (phase === 'downloading') return 'Downloading update...'
+  if (any('downloading')) return 'Downloading update...'
   if (updatesBusy(state)) return 'Checking for updates...'
-  if (state.web.pending) return 'Update ready. Apply now or it will install next time you open the app.'
-  if (phase === 'error') return 'Could not check for updates. Check your connection and try again.'
-  if (phase === 'unpublished') return 'No update has been published for this version yet.'
-  if (phase === 'disabled') return 'Updates are unavailable in this build.'
-  if (phase === 'current') return 'Up to date.'
+  if (channels.some(channel => channel.pending)) return 'Update ready. Apply now or it will install next time you open the app.'
+  if (any('error')) return 'Could not check for updates. Check your connection and try again.'
+  if (state.web.phase === 'unpublished') return 'No update has been published for this version yet.'
+  if (state.web.phase === 'disabled') return 'Updates are unavailable in this build.'
+  if (state.web.phase === 'current' && ['current', 'unpublished', 'disabled'].includes(state.content.phase)) return 'Up to date.'
   return 'Updates install automatically next time you open the app.'
 }

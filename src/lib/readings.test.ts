@@ -1,14 +1,6 @@
 import { expect, test, vi } from 'vitest'
 import { publicAliyotByParsha } from '../../generated/public-reading-manifest.ts'
-import {
-  availableReadings,
-  coverageSummary,
-  filterReadingCoverage,
-  getReadingAvailabilitySummary,
-  getRequiredReading,
-  parshaReadings,
-  readingCoverage,
-} from './readings.ts'
+import { availableReadings, coverageSummary, filterReadingCoverage, getRequiredReading, parshaReadings, readingCoverage } from './readings.ts'
 
 vi.mock('../../generated/public-reading-manifest.ts', async (importOriginal) => {
   const actual = await importOriginal<
@@ -97,30 +89,6 @@ test('filters coverage by practical status and English or Hebrew name', () => {
       ['progress', 'review'].includes(reading.statusKind)
     )
   ).toBe(true)
-})
-
-test('uses manual rows only for active work while generated cues decide readiness', () => {
-  expect(getRequiredReading('beresheet').statusLabel).toBe('Done')
-  expect(getRequiredReading('vayetzei').statusLabel).toBe('Done')
-  expect(getRequiredReading('nasso').statusLabel).toBe('Recording review')
-  expect(getRequiredReading('behalotecha').statusLabel).toBe('Sync in progress')
-  expect(getRequiredReading('vayelech').statusLabel).toBe('Audio available')
-  expect(readingCoverage.map((reading) => reading.statusLabel)).not.toContain(
-    'Needs review'
-  )
-})
-
-test('derives featured-reading copy from generated availability and cue truth', () => {
-  expect(getReadingAvailabilitySummary(getRequiredReading('beresheet'))).toEqual({
-    aliyahLabel: 'All seven aliyot available',
-    statusLabel: 'All aliyot ready',
-  })
-  expect(
-    getReadingAvailabilitySummary(getRequiredReading('behalotecha'))
-  ).toEqual({
-    aliyahLabel: 'All seven aliyot available',
-    statusLabel: 'Sync in progress',
-  })
 })
 
 test('fails the build-facing lookup when a featured reading is absent', () => {

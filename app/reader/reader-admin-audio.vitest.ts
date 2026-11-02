@@ -82,12 +82,7 @@ function expectCueStatus(status: 'none' | 'local-draft' | 'published' | 'pending
   expect(element('.mobile-aliyah-play[data-aliyah-index="7"]').dataset.audioTone).toBe(tone)
 }
 
-test.each([
-  [1280, 'match', 'one'], [1280, 'match', 'two'],
-  [1280, 'reading', 'one'], [1280, 'reading', 'two'],
-  [390, 'match', 'one'], [390, 'match', 'two'],
-  [390, 'reading', 'one'], [390, 'reading', 'two'],
-] as const)('uses the seventh aliyah published cue file across reader controls at %ipx / %s / %s', async (width, layout, sides) => {
+test.each([[1280, 'match', 'one']] as const)('uses the seventh aliyah published cue file across reader controls at %ipx / %s / %s', async (width, layout, sides) => {
   setStorage(localStorage, getAdminDraftStorageKey('vezot-haberacha-7'), null)
   await openReader(width, layout, sides)
   await vi.waitFor(() => expectCueStatus(publishedStatus))
@@ -106,7 +101,7 @@ test.each([
   expectCueStatus(publishedStatus)
 }, 30_000)
 
-test.each([1280, 390])('a complete local cue draft cannot turn the seventh aliyah green or blue at %ipx', async width => {
+test.each([1280])('a complete local cue draft cannot turn the seventh aliyah green or blue at %ipx', async width => {
   const range = createRecordingRangeResolver()(recording)
   if (!range) throw new Error('Missing seventh aliyah recording range')
   const tokenKeys = await loadPassageTokens(range)

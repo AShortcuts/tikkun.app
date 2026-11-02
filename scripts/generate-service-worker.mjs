@@ -30,6 +30,8 @@ const clientAppPath = path.join(
 
 const excludedPathPrefixes = [
   'audio/',
+  // Recordings and cues published for the installed apps; the website bundles its own.
+  'content/',
   'updates/',
   '.vite/',
   'prototypes/',

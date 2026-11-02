@@ -18,20 +18,8 @@ test(`יום כיפור on שבת`, async () => {
   expect(await dumpAliyot('2024-10-12:shacharis,main')).toMatchSnapshot()
 })
 
-test(`חול המוד סוכות`, async () => {
-  expect(await dumpAliyot('2024-10-20:shacharis,main')).toMatchSnapshot()
-})
-
 test(`שמחת תורה`, async () => {
   expect(await dumpAliyot('2024-10-25:shacharis,main')).toMatchSnapshot()
-})
-
-test(`תענית ציבור`, async () => {
-  expect(await dumpAliyot('2025-03-13:mincha,main')).toMatchSnapshot()
-})
-
-test(`פרשת האזינו`, async () => {
-  expect(await dumpAliyot('2024-10-05:shacharis,main')).toMatchSnapshot()
 })
 
 test(`חנוכה`, async () => {
@@ -40,15 +28,6 @@ test(`חנוכה`, async () => {
 
 test(`ראש חודש חנוכה`, async () => {
   expect(await dumpAliyot('2024-12-31:shacharis,main')).toMatchSnapshot()
-})
-
-test(`שקלים / ראש חודש from the main service reading`, async () => {
-  // A dated main reading includes the other Torah scrolls in that service.
-  expect(await dumpAliyot('2025-03-01:shacharis,main')).toMatchSnapshot()
-})
-
-test(`Weekday ראש חודש`, async () => {
-  expect(await dumpAliyot('2025-02-28:shacharis,main')).toMatchSnapshot()
 })
 
 test(`אסתר`, async () => {

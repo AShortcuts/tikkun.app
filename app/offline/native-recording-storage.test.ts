@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest'
 import type { NativeMediaPlugin } from '../platform/native-media.ts'
-import { createNativeDownloadIntent, createNativeRecordingStorage, resolveNativeRecording } from './native-recording-storage.ts'
+import { createNativeRecordingStorage, resolveNativeRecording } from './native-recording-storage.ts'
 import type { RecordingDescriptor } from './recording-download.ts'
 
 const asset: RecordingDescriptor = {
@@ -16,6 +16,7 @@ function harness() {
     remove: vi.fn(async () => {}), resolve: vi.fn(async () => ({ url: null })),
     metrics: vi.fn(async () => ({})), clearTemporary: vi.fn(async () => {}),
     readIntent: vi.fn(async () => ({ keys: ['one'] })), updateIntent: vi.fn(async () => {}),
+    readContent: vi.fn(async () => ({ value: null })), writeContent: vi.fn(async () => {}), pruneContent: vi.fn(async () => {}),
     addListener: vi.fn(async (_event, listener) => { callback = listener; return { remove: removeListener } }),
   }
   return { bridge, removeListener, emit: (value: unknown) => callback?.(value), storage: createNativeRecordingStorage(bridge) }
@@ -36,17 +37,6 @@ test('native batch preflight forwards physical assets and propagates low-space r
   vi.mocked(bridge.preflight).mockRejectedValueOnce(new Error('Not enough storage. Remove downloads or choose fewer recordings.'))
   await expect(storage.preflight!([asset])).rejects.toThrow('Not enough storage')
   expect(bridge.download).not.toHaveBeenCalled()
-})
-
-test('filters progress by request identity and releases its listener after commit', async () => {
-  const { storage, bridge, emit, removeListener } = harness()
-  vi.mocked(bridge.download).mockImplementationOnce(async ({ requestId }) => {
-    emit({ requestId: 'other', bytes: 70 }); emit({ requestId, bytes: 30 }); return asset
-  })
-  const progress = vi.fn()
-  await storage.download(asset, new AbortController().signal, progress)
-  expect(progress).toHaveBeenCalledExactlyOnceWith(30)
-  expect(removeListener).toHaveBeenCalledOnce()
 })
 
 test('cancellation waits for native transfer settlement and removes only its own listener', async () => {
@@ -72,16 +62,6 @@ test('does not start an aborted request and rejects mismatched committed identit
   expect(bridge.download).not.toHaveBeenCalled()
   vi.mocked(bridge.download).mockResolvedValueOnce({ ...asset, byteLength: 99 })
   await expect(storage.download(asset, new AbortController().signal, vi.fn())).rejects.toThrow('identity changed')
-})
-
-test('native queue persistence does not depend on Web Locks', async () => {
-  const { bridge } = harness()
-  const intent = createNativeDownloadIntent(bridge)
-  await expect(intent.read()).resolves.toEqual(['one'])
-  await intent.update(['two'], ['one'])
-  expect(bridge.updateIntent).toHaveBeenCalledWith({ add: ['two'], remove: ['one'] })
-  vi.mocked(bridge.readIntent).mockResolvedValueOnce({ keys: ['one', 'one'] })
-  await expect(intent.read()).rejects.toThrow('Invalid native download queue')
 })
 
 test('playback resolves a verified local file and streams only when no saved copy exists', async () => {

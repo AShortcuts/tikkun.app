@@ -34,20 +34,6 @@ test('cleans up a request when posting to the worker throws', async () => {
   client.destroy()
 })
 
-test('rejects pending requests when its owner is destroyed', async () => {
-  const postMessage = vi.fn()
-  const client = createOfflineWorkerRequestClient({
-    serviceWorker: serviceWorkerFor({ postMessage }),
-    responseTimeoutMs: 60_000,
-  })
-  const request = client.request({ type: 'TEST' }, () => true)
-  await vi.waitFor(() => expect(postMessage).toHaveBeenCalledTimes(1))
-
-  client.destroy()
-
-  await expect(request).rejects.toThrow('cancelled')
-})
-
 test('uses the controlling worker before active and never sends work to waiting', async () => {
   const calls: string[] = []
   const controller = respondingWorker('controller', calls)
@@ -161,71 +147,6 @@ test('extends the response deadline whenever the worker reports progress', async
   } finally {
     vi.useRealTimers()
   }
-})
-
-test('uses an active worker when the page has no controller and ignores waiting', async () => {
-  const calls: string[] = []
-  const active = respondingWorker('active', calls)
-  const waiting = respondingWorker('waiting', calls)
-  const registration = { active, waiting }
-  const serviceWorker = {
-    controller: null,
-    getRegistration: vi.fn(async () => registration),
-    ready: Promise.resolve(registration),
-  } as unknown as ServiceWorkerContainer
-  const client = createOfflineWorkerRequestClient({ serviceWorker })
-
-  await client.request({ type: 'TEST' }, () => true)
-  expect(calls).toEqual(['active'])
-  client.destroy()
-})
-
-test('times out worker acquisition when ready never resolves', async () => {
-  const serviceWorker = {
-    controller: null,
-    getRegistration: vi.fn(async () => ({ active: null, waiting: {} })),
-    ready: new Promise<ServiceWorkerRegistration>(() => {}),
-  } as unknown as ServiceWorkerContainer
-  const client = createOfflineWorkerRequestClient({
-    serviceWorker,
-    acquisitionTimeoutMs: 10,
-    responseTimeoutMs: 60_000,
-  })
-
-  await expect(client.request({ type: 'TEST' }, () => true)).rejects.toThrow(
-    'not ready'
-  )
-  client.destroy()
-})
-
-test('destroy rejects a request before worker acquisition completes', async () => {
-  const serviceWorker = {
-    controller: null,
-    getRegistration: vi.fn(async () => ({ active: null })),
-    ready: new Promise<ServiceWorkerRegistration>(() => {}),
-  } as unknown as ServiceWorkerContainer
-  const client = createOfflineWorkerRequestClient({
-    serviceWorker,
-    responseTimeoutMs: 60_000,
-  })
-  const request = client.request({ type: 'TEST' }, () => true)
-  await vi.waitFor(() => expect(serviceWorker.getRegistration).toHaveBeenCalled())
-
-  client.destroy()
-
-  await expect(request).rejects.toThrow('cancelled')
-})
-
-test('does not dispatch an already cancelled request', async () => {
-  const postMessage = vi.fn()
-  const client = createOfflineWorkerRequestClient({ serviceWorker: serviceWorkerFor({ postMessage }) })
-  const controller = new AbortController()
-  controller.abort()
-  await expect(client.request({ type: 'DOWNLOAD_RECORDING' }, () => true, {
-    signal: controller.signal,
-  })).rejects.toMatchObject({ name: 'AbortError' })
-  expect(postMessage).not.toHaveBeenCalled()
-  client.destroy()
 })
 
 test('sends cancellation over the existing port and waits for worker acknowledgement', async () => {

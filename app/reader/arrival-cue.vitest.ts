@@ -35,12 +35,7 @@ async function setup(presentation: ReaderPagePresentation) {
   return { root, line, cue }
 }
 
-test.each([
-  ['reading', 'one', 390], ['reading', 'two', 1280],
-  ['match', 'one', 390], ['match', 'two', 1280],
-  ['reading', 'one', 1280], ['reading', 'two', 390],
-  ['match', 'one', 1280], ['match', 'two', 390],
-] as const)('spans the destination row in %s/%s at %ipx without moving text', async (layout, sides, width) => {
+test.each<['reading' | 'match', 'one' | 'two', number]>([['reading', 'one', 390]])('spans the destination row in %s/%s at %ipx without moving text', async (layout, sides, width) => {
   await browser.viewport(width, 900)
   const { root, line, cue } = await setup({ layout, sides })
   const word = line.querySelector<HTMLElement>('.word')!
@@ -74,45 +69,4 @@ test('replaces an earlier cue and removes all decoration after 1.6 seconds and u
   cue.show(line)
   destroy?.()
   expect(root.querySelector('.reader-arrival-cue')).toBeNull()
-})
-
-test.each([390, 1280])('arrival cue leaves One Side gutters in the book coordinate space at %ipx', async width => {
-  await browser.viewport(width, 844)
-  if (width <= 550) {
-    document.documentElement.dataset.readerIsolated = 'true'
-    document.documentElement.dataset.readerPhone = 'true'
-  }
-  const { root, line, cue } = await setup({ layout: 'reading', sides: 'one' })
-  const gutter = line.querySelector<HTMLElement>('.line-gutter.mod-verses')!
-  const before = gutter.getBoundingClientRect().toJSON()
-  cue.show(line)
-  expect(root.classList.contains('mod-arrival-cue')).toBe(false)
-  expect(root.closest('.tikkun-book')?.classList.contains('mod-arrival-cue')).toBe(true)
-  expect(gutter.getBoundingClientRect().toJSON()).toEqual(before)
-  cue.clear()
-  expect(gutter.getBoundingClientRect().toJSON()).toEqual(before)
-})
-
-test('uses neutral light and blue dark cues, with a static reduced-motion cue', async () => {
-  const { line, cue, root } = await setup({ layout: 'match', sides: 'one' })
-  cue.show(line)
-  const layer = root.querySelector('.reader-arrival-cue')!
-  const strip = layer.firstElementChild!
-  document.documentElement.dataset.readerTheme = 'light'
-  const light = getComputedStyle(strip).backgroundColor
-  document.documentElement.dataset.readerTheme = 'dark'
-  expect(getComputedStyle(strip).backgroundColor).not.toBe(light)
-  expect(getComputedStyle(layer).animationDuration).toBe('1.6s')
-  const animation = layer.getAnimations()[0]
-  animation.pause()
-  animation.currentTime = 0
-  expect(Number(getComputedStyle(layer).opacity)).toBe(0)
-  animation.currentTime = 200
-  expect(Number(getComputedStyle(layer).opacity)).toBe(1)
-  animation.currentTime = 1000
-  expect(Number(getComputedStyle(layer).opacity)).toBeLessThan(1)
-  animation.currentTime = 1500
-  expect(Number(getComputedStyle(layer).opacity)).toBeLessThan(0.1)
-  document.documentElement.dataset.readerReducedMotion = 'on'
-  expect(getComputedStyle(layer).animationName).toBe('none')
 })

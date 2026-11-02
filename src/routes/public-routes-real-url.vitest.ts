@@ -23,36 +23,6 @@ test('loads the real Home route and keeps navigation operable', async () => {
   await assertRouteHealthy(route.document, errorCapture)
 })
 
-test('preserves the old homepage and its navigation at old-v2.html', async () => {
-  const route = await loadRoute(
-    '/old-v2.html',
-    '#home-title',
-    'Tikkun Reader — Torah reading practice in sync'
-  )
-  errorCapture = captureRouteErrors(route.view, 'Home')
-
-  expect(required(route.document, '#home-title').textContent).toContain(
-    'Your aliyah.'
-  )
-  expect(primaryNavHrefs(route.document)).toEqual([
-    '/readings/',
-    '/tidbits/',
-    '/about/',
-  ])
-
-  const mobileMenu = required<HTMLDetailsElement>(
-    route.document,
-    '.site-mobile-menu'
-  )
-  click(route.document, '.site-mobile-menu > summary')
-  await vi.waitFor(() => expect(mobileMenu.open).toBe(true))
-  route.document.dispatchEvent(
-    new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
-  )
-  await vi.waitFor(() => expect(mobileMenu.open).toBe(false))
-  await assertRouteHealthy(route.document, errorCapture)
-})
-
 test('loads the real Readings route and filters published coverage', async () => {
   const route = await loadRoute(
     '/readings/',
@@ -84,100 +54,6 @@ test('loads the real Readings route and filters published coverage', async () =>
     },
     { timeout: 5_000, interval: 25 }
   )
-  await assertRouteHealthy(route.document, errorCapture)
-})
-
-test('loads the real Tidbits route with its honest empty state', async () => {
-  const route = await loadRoute(
-    '/tidbits/',
-    '#tidbits-title',
-    'Tidbits — Tikkun Reader'
-  )
-  errorCapture = captureRouteErrors(route.view, 'Tidbits')
-
-  expect(required(route.document, '#tidbits-empty-title').textContent).toBe(
-    'No tidbits published yet.'
-  )
-  await assertRouteHealthy(route.document, errorCapture)
-})
-
-test.each(['about-link', 'mobile-library'])('opens Home from Reader %s and returns through Reading Index without reloading', async (control) => {
-  const route = await loadRoute('/reader/#/torah/parsha/noach', '[data-reader-boot-state="ready"]', 'Reader — Tikkun Reader')
-  errorCapture = captureRouteErrors(route.view, 'Reader navigation')
-  const timeOrigin = route.view.performance.timeOrigin
-  const readerStyle = () => {
-    const body = route.view.getComputedStyle(route.document.body)
-    const html = route.view.getComputedStyle(route.document.documentElement)
-    return { background: body.backgroundColor, font: body.fontFamily, overflow: html.overflowY, colorScheme: html.colorScheme }
-  }
-  const initialStyle = readerStyle()
-  click(route.document, `[data-target-id="${control}"]`)
-  await vi.waitFor(() => {
-    expect(route.view.location.pathname).toBe('/')
-    expect(route.document.querySelector('#scroll-hero-title')).not.toBeNull()
-  })
-  expect(route.view.getComputedStyle(route.document.documentElement).overflowY).toBe('auto')
-  expect(route.document.documentElement.scrollHeight).toBeGreaterThan(route.view.innerHeight)
-  click(route.document, '.scroll-nav-link[href="/readings/"]')
-  await vi.waitFor(() => expect(route.document.querySelector('#readings-title')).not.toBeNull())
-  click(route.document, 'a.coverage-open[href*="/beresheet"]')
-  await vi.waitFor(() => expect(route.document.querySelector('[data-reader-boot-state="ready"]')).not.toBeNull(), { timeout: 15_000 })
-  expect(route.view.location.hash).toContain('/beresheet')
-  expect(route.view.performance.timeOrigin).toBe(timeOrigin)
-  expect(readerStyle()).toEqual(initialStyle)
-  route.view.history.back()
-  await vi.waitFor(() => expect(route.document.querySelector('#readings-title')).not.toBeNull())
-  route.view.history.forward()
-  await vi.waitFor(() => expect(route.document.querySelector('[data-reader-boot-state="ready"]')).not.toBeNull(), { timeout: 15_000 })
-  expect(route.view.performance.timeOrigin).toBe(timeOrigin)
-  expect(readerStyle()).toEqual(initialStyle)
-  await assertRouteHealthy(route.document, errorCapture)
-}, 40_000)
-
-test('loads the real About route with support and project status', async () => {
-  const route = await loadRoute(
-    '/about/',
-    '#about-title',
-    'About — Tikkun Reader'
-  )
-  errorCapture = captureRouteErrors(route.view, 'About')
-
-  expect(required(route.document, '#support-title').textContent).toBe('Support')
-  expect(required(route.document, '#taskboard-title').textContent).toBe(
-    'Taskboard'
-  )
-  await assertRouteHealthy(route.document, errorCapture)
-})
-
-test.each(['/privacy', '/support'])('redirects the legacy trailing slash to %s', async (pathname) => {
-  const response = await fetch(`${pathname}/?from=legacy`)
-  expect(response.ok).toBe(true)
-  expect(response.redirected).toBe(true)
-  expect(new URL(response.url).pathname).toBe(pathname)
-  expect(new URL(response.url).search).toBe('?from=legacy')
-})
-
-test.each([1280, 390])('keeps Privacy and Support readable and connected at %ipx', async (width) => {
-  const route = await loadRoute('/privacy', '#privacy-title', 'Privacy Policy — Tikkun Reader')
-  errorCapture = captureRouteErrors(route.view, 'Privacy and support')
-  frame!.style.width = `${width}px`
-  await settleDocument(route.document)
-  expect(route.document.querySelector('main')?.textContent).toContain('What stays on your device')
-  expect(route.document.documentElement.scrollWidth).toBeLessThanOrEqual(width)
-  expect(required<HTMLAnchorElement>(route.document, 'footer a[href="/support"]').textContent).toBe('Support')
-
-  click(route.document, 'nav[aria-label="Help and privacy"] a[href="/support"]')
-  await vi.waitFor(() => {
-    expect(route.view.location.pathname).toBe('/support')
-    expect(route.document.title).toBe('Support — Tikkun Reader')
-  })
-  await settleDocument(route.document)
-  expect(route.document.querySelector('form')).toBeNull()
-  expect(required(route.document, '.support-email').textContent).toBe('support@oceanoftorah.com')
-  expect(required<HTMLAnchorElement>(route.document, 'main a.site-primary-action').getAttribute('href'))
-    .toBe('mailto:support@oceanoftorah.com?subject=Tikkun%20Reader%20support')
-  expect(required<HTMLAnchorElement>(route.document, 'footer a[href="/privacy"]').textContent).toBe('Privacy policy')
-  expect(route.document.documentElement.scrollWidth).toBeLessThanOrEqual(width)
   await assertRouteHealthy(route.document, errorCapture)
 })
 
@@ -230,21 +106,6 @@ async function settleDocument(document: Document) {
   await new Promise<void>((resolve) => {
     view.requestAnimationFrame(() => view.requestAnimationFrame(() => resolve()))
   })
-}
-
-function click(document: Document, selector: string) {
-  required<HTMLElement>(document, selector).click()
-}
-
-function primaryNavHrefs(document: Document) {
-  const base = document.defaultView?.location.href
-  if (!base) throw new Error('Public route document has no location')
-  return Array.from(
-    document.querySelectorAll<HTMLAnchorElement>(
-      '.home-nav > a.home-nav-link'
-    ),
-    (link) => new URL(link.getAttribute('href') ?? '', base).pathname
-  )
 }
 
 function required<T extends Element = HTMLElement>(

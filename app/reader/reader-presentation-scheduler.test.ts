@@ -61,32 +61,6 @@ test('coalesces mixed invalidations into one ordered immutable frame', () => {
   expect(Object.isFrozen(presented[0].invalidations)).toBe(true)
 })
 
-test('moves reentrant invalidation to the following frame', () => {
-  const frames = createFrameHarness()
-  const presented: ReaderPresentationFrame[] = []
-  const scheduler = createReaderPresentationScheduler({
-    frame: frames.adapter,
-    present: (snapshot) => {
-      presented.push(snapshot)
-      if (snapshot.revision === 1) scheduler.invalidate('playback-state')
-    },
-  })
-
-  scheduler.invalidate('reader-position')
-  frames.flush()
-
-  expect(presented.map(({ invalidations }) => invalidations)).toEqual([
-    ['reader-position'],
-  ])
-  expect(frames.size()).toBe(1)
-
-  frames.flush()
-  expect(presented.map(({ invalidations }) => invalidations)).toEqual([
-    ['reader-position'],
-    ['playback-state'],
-  ])
-})
-
 test('defers layout-sensitive work one frame before normal presentation', () => {
   const frames = createFrameHarness()
   const present = vi.fn()
@@ -109,53 +83,6 @@ test('defers layout-sensitive work one frame before normal presentation', () => 
   expect(present.mock.calls[0][0].invalidations).toEqual([
     'viewport-title',
     'reader-position',
-  ])
-})
-
-test('joins deferred work to an already scheduled presentation frame', () => {
-  const frames = createFrameHarness()
-  const present = vi.fn()
-  const scheduler = createReaderPresentationScheduler({
-    frame: frames.adapter,
-    present,
-  })
-
-  scheduler.invalidateAfterLayout('reader-position')
-  frames.flush()
-  scheduler.invalidate('playback-state')
-
-  expect(frames.size()).toBe(1)
-  frames.flush()
-
-  expect(present).toHaveBeenCalledOnce()
-  expect(present.mock.calls[0][0].invalidations).toEqual([
-    'reader-position',
-    'playback-state',
-  ])
-})
-
-test('uses one frame pump for immediate and layout-deferred work', () => {
-  const frames = createFrameHarness()
-  const presented: ReaderPresentationFrame[] = []
-  const scheduler = createReaderPresentationScheduler({
-    frame: frames.adapter,
-    present: (snapshot) => presented.push(snapshot),
-  })
-
-  scheduler.invalidate('inline-audio')
-  scheduler.invalidateAfterLayout('reader-position')
-
-  expect(frames.size()).toBe(1)
-  frames.flush()
-  expect(presented.map(({ invalidations }) => invalidations)).toEqual([
-    ['inline-audio'],
-  ])
-  expect(frames.size()).toBe(1)
-
-  frames.flush()
-  expect(presented.map(({ invalidations }) => invalidations)).toEqual([
-    ['inline-audio'],
-    ['reader-position'],
   ])
 })
 

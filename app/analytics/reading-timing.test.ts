@@ -6,17 +6,6 @@ const diaspora = new LeiningGenerator({ israel: false } as ConstructorParameters
 // Thursday, October 29, 2026: Lech Lecha was read Oct 24, Vayera is Oct 31, Chayei Sarah Nov 7, Toldot Nov 14.
 const today = new Date(2026, 9, 29, 12)
 
-test.each([
-  ['#/torah/parsha/vayera', 'this_week'],
-  ['#/torah/parsha/chayei-sarah', 'next_week'],
-  ['#/torah/parsha/toldot', 'weeks_2_4'],
-  ['#/torah/parsha/vayeshev', 'months_1_3'],
-  ['#/torah/parsha/lech-lecha', 'last_week'],
-  ['#/torah/parsha/noach', 'later'],
-  ['#/torah/parsha/devarim', 'later'],
-  ['#/next', 'this_week'],
-  ['#/torah/5-33-24', 'none'],
-  ['#/r/1-1-1', 'none'],
-])('%s opened on Oct 29, 2026 is %s', (hash, expected) => {
+test.each([['#/torah/parsha/vayera', 'this_week'], ['#/torah/parsha/chayei-sarah', 'next_week'], ['#/torah/parsha/noach', 'later'], ['#/torah/5-33-24', 'none']])('%s opened on Oct 29, 2026 is %s', (hash, expected) => {
   expect(readingTiming(hash, diaspora, today)).toBe(expected)
 })

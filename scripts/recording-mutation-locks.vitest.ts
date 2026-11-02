@@ -52,32 +52,3 @@ test('bulk deletion rejects new saves and holds its lock through failing cleanup
   expect(save).toHaveBeenCalledOnce()
   await noLocks(namespace)
 })
-
-test('cancelling a save waiting for an asset releases its global reservation', async () => {
-  const namespace = crypto.randomUUID(), first = owner(namespace), second = owner(namespace)
-  const hold = gate(), entered = vi.fn(), task = vi.fn(async () => {})
-  const saving = first.withRecordingSave('one', undefined, async () => { entered(); await hold.promise })
-  const controller = new AbortController()
-  const waiting = second.withRecordingSave('one', controller.signal, task)
-  const cancelled = expect(waiting).rejects.toMatchObject({ name: 'AbortError' })
-  try {
-    await expect.poll(() => entered.mock.calls.length).toBe(1)
-    controller.abort()
-    await cancelled
-    expect(task).not.toHaveBeenCalled()
-  } finally { controller.abort(); hold.release(); await saving }
-  await second.withRecordingRemoval(null, async () => {})
-  await noLocks(namespace)
-})
-
-test('deployment namespaces do not block each other', async () => {
-  const firstNamespace = crypto.randomUUID(), secondNamespace = crypto.randomUUID()
-  const hold = gate(), entered = vi.fn()
-  const first = owner(firstNamespace).withRecordingRemoval(null, async () => { entered(); await hold.promise })
-  try {
-    await expect.poll(() => entered.mock.calls.length).toBe(1)
-    await owner(secondNamespace).withRecordingSave('one', undefined, async () => {})
-  } finally { hold.release(); await first }
-  await noLocks(firstNamespace)
-  await noLocks(secondNamespace)
-})

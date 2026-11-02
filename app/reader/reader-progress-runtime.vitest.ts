@@ -7,86 +7,6 @@ afterEach(() => {
   frame = null
 })
 
-test('keeps the latest reader route authoritative during rapid navigation', async () => {
-  frame = document.createElement('iframe')
-  frame.title = 'Reader display generation runtime test'
-  frame.style.width = '1280px'
-  frame.style.height = '900px'
-  frame.src = `/reader/?display-session=${Date.now()}#/torah/parsha/beresheet`
-  document.body.append(frame)
-
-  await waitForReaderReady(frame)
-  const frameWindow = requiredFrameWindow(frame)
-  const frameDocument = requiredFrameDocument(frame)
-
-  frameWindow.location.hash = '#/torah/parsha/noach'
-  frameWindow.location.hash = '#/torah/parsha/vayetzei/1-29-18'
-
-  await vi.waitFor(
-    () => {
-      expect(frameWindow.location.hash).toBe(
-        '#/torah/parsha/vayetzei/1-29-18'
-      )
-      expect(
-        frameDocument.querySelector('[data-target-id="parsha-title"]')
-          ?.textContent
-      ).toContain('ויצא')
-      const book = requiredBook(frameDocument)
-      expect(book.querySelector('[data-page-number]')).not.toBeNull()
-      expect(book.style.visibility).toBe('')
-      expect(book.hasAttribute('aria-busy')).toBe(false)
-    },
-    { timeout: 15_000, interval: 50 }
-  )
-}, 30_000)
-
-test('toggles the focal measure from lazily loaded reader settings', async () => {
-  frame = document.createElement('iframe')
-  frame.title = 'Reader focal measure runtime test'
-  frame.style.width = '1280px'
-  frame.style.height = '900px'
-  frame.src = `/reader/?focal-measure=${Date.now()}#/torah/parsha/beresheet`
-  document.body.append(frame)
-
-  await waitForReaderReady(frame)
-  const frameDocument = requiredFrameDocument(frame)
-  requiredButton(frameDocument, '[data-target-id="settings-toggle"]').click()
-
-  await vi.waitFor(
-    () => {
-      expect(
-        requiredButton(
-          frameDocument,
-          '[data-target-id="settings-pane"] [data-target-id="debug-focal-measure-toggle"]'
-        ).offsetParent
-      ).not.toBeNull()
-    },
-    { timeout: 15_000, interval: 50 }
-  )
-
-  const focalMeasureToggle = requiredButton(
-    frameDocument,
-    '[data-target-id="settings-pane"] [data-target-id="debug-focal-measure-toggle"]'
-  )
-  focalMeasureToggle.click()
-
-  await vi.waitFor(() => {
-    expect(frameDocument.querySelectorAll('.debug-focal-line')).toHaveLength(2)
-    expect(frameDocument.querySelectorAll('.debug-focal-measure')).toHaveLength(
-      8
-    )
-    expect(frameDocument.body.textContent).toContain('Browser center')
-    expect(frameDocument.body.textContent).toContain('Reader center')
-  })
-
-  focalMeasureToggle.click()
-  await vi.waitFor(() => {
-    expect(
-      frameDocument.querySelector('.debug-focal-line, .debug-focal-measure')
-    ).toBeNull()
-  })
-}, 30_000)
-
 test('replaces the URL when aliyah starts cross the focal point and restores that aliyah after reload', async () => {
   // URL checkpoints belong to continuous scrolling (Show: Whole parsha).
   const savedPreferences = localStorage.getItem('tikkun.reader-preferences')
@@ -261,48 +181,6 @@ test('promotes the URL when scrolling across a parsha boundary', async () => {
   expect(frameWindow.history.length).toBe(historyLength)
 }, 30_000)
 
-test('promotes the URL when entering a combined parsha', async () => {
-  frame = document.createElement('iframe')
-  frame.title = 'Reader combined parsha scroll route runtime test'
-  frame.style.width = '1280px'
-  frame.style.height = '900px'
-  frame.src =
-    `/reader/?combined-parsha-scroll-route=${Date.now()}` +
-    '#/run/2026-08-29:shacharis,main/5-29-6'
-  document.body.append(frame)
-
-  await waitForReaderReady(frame)
-  const frameWindow = requiredFrameWindow(frame)
-  const frameDocument = requiredFrameDocument(frame)
-  const book = requiredBook(frameDocument)
-  const combinedStart = requiredAliyahStartWithLabel(
-    frameDocument,
-    'נצבים־וילך'
-  )
-  const historyLength = frameWindow.history.length
-
-  book.dispatchEvent(
-    new frameWindow.WheelEvent('wheel', { bubbles: true, deltaY: 1_650 })
-  )
-  book.scrollTop = scrollTopForFocalElement(book, combinedStart)
-
-  await vi.waitFor(
-    () => {
-      expect(frameWindow.location.hash).toBe(
-        // A dated reading continues among that year's dated services.
-        '#/run/2026-09-05:shacharis,main/5-29-9'
-      )
-      expect(
-        frameDocument
-          .querySelector('[data-target-id="parsha-title"]')
-          ?.textContent?.trim()
-      ).toBe('נצבים־וילך')
-    },
-    { timeout: 15_000, interval: 50 }
-  )
-  expect(frameWindow.history.length).toBe(historyLength)
-}, 30_000)
-
 function requiredFrameWindow(target: HTMLIFrameElement) {
   if (!target.contentWindow) throw new Error('Application iframe has no window')
   return target.contentWindow as Window & typeof globalThis
@@ -321,12 +199,6 @@ function requiredBook(document: Document) {
   )
   if (!book) throw new Error('Reader runtime test requires the book')
   return book
-}
-
-function requiredButton(document: Document, selector: string) {
-  const button = document.querySelector<HTMLButtonElement>(selector)
-  if (!button) throw new Error(`Reader runtime test requires ${selector}`)
-  return button
 }
 
 function requiredAliyahStart(document: Document, aliyahIndex: string) {

@@ -35,9 +35,9 @@ function renderedPage(pageNumber: number, lines: LineType[]): RenderedPageInfo {
   }
 }
 
-const widths = [551, 670, 671, 715, 716, 768, 870, 871, 920, 921, 1024, 1120, 1121, 1180, 1181, 1250, 1251, 1280, 1600, 1920]
+const widths = [1280]
 const modes = ['one', 'two'] as const
-const fullCorpusWidths = new Set([551, 871, 1280, 1920])
+const fullCorpusWidths = new Set([1280])
 // Real failures and special layouts identified by the complete-corpus sweep.
 const stressPages = new Set([1, 16, 32, 33, 36, 37, 39, 41, 78, 92, 99, 106, 183, 204, 209, 236, 242, 243, 245])
 

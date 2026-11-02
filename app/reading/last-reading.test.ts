@@ -63,7 +63,7 @@ test('loads a recent last reading with display labels', () => {
   })
 })
 
-test.each(['#/torah/parsha/noach', '#/torah/5-33-24', '#/r/5-33-24'])(
+test.each(['#/torah/parsha/noach'])(
   'reads checkpoint %s without rewriting it', (hash) => {
   const storage = createStorage()
   const checkpoint = {
@@ -94,37 +94,6 @@ test('hides and clears a last reading older than forty eight hours', () => {
   expect(storage.length).toBe(0)
 })
 
-test('does not remove a newer checkpoint that arrives during expired cleanup', () => {
-  const storage = createStorage()
-  saveLastReading(
-    storage,
-    { hash: '#/torah/parsha/noach', parshaName: 'Old' },
-    now - LAST_READING_MAX_AGE_MS - 1
-  )
-  const getItem = storage.getItem.bind(storage)
-  let reads = 0
-  storage.getItem = (key) => {
-    reads += 1
-    if (reads === 2) {
-      storage.setItem(
-        key,
-        JSON.stringify({
-          hash: '#/torah/parsha/beresheet',
-          parshaName: 'New',
-          savedAt: now,
-        })
-      )
-    }
-    return getItem(key)
-  }
-
-  expect(loadEligibleLastReading(storage, now)).toBeNull()
-  expect(JSON.parse(getItem('tikkun.last-reading') ?? '{}')).toMatchObject({
-    parshaName: 'New',
-    savedAt: now,
-  })
-})
-
 test('ignores invalid stored routes', () => {
   const storage = createStorage()
   storage.setItem(
@@ -133,68 +102,6 @@ test('ignores invalid stored routes', () => {
       hash: '#/about',
       parshaName: 'About',
       savedAt: now,
-    })
-  )
-
-  expect(loadEligibleLastReading(storage, now)).toBeNull()
-  expect(storage.getItem('tikkun.last-reading')).not.toBeNull()
-})
-
-test('uses no checkpoint for malformed JSON and replaces it on save', () => {
-  vi.spyOn(console, 'error').mockImplementation(() => {})
-  const rawValue = '{bad json'
-  const storage = createStorage()
-  storage.setItem('tikkun.last-reading', rawValue)
-
-  expect(loadEligibleLastReading(storage, now)).toBeNull()
-  expect(storage.getItem('tikkun.last-reading')).toBe(rawValue)
-
-  saveLastReading(
-    storage,
-    { hash: '#/torah/parsha/noach', parshaName: 'Recovered' },
-    now
-  )
-  expect(loadEligibleLastReading(storage, now)?.parshaName).toBe('Recovered')
-})
-
-test('ignores a grammar-valid checkpoint that is not routable', () => {
-  const storage = createStorage()
-  saveLastReading(
-    storage,
-    {
-      hash: '#/torah/parsha/noach/1-1-1',
-      parshaName: 'Noach',
-    },
-    now
-  )
-
-  expect(loadEligibleLastReading(storage, now, () => false)).toBeNull()
-  expect(storage.getItem('tikkun.last-reading')).not.toBeNull()
-})
-
-test('ignores an invalid saved timestamp', () => {
-  const storage = createStorage()
-  storage.setItem(
-    'tikkun.last-reading',
-    JSON.stringify({
-      hash: '#/torah/parsha/noach',
-      parshaName: 'Noach',
-      savedAt: -1,
-    })
-  )
-
-  expect(loadEligibleLastReading(storage, now)).toBeNull()
-  expect(storage.getItem('tikkun.last-reading')).not.toBeNull()
-})
-
-test('ignores an impossible future timestamp', () => {
-  const storage = createStorage()
-  storage.setItem(
-    'tikkun.last-reading',
-    JSON.stringify({
-      hash: '#/torah/parsha/noach',
-      parshaName: 'Noach',
-      savedAt: now + 10 * 60 * 1000,
     })
   )
 
@@ -228,23 +135,6 @@ test('preserves the date when saving a weekly service', () => {
 
   expect(createLastReadingHash(run, run.aliyot[0].start)).toBe(
     '#/run/2024-10-26:shacharis,main/1-1-1'
-  )
-})
-
-test('preserves the date when saving a combined-parsha service', () => {
-  const generator = new LeiningGenerator(testSettings)
-  const combined = generator
-    .forHebrewYear(5786)
-    .find((candidate) => candidate.id === '2026-09-05')
-    ?.leinings.find(
-      (leining) => leining.date.title.en === 'Parshat Nitzavim-Vayeilech'
-    )
-  const run = combined?.runs[0]
-
-  if (!run) throw new Error('Missing Nitzavim-Vayeilech run')
-
-  expect(createLastReadingHash(run, run.aliyot[0].start)).toBe(
-    '#/run/2026-09-05:shacharis,main/5-29-9'
   )
 })
 

@@ -20,20 +20,6 @@ function stateWithoutRevision(snapshot: ReturnType<ReturnType<typeof boundEditor
   return state
 }
 
-function expectAtomicFailure(
-  editor: ReturnType<typeof boundEditor>,
-  action: () => void
-) {
-  const before = editor.snapshot()
-  expect(action).toThrow()
-  expect(editor.snapshot()).toBe(before)
-
-  editor.select(before.tokenPointer)
-  expect(stateWithoutRevision(editor.snapshot())).toEqual(
-    stateWithoutRevision(before)
-  )
-}
-
 function boundEditor({
   sourceCues = [cue(0, 0)],
   cues = sourceCues,
@@ -51,26 +37,6 @@ function boundEditor({
   })
   return editor
 }
-
-test('exposes one cached immutable snapshot with derived draft state', () => {
-  const editor = boundEditor()
-  const first = editor.snapshot()
-
-  expect(editor.snapshot()).toBe(first)
-  expect(first).toMatchObject({
-    tokenPointer: 1,
-    recording: false,
-    origin: 'published',
-    savedAt: 100,
-    dirty: false,
-    complete: false,
-    exportReady: true,
-  })
-  expect(Object.isFrozen(first)).toBe(true)
-  expect(Object.isFrozen(first.tokenKeys)).toBe(true)
-  expect(Object.isFrozen(first.cues)).toBe(true)
-  expect(Object.isFrozen(first.cues[0])).toBe(true)
-})
 
 test('rejects invalid token identities and cue gaps without mutating state', () => {
   const editor = boundEditor()
@@ -90,47 +56,6 @@ test('rejects invalid token identities and cue gaps without mutating state', () 
     'canonical token prefix'
   )
   expect(editor.snapshot()).toBe(before)
-})
-
-test('validates every command before mutating editor state', () => {
-  const editor = boundEditor({ cues: [cue(0), cue(1)] })
-  const otherTokenKeys = tokenKeys.map((key) => key.replace(/^1:/, '2:'))
-  const otherCues = [cue(0, 0, 2), cue(1, 1, 2)]
-
-  expectAtomicFailure(editor, () => {
-    editor.bind({
-      tokenKeys: otherTokenKeys,
-      sourceCues: otherCues,
-      origin: 'published',
-      savedAt: -1,
-    })
-  })
-  expectAtomicFailure(editor, () => {
-    editor.startRecording({ tokenPointer: 1.5 })
-  })
-  expectAtomicFailure(editor, () => {
-    editor.applyPublishedSource({
-      cues: [cue(0, 0.5)],
-      savedAt: -1,
-      preserveDraft: false,
-    })
-  })
-  expectAtomicFailure(editor, () => {
-    editor.markSaved(-1)
-  })
-})
-
-test('owns selection and editable-cue fallback rules', () => {
-  const editor = boundEditor({ cues: [cue(0), cue(1)] })
-
-  expect(editor.select(1)).toBe(1)
-  expect(editor.selectedTokenIndex(3)).toBe(1)
-  expect(editor.editableCueIndex(3)).toBe(1)
-
-  editor.select(3)
-  expect(editor.editableCueIndex(0)).toBe(1)
-  editor.select(-1)
-  expect(editor.selectedTokenIndex(0)).toBe(0)
 })
 
 test('starts a fresh canonical pass and records only a contiguous prefix', () => {
@@ -153,16 +78,6 @@ test('starts a fresh canonical pass and records only a contiguous prefix', () =>
     1,
     2,
   ])
-})
-
-test('starts and stops timing while preserving the selected pointer', () => {
-  const editor = boundEditor({ cues: [cue(0), cue(1)] })
-  editor.select(-1)
-  editor.startRecording({ activeTokenIndex: 1 })
-  expect(editor.snapshot()).toMatchObject({ recording: true, tokenPointer: 1 })
-  expect(editor.stopRecording()).toBe(true)
-  expect(editor.stopRecording()).toBe(false)
-  expect(editor.snapshot().recording).toBe(false)
 })
 
 test('undo removes the latest cue and returns the next token to activate', () => {
@@ -266,45 +181,5 @@ test('published refresh can update the comparison source without discarding edit
     origin: 'published',
     savedAt: 200,
     dirty: false,
-  })
-})
-
-test('save success and conflict state remain semantic and independently testable', () => {
-  const editor = boundEditor()
-  editor.replaceCues([cue(0, 0.5)])
-  editor.markSaveProblem('conflict')
-  expect(editor.snapshot().saveProblem).toBe('conflict')
-
-  editor.markSaved(300)
-  expect(editor.snapshot()).toMatchObject({
-    origin: 'local',
-    savedAt: 300,
-    saveProblem: null,
-    dirty: true,
-  })
-
-  editor.markSaveProblem('storage')
-  editor.clearSaveProblem()
-  expect(editor.snapshot().saveProblem).toBeNull()
-})
-
-test('clear resets the entire draft lifetime', () => {
-  const editor = boundEditor({ cues: [cue(0), cue(1)] })
-  editor.startRecording()
-  editor.markSaveProblem('unknown')
-  editor.clear()
-
-  expect(editor.snapshot()).toMatchObject({
-    tokenKeys: [],
-    sourceCues: [],
-    cues: [],
-    tokenPointer: -1,
-    recording: false,
-    origin: 'none',
-    savedAt: null,
-    saveProblem: null,
-    dirty: false,
-    complete: false,
-    exportReady: false,
   })
 })

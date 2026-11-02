@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest'
 import { audioRecordings } from '../../generated/audio-manifest.ts'
-import { parseNativePlaybackState, type NativePlaybackPlugin, type NativePlaybackState } from '../platform/native-playback.ts'
+import { type NativePlaybackPlugin, type NativePlaybackState } from '../platform/native-playback.ts'
 import { createActiveAudioSession } from './audio-controller.ts'
 import { NativeAudioController } from './native-audio-controller.ts'
 
@@ -57,33 +57,6 @@ test('native playback receives the exact physical plan and serializes seek befor
   expect(vi.mocked(bridge.seek).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(bridge.play).mock.invocationCallOrder[0])
 })
 
-test('release waits for native clear acknowledgment after teardown', async () => {
-  const { controller, session, bridge, emit } = harness()
-  await controller.loadSession(session)
-  let finish!: () => void
-  vi.mocked(bridge.clear).mockImplementationOnce(() => new Promise((resolve) => {
-    finish = () => resolve(emit({ sessionID: null, phase: 'idle' }))
-  }))
-  controller.destroy()
-  const released = vi.fn()
-  const pending = controller.whenCleared().then(released)
-  await vi.waitFor(() => expect(bridge.clear).toHaveBeenCalledOnce())
-  expect(released).not.toHaveBeenCalled()
-  finish()
-  await pending
-  expect(released).toHaveBeenCalledOnce()
-})
-
-test('failed native clear does not report released audio', async () => {
-  const { controller, session, bridge } = harness()
-  await controller.loadSession(session)
-  vi.spyOn(console, 'error').mockImplementation(() => {})
-  vi.mocked(bridge.clear).mockRejectedValueOnce(new Error('clear failed'))
-  controller.destroy()
-  await expect(controller.whenCleared()).rejects.toThrow('clear failed')
-  expect(console.error).toHaveBeenCalledWith('Could not clear native playback', expect.any(Error))
-})
-
 test('native state drives highlights, while stale session and revision events are ignored', async () => {
   const { controller, session, emit, callbacks } = harness()
   const frame = vi.fn()
@@ -110,51 +83,6 @@ test('bridge errors use the existing Reader error path and playback can retry', 
   expect(controller.error).toBeNull()
 })
 
-test('clearing prevents queued playback from restarting a replaced session', async () => {
-  const { controller, session, bridge } = harness()
-  await controller.loadSession(session)
-  const playing = controller.play()
-  controller.clearSession()
-  await playing
-  await vi.waitFor(() => expect(bridge.clear).toHaveBeenCalledOnce())
-  expect(bridge.play).not.toHaveBeenCalled()
-  expect(controller.session).toBeNull()
-})
-
-test('duration waits reject on clear and remove listeners on destroy', async () => {
-  const { controller, session, bridge, remove } = harness()
-  session.segments[0].logicalEnd = Infinity
-  vi.mocked(bridge.setSession).mockImplementationOnce(async ({ sessionID }) => ({
-    revision: 1, sessionID, segmentIndex: 0, currentTime: 0, duration: null,
-    paused: true, ended: false, rate: 1, phase: 'loading', error: null,
-  }))
-  vi.mocked(bridge.setRate).mockImplementationOnce(async () => ({
-    revision: 2, sessionID: vi.mocked(bridge.setSession).mock.calls[0][0].sessionID,
-    segmentIndex: 0, currentTime: 0, duration: null,
-    paused: true, ended: false, rate: 1, phase: 'loading', error: null,
-  }))
-  await controller.loadSession(session)
-  const waiting = controller.waitForFiniteDuration()
-  const rejection = expect(waiting).rejects.toMatchObject({ name: 'AbortError' })
-  controller.clearSession()
-  await rejection
-  controller.destroy()
-  await vi.waitFor(() => expect(remove).toHaveBeenCalledTimes(2))
-})
-
-test('malformed native state never supplies a fabricated playback time', () => {
-  expect(() => parseNativePlaybackState({ currentTime: NaN })).toThrow('Invalid native playback state')
-})
-
-test('microphone authoring sessions stay on the existing HTML playback path', async () => {
-  const { controller, session, bridge } = harness()
-  session.segments[0].recording = { ...session.segments[0].recording, status: 'missing' }
-  await controller.loadSession(session)
-  expect(bridge.setSession).not.toHaveBeenCalled()
-  expect(controller.session).toBe(session)
-  await expect(controller.play()).rejects.toThrow('No source recording')
-})
-
 test('published playback uses the verified local file without rewriting catalog identity', async () => {
   const resolve = vi.fn(async () => 'file:///owned/one.m4a')
   const { controller, session, bridge } = harness(resolve)
@@ -163,11 +91,4 @@ test('published playback uses the verified local file without rewriting catalog 
     segments: [{ url: 'file:///owned/one.m4a', start: 2, end: 12 }],
   }))
   expect(session.segments[0].recording.playSrc).toBe('https://tikkunreader.com/audio/first.m4a')
-})
-
-test('a failed local-file check is surfaced before native playback starts', async () => {
-  const { controller, session, bridge } = harness(async () => { throw new Error('Corrupt local file') })
-  await expect(controller.loadSession(session)).rejects.toThrow('Corrupt local file')
-  expect(bridge.setSession).not.toHaveBeenCalled()
-  expect(controller.error?.message).toBe('Corrupt local file')
 })

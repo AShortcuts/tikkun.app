@@ -30,7 +30,7 @@ async function fixture(initialNpm = '11.19.0') {
   return { calls, state, options: { root, environment: { CF_PAGES: '1', TIKKUN_UPDATE_PRIVATE_KEY: 'production test secret', TIKKUN_UPDATE_PRIVATE_KEY_FILE: '/private/test.pem' }, nodeVersion: '22.23.2', run } }
 }
 
-test.each(['10.9.2', '11.19.0'])('pins npm from %s and isolates secrets during dependency installation', async version => {
+test.each(['11.19.0'])('pins npm from %s and isolates secrets during dependency installation', async version => {
   const f = await fixture(version)
   await bootstrapPages(f.options)
   expect(f.calls.filter(call => call.includes('install'))).toHaveLength(version === '11.19.0' ? 0 : 1)

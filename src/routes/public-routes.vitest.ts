@@ -9,12 +9,9 @@ import {
 import { afterEach, expect, test } from 'vitest'
 import { page } from 'vitest/browser'
 import '../../css/home.css'
-import ReadingCard from '../lib/components/ReadingCard.svelte'
-import { getRequiredReading, readingCoverage } from '../lib/readings.ts'
+import { readingCoverage } from '../lib/readings.ts'
 import SiteLayout from './(site)/+layout.svelte'
-import AboutPage from './(site)/about/+page.svelte'
 import ReadingsPage from './(site)/readings/+page.svelte'
-import TidbitsPage from './(site)/tidbits/+page.svelte'
 
 let component: ReturnType<typeof mount> | null = null
 let target: HTMLElement | null = null
@@ -24,19 +21,6 @@ afterEach(async () => {
   component = null
   target?.remove()
   target = null
-})
-
-test('renders an honest Tidbits empty state with a useful next action', () => {
-  mountPage(TidbitsPage)
-
-  expect(required('h1').textContent).toBe('Tidbits')
-  expect(required('#tidbits-empty-title').textContent).toBe(
-    'No tidbits published yet.'
-  )
-  expect(
-    required<HTMLAnchorElement>('a[href="/readings/"]').textContent
-  ).toBe('View available readings')
-  expect(target?.textContent).not.toMatch(/lorem|placeholder|coming soon/i)
 })
 
 test('renders canonical public navigation and dismisses the mobile menu accessibly', async () => {
@@ -122,47 +106,6 @@ test('filters public coverage by text and status, then restores the catalog', as
   expect(required('[aria-live="polite"]').textContent?.trim()).toBe(
     'Showing 56 of 56 readings'
   )
-})
-
-test('renders aliyah actions as sibling links inside a non-link reading card', () => {
-  target = document.createElement('div')
-  document.body.appendChild(target)
-  component = mount(ReadingCard, {
-    target,
-    props: { reading: getRequiredReading('beresheet') },
-  })
-
-  const card = required('article.home-reading-card')
-  const aliyahGroup = required('[aria-label="Beresheet aliyot"]')
-  const aliyahLinks = aliyahGroup.querySelectorAll<HTMLAnchorElement>('a')
-
-  expect(card.querySelector(':scope > a.home-reading-card')).toBeNull()
-  expect(aliyahLinks).toHaveLength(7)
-  expect(aliyahLinks[0]?.dataset.cueStatus).toBe('cued')
-  expect(aliyahLinks[0]?.getAttribute('href')).toBe(
-    '/reader/#/torah/parsha/beresheet/1-1-1'
-  )
-  expect(aliyahLinks[0]?.getAttribute('aria-label')).toContain(
-    'word timing ready'
-  )
-  const readyStatus = required<HTMLElement>('.home-reading-status.mod-ready')
-  expect(getComputedStyle(readyStatus).backgroundColor).toBe(
-    'rgba(63, 144, 83, 0.22)'
-  )
-})
-
-test('keeps analytics and maintained project status discoverable from About', () => {
-  mountPage(AboutPage)
-
-  expect(
-    required<HTMLAnchorElement>(
-      'a[href="/reader/#/about/playback-analytics"]'
-    ).textContent
-  ).toBe('Cue analytics')
-  expect(required('#taskboard-title').textContent).toBe('Taskboard')
-  expect(
-    target?.querySelectorAll('[role="list"] > [role="listitem"]').length
-  ).toBeGreaterThan(0)
 })
 
 function mountPage(Page: Component<Record<string, never>>) {

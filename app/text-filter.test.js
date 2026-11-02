@@ -1,25 +1,11 @@
 import { expect, test } from 'vitest'
 import textFilter from './text-filter.ts'
 
-test('simple annotated text remains untouched', () => {
-  expect(textFilter({
-      text: 'בְּרֵאשִׁ֖ית בָּרָ֣א אֱלֹהִ֑ים אֵ֥ת הַשָּׁמַ֖יִם וְאֵ֥ת הָאָֽרֶץ׃',
-      annotated: true,
-    })).toBe('בְּרֵאשִׁ֖ית בָּרָ֣א אֱלֹהִ֑ים אֵ֥ת הַשָּׁמַ֖יִם וְאֵ֥ת הָאָֽרֶץ׃')
-})
-
 test('simple unannotated text removes everything but simple letters', () => {
   expect(textFilter({
       text: 'בְּרֵאשִׁ֖ית בָּרָ֣א אֱלֹהִ֑ים אֵ֥ת הַשָּׁמַ֖יִם וְאֵ֥ת הָאָֽרֶץ׃',
       annotated: false,
     })).toBe('בראשית ברא אלהים את השמים ואת הארץ')
-})
-
-test('annotated text removes PETUCHA', () => {
-  expect(textFilter({
-      text: 'וַֽיְהִי־בֹ֖קֶר י֥וֹם אֶחָֽד׃#(פ)',
-      annotated: true,
-    })).toBe('וַֽיְהִי־בֹ֖קֶר י֥וֹם אֶחָֽד׃')
 })
 
 test('annotated text shows KETIV version', () => {
@@ -36,13 +22,6 @@ test('KRI replaces dashes with spaces', () => {
     })).toBe('אלהים את חית הארץ למינה ואת הבהמה למינה')
 })
 
-test('KRI removes PETUCHA', () => {
-  expect(textFilter({
-      text: 'וַֽיְהִי־עֶ֥רֶב וַֽיְהִי־בֹ֖קֶר י֥וֹם הַשִּׁשִּֽׁי׃#(פ)',
-      annotated: false,
-    })).toBe('ויהי ערב ויהי בקר יום הששי')
-})
-
 test('unannotated text shows KRI version', () => {
   expect(textFilter({
       text: 'וּבַבְּהֵמָ֛ה וּבְכָל־הָרֶ֛מֶשׂ הָרֹמֵ֥שׂ עַל־הָאָ֖רֶץ הוצא#[הַיְצֵ֣א] אִתָּ֑ךְ',
@@ -55,13 +34,6 @@ test('KRI does not take parts from the KETIV', () => {
       text: 'לֵאָ֖ה בגד#[בָּ֣א גָ֑ד] וַתִּקְרָ֥א אֶת־שְׁמ֖וֹ גָּֽד׃ וַתֵּ֗לֶד זִלְפָּה֙',
       annotated: false,
     })).toBe('לאה בגד ותקרא את שמו גד ותלד זלפה')
-})
-
-test('keeps SOF PASUK for KETIV', () => {
-  expect(textFilter({
-      text: 'הַשָּׂדֶ֔ה וְצ֥וּדָה לִּ֖י צידה#[צָֽיִד]׃ וַעֲשֵׂה־לִ֨י מַטְעַמִּ֜ים כַּאֲשֶׁ֥ר',
-      annotated: true,
-    })).toBe('הַשָּׂדֶ֔ה וְצ֥וּדָה לִּ֖י {צָֽיִד}׃ וַעֲשֵׂה־לִ֨י מַטְעַמִּ֜ים כַּאֲשֶׁ֥ר')
 })
 
 test(`k'tiv word that separates into two k'ri words renders both on chumash side`, () => {

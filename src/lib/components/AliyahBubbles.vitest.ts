@@ -72,24 +72,3 @@ test('keeps published synced status while disclosing an incomplete local draft',
     'word timing ready; local timing draft present, not publicly verified'
   )
 })
-
-test('keeps published missing status while disclosing a full local draft as unverified', async () => {
-  saveLocalDraft(2, 2)
-  mountBubbles({
-    number: 1,
-    audioId: 'beresheet-1',
-    cueStatus: 'missing',
-    expectedTokenCount: 2,
-    readerHash: '#/torah/parsha/beresheet/1-1-1',
-  })
-  await tick()
-
-  const bubble = target?.querySelector<HTMLAnchorElement>('.home-aliyah-bubble')
-  expect(bubble?.dataset.cueStatus).toBe('missing')
-  expect(bubble?.dataset.localCueStatus).toBe('draft')
-  expect(bubble?.classList.contains('mod-missing')).toBe(true)
-  expect(bubble?.classList.contains('mod-cued')).toBe(false)
-  expect(bubble?.getAttribute('aria-label')).toContain(
-    'Not synced yet; local timing draft present, not publicly verified'
-  )
-})

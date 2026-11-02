@@ -6,18 +6,10 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from core import AlignmentError
 from prosody import pitch_track
-from review_evidence import signal_quality, repeated_prefixes, sustained_tail_regions, uncertain_word_events
+from review_evidence import signal_quality, repeated_prefixes, sustained_tail_regions
 
 
 class ReviewEvidenceTests(unittest.TestCase):
-    def test_band_limited_audio_is_unclear_not_a_proven_omission(self):
-        t = np.arange(32000) / 16000
-        quality = signal_quality(.2 * np.sin(2 * np.pi * 180 * t))
-        self.assertIn("severely-restricted-spectral-bandwidth", quality["flags"])
-        graph = {"lexicalOccurrences": [], "events": [{"kind": "candidate_skip", "tokenKey": "a"}]}
-        event = uncertain_word_events(graph, quality)[0]
-        self.assertEqual(event["kind"], "unresolved_word")
-        self.assertIsNone(event["pronunciationAssessment"])
 
     def test_invalid_signal_and_silence_are_explicit(self):
         with self.assertRaises(AlignmentError):

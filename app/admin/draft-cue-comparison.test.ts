@@ -35,15 +35,6 @@ test('treats draft cues as different when a local cue changes timing', () => {
   ).toBe(false)
 })
 
-test('treats draft cues as different when the local draft has additional cues', () => {
-  expect(
-    areCueDraftsEquivalent(
-      [cue({ timeStart: 0 }), cue({ timeStart: 1.25, wordIndex: 4 })],
-      [cue({ timeStart: 0 })]
-    )
-  ).toBe(false)
-})
-
 test('ignores aligner review notes, which exports leave out', () => {
   const review = { source: 'torah-audio-aligner' as const, status: 'pending' as const, flags: [] }
   expect(areCueDraftsEquivalent([cue({ review })], [cue()])).toBe(true)

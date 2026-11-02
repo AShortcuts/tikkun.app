@@ -16,16 +16,20 @@ public class TikkunMediaPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "metrics", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clearTemporary", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "readIntent", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "updateIntent", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "updateIntent", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "readContent", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "writeContent", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "pruneContent", returnType: CAPPluginReturnPromise)
     ]
 
     // Plugin state is main-queue confined; filesystem work runs on MediaStore.
     private static var sharedStore: MediaStore?
+    private static var sharedContent: PublishedContentStore?
     private var downloads: [String: Task<Void, Never>] = [:]
 
     public override func load() {
-        // Builds 6 and 7 saved separate content snapshots here. Each app update now
-        // carries its own content, so remove the unused copy once.
+        // Builds 6 and 7 saved whole content snapshots here; current builds use
+        // TikkunPublishedContent, so remove the unused copy once.
         DispatchQueue.global(qos: .utility).async {
             guard let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
             let legacy = support.appendingPathComponent("TikkunContent", isDirectory: true)
@@ -45,6 +49,45 @@ public class TikkunMediaPlugin: CAPPlugin, CAPBridgedPlugin {
         let store = try MediaStore(root: root, origin: origin)
         Self.sharedStore = store
         return store
+    }
+
+    // Main-queue confined like sharedStore.
+    private func contentStore() throws -> PublishedContentStore {
+        if let store = Self.sharedContent { return store }
+        let root = try FileManager.default.url(for: .applicationSupportDirectory,
+            in: .userDomainMask, appropriateFor: nil, create: true).appendingPathComponent("TikkunPublishedContent")
+        let store = try PublishedContentStore(root: root)
+        Self.sharedContent = store
+        return store
+    }
+    private func performContent(_ call: CAPPluginCall, action: @escaping (PublishedContentStore) async throws -> JSObject) {
+        DispatchQueue.main.async {
+            do {
+                let store = try self.contentStore()
+                Task { @MainActor in
+                    do { call.resolve(try await action(store)) }
+                    catch { call.reject(error.localizedDescription) }
+                }
+            } catch { call.reject(error.localizedDescription) }
+        }
+    }
+    @objc func readContent(_ call: CAPPluginCall) {
+        guard let name = call.getString("name") else { call.reject("Missing content name"); return }
+        performContent(call) { store in
+            let text = try await store.read(name)
+            let value: JSValue = text.map { $0 as JSValue } ?? NSNull()
+            return ["value": value]
+        }
+    }
+    @objc func writeContent(_ call: CAPPluginCall) {
+        guard let name = call.getString("name"), let value = call.getString("value") else {
+            call.reject("Missing content name or value"); return
+        }
+        performContent(call) { store in try await store.write(name, value: value); return [:] }
+    }
+    @objc func pruneContent(_ call: CAPPluginCall) {
+        guard let keep = call.getArray("keep", String.self) else { call.reject("Missing content list"); return }
+        performContent(call) { store in try await store.prune(keeping: keep); return [:] }
     }
 
     private func asset(_ call: CAPPluginCall) throws -> MediaAsset {

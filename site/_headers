@@ -12,3 +12,12 @@
 /updates/*
   Access-Control-Allow-Origin: capacitor://localhost
   Cache-Control: no-store
+
+/content/*
+  Access-Control-Allow-Origin: capacitor://localhost
+
+/content/v1/latest.json
+  Cache-Control: no-cache
+
+/content/v1/cues/*
+  Cache-Control: public, max-age=31536000, immutable

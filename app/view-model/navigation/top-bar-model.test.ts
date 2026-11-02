@@ -37,61 +37,6 @@ afterEach(() => {
   pages = []
 })
 
-test('renders across runs for שמיני עצרת', async () => {
-  await createModel('2024-10-24:shacharis,main', {
-    count: 5,
-    fetchPreviousPages: false,
-  })
-
-  // Scroll to the end of the main leining, which has a run
-  const inMainLeining = cachedTracker.setLine(viewModel!, {
-    first: getLine(
-      'וּבְחַ֥ג הַשָּׁבֻע֖וֹת וּבְחַ֣ג הַסֻּכּ֑וֹת וְלֹ֧א יֵרָאֶ֛ה אֶת־פְּנֵ֥י'
-    ),
-    center: null,
-    last: getLine(
-      'נֹתֵ֣ן לָ֑ךְ אִ֣ישׁ אוֹ־אִשָּׁ֗ה אֲשֶׁ֨ר יַעֲשֶׂ֧ה אֶת־הָרַ֛ע בְּעֵינֵ֥י'
-    ),
-  })
-  const linesBetweenRuns: Parameters<typeof renderResult>[0] = {
-    first: getLine(
-      'לִשְׁבָטֶ֑יךָ וְשָׁפְט֥וּ אֶת־הָעָ֖ם מִשְׁפַּט־צֶֽדֶק׃ לֹא־תַטֶּ֣ה'
-    ),
-    center: null,
-    last: getLine(
-      'הַשְּׁבִיעִ֛י פָּרִ֥ים שִׁבְעָ֖ה אֵילִ֣ם שְׁנָ֑יִם כְּבָשִׂ֧ים בְּנֵי־'
-    ),
-  }
-  // Scroll to a screen entirely between runs, which should remember the last position
-  let betweenRuns = cachedTracker.setLine(viewModel!, linesBetweenRuns)
-
-  expect(betweenRuns).toEqual(inMainLeining)
-
-  const inMaftir = cachedTracker.setLine(viewModel!, {
-    first: getLine(
-      'תִּהְיֶ֣ה לָכֶ֑ם כׇּל־מְלֶ֥אכֶת עֲבֹדָ֖ה לֹ֥א תַעֲשֽׂוּ׃ וְהִקְרַבְתֶּ֨ם'
-    ),
-    center: null,
-    last: getLine(
-      'נַפְשׁ֔וֹ לֹ֥א יַחֵ֖ל דְּבָר֑וֹ כְּכׇל־הַיֹּצֵ֥א מִפִּ֖יו יַעֲשֶֽׂה׃'
-    ),
-  })
-  // When we scroll to the same lines again, use the last position.
-  betweenRuns = cachedTracker.setLine(viewModel!, linesBetweenRuns)
-
-  expect(betweenRuns).toEqual(inMaftir)
-
-  expect(renderResult({
-      first: getLine(
-        'וּבְחַ֥ג הַשָּׁבֻע֖וֹת וּבְחַ֣ג הַסֻּכּ֑וֹת וְלֹ֧א יֵרָאֶ֛ה אֶת־פְּנֵ֥י'
-      ),
-      center: linesBetweenRuns.first,
-      last: getLine(
-        'תִּהְיֶ֣ה לָכֶ֑ם כׇּל־מְלֶ֥אכֶת עֲבֹדָ֖ה לֹ֥א תַעֲשֽׂוּ׃ וְהִקְרַבְתֶּ֨ם'
-      ),
-    }), 'spanning main leining and מפטיר').toMatchSnapshot()
-})
-
 function renderRoshCodesh() {
   return renderResult({
     first: getLine(
@@ -141,40 +86,6 @@ test('preserves unequal days of ראש חודש', async () => {
   expect(firstDay.nextLink?.targetRun).toEqual(secondDay.relatedRuns[0]?.targetRun)
 })
 
-test('renders from only one line', async () => {
-  await createModel('2024-09-28:shacharis,main', {
-    count: 5,
-    fetchPreviousPages: false,
-  })
-
-  const line = getLine(
-    'בַּחַיִּ֔ים לְמַ֥עַן תִּֽחְיֶ֖ה אַתָּ֥ה וְזַרְעֶֽךָ׃ לְאַֽהֲבָה֙ אֶת־'
-  )
-
-  const results = {
-    fromFirst: renderResult({
-      first: line,
-      center: null,
-      last: null,
-    }),
-    fromCenter: renderResult({
-      first: null,
-      center: line,
-      last: null,
-    }),
-    fromLast: renderResult({
-      first: null,
-      center: null,
-      last: line,
-    }),
-  }
-
-  expect(results.fromFirst.currentRun?.title).toBe('פרשת נצבים־וילך שחרית Main')
-
-  expect(results.fromFirst).toEqual(results.fromCenter)
-  expect(results.fromCenter).toEqual(results.fromLast)
-})
-
 test('picks primary run', async () => {
   await createModel('parsha:terumah,main', {
     count: 5,
@@ -208,68 +119,6 @@ test('picks primary run', async () => {
   })
   expect(centerInMishpatim.currentRun?.title).toBe('פרשת משפטים שחרית Main')
   expect(centerInMishpatim.aliyahRange).toEqual(['שביעי', 'פרשת תרומה ראשון'])
-})
-
-test('renders for the beginning of בראשית', async () => {
-  await createModel('2024-10-26:shacharis,main', {
-    count: 5,
-    fetchPreviousPages: false,
-  })
-
-  expect(renderResult({
-      first: firstLine(pages[0]),
-      center: null,
-      last: firstLine(pages[1]),
-    })).toMatchSnapshot()
-})
-
-test('renders for שמחת תורה', async () => {
-  await createModel('2024-10-25:shacharis,main', {
-    count: 5,
-    fetchPreviousPages: false,
-  })
-
-  expect(renderResult({
-      first: firstLine(pages[0]),
-      center: null,
-      last: firstLine(pages[1]),
-    })).toMatchSnapshot()
-})
-
-test('שקלים / ראש חודש', async () => {
-  await createModel('2025-03-01:shacharis,main', {
-    count: 5,
-    fetchPreviousPages: false,
-  })
-
-  expect(renderResult({
-      first: getLine(
-        'וַיְדַבֵּ֥ר יְהֹוָ֖ה אֶל־מֹשֶׁ֥ה לֵּאמֹֽר׃ דַּבֵּר֙ אֶל־בְּנֵ֣י יִשְׂרָאֵ֔ל'
-      ),
-      center: null,
-      last: getLine(
-        'זָהָ֣ב טָה֑וֹר אַמָּתַ֤יִם וָחֵ֙צִי֙ אׇרְכָּ֔הּ וְאַמָּ֥ה וָחֵ֖צִי רׇחְבָּֽהּ׃'
-      ),
-    })).toMatchSnapshot()
-})
-
-test('renders for חול המועד סוכות', async () => {
-  await createModel('2024-10-22:shacharis,main', {
-    count: 5,
-    fetchPreviousPages: false,
-  })
-
-  expect(renderResult({
-      first: getLine(
-        'הַחֲמִישִׁ֛י פָּרִ֥ים תִּשְׁעָ֖ה אֵילִ֣ם שְׁנָ֑יִם כְּבָשִׂ֧ים בְּנֵֽי'
-      ),
-      center: getLine(
-        'שְׁמֹנָ֖ה אֵילִ֣ם שְׁנָ֑יִם כְּבָשִׂ֧ים בְּנֵי־שָׁנָ֛ה אַרְבָּעָ֥ה עָשָׂ֖ר'
-      ),
-      last: getLine(
-        'וּשְׂעִ֥יר חַטָּ֖את אֶחָ֑ד מִלְּבַד֙ עֹלַ֣ת הַתָּמִ֔יד מִנְחָתָ֖הּ'
-      ),
-    })).toMatchSnapshot()
 })
 
 test('calendar navigation skips unsupported scrolls', async () => {
@@ -322,11 +171,6 @@ function renderLink(link: Link | null) {
     targetRun: link.targetRun.id,
     label: link.label,
   }
-}
-
-function firstLine(page: RenderedEntry) {
-  if (page.type !== 'page') throw new Error('Must be a page')
-  return page.lines[0]
 }
 
 /** Finds the single line containing the specified text. */

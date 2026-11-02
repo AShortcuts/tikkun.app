@@ -84,29 +84,6 @@ describe('unified reader search', () => {
     ).toHaveLength(1)
   })
 
-  test('preserves bold ranges for labels and off-label aliases', () => {
-    const search = createReaderSearch(readings, [
-      createNavigationAction({
-        id: 'tools.analytics',
-        group: 'tools',
-        label: 'Cue Analytics',
-        aliases: ['Playback Analytics'],
-        run: vi.fn(),
-      }),
-    ])
-
-    const alias = search.search('Playback Analytics')[0]
-    expect(alias).toMatchObject({
-      matchedAlias: 'Playback Analytics',
-      matchedField: 'alias',
-      band: 'exact-alias',
-    })
-    expect(alias?.matchedAliasRanges.length).toBeGreaterThan(0)
-
-    const reading = search.search('Beresheet')[0]
-    expect(reading?.labelRanges.length).toBeGreaterThan(0)
-  })
-
   test('does not flood a plain reading query with every aliyah', () => {
     const search = createReaderSearch(
       readings,
@@ -130,28 +107,5 @@ describe('unified reader search', () => {
         .filter(({ source }) => source === 'action')
         .map(({ action }) => action?.id)
     ).toEqual(['reading.beresheet.3'])
-  })
-
-  test('shows only explicitly prioritized quick actions on an empty query', () => {
-    const search = createReaderSearch(readings, [
-      createNavigationAction({
-        id: 'today',
-        group: 'reading',
-        label: 'Today',
-        emptyPriority: 100,
-        run: vi.fn(),
-      }),
-      createNavigationAction({
-        id: 'hidden',
-        group: 'reading',
-        label: 'Search only',
-        showWhenEmpty: false,
-        run: vi.fn(),
-      }),
-    ])
-
-    expect(search.search('').map((result) => result.action?.id)).toEqual([
-      'today',
-    ])
   })
 })

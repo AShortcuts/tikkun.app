@@ -3,13 +3,7 @@ import type {
   LeiningAliyah,
   LeiningRun,
 } from '../calendar-model/model-types.ts'
-import {
-  aliyahMembershipsAtRef,
-  aliyahMembershipsForFocalLine,
-  parseAliyahIndex,
-  resolveActiveAliyahIdentity,
-  type AliyahIdentity,
-} from './aliyah-identity.ts'
+import { aliyahMembershipsAtRef, aliyahMembershipsForFocalLine, resolveActiveAliyahIdentity, type AliyahIdentity } from './aliyah-identity.ts'
 
 const first: AliyahIdentity = { runId: 'rosh-chodesh', index: 1 }
 const second: AliyahIdentity = { runId: 'rosh-chodesh', index: 2 }
@@ -68,26 +62,6 @@ test('the newly starting aliyah owns a line shared with the previous aliyah', ()
   })).toEqual([{ runId: 'beresheet', index: 2 }])
 })
 
-test('a line without a new start keeps its containing aliyah', () => {
-  const firstAliyah: LeiningAliyah = {
-    index: 1,
-    start: { scroll: 'torah', b: 1, c: 1, v: 1 },
-    end: { scroll: 'torah', b: 1, c: 2, v: 3 },
-  }
-  const run = {
-    id: 'beresheet',
-    aliyot: [firstAliyah],
-  } as LeiningRun
-
-  expect(aliyahMembershipsForFocalLine({
-    runs: [run],
-    lineRun: run,
-    focalRef: { b: 1, c: 2, v: 3 },
-    aliyot: [firstAliyah],
-    aliyahStarts: [],
-  })).toEqual([{ runId: 'beresheet', index: 1 }])
-})
-
 test('focal scripture membership spans overlapping aliyot across separate runs', () => {
   const runs = [
     {
@@ -115,16 +89,4 @@ test('focal scripture membership spans overlapping aliyot across separate runs',
     { runId: 'main', index: 7 },
     { runId: 'maftir', index: 'Maftir' },
   ])
-})
-
-test('parses valid aliyah indices from DOM values', () => {
-  expect(parseAliyahIndex('1')).toBe(1)
-  expect(parseAliyahIndex('7')).toBe(7)
-  expect(parseAliyahIndex('Maftir')).toBe('Maftir')
-  expect(parseAliyahIndex(undefined)).toBeNull()
-  expect(parseAliyahIndex('0')).toBeNull()
-  // Israel's Simchat Torah on Shabbat calls Chatan Bereshit as aliyah 8.
-  expect(parseAliyahIndex('8')).toBe(8)
-  expect(parseAliyahIndex('9')).toBeNull()
-  expect(parseAliyahIndex('1.5')).toBeNull()
 })

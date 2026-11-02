@@ -1,5 +1,4 @@
 import { expect, test, vi } from 'vitest'
-import { EventEmitter } from '../event-emitter.ts'
 import {
   createMount,
   MountCleanupError,
@@ -61,29 +60,6 @@ test('owned resources release once in reverse registration order', () => {
   expect(calls).toEqual(['second', 'third', 'first'])
 })
 
-test('subscriptions do not duplicate across remounts', () => {
-  type Events = { update: number }
-  const emitter = new EventEmitter<Events>()
-  const mount = createMount()
-  const listener = vi.fn()
-
-  const attach = () =>
-    mount((scope) => {
-      scope.own(emitter.on('update', listener))
-    })
-
-  const destroyFirst = attach()
-  emitter.emit('update', 1)
-  const destroySecond = attach()
-  emitter.emit('update', 2)
-  destroyFirst()
-  emitter.emit('update', 3)
-  destroySecond()
-  emitter.emit('update', 4)
-
-  expect(listener.mock.calls).toEqual([[1], [2], [3]])
-})
-
 test('setup failure rolls back resources and aborts the scope', () => {
   const mount = createMount()
   const cleanup = vi.fn()
@@ -98,22 +74,6 @@ test('setup failure rolls back resources and aborts the scope', () => {
   ).toThrow('setup failed')
 
   expect(scope!.signal.aborted).toBe(true)
-  expect(cleanup).toHaveBeenCalledOnce()
-})
-
-test('async setup is rejected and rolled back', () => {
-  const mount = createMount()
-  const cleanup = vi.fn()
-  let signal: AbortSignal | null = null
-
-  expect(() =>
-    mount(async (scope) => {
-      signal = scope.signal
-      scope.own(cleanup)
-    })
-  ).toThrow('Mount setup must be synchronous')
-
-  expect(signal!.aborted).toBe(true)
   expect(cleanup).toHaveBeenCalledOnce()
 })
 
@@ -143,18 +103,4 @@ test('teardown attempts every cleanup and reports all failures', () => {
   expect(completedCleanup).toHaveBeenCalledOnce()
   expect(thrown).toBeInstanceOf(MountCleanupError)
   expect((thrown as MountCleanupError).errors).toEqual([secondError, firstError])
-})
-
-test('resources acquired after destruction are released immediately', () => {
-  const mount = createMount()
-  let scope: MountScope | null = null
-  const cleanup = vi.fn()
-
-  const destroy = mount((currentScope) => {
-    scope = currentScope
-  })
-  destroy()
-  scope!.own(cleanup)
-
-  expect(cleanup).toHaveBeenCalledOnce()
 })

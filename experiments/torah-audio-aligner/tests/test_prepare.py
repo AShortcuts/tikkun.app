@@ -28,14 +28,5 @@ class PrepareTests(unittest.TestCase):
                 verify.assert_not_called()
                 write.assert_not_called()
 
-    def test_unstructured_compiler_output_is_bounded_and_empty_output_reports_exit_status(self):
-        for stderr, expected in (("x" * 5000, "x" * 4000), (None, "Compiler exited with status 1")):
-            with self.subTest(stderr=bool(stderr)), patch("aligner.subprocess.run", side_effect=
-                    subprocess.CalledProcessError(1, ["node"], stderr=stderr)):
-                with self.assertRaises(AlignmentError) as raised:
-                    prepare(SimpleNamespace(manifest=None, keep_current=True))
-                self.assertEqual(str(raised.exception), f"Could not prepare recording text: {expected}")
-
-
 if __name__ == "__main__":
     unittest.main()

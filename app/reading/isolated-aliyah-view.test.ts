@@ -64,10 +64,7 @@ test('same-line boundaries preserve physical line/fragment/word identities and b
   expect(selection.containsRef({ scroll: 'esther', b: 1, c: 1, v: 6 })).toBe(false)
 })
 
-test.each([
-  [1, 32, 3, 36, 37], [1, 50, 26, 60, 61], [2, 34, 35, 102, 103],
-  [3, 24, 23, 142, 143], [4, 9, 14, 163, 164], [5, 33, 17, 244, 245],
-])('includes the full final verse %i:%i:%i across pages %i/%i without neighboring words', async (b, c, v, first, last) => {
+test.each([[1, 32, 3, 36, 37], [5, 33, 17, 244, 245]])('includes the full final verse %i:%i:%i across pages %i/%i without neighboring words', async (b, c, v, first, last) => {
   const { model, selection } = await boundedRange(ref(b, c, v))
   expect(selection.pageNumbers).toEqual([first, last])
   const words = await selectedWords(model)

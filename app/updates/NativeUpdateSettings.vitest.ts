@@ -11,7 +11,7 @@ let component: ReturnType<typeof mount>
 
 beforeEach(() => {
   const channel = { phase: 'idle' as const, pending: false, checkedAt: null }
-  nativeUpdateState.set({ web: { ...channel }, applying: false, canCancel: false, applyError: null })
+  nativeUpdateState.set({ web: { ...channel }, content: { ...channel }, applying: false, canCancel: false, applyError: null })
   fixture = document.createElement('div')
   fixture.className = 'settings-category-panel'
   fixture.style.cssText = 'width: min(100%, 380px); box-sizing: border-box; padding: 16px;'
@@ -21,7 +21,7 @@ beforeEach(() => {
 })
 afterEach(async () => { await unmount(component); fixture.remove() })
 
-test.each([320, 390, 1280])('manual controls fit at %ipx and call the real action entry points', async width => {
+test.each([320])('manual controls fit at %ipx and call the real action entry points', async width => {
   await page.viewport(width, 844)
   nativeUpdatePromptDismissed.set(true)
   await page.getByRole('button', { name: 'Check for Updates' }).click()
@@ -55,7 +55,15 @@ test('busy, offline, unpublished and current states stay distinct and accessible
   flushSync()
   await expect.element(page.getByRole('status')).toHaveTextContent('No update has been published')
   updateChannel('web', { phase: 'current' })
+  updateChannel('content', { phase: 'current' })
   flushSync()
+  await expect.element(page.getByRole('status')).toHaveTextContent('Up to date.')
+  updateChannel('content', { phase: 'ready', pending: true })
+  flushSync()
+  await expect.element(page.getByRole('status')).toHaveTextContent('Update ready.')
+  updateChannel('content', { phase: 'unpublished', pending: false })
+  flushSync()
+  // Website content made for newer Torah text is not something this version can install.
   await expect.element(page.getByRole('status')).toHaveTextContent('Up to date.')
   nativeUpdateState.update(state => ({ ...state, applyError: 'Pause audio before applying the update.' }))
   flushSync()

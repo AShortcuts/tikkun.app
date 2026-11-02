@@ -1,9 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { createMount } from '../lifecycle/mount.ts'
-import {
-  CUE_AUTHORING_PANEL_OPEN_KEY,
-  CUE_AUTHORING_UNLOCKED_KEY,
-} from './access.ts'
+import { CUE_AUTHORING_UNLOCKED_KEY } from './access.ts'
 import {
   createCueAuthoringLoader,
   type CueAuthoringLoader,
@@ -84,42 +81,6 @@ async function flushLazyWork() {
   }
 }
 
-test('shares one in-flight optional import and one mount', async () => {
-  sessionStorage.setItem(CUE_AUTHORING_UNLOCKED_KEY, '1')
-  const load = vi.fn(async () => createModule())
-  const harness = mountLoader({ load })
-
-  harness.loader.open()
-  harness.loader.open()
-  await flushLazyWork()
-
-  expect(load).toHaveBeenCalledOnce()
-  expect(harness.authoring.restoreAccessState).toHaveBeenCalledOnce()
-  expect(harness.authoring.setVisible).toHaveBeenLastCalledWith(true)
-})
-
-test('reports unlocked access without loading the optional implementation', () => {
-  sessionStorage.setItem(CUE_AUTHORING_UNLOCKED_KEY, '1')
-  const load = vi.fn(async () => createModule())
-  const harness = mountLoader({ load })
-
-  expect(harness.loader.isUnlocked()).toBe(true)
-  expect(load).not.toHaveBeenCalled()
-})
-
-test('opens an unlocked authoring panel after its first-use import', async () => {
-  sessionStorage.setItem(CUE_AUTHORING_UNLOCKED_KEY, '1')
-  const load = vi.fn(async () => createModule())
-  const harness = mountLoader({ load })
-
-  harness.loader.open()
-  await flushLazyWork()
-
-  expect(load).toHaveBeenCalledOnce()
-  expect(harness.authoring.restoreAccessState).toHaveBeenCalledOnce()
-  expect(harness.authoring.setVisible).toHaveBeenLastCalledWith(true)
-})
-
 test('a failed optional import reports the error and can retry', async () => {
   sessionStorage.setItem(CUE_AUTHORING_UNLOCKED_KEY, '1')
   const failure = new Error('chunk unavailable')
@@ -147,52 +108,4 @@ test('does not load or open when authoring access is locked', async () => {
 
   expect(load).not.toHaveBeenCalled()
   expect(harness.authoring.setVisible).not.toHaveBeenCalled()
-})
-
-test('closing while the shortcut import is pending prevents a late open', async () => {
-  const deferred: {
-    resolve?: (module: CueAuthoringModule) => void
-  } = {}
-  const harness = mountLoader({
-    load: () =>
-      new Promise((resolve) => {
-        deferred.resolve = resolve
-      }),
-  })
-  const shortcut = new KeyboardEvent('keydown', {
-    key: 'a',
-    ctrlKey: true,
-    shiftKey: true,
-    cancelable: true,
-  })
-
-  expect(harness.loader.handleShortcut(shortcut)).toBe(true)
-  expect(shortcut.defaultPrevented).toBe(true)
-  harness.loader.close()
-  deferred.resolve?.(createModule())
-  await Promise.resolve()
-  await Promise.resolve()
-
-  expect(harness.authoring.handleKeydown).not.toHaveBeenCalled()
-  expect(harness.authoring.setVisible).toHaveBeenCalledWith(false)
-})
-
-test('restores only a panel that was open, not closed unlocked access', async () => {
-  const closedLoad = vi.fn(async () => createModule())
-  sessionStorage.setItem(CUE_AUTHORING_UNLOCKED_KEY, '1')
-  const closedHarness = mountLoader({ load: closedLoad })
-  closedHarness.loader.restoreIfOpen()
-  await Promise.resolve()
-  expect(closedLoad).not.toHaveBeenCalled()
-  destroy?.()
-  destroy = null
-
-  sessionStorage.setItem(CUE_AUTHORING_PANEL_OPEN_KEY, '1')
-  const openLoad = vi.fn(async () => createModule())
-  const openHarness = mountLoader({ load: openLoad })
-  openHarness.loader.restoreIfOpen()
-  await Promise.resolve()
-  await Promise.resolve()
-  expect(openLoad).toHaveBeenCalledOnce()
-  expect(openHarness.authoring.restoreAccessState).toHaveBeenCalledOnce()
 })

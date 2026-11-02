@@ -5,8 +5,9 @@ import { descriptorForRecording, type RecordingDescriptor } from './recording-do
 import type { RecordingDependencies } from './recording-dependencies.ts'
 import { recordingAssetKey, resolveRecordingAsset } from './recording-storage.ts'
 
-// Only for immutable native bundles. Web module loads alone do not prove that
-// a service worker has durably saved the modules for the next cold launch.
+// Only for native apps, whose cues are either bundled or saved on the device
+// before their catalog is used. Web module loads alone do not prove that a
+// service worker has durably saved the modules for the next cold launch.
 export function createBundledRecordingDependencies({ recordings, baseUrl, resolve = retryCueDataForRecording }: {
   recordings: readonly AudioRecording[]
   baseUrl: string

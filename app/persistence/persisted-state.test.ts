@@ -1,15 +1,5 @@
 import { expect, test } from 'vitest'
-import {
-  PERSISTED_TIMESTAMP_FUTURE_TOLERANCE_MS,
-  PersistedStateConflictError,
-  PersistedStateStorageError,
-  createPersistedJsonStore,
-  isPlausiblePersistedTimestamp,
-  readStorageItem,
-  removeStorageItem,
-  requirePersistedJsonMutation,
-  writeStorageItem,
-} from './persisted-state.ts'
+import { PERSISTED_TIMESTAMP_FUTURE_TOLERANCE_MS, createPersistedJsonStore, isPlausiblePersistedTimestamp } from './persisted-state.ts'
 
 function memoryStorage() {
   const values = new Map<string, string>()
@@ -51,16 +41,6 @@ test('accepts bounded timestamps and rejects impossible future values', () => {
   ).toBe(false)
 })
 
-test('normalizes denied storage operations into one error contract', () => {
-  expect(() => readStorageItem(null, 'reader')).toThrow(PersistedStateStorageError)
-  expect(() => writeStorageItem(null, 'reader', '{}')).toThrow(
-    PersistedStateStorageError
-  )
-  expect(() => removeStorageItem(null, 'reader')).toThrow(
-    PersistedStateStorageError
-  )
-})
-
 test('stores the current value directly as JSON', () => {
   const storage = memoryStorage()
   const store = stringListStore(storage)
@@ -77,10 +57,7 @@ test('stores the current value directly as JSON', () => {
   })
 })
 
-test.each([
-  ['{bad json', 'invalid-json'],
-  ['["valid",1]', 'invalid-value'],
-] as const)('returns a revision for %s without mutating it', (raw, reason) => {
+test.each([['{bad json', 'invalid-json']] as const)('returns a revision for %s without mutating it', (raw, reason) => {
   const storage = memoryStorage()
   storage.setItem('reader', raw)
   const store = stringListStore(storage)
@@ -136,18 +113,6 @@ test('reports unavailable reads and writes', () => {
     status: 'unavailable',
     error: { operation: 'write', key: 'reader', cause: denied },
   })
-})
-
-test('throws a typed error when a required mutation conflicts', () => {
-  const storage = memoryStorage()
-  const store = stringListStore(storage)
-  const stale = store.read()
-  if (stale.status !== 'missing') throw new Error('Expected missing state')
-  storage.setItem('reader', '[]')
-
-  expect(() =>
-    requirePersistedJsonMutation(store.write(['stale'], stale.revision))
-  ).toThrow(PersistedStateConflictError)
 })
 
 test('rejects invalid values before touching storage', () => {

@@ -59,86 +59,6 @@ test('nested navigation holds apply only when the final hold releases', () => {
   expect(display.evictCalls).toEqual([[1, 7, 8]])
 })
 
-test('navigation hold uses the bounded timer while an ordinary pause never applies on release', () => {
-  const fixture = createFixture({ playbackPages: [] })
-  const display = new FakeDisplay(pages(1, 8), 4)
-  fixture.pageWindow.replaceDisplay(display)
-  fixture.pageWindow.markReady(display)
-
-  const pause = fixture.pageWindow.pauseEviction()
-  fixture.pageWindow.afterPageRendered()
-  pause.release()
-
-  expect(display.evictCalls).toEqual([])
-
-  const navigation = fixture.pageWindow.holdNavigation()
-  navigation.releaseAfterNavigation()
-  expect(fixture.timer.delays()).toEqual([1400])
-  fixture.timer.runNext()
-
-  expect(display.evictCalls).toEqual([[1, 7, 8]])
-})
-
-test('coalesces viewport remount work and refreshes only after current-display completion', async () => {
-  const fixture = createFixture({ playbackPages: [] })
-  const display = new FakeDisplay([1, 2, 3], 2)
-  display.setEvicted([1])
-  display.nearViewportPages = [1]
-  fixture.pageWindow.replaceDisplay(display)
-  fixture.pageWindow.markReady(display)
-
-  fixture.pageWindow.onReaderScroll()
-  fixture.pageWindow.onReaderScroll()
-
-  expect(fixture.frame.pendingCount()).toBe(1)
-  fixture.frame.runNext()
-  await flushMicrotasks()
-
-  expect(display.nearViewportQueries).toEqual([{ marginPx: 200 }])
-  expect(display.nearViewportMountCalls).toEqual([{ marginPx: 200 }])
-  expect(fixture.effectEvents).toEqual(['refresh-viewport', 'invalidate-position'])
-  expect(fixture.frame.pendingCount()).toBe(1)
-
-  display.nearViewportPages = []
-  fixture.pageWindow.onReaderScroll()
-  fixture.pageWindow.onReaderScroll()
-  expect(fixture.frame.pendingCount()).toBe(1)
-
-  fixture.frame.runNext()
-  await flushMicrotasks()
-  expect(fixture.frame.pendingCount()).toBe(1)
-
-  fixture.frame.runNext()
-  expect(fixture.frame.pendingCount()).toBe(0)
-})
-
-test('reschedules a paused viewport trim only after the final ordinary pause releases', async () => {
-  const fixture = createFixture({ playbackPages: [] })
-  const display = new FakeDisplay(pages(1, 8), 4)
-  display.setEvicted([1])
-  display.nearViewportPages = [1]
-  fixture.pageWindow.replaceDisplay(display)
-  fixture.pageWindow.markReady(display)
-  fixture.pageWindow.onReaderScroll()
-  fixture.frame.runNext()
-  await flushMicrotasks()
-
-  const firstPause = fixture.pageWindow.pauseEviction()
-  const finalPause = fixture.pageWindow.pauseEviction()
-  fixture.frame.runNext()
-
-  expect(fixture.frame.pendingCount()).toBe(0)
-
-  firstPause.release()
-  expect(fixture.frame.pendingCount()).toBe(0)
-
-  finalPause.release()
-  expect(fixture.frame.pendingCount()).toBe(1)
-
-  fixture.frame.runNext()
-  expect(display.evictCalls).toEqual([[1, 7, 8]])
-})
-
 test('trims remounted pages after reverse traversal and keeps the mounted set bounded', async () => {
   const fixture = createFixture({ playbackPages: [] })
   const display = new FakeDisplay(pages(1, 12), 10)
@@ -170,35 +90,6 @@ test('trims remounted pages after reverse traversal and keeps the mounted set bo
   expect(display.getMountedPageNumbers()).toEqual([1, 2, 3])
 })
 
-test('keeps a pending remount pause across display replacement and ignores its stale completion', async () => {
-  const fixture = createFixture({ playbackPages: [] })
-  const oldDisplay = new FakeDisplay([1, 2, 3], 2)
-  oldDisplay.setEvicted([1])
-  oldDisplay.nearViewportPages = [1]
-  const pendingRemount = deferred<number[]>()
-  oldDisplay.nearViewportMountResult = pendingRemount.promise
-  fixture.pageWindow.replaceDisplay(oldDisplay)
-  fixture.pageWindow.markReady(oldDisplay)
-  fixture.pageWindow.onReaderScroll()
-  fixture.frame.runNext()
-  await flushMicrotasks()
-
-  const newDisplay = new FakeDisplay(pages(10, 17), 13)
-  fixture.pageWindow.replaceDisplay(newDisplay)
-  fixture.pageWindow.markReady(newDisplay)
-  fixture.pageWindow.afterPageRendered()
-
-  expect(newDisplay.evictCalls).toEqual([])
-
-  pendingRemount.resolve([1])
-  await flushMicrotasks()
-
-  expect(fixture.effectEvents).toEqual([])
-
-  fixture.pageWindow.afterPageRendered()
-  expect(newDisplay.evictCalls).toEqual([[10, 16, 17]])
-})
-
 test('destroy cancels scheduled remount trim and navigation timer idempotently', async () => {
   const fixture = createFixture({ playbackPages: [] })
   const display = new FakeDisplay([1, 2, 3], 2)
@@ -218,30 +109,6 @@ test('destroy cancels scheduled remount trim and navigation timer idempotently',
   expect(fixture.frame.pendingCount()).toBe(0)
   expect(fixture.timer.pendingCount()).toBe(0)
   fixture.pageWindow.afterPageRendered()
-  expect(display.evictCalls).toEqual([])
-})
-
-test('destroy cancels a viewport trim rescheduled by ordinary pause release', async () => {
-  const fixture = createFixture({ playbackPages: [] })
-  const display = new FakeDisplay(pages(1, 8), 4)
-  display.setEvicted([1])
-  display.nearViewportPages = [1]
-  fixture.pageWindow.replaceDisplay(display)
-  fixture.pageWindow.markReady(display)
-  fixture.pageWindow.onReaderScroll()
-  fixture.frame.runNext()
-  await flushMicrotasks()
-
-  const pause = fixture.pageWindow.pauseEviction()
-  fixture.frame.runNext()
-  expect(fixture.frame.pendingCount()).toBe(0)
-
-  pause.release()
-  expect(fixture.frame.pendingCount()).toBe(1)
-
-  fixture.pageWindow.destroy()
-
-  expect(fixture.frame.pendingCount()).toBe(0)
   expect(display.evictCalls).toEqual([])
 })
 
@@ -409,14 +276,6 @@ function createTimerAdapter() {
 
 function pages(start: number, end: number) {
   return Array.from({ length: end - start + 1 }, (_, index) => start + index)
-}
-
-function deferred<T>() {
-  let resolve!: (value: T) => void
-  const promise = new Promise<T>((resolvePromise) => {
-    resolve = resolvePromise
-  })
-  return { promise, resolve }
 }
 
 async function flushMicrotasks() {

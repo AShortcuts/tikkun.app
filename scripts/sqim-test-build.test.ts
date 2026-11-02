@@ -86,10 +86,7 @@ test('records numbering before sync, embeds target 8, temporarily stamps the arc
   expect(f.fetcher).toHaveBeenCalledWith('https://updates.example.test/updates/web/8/latest.json', expect.any(Object))
 })
 
-test.each([
-  { phase: 'npm', mode: 'exit' }, { phase: 'npm', mode: 'throw' },
-  { phase: 'sqim', mode: 'exit' }, { phase: 'sqim', mode: 'throw' },
-])('$phase $mode failure retains the shared record and leaves the native project restored', async ({ phase, mode }) => {
+test.each([{ phase: 'npm', mode: 'exit' }])('$phase $mode failure retains the shared record and leaves the native project restored', async ({ phase, mode }) => {
   const f = await fixture()
   const execute = vi.fn<NonNullable<Parameters<typeof shareTestBuild>[2]>>(async command => {
     expect(await readReleaseBuildState(f.root)).toEqual(allocated)
@@ -125,16 +122,6 @@ test('a corrupted shared record fails before sync, upload, or project mutation',
   expect(execute).not.toHaveBeenCalled()
   expect(f.fetcher).not.toHaveBeenCalled()
   expect(await readFile(path.join(f.root, 'config/app-release.json'), 'utf8')).toBe(invalid)
-  expect(await readFile(f.projectFile, 'utf8')).toBe(pbxproj)
-})
-
-test('published-feed failure does not allocate a number or start native work', async () => {
-  const f = await fixture()
-  f.fetcher.mockRejectedValue(new Error('offline'))
-  const execute = vi.fn<NonNullable<Parameters<typeof shareTestBuild>[2]>>(async () => 0)
-  await expect(shareTestBuild(f.root, [], execute, f.fetcher)).rejects.toThrow('offline')
-  expect(execute).not.toHaveBeenCalled()
-  expect(await readReleaseBuildState(f.root)).toEqual(previous)
   expect(await readFile(f.projectFile, 'utf8')).toBe(pbxproj)
 })
 

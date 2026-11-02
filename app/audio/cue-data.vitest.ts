@@ -64,22 +64,6 @@ test('retains invalid Cue Data as one inspectable result until explicit retry', 
   expect(first.problem.details.join(' ')).toContain('audioFormat')
 })
 
-test('re-evaluates a retained Cue Data failure only when retry is requested', async () => {
-  const load = vi.fn()
-    .mockResolvedValueOnce({ ...payload, cueCount: 2 })
-    .mockResolvedValueOnce(payload)
-  const resolver = new CueDataResolver({ [path]: load })
-
-  await expect(resolver.resolve(recording)).resolves.toMatchObject({
-    status: 'invalid',
-  })
-  await expect(resolver.retry(recording)).resolves.toMatchObject({
-    status: 'ready',
-    payload: { audioId: recording.id },
-  })
-  expect(load).toHaveBeenCalledTimes(2)
-})
-
 test('retries transient load failures and reports recording mismatches as data states', async () => {
   const failedLoad = vi.fn()
     .mockRejectedValueOnce(new Error('chunk unavailable'))

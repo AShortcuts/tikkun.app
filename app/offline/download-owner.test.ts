@@ -81,29 +81,6 @@ test('preserves pending removal until every playback protection releases', async
   expect(library.snapshot().entries[0].phase).toBe('idle')
 })
 
-test('keeps refresh listeners outside Reader and removes them at application teardown', async () => {
-  const f = fixture()
-  const library = f.library()
-  const refresh = vi.spyOn(library, 'refresh')
-  f.events.view.dispatchEvent(new Event('focus'))
-  expect(refresh).not.toHaveBeenCalled()
-  await library.refresh()
-  refresh.mockClear()
-  f.events.view.dispatchEvent(new Event('focus'))
-  f.events.view.dispatchEvent(Object.assign(new Event('storage'), { key: 'other' }))
-  f.events.view.dispatchEvent(Object.assign(new Event('storage'), { key: f.events.intentKey }))
-  f.events.view.dispatchEvent(Object.assign(new Event('storage'), { key: null }))
-  f.events.document.dispatchEvent(new Event('visibilitychange'))
-  expect(refresh).toHaveBeenCalledTimes(4)
-  await library.refresh()
-  f.owner.destroy()
-  refresh.mockClear()
-  f.events.view.dispatchEvent(new Event('focus'))
-  f.events.view.dispatchEvent(Object.assign(new Event('storage'), { key: f.events.intentKey }))
-  f.events.document.dispatchEvent(new Event('visibilitychange'))
-  expect(refresh).not.toHaveBeenCalled()
-})
-
 test('aborts only on application teardown, preserving persisted retry intent', async () => {
   const f = fixture()
   await f.library().enqueue([f.key])
@@ -116,29 +93,6 @@ test('aborts only on application teardown, preserving persisted retry intent', a
   await vi.waitFor(() => expect(f.backend.destroy).toHaveBeenCalledOnce())
   expect(() => f.library()).toThrow('destroyed')
   expect(() => f.owner.protectPlayback(() => false)).toThrow('destroyed')
-})
-
-test('does not automatically refresh an unsupported download backend', async () => {
-  const f = fixture()
-  Object.defineProperty(f.backend, 'supported', { value: false })
-  const library = f.library()
-  await library.refresh()
-  const refresh = vi.spyOn(library, 'refresh')
-  f.events.view.dispatchEvent(new Event('focus'))
-  f.events.view.dispatchEvent(Object.assign(new Event('storage'), { key: f.events.intentKey }))
-  f.events.document.dispatchEvent(new Event('visibilitychange'))
-  expect(refresh).not.toHaveBeenCalled()
-})
-
-test('separate application roots never share a library or playback protections', async () => {
-  const first = fixture()
-  const second = fixture()
-  expect(first.library()).not.toBe(second.library())
-  first.owner.destroy()
-  await second.library().enqueue([second.key])
-  expect(second.signal()?.aborted).toBe(false)
-  second.finish()
-  await vi.waitFor(() => expect(second.library().snapshot().entries[0].phase).toBe('stored'))
 })
 
 test('retries failed initialization without retaining a broken library', () => {

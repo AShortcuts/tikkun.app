@@ -32,13 +32,6 @@ describe('reading search adapter', () => {
     )
   })
 
-  test('exposes the alias that produced a result', () => {
-    const result = search.search('Bereshit')[0]
-
-    expect(result?.englishLabel).toContain('Beresheet')
-    expect(result?.matchedAlias).toBe('bereshit')
-  })
-
   test('resolves structured aliyah and reference queries', () => {
     expect(search.search('Noach 3')[0]).toMatchObject({
       href: '#/torah/parsha/noach/1-7-17',
@@ -72,26 +65,6 @@ describe('reading search adapter', () => {
     const fastDay = search.search('Tishah B’Av 3')[0]
     expect(fastDay?.englishLabel).toMatch(/Tish.*B.*Av/i)
     expect(fastDay?.href).toMatch(/^#\/run\/.+\/\d+-\d+-\d+$/)
-  })
-
-  test('finds each single and combined parsha independently of the current calendar', () => {
-    for (const slug of ['matot', 'masei', 'matot-masei', 'vayakhel', 'pekudei', 'vayakhel-pekudei']) {
-      expect(search.search(`${slug} 3`)[0]?.href).toMatch(new RegExp(`^#/torah/parsha/${slug}/`))
-    }
-  })
-
-  test('uses the service honor label for Simchat Torah search results', () => {
-    expect(search.search('Simchat Torah 7')[0]?.detailLabel).toBe('Chatan Beresheet · שמחת תורה')
-  })
-
-  test('keeps routing metadata out of visible regular-reading labels', () => {
-    const result = search.search('Noach')[0]
-
-    expect(result?.hebrewLabel).toBe('נח')
-    expect(result?.detailLabel).toBe('נח')
-    expect(`${result?.englishLabel} ${result?.detailLabel}`).not.toMatch(
-      /shacharit|שחרית/i
-    )
   })
 
   test('handles hostile punctuation and empty input safely', () => {

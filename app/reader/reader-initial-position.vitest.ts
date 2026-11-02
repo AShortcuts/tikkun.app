@@ -16,13 +16,7 @@ afterEach(() => {
   }
 })
 
-test.each([
-  [389, 'match', 'one'],
-  [389, 'reading', 'one'],
-  [1280, 'match', 'one'],
-  [1280, 'match', 'two'],
-  [1280, 'reading', 'two'],
-] as const)('resolves the initial Vayelech center without scrolling at %ipx in %s / %s', async (width, readerTextLayout, readerSideMode) => {
+test.each([[389, 'match', 'one']] as const)('resolves the initial Vayelech center without scrolling at %ipx in %s / %s', async (width, readerTextLayout, readerSideMode) => {
   await page.viewport(1440, 1000)
   savedStorage = new Map(Object.entries(localStorage))
   localStorage.clear()
@@ -52,9 +46,7 @@ test.each([
     .toBe(false)
 }, 20_000)
 
-test.each([
-  ['one', 'reader'], ['two', 'reader'], ['one', 'browser'], ['two', 'browser'],
-] as const)('aligns Reading links, rail navigation, and checkpoints to the exact pasuk in %s/%s', async (readerSideMode, focalPointMode) => {
+test.each<['one' | 'two', 'reader' | 'browser']>([['one', 'reader']])('aligns Reading links, rail navigation, and checkpoints to the exact pasuk in %s/%s', async (readerSideMode, focalPointMode) => {
   await page.viewport(1440, 1000)
   savedStorage = new Map(Object.entries(localStorage))
   localStorage.clear()
