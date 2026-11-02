@@ -21,3 +21,7 @@
 
 /content/v1/cues/*
   Cache-Control: public, max-age=31536000, immutable
+
+/app-store.json
+  Access-Control-Allow-Origin: capacitor://localhost
+  Cache-Control: no-cache

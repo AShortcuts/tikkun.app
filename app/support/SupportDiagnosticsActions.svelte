@@ -3,10 +3,11 @@
     supportDiagnostics,
     type SupportDiagnostics,
   } from './support-diagnostics.ts'
+  import { isNativeApp } from '../platform/native.ts'
 
   type DiagnosticsActions = Pick<
     SupportDiagnostics,
-    'buildIdentifier' | 'copy' | 'download'
+    'buildIdentifier' | 'releaseVersion' | 'copy' | 'download'
   >
 
   let {
@@ -50,9 +51,12 @@
   class:mod-reader={variant === 'reader'}
   class:mod-site={variant === 'site'}
 >
-  <p class="support-build" data-target-id="support-build-identifier">
-    Build <code>{diagnostics.buildIdentifier}</code>
-  </p>
+  <!-- The app shows its version under App Updates on the same page. -->
+  {#if !(variant === 'reader' && isNativeApp() && diagnostics.releaseVersion)}
+    <p class="support-build" data-target-id="support-build-identifier">
+      {#if diagnostics.releaseVersion}Version {diagnostics.releaseVersion}{:else}Build <code>{diagnostics.buildIdentifier}</code>{/if}
+    </p>
+  {/if}
   <div class="support-actions">
     <button
       class:settings-offline-button={variant === 'reader'}

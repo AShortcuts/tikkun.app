@@ -10,7 +10,7 @@ import type { BundledAppRelease } from '../app/updates/release-identity.ts'
 
 const project = { version: '1.1', build: 8 }
 const previous = { nativeVersion: '1.1', version: '1.1', build: 9 }
-const allocated = { nativeVersion: '1.1', version: '1.1.2', build: 13 }
+const allocated = { nativeVersion: '1.1', version: '1.1', build: 13 }
 const pbxproj = ['\tCODE_SIGN_STYLE = Automatic;', '\tCURRENT_PROJECT_VERSION = 8;', '\tMARKETING_VERSION = 1.1;',
   '\tCURRENT_PROJECT_VERSION = 8;', '\tMARKETING_VERSION = 1.1;', ''].join('\n')
 const roots: string[] = []
@@ -63,7 +63,7 @@ test('records numbering before sync, embeds target 8, temporarily stamps the arc
   const execute = vi.fn<NonNullable<Parameters<typeof shareTestBuild>[2]>>(async (command, args, cwd, env) => {
     expect(cwd).toBe(f.root)
     expect(await readReleaseBuildState(f.root)).toEqual(allocated)
-    expect(JSON.parse(env.TIKKUN_RELEASE_IDENTITY!)).toEqual({ version: '1.1.2', build: 13 })
+    expect(JSON.parse(env.TIKKUN_RELEASE_IDENTITY!)).toEqual({ version: '1.1', build: 13 })
     expect(env.TIKKUN_TEST_BUILD).toBe('1')
     const native = readProjectRelease(await readFile(f.projectFile, 'utf8'))
     if (command === 'npm') {
@@ -74,8 +74,8 @@ test('records numbering before sync, embeds target 8, temporarily stamps the arc
       expect(command).toBe('sqim')
       expect(args).toEqual(['upload', '--device', 'ios/App', '--build', '--project', 'App.xcodeproj',
         '--scheme', 'App', '--allow-provisioning-updates', '--test-option'])
-      expect(native).toEqual({ version: '1.1.2', build: 13 })
-      expect(bundled).toEqual({ release: { version: '1.1.2', build: 13 }, target: { nativeBuild: '8' } })
+      expect(native).toEqual({ version: '1.1', build: 13 })
+      expect(bundled).toEqual({ release: { version: '1.1', build: 13 }, target: { nativeBuild: '8' } })
     }
     return 0
   })
@@ -90,7 +90,7 @@ test.each([{ phase: 'npm', mode: 'exit' }])('$phase $mode failure retains the sh
   const f = await fixture()
   const execute = vi.fn<NonNullable<Parameters<typeof shareTestBuild>[2]>>(async command => {
     expect(await readReleaseBuildState(f.root)).toEqual(allocated)
-    const expected = command === 'npm' ? project : { version: '1.1.2', build: 13 }
+    const expected = command === 'npm' ? project : { version: '1.1', build: 13 }
     expect(readProjectRelease(await readFile(f.projectFile, 'utf8'))).toEqual(expected)
     if (command !== phase) return 0
     if (mode === 'throw') throw new Error(`failed ${phase}`)

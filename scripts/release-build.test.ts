@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { releaseLabel } from '../app/updates/release-identity.ts'
 import { allocateReleaseBuild, bundledAppRelease, nextReleaseBuild, publishedRelease,
   readProjectRelease, readReleaseBuildState, withProjectRelease } from './release-build.ts'
 import { nativeUpdateContract } from './native-update-contract.mjs'
@@ -71,20 +72,21 @@ test.each([pbxproj.replace('CURRENT_PROJECT_VERSION = 8;', 'CURRENT_PROJECT_VERS
   expect(() => readProjectRelease(value)).toThrow()
 })
 
-test('a new native marketing version resets the release counter after native build 1', () => {
-  const old = { nativeVersion: '1.1', version: '1.1.99', build: 100 }
-  expect(nextReleaseBuild('test', { version: '1.2', build: 1 }, old))
-    .toEqual({ nativeVersion: '1.2', version: '1.2', build: 2 })
-  expect(nextReleaseBuild('web', { version: '1.2', build: 1 }, old))
-    .toEqual({ nativeVersion: '1.2', version: '1.2.1', build: 2 })
-})
-
-test('web releases advance both the latest version and the highest test or published build', () => {
-  const tests = { nativeVersion: '1.1', version: '1.1.3', build: 25 }
-  expect(nextReleaseBuild('web', project, tests, { version: '1.1.4', build: 24 }))
-    .toEqual({ nativeVersion: '1.1', version: '1.1.5', build: 26 })
-  expect(nextReleaseBuild('web', project, tests, { version: '1.1.4', build: 30 }))
-    .toEqual({ nativeVersion: '1.1', version: '1.1.5', build: 31 })
+test('Release Versions count up within a month, restart each month, and survive a website rollback', () => {
+  const november = new Date('2026-11-02T12:00:00Z')
+  const clock = Math.floor((november.getTime() - Date.UTC(2026, 0, 1)) / 60_000)
+  // The first release after the old 1.1.x numbering is r1 of the current month.
+  const first = nextReleaseBuild('web', project, previous, { version: '1.1.1', build: 10 }, november)
+  expect(first).toEqual({ nativeVersion: '1.1', version: '2026.11.1', build: clock })
+  expect(releaseLabel(first.version)).toBe('v2026.11-r1')
+  expect(nextReleaseBuild('web', project, previous, first, november).version).toBe('2026.11.2')
+  expect(releaseLabel(nextReleaseBuild('web', project, previous, { version: '2026.11.9', build: clock }, new Date('2027-01-01T00:00:00Z')).version)).toBe('v2027.01-r1')
+  // After a rollback the live site shows an older release, but builds still rise with the clock.
+  expect(nextReleaseBuild('web', project, previous, { version: '2026.11.1', build: 20 }, november).build).toBe(clock)
+  // Sqim tests and App Store builds keep the App Store Version, which never takes the dated form.
+  expect(nextReleaseBuild('test', { version: '1.2', build: 1 }, previous, first, november))
+    .toEqual({ nativeVersion: '1.2', version: '1.2', build: clock + 1 })
+  expect(releaseLabel('1.2')).toBe('v1.2')
 })
 
 test.each([{ version: 'invalid', build: 9 }])('invalid versions/counters fail for project, previous, published, and replacement identities: %j', invalid => {
@@ -107,9 +109,9 @@ test.each([false])('allocation uses verified published numbering, local=%s, with
   await f.put('site/updates/web/8/latest.json', signedFeed())
   const fetcher = vi.fn<typeof fetch>(async () => new Response(signedFeed()))
   expect(await allocateReleaseBuild(f.root, 'test', { local, fetcher }))
-    .toEqual({ nativeVersion: '1.1', version: '1.1.2', build: 13 })
-  expect(await allocateReleaseBuild(f.root, 'web', { local, fetcher }))
-    .toEqual({ nativeVersion: '1.1', version: '1.1.3', build: 13 })
+    .toEqual({ nativeVersion: '1.1', version: '1.1', build: 13 })
+  expect(await allocateReleaseBuild(f.root, 'web', { local, fetcher, now: new Date('2026-11-02T00:00:00Z') }))
+    .toMatchObject({ nativeVersion: '1.1', version: '2026.11.1' })
   expect(fetcher).toHaveBeenCalledTimes(local ? 0 : 2)
   expect(await readReleaseBuildState(f.root)).toEqual(previous)
   expect(await readFile(path.join(f.root, 'ios/App/App.xcodeproj/project.pbxproj'), 'utf8')).toBe(pbxproj)

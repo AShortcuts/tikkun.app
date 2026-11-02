@@ -65,6 +65,7 @@ test('copies and downloads the same report only after explicit action', async ()
   vi.useFakeTimers()
   const diagnostics = createSupportDiagnostics({
     buildIdentifier: 'release-42',
+    releaseVersion: 'v2026.11-r3',
     now: () => new Date('2026-08-19T12:00:00.000Z'),
   })
   const writeText = vi.fn(async () => {})
@@ -91,6 +92,7 @@ test('copies and downloads the same report only after explicit action', async ()
   expect(copied).toMatchObject({
     format: 'tikkun.support-diagnostics',
     buildIdentifier: 'release-42',
+    releaseVersion: 'v2026.11-r3',
   })
   expect(createObjectURL).toHaveBeenCalledOnce()
   expect(click).toHaveBeenCalledOnce()

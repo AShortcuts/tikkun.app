@@ -4,6 +4,20 @@ import { checkNativeWeb } from './web-runtime.ts'
 import { nativeUpdatePromptDismissed, nativeUpdateState, updatePending, updatesBusy } from './update-state.ts'
 
 let applyAttempt: AbortController | undefined
+let preparation: (() => void | Promise<void>) | null = null
+
+export function setUpdatePreparation(prepare: (() => void | Promise<void>) | null) {
+  preparation = prepare
+}
+
+// Settings has no reader context, so it uses the reader's registered preparation.
+export function applyPreparedUpdate() {
+  if (!preparation) {
+    nativeUpdateState.update(state => ({ ...state, applyError: 'Wait for your reading to load before applying the update.' }))
+    return Promise.resolve()
+  }
+  return applyNativeUpdate(preparation)
+}
 
 export async function checkNativeUpdates(force = false) {
   if (get(nativeUpdateState).applying) return

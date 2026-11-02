@@ -198,11 +198,11 @@ _Avoid_: Reader Settings, Command Palette, Parsha Picker, deferred data
 ### Releases
 
 **Release Version**:
-The single version of Tikkun, defined by the website: every push that deploys to production successfully is a new Release Version, written `2026.11-r3` for the third release of November 2026. The release number restarts at r1 each month and never repeats, even after a rollback; failed deploys get no number.
+The single version of Tikkun, defined by the website: every push that deploys to production successfully is a new Release Version, shown as `v2026.11-r3` for the third release of November 2026. The release number restarts at r1 each month, and failed deploys get no number. The only time a number can repeat is right after Cloudflare's Rollback button is used.
 _Avoid_: Web version, app version, build number
 
 **App Store Version**:
-The version of the native iPhone app shell, such as 1.1, changed only when native work ships that the website cannot deliver, such as push notifications or the print plugin. It is not the version people think in.
+The version of the native iPhone app shell, numbered on its own and shown as v1.1, v1.2 and so on, changed only when native work ships that the website cannot deliver, such as push notifications or the print plugin. It never takes the Release Version form, which Apple does not allow. It is not the version people think in.
 _Avoid_: App version, marketing version, Release Version
 
 **Minimum App Store Version**:

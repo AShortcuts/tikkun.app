@@ -10,6 +10,7 @@
   import { nativeContentReady, prepareNativeContent } from '../../../app/updates/content-runtime.ts'
   import { nativeWebReady } from '../../../app/updates/web-runtime.ts'
   import { checkNativeUpdates } from '../../../app/updates/native-updates.ts'
+  import { markReaderShown } from '../../../app/updates/app-store.ts'
   import { isNativeApp } from '../../../app/platform/native.ts'
   import ReaderLoadingMark from './ReaderLoadingMark.svelte'
   import ReaderLoadingDoors from './ReaderLoadingDoors.svelte'
@@ -52,6 +53,10 @@
   let bootRevision = 0
   let stopApp: (() => void) | null = null
   let reloadOnRetry = false
+
+  $effect(() => {
+    if (bootState === 'ready' && !(loadingAnimation === 'doors' && doorsVisible)) markReaderShown()
+  })
 
   onNavigate(({ from, to }) => {
     if (from?.route.id === to?.route.id) return

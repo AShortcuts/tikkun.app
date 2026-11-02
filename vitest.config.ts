@@ -50,6 +50,9 @@ const blockPhoneTextPage = defineBrowserCommand<[number | null]>(async ({ contex
 export default mergeConfig(
   viteConfig,
   defineConfig({
+    // Tests prebuild dependencies in their own folder, so a run never replaces the files a
+    // running dev server is serving (which leaves the reader stuck on its loading screen).
+    cacheDir: 'node_modules/.vite-test',
     test: {
       includeTaskLocation: true,
       mockReset: true,

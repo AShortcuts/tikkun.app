@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { updateConfig } from './update-config.mjs'
 import { assertNativeTarget, readNativeTarget, targetFromArchive } from './native-update-target.ts'
 import { compareReleaseVersions, nativeFeedKey, parseBundledAppRelease } from '../app/updates/release-identity.ts'
-import { allocateReleaseBuild } from './release-build.ts'
+import { knownReleases } from './release-build.ts'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const args = process.argv.slice(2)
@@ -30,8 +30,9 @@ const target = args.includes('--target-record')
 assertNativeTarget(target, JSON.parse(await readFile(path.join(source, 'native-update-contract.json'), 'utf8')), config.publicKey, nativeBuild)
 const bundled = parseBundledAppRelease(JSON.parse(await readFile(path.join(source, 'app-release.json'), 'utf8')))
 if (nativeFeedKey(bundled.target) !== nativeFeedKey(target)) throw new Error('Bundled app release targets another native archive')
-const minimum = await allocateReleaseBuild(root, 'web', { local: true })
-if (bundled.release.build < minimum.build || compareReleaseVersions(bundled.release.version, minimum.version) < 0) {
+const known = await knownReleases(root, 'web', { local: true })
+const newest = [known.previous, ...(known.published ? [known.published] : [])]
+if (newest.some(release => bundled.release.build <= release.build || compareReleaseVersions(bundled.release.version, release.version) <= 0)) {
   throw new Error('Web release must advance its version and build beyond previous tests and releases; rebuild with --web-release')
 }
 let total = 0

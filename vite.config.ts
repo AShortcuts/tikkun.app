@@ -10,8 +10,10 @@ import { contentInventoryPlugin } from './scripts/content-inventory-plugin.ts'
 import { audioAssetsPlugin } from './scripts/audio-assets-plugin.ts'
 import { cueFileSavePlugin } from './scripts/cue-file-save-plugin.ts'
 import { buildPublishedContent, publishedContentPlugin } from './scripts/published-content.ts'
+import { appStoreInfoPlugin } from './scripts/app-store-info-plugin.ts'
 import { updateConfig } from './scripts/update-config.mjs'
 import { analyticsConfig } from './app/analytics/config.ts'
+import { parseBundledAppRelease, parseReleaseIdentity } from './app/updates/release-identity.ts'
 import analyticsPublic from './config/analytics-public.json' with { type: 'json' }
 
 const projectRoot = fileURLToPath(new URL('.', import.meta.url))
@@ -22,6 +24,10 @@ const contentVersion = randomUUID()
 const updates = native.enabled ? updateConfig() : { enabled: false, publicKey: '' }
 // Native apps compare this summary of their built-in recordings and cues with the website's catalog.
 const builtInContent = native.enabled ? buildPublishedContent(projectRoot).builtIn : null
+// Production website and app builds receive their Release Version from the release pipeline.
+const releaseVersion = process.env.TIKKUN_APP_RELEASE
+  ? parseBundledAppRelease(JSON.parse(process.env.TIKKUN_APP_RELEASE)).release.version
+  : process.env.TIKKUN_RELEASE_IDENTITY ? parseReleaseIdentity(JSON.parse(process.env.TIKKUN_RELEASE_IDENTITY)).version : null
 
 export const viteConfig = {
   plugins: [
@@ -32,9 +38,11 @@ export const viteConfig = {
     sveltekit(),
     contentInventoryPlugin(contentVersion),
     publishedContentPlugin(projectRoot, { native: native.enabled }),
+    appStoreInfoPlugin(projectRoot, { native: native.enabled }),
   ],
   define: {
     __TIKKUN_BUILD_ID__: JSON.stringify(buildIdentifier),
+    __TIKKUN_RELEASE_VERSION__: JSON.stringify(releaseVersion),
     __TIKKUN_ANALYTICS_CONFIG__: JSON.stringify(analyticsConfig({ ...analyticsPublic, ...process.env })),
     __TIKKUN_BUILT_IN_CONTENT__: JSON.stringify(builtInContent),
     'import.meta.env.TIKKUN_NATIVE_MEDIA_ORIGIN': JSON.stringify(native.mediaOrigin),

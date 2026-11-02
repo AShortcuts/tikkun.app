@@ -1,3 +1,5 @@
+import { RELEASE_LABEL } from '../updates/release-version.ts'
+
 export const BUILD_IDENTIFIER = __TIKKUN_BUILD_ID__
 
 export type SupportIncidentCode =
@@ -36,6 +38,7 @@ export interface SupportRecentError {
 export interface SupportReport {
   readonly format: 'tikkun.support-diagnostics'
   readonly buildIdentifier: string
+  readonly releaseVersion: string | null
   readonly generatedAt: string
   readonly environment: {
     readonly browser: SupportBrowser
@@ -55,6 +58,7 @@ export interface SupportReport {
 
 export interface SupportDiagnostics {
   readonly buildIdentifier: string
+  readonly releaseVersion: string | null
   start(options: { view: Window; console?: Console }): () => void
   record(code: SupportIncidentCode, error?: unknown): void
   snapshot(view?: Window): SupportReport
@@ -90,10 +94,12 @@ const SAFE_ERROR_TYPES = new Set<SupportErrorType>([
 
 export function createSupportDiagnostics({
   buildIdentifier,
+  releaseVersion = null,
   recentErrorLimit = DEFAULT_RECENT_ERROR_LIMIT,
   now = () => new Date(),
 }: {
   buildIdentifier: string
+  releaseVersion?: string | null
   recentErrorLimit?: number
   now?: () => Date
 }): SupportDiagnostics {
@@ -141,6 +147,7 @@ export function createSupportDiagnostics({
 
   const diagnostics: SupportDiagnostics = {
     buildIdentifier,
+    releaseVersion,
 
     start({ view, console: consoleAdapter = globalThis.console }) {
       if (activeCapture) stopCapture(activeCapture)
@@ -179,6 +186,7 @@ export function createSupportDiagnostics({
       return {
         format: 'tikkun.support-diagnostics',
         buildIdentifier,
+        releaseVersion,
         generatedAt: now().toISOString(),
         environment: readEnvironment(view),
         recentErrors: recentErrors.map((entry) => ({ ...entry })),
@@ -296,4 +304,5 @@ function classifyPlatform(userAgent: string): SupportPlatform {
 
 export const supportDiagnostics = createSupportDiagnostics({
   buildIdentifier: BUILD_IDENTIFIER,
+  releaseVersion: RELEASE_LABEL,
 })

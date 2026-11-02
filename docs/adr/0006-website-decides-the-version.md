@@ -1,0 +1,3 @@
+# The website decides the version
+
+Every successful push is a new Release Version, shown as `v2026.11-r3`, and every installed iPhone app at or above the Minimum App Store Version receives it as a web update, including its text, recordings and cues. The App Store Version keeps its own numbering (`v1.1`, `v1.2`) and changes only for native work the website cannot deliver; new native features check whether the phone supports them instead of splitting releases by App Store Version. We accept that web code must keep working on every App Store Version from the minimum up, in exchange for shipping everything else without App Store review, and we raise the minimum only when a release truly cannot run on older apps, prompting those phones to update.

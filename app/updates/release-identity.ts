@@ -27,12 +27,30 @@ export function compareReleaseVersions(left: string, right: string): number {
   return 0
 }
 
-export function nextReleaseVersion(version: string): string {
+// Release Versions are stored as dotted numbers (2026.11.3), the only form that
+// App Store 1.1 accepts, and shown to people as v2026.11-r3.
+const datedRelease = /^(\d{4})\.(\d{1,2})\.(\d+)$/
+
+export function releaseLabel(version: string): string {
   if (!validReleaseVersion(version)) throw new Error('Invalid app release version')
-  const [major, minor, patch = 0] = version.split('.').map(Number)
-  const next = `${major}.${minor}.${patch + 1}`
-  if (!validReleaseVersion(next)) throw new Error('App release version exceeds supported range')
-  return next
+  const dated = datedRelease.exec(version)
+  return dated && Number(dated[1]) >= 2000 ? `v${dated[1]}.${dated[2].padStart(2, '0')}-r${Number(dated[3])}` : `v${version}`
+}
+
+// The next Release Version counts up within the current UTC month and restarts at r1
+// in a new month. A clock behind the latest release keeps counting from that release.
+export function nextReleaseVersion(latest: string, now: Date): string {
+  if (!validReleaseVersion(latest)) throw new Error('Invalid app release version')
+  const current = `${now.getUTCFullYear()}.${now.getUTCMonth() + 1}.1`
+  const dated = datedRelease.exec(latest)
+  if (!dated || Number(dated[1]) < 2000 || compareReleaseVersions(`${dated[1]}.${dated[2]}.1`, current) < 0) return current
+  return `${dated[1]}.${Number(dated[2])}.${Number(dated[3]) + 1}`
+}
+
+// Minutes since 2026 give web releases a build number that keeps rising even if
+// the website is rolled back, so phones always accept the next release.
+export function releaseClock(now: Date): number {
+  return Math.floor((now.getTime() - Date.UTC(2026, 0, 1)) / 60_000)
 }
 
 export function nativeFeedKey(target: NativeReleaseTarget): string {

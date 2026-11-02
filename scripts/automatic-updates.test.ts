@@ -126,7 +126,7 @@ test('automatic production builds retain downloads, including legacy content fee
   expect(await readFile(path.join(output, `web/7/${hash('old ZIP')}.zip`), 'utf8')).toBe('old ZIP')
   expect(await readFile(path.join(output, `content/${compatibility}/${hash(content)}.json`), 'utf8')).toBe(content)
   const latest = await verifyReleaseEnvelope(JSON.parse(await readFile(path.join(output, 'web/7/latest.json'), 'utf8')), publicKey)
-  expect(latest).toMatchObject({ bundleId: hash('new ZIP'), release: { version: '1.1.1', build: 10 } })
+  expect(latest).toMatchObject({ bundleId: hash('new ZIP'), release: { version: expect.stringMatching(/^20\d\d\.\d{1,2}\.1$/) } })
   expect(await verifyReleaseEnvelope(JSON.parse(await readFile(path.join(output, 'index.json'), 'utf8')), publicKey)).toEqual(await inspectUpdateFeeds(output, publicKey))
   for (const file of f.temporaryKeys) await expect(stat(file)).rejects.toMatchObject({ code: 'ENOENT' })
 })

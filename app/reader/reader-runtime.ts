@@ -16,7 +16,8 @@ import {
 import { listenForRevealGesture } from './reveal-gesture.ts'
 import { createPlaybackLeadSpace, type PlaybackLeadSpace } from './playback-lead-space.ts'
 import { findReadingVerseStartWord, readingVerseAtWord } from './reading-verse-target.ts'
-import { createNativeUpdatePrompt } from '../updates/native-update-prompt.ts'
+import { createAppStorePrompt, createNativeUpdatePrompt } from '../updates/native-update-prompt.ts'
+import { appStorePreview } from '../updates/app-store.ts'
 import { loadPassageTokens } from '../audio/passage-tokens.ts'
 import { audioButtonState } from '../reading/audio-button-state.ts'
 import { createRecordingRangeResolver } from '../audio/recording-ranges.ts'
@@ -3615,6 +3616,7 @@ export function startReaderRuntime({
     scope.own(() => { playbackLeadSpaceGlobal = null })
     setupReaderViewportResize(scope, book)
 
+    const canInterrupt = () => readerPlayback.snapshot().paused && !recordingMode.enabled && !cueAuthoringGlobal?.isActive()
     if (isNativeApp()) createNativeUpdatePrompt(scope, document, () => {
       if (!readerPlayback.snapshot().paused) throw new Error('Pause audio before applying the update.')
       if (cueAuthoringGlobal?.isActive() || recordingMode.enabled) throw new Error('Finish recording or editing before applying the update.')
@@ -3624,7 +3626,13 @@ export function startReaderRuntime({
       const reading = captureCurrentLastReading()
       if (!reading) throw new Error('Wait for your reading to load before applying the update.')
       saveLastReading(browserLocalStorage, reading)
-    })
+    }, canInterrupt)
+    else if (appStorePreview()) {
+      const target = document.createElement('div')
+      document.body.append(target)
+      scope.own(() => target.remove())
+      createAppStorePrompt(scope, target, canInterrupt)
+    }
 
     const readerSettings = createLazyReaderSettings(scope, {
       document,

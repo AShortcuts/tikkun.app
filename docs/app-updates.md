@@ -1,5 +1,9 @@
 # Tikkun Update Delivery
 
+Release Versions and the App Store Update Prompt: 2026-11-02. Every successful production push is a new Release Version, shown as `v2026.11-r3` (the third release of November 2026, counted in UTC; the count restarts at r1 each month). It is stored as the dotted number `2026.11.3`, which App Store 1.1 accepts, so no second copy is ever needed. The hidden build number of a web release is the number of minutes since 2026, so it keeps rising even after a Cloudflare rollback and phones always accept the next release. App Store Versions keep their own numbering (1.1, 1.2) and appear with a v in the app. See `docs/adr/0006-website-decides-the-version.md`.
+
+`config/app-store.json` holds the newest App Store Version (`latest`), the Minimum App Store Version (`minimum`) and an optional `message` of up to 160 characters. Edit it by hand when an App Store version goes live or the minimum changes; each website build checks it and publishes it at `/app-store.json`. Forgetting to edit it breaks nothing: a phone newer than the file counts as latest. At launch, after the reader appears and never during playback, recording or cue editing, the app shows **New Update Available** when the phone is below `latest` (again a week after Update or Later) and **App Update Required** when it is below `minimum` (again the next day). The message replaces the default text in either prompt. Below the minimum, the phone keeps its current web code and installs no further web updates until the App Store update. Settings > More > App Updates shows the Release Version and, on iPhone, the App Store Version with its status.
+
 Every App Store build receives web updates: 2026-11-02. A web update is no longer limited to App Store builds whose iOS code matches the current source. Production publishes every web update to the channel of the installed App Store build recorded in `config/native-update-target.json` (build 8, App Store version 1.1), and web code checks for any native capability it needs: printing explains that the app needs updating, the analytics device lookup is skipped, and the on-phone recording and cue storage stays off. The only remaining requirement is the signing key built into that app. App Store version 1.1 is the first Minimum App Store Version; build 7 (App Store version 1.0) keeps its frozen feed. Raise the minimum only when a web update truly cannot run on older apps.
 
 Recordings and cues from the website: 2026-11-02. The recording list and cue files reach installed apps from the website, so publishing a recording or a cue needs only a website deploy. Every website build publishes `/content/v1/latest.json` plus fingerprinted cue files; the app checks them at launch and on return, keeps the last verified copy on the phone for offline use, and falls back to the copy it was built with. Signed app updates still carry code and Torah text. The phone stores its copy through new `TikkunMedia` methods, so this starts with the next native release; build 8 keeps the October 20 behavior below.
@@ -68,16 +72,16 @@ the old directory while installed apps still read it.
 
 ## Manual Checking
 
-Native Reader Settings > More > App Updates includes **Check for Updates**.
-It checks the app update feed immediately, bypassing the normal 15-minute interval while
-sharing any check already in flight. Status distinguishes checking, downloading,
-up to date, unpublished feeds, unsupported builds, and failed checks. Missing or
-invalid feeds never report success.
+Native Reader Settings > More > App Updates shows "Version v2026.11-r3 · Latest" (or
+Checking..., Downloading..., Update ready, Could not check) and "App Store v1.1 · Latest"
+(or a link to update in the App Store), with **Check for Updates**.
+It checks the app update feed and `/app-store.json` immediately, bypassing the normal 15-minute interval while
+sharing any check already in flight. Missing or invalid feeds never report success.
 
 Once an update is staged, the Reader displays the same centered **Update available**
 pill as the PWA, with **Apply** and **Later**. Both delivery paths render
-`src/lib/components/UpdatePrompt.svelte`; Settings does not add a second Apply
-button. Manual checking reopens a dismissed prompt. **Apply** saves the current
+`src/lib/components/UpdatePrompt.svelte`; Settings also shows **Apply Update**, with the
+same checks. Manual checking reopens a dismissed prompt. **Apply** saves the current
 reading and reloads through the native LiveUpdate plugin. Playback, recording, cue authoring, and
 active download/removal work must finish first. The error remains visible and the
 update stays pending. Apply becomes a neutral **Cancel** button, a thin line sweeps
@@ -306,7 +310,7 @@ npm run native:share
 This rebuilds and syncs web assets **before** asking Sqim to archive and upload.
 Running Sqim alone does not refresh Capacitor's copied web files. The configured production Pages build prepares eligible signed updates automatically, but it does not build or distribute a new iOS binary. A new App Store build embeds the existing update channel and receives the same web updates as older apps at or above the Minimum App Store Version.
 
-Every release changes the version. A new native release normally starts at build 1; Sqim test builds keep the current version and advance the build. Web releases advance both the patch version and the build, above all preceding tests and web releases for that native version. For example: native `1.2 (1)`, test `1.2 (2)`, test `1.2 (3)`, web release `1.2.1 (4)`, test `1.2.1 (5)`. A later native release can start at `1.3 (1)`.
+Every release changes the version. A new native release normally starts at build 1; Sqim test builds carry the App Store Version and advance the build past every test and published release. Web releases take the next Release Version and a build of at least the minutes since 2026, above all preceding tests and web releases. For example: native `1.2 (1)`, test `1.2 (2)`, web release `2026.11.1` (shown as v2026.11-r1) with build 440,000, test `1.2 (440001)`, web release `2026.11.2`.
 
 `config/app-release.json` records the latest attempted test version/build and the native version it belongs to. Include it with the source when publishing so the Pages build can advance past local tests; an ignored counter cannot supply that information to CI. `native:share` checks the signed published feed, reserves the next number, then rebuilds and syncs with that identity embedded in the web assets. It temporarily applies the same version/build to every Xcode target for the archive and restores `project.pbxproj` afterwards. Failed attempts reserve their number. Nothing is staged, committed or published by the numbering step.
 

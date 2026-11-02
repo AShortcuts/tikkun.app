@@ -29,17 +29,15 @@ export function updatePending() {
 export function updatesBusy(state: NativeUpdateState) {
   return state.applying || [state.web, state.content].some(channel => ['checking', 'downloading'].includes(channel.phase))
 }
-export function updateStatusText(state: NativeUpdateState) {
+// The short status shown after the Release Version in Settings; null before the first check.
+export function releaseStatus(state: NativeUpdateState) {
   const channels = [state.web, state.content]
-  const any = (phase: UpdatePhase) => channels.some(channel => channel.phase === phase)
-  if (state.applyError) return state.applyError
-  if (state.applying) return 'Applying update...'
-  if (any('downloading')) return 'Downloading update...'
-  if (updatesBusy(state)) return 'Checking for updates...'
-  if (channels.some(channel => channel.pending)) return 'Update ready. Apply now or it will install next time you open the app.'
-  if (any('error')) return 'Could not check for updates. Check your connection and try again.'
-  if (state.web.phase === 'unpublished') return 'No update has been published for this version yet.'
-  if (state.web.phase === 'disabled') return 'Updates are unavailable in this build.'
-  if (state.web.phase === 'current' && ['current', 'unpublished', 'disabled'].includes(state.content.phase)) return 'Up to date.'
-  return 'Updates install automatically next time you open the app.'
+  if (state.applying) return 'Applying...'
+  if (channels.some(channel => channel.phase === 'downloading')) return 'Downloading...'
+  if (updatesBusy(state)) return 'Checking...'
+  if (channels.some(channel => channel.pending)) return 'Update ready'
+  if (channels.some(channel => channel.phase === 'error')) return 'Could not check'
+  // Website content made for newer Torah text is not something this version can install.
+  if (['current', 'unpublished'].includes(state.web.phase) && ['current', 'unpublished', 'disabled'].includes(state.content.phase)) return 'Latest'
+  return null
 }

@@ -3,6 +3,7 @@ import { stageWebRelease, verifyWebRelease } from './web-update.ts'
 import { updateChannel } from './update-state.ts'
 import { nativeFeedKey, parseBundledAppRelease } from './release-identity.ts'
 import { readBoundedResponse } from './download-response.ts'
+import { checkAppStore } from './app-store.ts'
 
 export { readBoundedResponse } from './download-response.ts'
 
@@ -33,6 +34,12 @@ export function checkNativeWeb(force = false): Promise<void> {
   return checking = (async () => {
     await markReady()
     updateChannel('web', { phase: 'checking' })
+    // Below the Minimum App Store Version, keep the last compatible release until the App Store update.
+    if (await checkAppStore(force) === 'required') {
+      lastCheck = Date.now()
+      updateChannel('web', { phase: 'current', checkedAt: lastCheck })
+      return
+    }
     const { LiveUpdate } = await import('@capawesome/capacitor-live-update')
     const bundledValue = import.meta.env.TIKKUN_APP_RELEASE
     const bundled = bundledValue === undefined ? undefined : parseBundledAppRelease(JSON.parse(bundledValue))

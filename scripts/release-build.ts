@@ -2,7 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { object } from '../app/updates/content-schema.ts'
-import { compareReleaseVersions, nativeFeedKey, nextReleaseVersion, parseReleaseIdentity, validReleaseVersion } from '../app/updates/release-identity.ts'
+import { compareReleaseVersions, nativeFeedKey, nextReleaseVersion, parseReleaseIdentity, releaseClock, validReleaseVersion } from '../app/updates/release-identity.ts'
 import type { BundledAppRelease, NativeReleaseTarget, ReleaseIdentity } from '../app/updates/release-identity.ts'
 import { verifyWebRelease } from '../app/updates/web-update.ts'
 import { readBoundedResponse } from '../app/updates/download-response.ts'
@@ -32,20 +32,20 @@ export function withProjectRelease(pbxproj: string, release: ReleaseIdentity): s
 }
 
 export function nextReleaseBuild(kind: 'test' | 'web', project: ReleaseIdentity, previous: ReleaseBuildState,
-  published?: ReleaseIdentity): ReleaseBuildState {
+  published?: ReleaseIdentity, now = new Date()): ReleaseBuildState {
   parseReleaseIdentity(project)
   parseReleaseIdentity(previous)
   if (!validReleaseVersion(previous.nativeVersion)) throw new Error('Invalid native version in app-release.json')
   const epoch = compareReleaseVersions(project.version, previous.nativeVersion)
   if (epoch < 0) throw new Error('Native project version is older than the recorded release; use the current source')
-  if (epoch > 0 && compareReleaseVersions(project.version, previous.version) <= 0) {
-    throw new Error('A new native release must advance beyond the latest tracked app release version')
-  }
   const candidates = [project, ...(epoch === 0 ? [previous] : []), ...(published ? [parseReleaseIdentity(published)] : [])]
-  const version = candidates.reduce((latest, item) => compareReleaseVersions(item.version, latest) > 0 ? item.version : latest, project.version)
-  const release = parseReleaseIdentity({ version: kind === 'web' ? nextReleaseVersion(version) : version,
-    build: Math.max(...candidates.map(item => item.build)) + 1 })
-  return { nativeVersion: project.version, ...release }
+  const build = Math.max(...candidates.map(item => item.build)) + 1
+  // Sqim tests carry the App Store Version; web releases get the next Release Version.
+  if (kind === 'test') return { nativeVersion: project.version, ...parseReleaseIdentity({ version: project.version, build }) }
+  const latest = [previous, ...(published ? [published] : [])]
+    .reduce((newest, item) => compareReleaseVersions(item.version, newest) > 0 ? item.version : newest, previous.version)
+  return { nativeVersion: project.version,
+    ...parseReleaseIdentity({ version: nextReleaseVersion(latest, now), build: Math.max(build, releaseClock(now)) }) }
 }
 
 export async function readReleaseBuildState(root: string): Promise<ReleaseBuildState> {
@@ -78,7 +78,9 @@ export async function publishedRelease(root: string, target: NativeReleaseTarget
   return release.release
 }
 
-export async function allocateReleaseBuild(root: string, kind: 'test' | 'web', options: { local?: boolean; fetcher?: typeof fetch } = {}) {
+// The newest release this source knows about: Sqim tests recorded in app-release.json
+// and the verified published feed.
+export async function knownReleases(root: string, kind: 'test' | 'web', options: { local?: boolean; fetcher?: typeof fetch } = {}) {
   const { release: project, target } = await bundledAppRelease(root, undefined, kind === 'test')
   const previous = await readReleaseBuildState(root)
   const { publicKey, enabled } = configuration(root)
@@ -92,7 +94,12 @@ export async function allocateReleaseBuild(root: string, kind: 'test' | 'web', o
     return { version: compareReleaseVersions(release.version, latest.version) > 0 ? release.version : latest.version,
       build: Math.max(release.build, latest.build) }
   }, undefined)
-  return nextReleaseBuild(kind, project, previous, published)
+  return { project, previous, published }
+}
+
+export async function allocateReleaseBuild(root: string, kind: 'test' | 'web', options: { local?: boolean; fetcher?: typeof fetch; now?: Date } = {}) {
+  const { project, previous, published } = await knownReleases(root, kind, options)
+  return nextReleaseBuild(kind, project, previous, published, options.now)
 }
 
 export async function bundledAppRelease(root: string, identity?: ReleaseIdentity, testBuild = false): Promise<BundledAppRelease> {
