@@ -43,7 +43,7 @@ function fixture(assets = [asset('one'), asset('two'), asset('three')], dependen
       remove.forEach((key) => saved.delete(key)); add.forEach((key) => saved.add(key))
     }),
   }
-  const inUse = vi.fn(() => false)
+  const inUse = vi.fn<(asset: RecordingDescriptor) => boolean>(() => false)
   const library = createDownloadLibrary({ assets, backend, intent, inUse, dependencies })
   libraries.push(library)
   const keys = assets.map(recordingAssetKey)
@@ -415,4 +415,27 @@ test('destroy during reservation releases a late reservation before backend tear
   expect(release).toHaveBeenCalledOnce()
   expect(f.intent.update).not.toHaveBeenCalled()
   await vi.waitFor(() => expect(f.backend.destroy).toHaveBeenCalledOnce())
+})
+
+test('removes a copy superseded by re-published bytes once playback releases it, without downloading', async () => {
+  const f = fixture()
+  const old = { ...f.assets[0], url: 'https://tikkun.test/audio/one.m4a?tikkun-media=old', digest: 'b'.repeat(64) }
+  const withdrawn = { ...asset('gone'), digest: 'c'.repeat(64) }
+  f.files.set(recordingAssetKey(old), old)
+  f.files.set(recordingAssetKey(withdrawn), withdrawn)
+  f.saved.add(recordingAssetKey(old))
+  f.inUse.mockImplementation((recording) => recording.digest === old.digest)
+  await f.library.refresh()
+  await vi.waitFor(() => expect(f.library.snapshot().entries.find((entry) => entry.key === recordingAssetKey(old))?.phase).toBe('removal-pending'))
+  expect(f.backend.remove).not.toHaveBeenCalled()
+  f.inUse.mockReturnValue(false)
+  await f.library.releasePlayback()
+  expect(f.backend.remove).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ digest: old.digest }))
+  expect(f.files.has(recordingAssetKey(old))).toBe(false)
+  expect(f.files.has(recordingAssetKey(withdrawn))).toBe(true)
+  expect(f.library.snapshot().entries.map((entry) => entry.key)).not.toContain(recordingAssetKey(old))
+  expect(f.library.snapshot().unavailableIntent).toEqual([])
+  expect(f.saved.has(recordingAssetKey(old))).toBe(false)
+  expect(f.backend.download).not.toHaveBeenCalled()
+  expect(f.phases()).toEqual(['idle', 'idle', 'idle', 'stored'])
 })

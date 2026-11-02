@@ -15,7 +15,7 @@ from types import SimpleNamespace
 from aligner import (HERE, REPO, WORK, current_input, file_hash, load_json, prepare,
                      probe, verify_sources, work_path, write_json)
 from beta_store import BetaStore, now
-from core import AlignmentError, digest_json
+from core import AlignmentError, digest_json, resolve_media
 
 MAX_UPLOAD = 100 * 1024 * 1024
 MAX_DURATION = 900
@@ -124,7 +124,7 @@ class RecordingLibrary:
         checked = self.selection(selection["sourceId"], selection.get("uploadId"))
         if checked["sourceKey"] != selection["sourceKey"]:
             raise AlignmentError("The selected recording changed after it was queued.")
-        duration = media_duration(REPO / source["mediaPath"])
+        duration = media_duration(resolve_media(REPO, source["mediaPath"]))
         manifest = {"textPagesSha256": self.text_hash, "inputs": [{
             **{key: source[key] for key in ["audioId", "narratorId", "mediaPath", "mediaIdentity"]},
             "durationSeconds": duration, "legacyCuePath": None, "split": "uncued-demonstration"}]}

@@ -10,6 +10,7 @@ import {
   audioRecordingsByParsha,
 } from '../../generated/audio-manifest.ts'
 import { audioRecordings } from './audio-catalog.ts'
+import { recordingFilePath } from '../../scripts/audio-library.mjs'
 import { aliyahVideos } from '../../generated/video-manifest.ts'
 import { canonicalizeParshaSlug } from '../view-model/navigation/parsha-routes.ts'
 
@@ -65,11 +66,9 @@ test('generated audio and video catalogs have unique, internally consistent iden
     catalogSlots.add(slot)
 
     if (recording.status === 'available' && recording.playSrc.startsWith('/')) {
-      const sitePath = decodeURIComponent(
-        new URL(recording.playSrc, 'https://tikkun.local').pathname
-      ).replace(/^\/+/, '')
-      const mediaPath = path.resolve(repoRoot, 'site', sitePath)
-      expect(mediaPath.startsWith(path.resolve(repoRoot, 'site') + path.sep)).toBe(true)
+      // The URL mirrors a file in the numbered audio/ library.
+      const mediaPath = recordingFilePath(repoRoot, recording.playSrc)
+      expect(mediaPath.startsWith(path.resolve(repoRoot, 'audio') + path.sep)).toBe(true)
       const mediaStat = await stat(mediaPath)
       expect(mediaStat.isFile(), recording.id).toBe(true)
       if (recording.mediaIdentity) {

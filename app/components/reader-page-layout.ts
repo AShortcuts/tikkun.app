@@ -1,5 +1,5 @@
 import type { ReaderPagePresentation } from '../reader-presentation.ts'
-import { readerLayoutViewport } from '../adaptive/reader-viewport.ts'
+import { COMPACT_READER_MAX_WIDTH, WIDE_READER_QUERY, readerLayoutViewport } from '../adaptive/reader-viewport.ts'
 import { verseStartWordIndex } from '../reading/aliyah-token-sequence.ts'
 import { findReadingVerseStartWord } from '../reader/reading-verse-target.ts'
 import { applyAnnotationMode } from './annotation-rendering.ts'
@@ -23,10 +23,16 @@ function removeLayoutStyle(element: HTMLElement, property: string) {
   if (element.style.getPropertyValue(property)) element.style.removeProperty(property)
 }
 
+function setLayoutClass(element: HTMLElement, className: string, present: boolean) {
+  if (element.classList.contains(className) !== present) element.classList.toggle(className, present)
+}
+
 function joinReadingMaqafBoundaries(book: HTMLElement, sides: ReaderPagePresentation['sides']) {
   const previousSpaces = readingMaqafSpaces.get(book)
   const spaces = new Map<Node, string>()
   const boundaryWords = new Set<HTMLElement>()
+  // Consecutive tokens that Reading displays as one maqaf phrase.
+  const joinedGroups: HTMLElement[][] = []
 
   const surfaces = sides === 'one'
     ? [book]
@@ -47,6 +53,11 @@ function joinReadingMaqafBoundaries(book: HTMLElement, sides: ReaderPagePresenta
       if (sides === 'two') {
         boundaryWords.add(word)
         boundaryWords.add(next)
+      }
+      if (word.dataset.tokenKey && next.dataset.tokenKey) {
+        const group = joinedGroups.at(-1)
+        if (group?.at(-1) === word) group.push(next)
+        else joinedGroups.push([word, next])
       }
 
       // Physical source rows may end mid-phrase. Join only their intervening
@@ -72,6 +83,26 @@ function joinReadingMaqafBoundaries(book: HTMLElement, sides: ReaderPagePresenta
   }
   for (const word of boundaryWords) {
     if (!word.classList.contains('mod-maqaf-boundary')) word.classList.add('mod-maqaf-boundary')
+  }
+  // The highlight lights a joined phrase as one unit, so every member lists
+  // the whole group's token keys and which of its sides meet a neighbor.
+  const joinedWords = new Map<HTMLElement, { group: string; lead: boolean; tail: boolean }>()
+  for (const group of joinedGroups) {
+    const keys = group.map((word) => word.dataset.tokenKey).join(' ')
+    group.forEach((word, index) => {
+      joinedWords.set(word, { group: keys, lead: index < group.length - 1, tail: index > 0 })
+    })
+  }
+  for (const word of book.querySelectorAll<HTMLElement>('[data-maqaf-group]')) {
+    if (joinedWords.has(word)) continue
+    delete word.dataset.maqafGroup
+    setLayoutClass(word, 'mod-maqaf-join-lead', false)
+    setLayoutClass(word, 'mod-maqaf-join-tail', false)
+  }
+  for (const [word, { group, lead, tail }] of joinedWords) {
+    if (word.dataset.maqafGroup !== group) word.dataset.maqafGroup = group
+    setLayoutClass(word, 'mod-maqaf-join-lead', lead)
+    setLayoutClass(word, 'mod-maqaf-join-tail', tail)
   }
   readingMaqafSpaces.set(book, spaces)
 }
@@ -144,7 +175,7 @@ function measureOrdinaryMatchLines(page: HTMLElement) {
 }
 
 function sizeOrdinaryMatchLines(page: HTMLElement, sides: ReaderPagePresentation['sides']) {
-  if (sides === 'one' && !window.matchMedia('(min-width: 551px)').matches) return
+  if (sides === 'one' && !window.matchMedia(WIDE_READER_QUERY).matches) return
   const row = page.querySelector<HTMLElement>('tr:not([data-shirah-kind])')
   const book = page.closest<HTMLElement>('.tikkun-book')
   const table = page.querySelector('table')
@@ -191,7 +222,7 @@ function clearMatchSongFrame(page: HTMLElement) {
 }
 
 function alignMatchSongFrame(page: HTMLElement, sides: ReaderPagePresentation['sides']) {
-  if (sides === 'one' && !window.matchMedia('(min-width: 551px)').matches) return
+  if (sides === 'one' && !window.matchMedia(WIDE_READER_QUERY).matches) return
   const ordinary = page.querySelector<HTMLElement>('tr:not([data-shirah-kind]) .line-content')
   const song = page.querySelector<HTMLElement>('tr[data-shirah-kind] .line-content')
   const book = page.closest('.tikkun-book')
@@ -229,7 +260,7 @@ function sizeMatchShirah(
   if (kind !== 'sea' && kind !== 'haazinu') return
   if (
     kind !== 'haazinu' &&
-    sides === 'one' && !window.matchMedia('(min-width: 551px)').matches
+    sides === 'one' && !window.matchMedia(WIDE_READER_QUERY).matches
   ) return
 
   const rows = [
@@ -524,7 +555,7 @@ function measureReadingAliyahBadges(
   const book = page.closest<HTMLElement>('.tikkun-book')
   const view = page.ownerDocument.defaultView
   const root = page.ownerDocument.documentElement
-  if (!source || !book || !view || readerLayoutViewport(view).width <= 550 ||
+  if (!source || !book || !view || readerLayoutViewport(view).width <= COMPACT_READER_MAX_WIDTH ||
     root.dataset.readerIsolated === 'true' && root.dataset.readerPhone === 'true') return []
 
   const container = sides === 'one' ? book : page.querySelector<HTMLElement>('.reader-reading-page')

@@ -23,6 +23,15 @@ export interface LastReading {
 
 export type LastReadingInput = Omit<LastReading, 'savedAt'>
 
+/** Two positions name the same place when their link or their parsha and aliyah match. */
+export function isSameReadingPlace(saved: LastReadingInput, current: LastReadingInput | null) {
+  if (!current) return false
+  return saved.hash === current.hash || (
+    saved.parshaName === current.parshaName &&
+    (saved.aliyahLabel ?? '') === (current.aliyahLabel ?? '')
+  )
+}
+
 export function createLastReadingHash(run: LeiningRun, initialRef?: RefWithScroll) {
   if (run.scroll === 'esther') {
     return semanticParshaUrlForLeining(run.leining, initialRef) ?? generateUrl(run, initialRef)

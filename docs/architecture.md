@@ -86,7 +86,8 @@ Durable trade-offs live in [`docs/adr/`](adr/): static delivery, Reader hash rou
 ## Build and Delivery
 
 - SvelteKit and `adapter-static` prerender the public pages and fixed Reader entry; Vite compiles the client bundles.
-- `site/` contains files copied unchanged by SvelteKit, including audio and install assets.
+- `site/` contains files copied unchanged by SvelteKit, including install assets.
+- `audio/` holds the narrator recordings beside `audio-cues/`, in numbered reading folders such as `yoni-davidov/03 lech-lecha/1.m4a`. The URL mirrors the file (`/audio/yoni-davidov/03%20lech-lecha/1.m4a`): `scripts/audio-assets-plugin.ts` serves the directory in development and `scripts/build-production.mjs` copies it into `dist/audio/` unchanged (see `audio/README.md`). `functions/audio/` redirects the earlier unnumbered URLs that installed builds still request.
 - `dist/` is the portable static output. The Cloudflare release also deploys `functions/audio/`; a dist-only host remains functional but cannot claim verified byte-range media unless that host independently serves `206` responses.
 - `scripts/generate-torah-index.mjs` validates canonical `text/torah-toc.json` and writes the smaller `generated/torah-index.json` used at runtime. `predev` and the production build keep it current.
 - `npm run dev` renders routes on demand with hot reload. `npm run build` generates authoritative reading data, prerenders the routes, derives CSP hashes from every built inline script, generates `dist/service-worker.js`, and enforces code plus host-asset size ceilings.
@@ -417,7 +418,7 @@ Rendering is page-oriented and lazy.
 
 Audio support is data-driven and controller-based.
 
-- `scripts/generate-audio-manifest.mjs` copies supported source audio into `site/audio/` and regenerates `generated/audio-manifest.ts`.
+- `scripts/generate-audio-manifest.mjs` copies supported source audio into numbered folders under `audio/` and regenerates `generated/audio-manifest.ts`; `scripts/audio-library.mjs` owns the folder naming and the on-disk lookup for a recording's `playSrc`.
 - `app/audio/library.ts` exposes narrators, recordings, cue lookup, cue progress, and recording matching.
 - Cue payloads live in `audio-cues/` and are loaded lazily through the glob in `app/audio/cue-data.ts`.
 - `PlaybackController` is the shared typed playback contract. `AudioController`

@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 import re
+from pathlib import Path
 
 import numpy as np
 
@@ -17,6 +18,29 @@ class AlignmentError(ValueError):
 def digest_json(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"),
                                      allow_nan=False).encode()).hexdigest()
+
+
+def resolve_media(repo: Path, media_path: str) -> Path:
+    """Locate a recording by its saved path, following the library's folder moves.
+
+    Recordings moved from site/audio/<narrator>/<reading>/ to
+    audio/<narrator>/<NN reading>/; prepared bundles may still name the old path.
+    """
+    direct = repo / media_path
+    if direct.exists():
+        return direct
+    parts = Path(media_path).parts
+    if parts and parts[0] == "site":
+        parts = parts[1:]
+    if len(parts) == 4 and parts[0] == "audio":
+        narrator, reading, name = parts[1:]
+        plain = re.sub(r"^\d{2} ", "", reading)
+        folder = repo / "audio" / narrator
+        if folder.is_dir():
+            for candidate in sorted(folder.iterdir()):
+                if re.sub(r"^\d{2} ", "", candidate.name) == plain and (candidate / name).is_file():
+                    return candidate / name
+    return direct
 
 
 def frame_geometry(kernels, strides):

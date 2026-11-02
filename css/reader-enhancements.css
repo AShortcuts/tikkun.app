@@ -836,6 +836,12 @@ html[data-reader-isolated='true'] .reader-passage-status button:focus-visible {
   }
 }
 
+/* Room added above a One aliyah passage on phones when playback starts, so its
+   first words can reach the focal line (playback-lead-space.ts). */
+html[data-reader-isolated='true'][data-reader-phone='true'] .tikkun-book {
+  padding-top: calc(1em + var(--reader-playback-lead, 0px));
+}
+
 .isolated-aliyah-end {
   display: flex;
   justify-content: center;

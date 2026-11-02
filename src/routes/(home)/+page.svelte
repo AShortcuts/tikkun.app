@@ -2,7 +2,7 @@
   import { asset, resolve } from '$app/paths'
   import AliyahBubbles from '$lib/components/AliyahBubbles.svelte'
   import ReadingCard from '$lib/components/ReadingCard.svelte'
-  import { availableReadings, getRequiredReading } from '$lib/readings'
+  import { getRequiredReading, parshaReadings } from '$lib/readings'
   import { onMount } from 'svelte'
   import { Spring } from 'svelte/motion'
   import { APP_BANNER_CONTENT } from '../../../app/platform/smart-app-banner.ts'
@@ -1166,13 +1166,14 @@
     <div class="scroll-readings-heading">
       <h2 id="scroll-readings-title">Choose what you are preparing.</h2>
       <p>
-        Select any aliyah bubble to open it directly. Green is synced, blue is a draft, and yellow still needs timing.
+        Select any aliyah bubble to open it directly. Green is synced, blue is a draft, yellow still needs timing,
+        and gray has no audio yet.
       </p>
     </div>
 
     <div class="scroll-readings-grid">
-      {#each availableReadings as reading (reading.parshaSlug)}
-        <ReadingCard {reading} />
+      {#each parshaReadings as reading (reading.parshaSlug)}
+        <ReadingCard {reading} table />
       {/each}
     </div>
 

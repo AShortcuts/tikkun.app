@@ -9,8 +9,8 @@
   "tokenizationVersion": "v2",
   "mediaIdentity": {
     "algorithm": "sha256",
-    "digest": "f251f61cae230df2d654fc364bf92995c3c76fd8494d0f393bcc1b017f494dab",
-    "byteLength": 16670204
+    "digest": "11a10c31f681a0c1f718dbaf4b92e7fad457c90894d4f5e6304ef23a81016ffd",
+    "byteLength": 14482533
   },
   "savedAt": "2026-09-10T01:56:37.351Z",
   "issues": [],
@@ -21,19 +21,7 @@
       "pageNumber": 158,
       "lineIndex": 26,
       "fragmentIndex": 1,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "reviewed",
-        "flags": [
-          {
-            "id": "a16ea5a4626b490c:event:0",
-            "kind": "unclear_audio",
-            "message": "Audio quality limits what can be verified.",
-            "status": "reviewed"
-          }
-        ]
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 2,
@@ -41,12 +29,7 @@
       "pageNumber": 158,
       "lineIndex": 27,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 3,
@@ -54,12 +37,7 @@
       "pageNumber": 158,
       "lineIndex": 27,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 4,
@@ -67,12 +45,7 @@
       "pageNumber": 158,
       "lineIndex": 27,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 5,
@@ -80,12 +53,7 @@
       "pageNumber": 158,
       "lineIndex": 27,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 6,
@@ -93,12 +61,7 @@
       "pageNumber": 158,
       "lineIndex": 27,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 7,
@@ -106,12 +69,7 @@
       "pageNumber": 158,
       "lineIndex": 27,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 8,
@@ -119,12 +77,7 @@
       "pageNumber": 158,
       "lineIndex": 28,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 9,
@@ -132,12 +85,7 @@
       "pageNumber": 158,
       "lineIndex": 28,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 10,
@@ -145,12 +93,7 @@
       "pageNumber": 158,
       "lineIndex": 28,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 11,
@@ -158,12 +101,7 @@
       "pageNumber": 158,
       "lineIndex": 28,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 12,
@@ -171,12 +109,7 @@
       "pageNumber": 158,
       "lineIndex": 28,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 13,
@@ -184,12 +117,7 @@
       "pageNumber": 158,
       "lineIndex": 28,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 14,
@@ -197,12 +125,7 @@
       "pageNumber": 158,
       "lineIndex": 29,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 15,
@@ -210,12 +133,7 @@
       "pageNumber": 158,
       "lineIndex": 29,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 16,
@@ -223,12 +141,7 @@
       "pageNumber": 158,
       "lineIndex": 29,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 17,
@@ -236,12 +149,7 @@
       "pageNumber": 158,
       "lineIndex": 29,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 18,
@@ -249,12 +157,7 @@
       "pageNumber": 158,
       "lineIndex": 29,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 19,
@@ -262,12 +165,7 @@
       "pageNumber": 158,
       "lineIndex": 29,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 20,
@@ -275,12 +173,7 @@
       "pageNumber": 158,
       "lineIndex": 30,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 21,
@@ -288,12 +181,7 @@
       "pageNumber": 158,
       "lineIndex": 30,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 22,
@@ -301,12 +189,7 @@
       "pageNumber": 158,
       "lineIndex": 30,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 23,
@@ -314,12 +197,7 @@
       "pageNumber": 158,
       "lineIndex": 30,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 24,
@@ -327,12 +205,7 @@
       "pageNumber": 158,
       "lineIndex": 30,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 25,
@@ -340,12 +213,7 @@
       "pageNumber": 158,
       "lineIndex": 30,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 26,
@@ -353,12 +221,7 @@
       "pageNumber": 158,
       "lineIndex": 30,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 27,
@@ -366,12 +229,7 @@
       "pageNumber": 158,
       "lineIndex": 30,
       "fragmentIndex": 0,
-      "wordIndex": 7,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 7
     },
     {
       "cueNumber": 28,
@@ -379,12 +237,7 @@
       "pageNumber": 158,
       "lineIndex": 31,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 29,
@@ -392,12 +245,7 @@
       "pageNumber": 158,
       "lineIndex": 31,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 30,
@@ -405,12 +253,7 @@
       "pageNumber": 158,
       "lineIndex": 31,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 31,
@@ -418,12 +261,7 @@
       "pageNumber": 158,
       "lineIndex": 31,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 32,
@@ -431,12 +269,7 @@
       "pageNumber": 158,
       "lineIndex": 31,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 33,
@@ -444,12 +277,7 @@
       "pageNumber": 158,
       "lineIndex": 31,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 34,
@@ -457,12 +285,7 @@
       "pageNumber": 158,
       "lineIndex": 32,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 35,
@@ -470,12 +293,7 @@
       "pageNumber": 158,
       "lineIndex": 32,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 36,
@@ -483,12 +301,7 @@
       "pageNumber": 158,
       "lineIndex": 32,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 37,
@@ -496,12 +309,7 @@
       "pageNumber": 158,
       "lineIndex": 32,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 38,
@@ -509,12 +317,7 @@
       "pageNumber": 158,
       "lineIndex": 32,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 39,
@@ -522,12 +325,7 @@
       "pageNumber": 158,
       "lineIndex": 32,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 40,
@@ -535,12 +333,7 @@
       "pageNumber": 158,
       "lineIndex": 32,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 41,
@@ -548,12 +341,7 @@
       "pageNumber": 158,
       "lineIndex": 33,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 42,
@@ -561,12 +349,7 @@
       "pageNumber": 158,
       "lineIndex": 33,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 43,
@@ -574,12 +357,7 @@
       "pageNumber": 158,
       "lineIndex": 33,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 44,
@@ -587,12 +365,7 @@
       "pageNumber": 158,
       "lineIndex": 33,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 45,
@@ -600,12 +373,7 @@
       "pageNumber": 158,
       "lineIndex": 33,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 46,
@@ -613,12 +381,7 @@
       "pageNumber": 158,
       "lineIndex": 33,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 47,
@@ -626,12 +389,7 @@
       "pageNumber": 158,
       "lineIndex": 33,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 48,
@@ -639,12 +397,7 @@
       "pageNumber": 158,
       "lineIndex": 34,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 49,
@@ -652,12 +405,7 @@
       "pageNumber": 158,
       "lineIndex": 34,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 50,
@@ -665,12 +413,7 @@
       "pageNumber": 158,
       "lineIndex": 34,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 51,
@@ -678,12 +421,7 @@
       "pageNumber": 158,
       "lineIndex": 34,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 52,
@@ -691,12 +429,7 @@
       "pageNumber": 158,
       "lineIndex": 34,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 53,
@@ -704,12 +437,7 @@
       "pageNumber": 158,
       "lineIndex": 34,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 54,
@@ -717,12 +445,7 @@
       "pageNumber": 158,
       "lineIndex": 34,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 55,
@@ -730,12 +453,7 @@
       "pageNumber": 158,
       "lineIndex": 34,
       "fragmentIndex": 0,
-      "wordIndex": 7,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 7
     },
     {
       "cueNumber": 56,
@@ -743,12 +461,7 @@
       "pageNumber": 158,
       "lineIndex": 35,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 57,
@@ -756,12 +469,7 @@
       "pageNumber": 158,
       "lineIndex": 35,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 58,
@@ -769,12 +477,7 @@
       "pageNumber": 158,
       "lineIndex": 35,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 59,
@@ -782,12 +485,7 @@
       "pageNumber": 158,
       "lineIndex": 35,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 60,
@@ -795,12 +493,7 @@
       "pageNumber": 158,
       "lineIndex": 35,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 61,
@@ -808,12 +501,7 @@
       "pageNumber": 158,
       "lineIndex": 35,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 62,
@@ -821,12 +509,7 @@
       "pageNumber": 158,
       "lineIndex": 36,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 63,
@@ -834,12 +517,7 @@
       "pageNumber": 158,
       "lineIndex": 36,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 64,
@@ -847,12 +525,7 @@
       "pageNumber": 158,
       "lineIndex": 36,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 65,
@@ -860,12 +533,7 @@
       "pageNumber": 158,
       "lineIndex": 36,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 66,
@@ -873,12 +541,7 @@
       "pageNumber": 158,
       "lineIndex": 36,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 67,
@@ -886,12 +549,7 @@
       "pageNumber": 158,
       "lineIndex": 36,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 68,
@@ -899,12 +557,7 @@
       "pageNumber": 158,
       "lineIndex": 36,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 69,
@@ -912,12 +565,7 @@
       "pageNumber": 158,
       "lineIndex": 37,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 70,
@@ -925,12 +573,7 @@
       "pageNumber": 158,
       "lineIndex": 37,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 71,
@@ -938,12 +581,7 @@
       "pageNumber": 158,
       "lineIndex": 37,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 72,
@@ -951,12 +589,7 @@
       "pageNumber": 158,
       "lineIndex": 37,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 73,
@@ -964,12 +597,7 @@
       "pageNumber": 158,
       "lineIndex": 37,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 74,
@@ -977,12 +605,7 @@
       "pageNumber": 158,
       "lineIndex": 37,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 75,
@@ -990,12 +613,7 @@
       "pageNumber": 158,
       "lineIndex": 37,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 76,
@@ -1003,12 +621,7 @@
       "pageNumber": 158,
       "lineIndex": 37,
       "fragmentIndex": 0,
-      "wordIndex": 7,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 7
     },
     {
       "cueNumber": 77,
@@ -1016,12 +629,7 @@
       "pageNumber": 158,
       "lineIndex": 38,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 78,
@@ -1029,12 +637,7 @@
       "pageNumber": 158,
       "lineIndex": 38,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 79,
@@ -1042,12 +645,7 @@
       "pageNumber": 158,
       "lineIndex": 38,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 80,
@@ -1055,12 +653,7 @@
       "pageNumber": 158,
       "lineIndex": 38,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 81,
@@ -1068,12 +661,7 @@
       "pageNumber": 158,
       "lineIndex": 38,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 82,
@@ -1081,12 +669,7 @@
       "pageNumber": 158,
       "lineIndex": 38,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 83,
@@ -1094,12 +677,7 @@
       "pageNumber": 158,
       "lineIndex": 38,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 84,
@@ -1107,12 +685,7 @@
       "pageNumber": 158,
       "lineIndex": 38,
       "fragmentIndex": 0,
-      "wordIndex": 7,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 7
     },
     {
       "cueNumber": 85,
@@ -1120,12 +693,7 @@
       "pageNumber": 158,
       "lineIndex": 39,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 86,
@@ -1133,12 +701,7 @@
       "pageNumber": 158,
       "lineIndex": 39,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 87,
@@ -1146,12 +709,7 @@
       "pageNumber": 158,
       "lineIndex": 39,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 88,
@@ -1159,12 +717,7 @@
       "pageNumber": 158,
       "lineIndex": 39,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 89,
@@ -1172,12 +725,7 @@
       "pageNumber": 158,
       "lineIndex": 39,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 90,
@@ -1185,12 +733,7 @@
       "pageNumber": 158,
       "lineIndex": 39,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 91,
@@ -1198,12 +741,7 @@
       "pageNumber": 158,
       "lineIndex": 39,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 92,
@@ -1211,12 +749,7 @@
       "pageNumber": 158,
       "lineIndex": 39,
       "fragmentIndex": 0,
-      "wordIndex": 7,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 7
     },
     {
       "cueNumber": 93,
@@ -1224,12 +757,7 @@
       "pageNumber": 158,
       "lineIndex": 40,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 94,
@@ -1237,12 +765,7 @@
       "pageNumber": 158,
       "lineIndex": 40,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 95,
@@ -1250,12 +773,7 @@
       "pageNumber": 158,
       "lineIndex": 40,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 96,
@@ -1263,12 +781,7 @@
       "pageNumber": 158,
       "lineIndex": 40,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 97,
@@ -1276,12 +789,7 @@
       "pageNumber": 158,
       "lineIndex": 40,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 98,
@@ -1289,12 +797,7 @@
       "pageNumber": 158,
       "lineIndex": 40,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 99,
@@ -1302,12 +805,7 @@
       "pageNumber": 158,
       "lineIndex": 40,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 100,
@@ -1315,12 +813,7 @@
       "pageNumber": 158,
       "lineIndex": 41,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 101,
@@ -1328,12 +821,7 @@
       "pageNumber": 158,
       "lineIndex": 41,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 102,
@@ -1341,12 +829,7 @@
       "pageNumber": 158,
       "lineIndex": 41,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 103,
@@ -1354,12 +837,7 @@
       "pageNumber": 158,
       "lineIndex": 41,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 104,
@@ -1367,12 +845,7 @@
       "pageNumber": 158,
       "lineIndex": 41,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 105,
@@ -1380,12 +853,7 @@
       "pageNumber": 158,
       "lineIndex": 41,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 106,
@@ -1393,12 +861,7 @@
       "pageNumber": 158,
       "lineIndex": 41,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 107,
@@ -1406,12 +869,7 @@
       "pageNumber": 158,
       "lineIndex": 41,
       "fragmentIndex": 0,
-      "wordIndex": 7,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 7
     },
     {
       "cueNumber": 108,
@@ -1419,12 +877,7 @@
       "pageNumber": 159,
       "lineIndex": 0,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 109,
@@ -1432,12 +885,7 @@
       "pageNumber": 159,
       "lineIndex": 0,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 110,
@@ -1445,12 +893,7 @@
       "pageNumber": 159,
       "lineIndex": 0,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 111,
@@ -1458,12 +901,7 @@
       "pageNumber": 159,
       "lineIndex": 0,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 112,
@@ -1471,12 +909,7 @@
       "pageNumber": 159,
       "lineIndex": 0,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 113,
@@ -1484,12 +917,7 @@
       "pageNumber": 159,
       "lineIndex": 0,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 114,
@@ -1497,12 +925,7 @@
       "pageNumber": 159,
       "lineIndex": 1,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 115,
@@ -1510,12 +933,7 @@
       "pageNumber": 159,
       "lineIndex": 1,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 116,
@@ -1523,12 +941,7 @@
       "pageNumber": 159,
       "lineIndex": 1,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 117,
@@ -1536,12 +949,7 @@
       "pageNumber": 159,
       "lineIndex": 1,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 118,
@@ -1549,12 +957,7 @@
       "pageNumber": 159,
       "lineIndex": 1,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 119,
@@ -1562,12 +965,7 @@
       "pageNumber": 159,
       "lineIndex": 1,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 120,
@@ -1575,12 +973,7 @@
       "pageNumber": 159,
       "lineIndex": 2,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 121,
@@ -1588,12 +981,7 @@
       "pageNumber": 159,
       "lineIndex": 2,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 122,
@@ -1601,12 +989,7 @@
       "pageNumber": 159,
       "lineIndex": 2,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 123,
@@ -1614,12 +997,7 @@
       "pageNumber": 159,
       "lineIndex": 2,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 124,
@@ -1627,12 +1005,7 @@
       "pageNumber": 159,
       "lineIndex": 2,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 125,
@@ -1640,12 +1013,7 @@
       "pageNumber": 159,
       "lineIndex": 2,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 126,
@@ -1653,12 +1021,7 @@
       "pageNumber": 159,
       "lineIndex": 2,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 127,
@@ -1666,12 +1029,7 @@
       "pageNumber": 159,
       "lineIndex": 3,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 128,
@@ -1679,12 +1037,7 @@
       "pageNumber": 159,
       "lineIndex": 3,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 129,
@@ -1692,12 +1045,7 @@
       "pageNumber": 159,
       "lineIndex": 3,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 130,
@@ -1705,12 +1053,7 @@
       "pageNumber": 159,
       "lineIndex": 3,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 131,
@@ -1718,12 +1061,7 @@
       "pageNumber": 159,
       "lineIndex": 3,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 132,
@@ -1731,12 +1069,7 @@
       "pageNumber": 159,
       "lineIndex": 3,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 133,
@@ -1744,12 +1077,7 @@
       "pageNumber": 159,
       "lineIndex": 4,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 134,
@@ -1757,12 +1085,7 @@
       "pageNumber": 159,
       "lineIndex": 4,
       "fragmentIndex": 1,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 135,
@@ -1770,12 +1093,7 @@
       "pageNumber": 159,
       "lineIndex": 5,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 136,
@@ -1783,12 +1101,7 @@
       "pageNumber": 159,
       "lineIndex": 5,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 137,
@@ -1796,12 +1109,7 @@
       "pageNumber": 159,
       "lineIndex": 5,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 138,
@@ -1809,12 +1117,7 @@
       "pageNumber": 159,
       "lineIndex": 5,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 139,
@@ -1822,12 +1125,7 @@
       "pageNumber": 159,
       "lineIndex": 5,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 140,
@@ -1835,12 +1133,7 @@
       "pageNumber": 159,
       "lineIndex": 5,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 141,
@@ -1848,12 +1141,7 @@
       "pageNumber": 159,
       "lineIndex": 6,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 142,
@@ -1861,12 +1149,7 @@
       "pageNumber": 159,
       "lineIndex": 6,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 143,
@@ -1874,12 +1157,7 @@
       "pageNumber": 159,
       "lineIndex": 6,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 144,
@@ -1887,12 +1165,7 @@
       "pageNumber": 159,
       "lineIndex": 6,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 145,
@@ -1900,12 +1173,7 @@
       "pageNumber": 159,
       "lineIndex": 6,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 146,
@@ -1913,12 +1181,7 @@
       "pageNumber": 159,
       "lineIndex": 6,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 147,
@@ -1926,12 +1189,7 @@
       "pageNumber": 159,
       "lineIndex": 7,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 148,
@@ -1939,12 +1197,7 @@
       "pageNumber": 159,
       "lineIndex": 7,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 149,
@@ -1952,12 +1205,7 @@
       "pageNumber": 159,
       "lineIndex": 7,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 150,
@@ -1965,12 +1213,7 @@
       "pageNumber": 159,
       "lineIndex": 7,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 151,
@@ -1978,12 +1221,7 @@
       "pageNumber": 159,
       "lineIndex": 7,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 152,
@@ -1991,12 +1229,7 @@
       "pageNumber": 159,
       "lineIndex": 7,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 153,
@@ -2004,12 +1237,7 @@
       "pageNumber": 159,
       "lineIndex": 7,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 154,
@@ -2017,12 +1245,7 @@
       "pageNumber": 159,
       "lineIndex": 8,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 155,
@@ -2030,12 +1253,7 @@
       "pageNumber": 159,
       "lineIndex": 8,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 156,
@@ -2043,12 +1261,7 @@
       "pageNumber": 159,
       "lineIndex": 8,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 157,
@@ -2056,12 +1269,7 @@
       "pageNumber": 159,
       "lineIndex": 8,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 158,
@@ -2069,12 +1277,7 @@
       "pageNumber": 159,
       "lineIndex": 8,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 159,
@@ -2082,12 +1285,7 @@
       "pageNumber": 159,
       "lineIndex": 8,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 160,
@@ -2095,12 +1293,7 @@
       "pageNumber": 159,
       "lineIndex": 8,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 161,
@@ -2108,12 +1301,7 @@
       "pageNumber": 159,
       "lineIndex": 9,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 162,
@@ -2121,12 +1309,7 @@
       "pageNumber": 159,
       "lineIndex": 9,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 163,
@@ -2134,12 +1317,7 @@
       "pageNumber": 159,
       "lineIndex": 9,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 164,
@@ -2147,12 +1325,7 @@
       "pageNumber": 159,
       "lineIndex": 9,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 165,
@@ -2160,12 +1333,7 @@
       "pageNumber": 159,
       "lineIndex": 9,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 166,
@@ -2173,12 +1341,7 @@
       "pageNumber": 159,
       "lineIndex": 9,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 167,
@@ -2186,12 +1349,7 @@
       "pageNumber": 159,
       "lineIndex": 9,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 168,
@@ -2199,12 +1357,7 @@
       "pageNumber": 159,
       "lineIndex": 10,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 169,
@@ -2212,12 +1365,7 @@
       "pageNumber": 159,
       "lineIndex": 10,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 170,
@@ -2225,12 +1373,7 @@
       "pageNumber": 159,
       "lineIndex": 10,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 171,
@@ -2238,12 +1381,7 @@
       "pageNumber": 159,
       "lineIndex": 10,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 172,
@@ -2251,12 +1389,7 @@
       "pageNumber": 159,
       "lineIndex": 10,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 173,
@@ -2264,12 +1397,7 @@
       "pageNumber": 159,
       "lineIndex": 10,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 174,
@@ -2277,12 +1405,7 @@
       "pageNumber": 159,
       "lineIndex": 10,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 175,
@@ -2290,12 +1413,7 @@
       "pageNumber": 159,
       "lineIndex": 11,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 176,
@@ -2303,12 +1421,7 @@
       "pageNumber": 159,
       "lineIndex": 11,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 177,
@@ -2316,12 +1429,7 @@
       "pageNumber": 159,
       "lineIndex": 11,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 178,
@@ -2329,12 +1437,7 @@
       "pageNumber": 159,
       "lineIndex": 11,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 179,
@@ -2342,12 +1445,7 @@
       "pageNumber": 159,
       "lineIndex": 11,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 180,
@@ -2355,12 +1453,7 @@
       "pageNumber": 159,
       "lineIndex": 11,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 181,
@@ -2368,12 +1461,7 @@
       "pageNumber": 159,
       "lineIndex": 12,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 182,
@@ -2381,12 +1469,7 @@
       "pageNumber": 159,
       "lineIndex": 12,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 183,
@@ -2394,12 +1477,7 @@
       "pageNumber": 159,
       "lineIndex": 12,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 184,
@@ -2407,12 +1485,7 @@
       "pageNumber": 159,
       "lineIndex": 12,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 185,
@@ -2420,12 +1493,7 @@
       "pageNumber": 159,
       "lineIndex": 12,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 186,
@@ -2433,12 +1501,7 @@
       "pageNumber": 159,
       "lineIndex": 12,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 187,
@@ -2446,12 +1509,7 @@
       "pageNumber": 159,
       "lineIndex": 13,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 188,
@@ -2459,12 +1517,7 @@
       "pageNumber": 159,
       "lineIndex": 13,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 189,
@@ -2472,12 +1525,7 @@
       "pageNumber": 159,
       "lineIndex": 13,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 190,
@@ -2485,12 +1533,7 @@
       "pageNumber": 159,
       "lineIndex": 13,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 191,
@@ -2498,12 +1541,7 @@
       "pageNumber": 159,
       "lineIndex": 13,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 192,
@@ -2511,12 +1549,7 @@
       "pageNumber": 159,
       "lineIndex": 13,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 193,
@@ -2524,12 +1557,7 @@
       "pageNumber": 159,
       "lineIndex": 13,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 194,
@@ -2537,12 +1565,7 @@
       "pageNumber": 159,
       "lineIndex": 14,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 195,
@@ -2550,12 +1573,7 @@
       "pageNumber": 159,
       "lineIndex": 15,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 196,
@@ -2563,12 +1581,7 @@
       "pageNumber": 159,
       "lineIndex": 15,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 197,
@@ -2576,12 +1589,7 @@
       "pageNumber": 159,
       "lineIndex": 15,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 198,
@@ -2589,12 +1597,7 @@
       "pageNumber": 159,
       "lineIndex": 15,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 199,
@@ -2602,12 +1605,7 @@
       "pageNumber": 159,
       "lineIndex": 15,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 200,
@@ -2615,12 +1613,7 @@
       "pageNumber": 159,
       "lineIndex": 15,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 201,
@@ -2628,12 +1621,7 @@
       "pageNumber": 159,
       "lineIndex": 15,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 202,
@@ -2641,12 +1629,7 @@
       "pageNumber": 159,
       "lineIndex": 16,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 203,
@@ -2654,12 +1637,7 @@
       "pageNumber": 159,
       "lineIndex": 16,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 204,
@@ -2667,12 +1645,7 @@
       "pageNumber": 159,
       "lineIndex": 16,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 205,
@@ -2680,12 +1653,7 @@
       "pageNumber": 159,
       "lineIndex": 16,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 206,
@@ -2693,12 +1661,7 @@
       "pageNumber": 159,
       "lineIndex": 16,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 207,
@@ -2706,12 +1669,7 @@
       "pageNumber": 159,
       "lineIndex": 17,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 208,
@@ -2719,12 +1677,7 @@
       "pageNumber": 159,
       "lineIndex": 17,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 209,
@@ -2732,12 +1685,7 @@
       "pageNumber": 159,
       "lineIndex": 17,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 210,
@@ -2745,12 +1693,7 @@
       "pageNumber": 159,
       "lineIndex": 17,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 211,
@@ -2758,12 +1701,7 @@
       "pageNumber": 159,
       "lineIndex": 17,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 212,
@@ -2771,12 +1709,7 @@
       "pageNumber": 159,
       "lineIndex": 17,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 213,
@@ -2784,12 +1717,7 @@
       "pageNumber": 159,
       "lineIndex": 17,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 214,
@@ -2797,12 +1725,7 @@
       "pageNumber": 159,
       "lineIndex": 18,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 215,
@@ -2810,12 +1733,7 @@
       "pageNumber": 159,
       "lineIndex": 18,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 216,
@@ -2823,12 +1741,7 @@
       "pageNumber": 159,
       "lineIndex": 18,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 217,
@@ -2836,12 +1749,7 @@
       "pageNumber": 159,
       "lineIndex": 18,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 218,
@@ -2849,12 +1757,7 @@
       "pageNumber": 159,
       "lineIndex": 18,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 219,
@@ -2862,12 +1765,7 @@
       "pageNumber": 159,
       "lineIndex": 18,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 220,
@@ -2875,12 +1773,7 @@
       "pageNumber": 159,
       "lineIndex": 19,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 221,
@@ -2888,12 +1781,7 @@
       "pageNumber": 159,
       "lineIndex": 19,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 222,
@@ -2901,20 +1789,7 @@
       "pageNumber": 159,
       "lineIndex": 19,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "reviewed",
-        "flags": [
-          {
-            "id": "a16ea5a4626b490c:event:1",
-            "kind": "ambiguous_repeated_prefix",
-            "message": "Possible restart or rearticulation. Listen to the word and its lead-in.",
-            "status": "reviewed",
-            "sourceTime": 302.56
-          }
-        ]
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 223,
@@ -2922,12 +1797,7 @@
       "pageNumber": 159,
       "lineIndex": 19,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 224,
@@ -2935,12 +1805,7 @@
       "pageNumber": 159,
       "lineIndex": 19,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 225,
@@ -2948,12 +1813,7 @@
       "pageNumber": 159,
       "lineIndex": 19,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 226,
@@ -2961,12 +1821,7 @@
       "pageNumber": 159,
       "lineIndex": 19,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 227,
@@ -2974,12 +1829,7 @@
       "pageNumber": 159,
       "lineIndex": 20,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 228,
@@ -2987,12 +1837,7 @@
       "pageNumber": 159,
       "lineIndex": 20,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 229,
@@ -3000,12 +1845,7 @@
       "pageNumber": 159,
       "lineIndex": 20,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 230,
@@ -3013,12 +1853,7 @@
       "pageNumber": 159,
       "lineIndex": 20,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 231,
@@ -3026,12 +1861,7 @@
       "pageNumber": 159,
       "lineIndex": 20,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 232,
@@ -3039,12 +1869,7 @@
       "pageNumber": 159,
       "lineIndex": 20,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 233,
@@ -3052,12 +1877,7 @@
       "pageNumber": 159,
       "lineIndex": 20,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 234,
@@ -3065,12 +1885,7 @@
       "pageNumber": 159,
       "lineIndex": 21,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 235,
@@ -3078,12 +1893,7 @@
       "pageNumber": 159,
       "lineIndex": 21,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 236,
@@ -3091,12 +1901,7 @@
       "pageNumber": 159,
       "lineIndex": 21,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 237,
@@ -3104,12 +1909,7 @@
       "pageNumber": 159,
       "lineIndex": 21,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 238,
@@ -3117,12 +1917,7 @@
       "pageNumber": 159,
       "lineIndex": 21,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 239,
@@ -3130,12 +1925,7 @@
       "pageNumber": 159,
       "lineIndex": 21,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 240,
@@ -3143,12 +1933,7 @@
       "pageNumber": 159,
       "lineIndex": 22,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 241,
@@ -3156,12 +1941,7 @@
       "pageNumber": 159,
       "lineIndex": 22,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 242,
@@ -3169,12 +1949,7 @@
       "pageNumber": 159,
       "lineIndex": 22,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 243,
@@ -3182,12 +1957,7 @@
       "pageNumber": 159,
       "lineIndex": 22,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 244,
@@ -3195,12 +1965,7 @@
       "pageNumber": 159,
       "lineIndex": 22,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 245,
@@ -3208,12 +1973,7 @@
       "pageNumber": 159,
       "lineIndex": 22,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 246,
@@ -3221,12 +1981,7 @@
       "pageNumber": 159,
       "lineIndex": 23,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 247,
@@ -3234,12 +1989,7 @@
       "pageNumber": 159,
       "lineIndex": 23,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 248,
@@ -3247,12 +1997,7 @@
       "pageNumber": 159,
       "lineIndex": 23,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 249,
@@ -3260,12 +2005,7 @@
       "pageNumber": 159,
       "lineIndex": 23,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 250,
@@ -3273,12 +2013,7 @@
       "pageNumber": 159,
       "lineIndex": 23,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 251,
@@ -3286,12 +2021,7 @@
       "pageNumber": 159,
       "lineIndex": 23,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 252,
@@ -3299,12 +2029,7 @@
       "pageNumber": 159,
       "lineIndex": 23,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 253,
@@ -3312,12 +2037,7 @@
       "pageNumber": 159,
       "lineIndex": 24,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 254,
@@ -3325,12 +2045,7 @@
       "pageNumber": 159,
       "lineIndex": 25,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 255,
@@ -3338,12 +2053,7 @@
       "pageNumber": 159,
       "lineIndex": 25,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 256,
@@ -3351,12 +2061,7 @@
       "pageNumber": 159,
       "lineIndex": 25,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 257,
@@ -3364,12 +2069,7 @@
       "pageNumber": 159,
       "lineIndex": 25,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 258,
@@ -3377,12 +2077,7 @@
       "pageNumber": 159,
       "lineIndex": 25,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 259,
@@ -3390,12 +2085,7 @@
       "pageNumber": 159,
       "lineIndex": 25,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 260,
@@ -3403,12 +2093,7 @@
       "pageNumber": 159,
       "lineIndex": 25,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 261,
@@ -3416,12 +2101,7 @@
       "pageNumber": 159,
       "lineIndex": 26,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 262,
@@ -3429,12 +2109,7 @@
       "pageNumber": 159,
       "lineIndex": 26,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 263,
@@ -3442,12 +2117,7 @@
       "pageNumber": 159,
       "lineIndex": 26,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 264,
@@ -3455,12 +2125,7 @@
       "pageNumber": 159,
       "lineIndex": 26,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 265,
@@ -3468,12 +2133,7 @@
       "pageNumber": 159,
       "lineIndex": 26,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 266,
@@ -3481,12 +2141,7 @@
       "pageNumber": 159,
       "lineIndex": 26,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 267,
@@ -3494,12 +2149,7 @@
       "pageNumber": 159,
       "lineIndex": 27,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 268,
@@ -3507,12 +2157,7 @@
       "pageNumber": 159,
       "lineIndex": 27,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 269,
@@ -3520,12 +2165,7 @@
       "pageNumber": 159,
       "lineIndex": 27,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 270,
@@ -3533,12 +2173,7 @@
       "pageNumber": 159,
       "lineIndex": 27,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 271,
@@ -3546,12 +2181,7 @@
       "pageNumber": 159,
       "lineIndex": 27,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 272,
@@ -3559,12 +2189,7 @@
       "pageNumber": 159,
       "lineIndex": 27,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 273,
@@ -3572,12 +2197,7 @@
       "pageNumber": 159,
       "lineIndex": 27,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 274,
@@ -3585,12 +2205,7 @@
       "pageNumber": 159,
       "lineIndex": 28,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 275,
@@ -3598,12 +2213,7 @@
       "pageNumber": 159,
       "lineIndex": 28,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 276,
@@ -3611,12 +2221,7 @@
       "pageNumber": 159,
       "lineIndex": 28,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 277,
@@ -3624,12 +2229,7 @@
       "pageNumber": 159,
       "lineIndex": 28,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 278,
@@ -3637,12 +2237,7 @@
       "pageNumber": 159,
       "lineIndex": 28,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 279,
@@ -3650,12 +2245,7 @@
       "pageNumber": 159,
       "lineIndex": 28,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 280,
@@ -3663,12 +2253,7 @@
       "pageNumber": 159,
       "lineIndex": 29,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 281,
@@ -3676,12 +2261,7 @@
       "pageNumber": 159,
       "lineIndex": 29,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 282,
@@ -3689,12 +2269,7 @@
       "pageNumber": 159,
       "lineIndex": 29,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 283,
@@ -3702,12 +2277,7 @@
       "pageNumber": 159,
       "lineIndex": 29,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 284,
@@ -3715,12 +2285,7 @@
       "pageNumber": 159,
       "lineIndex": 29,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 285,
@@ -3728,12 +2293,7 @@
       "pageNumber": 159,
       "lineIndex": 29,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 286,
@@ -3741,12 +2301,7 @@
       "pageNumber": 159,
       "lineIndex": 29,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 287,
@@ -3754,12 +2309,7 @@
       "pageNumber": 159,
       "lineIndex": 30,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 288,
@@ -3767,12 +2317,7 @@
       "pageNumber": 159,
       "lineIndex": 30,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 289,
@@ -3780,12 +2325,7 @@
       "pageNumber": 159,
       "lineIndex": 30,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 290,
@@ -3793,12 +2333,7 @@
       "pageNumber": 159,
       "lineIndex": 30,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 291,
@@ -3806,12 +2341,7 @@
       "pageNumber": 159,
       "lineIndex": 30,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 292,
@@ -3819,12 +2349,7 @@
       "pageNumber": 159,
       "lineIndex": 30,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 293,
@@ -3832,12 +2357,7 @@
       "pageNumber": 159,
       "lineIndex": 30,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 294,
@@ -3845,12 +2365,7 @@
       "pageNumber": 159,
       "lineIndex": 31,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 295,
@@ -3858,12 +2373,7 @@
       "pageNumber": 159,
       "lineIndex": 31,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 296,
@@ -3871,12 +2381,7 @@
       "pageNumber": 159,
       "lineIndex": 31,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 297,
@@ -3884,12 +2389,7 @@
       "pageNumber": 159,
       "lineIndex": 31,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 298,
@@ -3897,12 +2397,7 @@
       "pageNumber": 159,
       "lineIndex": 31,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 299,
@@ -3910,12 +2405,7 @@
       "pageNumber": 159,
       "lineIndex": 31,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 300,
@@ -3923,12 +2413,7 @@
       "pageNumber": 159,
       "lineIndex": 32,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 301,
@@ -3936,12 +2421,7 @@
       "pageNumber": 159,
       "lineIndex": 32,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 302,
@@ -3949,12 +2429,7 @@
       "pageNumber": 159,
       "lineIndex": 32,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 303,
@@ -3962,12 +2437,7 @@
       "pageNumber": 159,
       "lineIndex": 32,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 304,
@@ -3975,12 +2445,7 @@
       "pageNumber": 159,
       "lineIndex": 32,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 305,
@@ -3988,12 +2453,7 @@
       "pageNumber": 159,
       "lineIndex": 32,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 306,
@@ -4001,12 +2461,7 @@
       "pageNumber": 159,
       "lineIndex": 33,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 307,
@@ -4014,12 +2469,7 @@
       "pageNumber": 159,
       "lineIndex": 33,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 308,
@@ -4027,12 +2477,7 @@
       "pageNumber": 159,
       "lineIndex": 33,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 309,
@@ -4040,12 +2485,7 @@
       "pageNumber": 159,
       "lineIndex": 33,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 310,
@@ -4053,12 +2493,7 @@
       "pageNumber": 159,
       "lineIndex": 33,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 311,
@@ -4066,12 +2501,7 @@
       "pageNumber": 159,
       "lineIndex": 33,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 312,
@@ -4079,12 +2509,7 @@
       "pageNumber": 159,
       "lineIndex": 33,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 313,
@@ -4092,12 +2517,7 @@
       "pageNumber": 159,
       "lineIndex": 34,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 314,
@@ -4105,12 +2525,7 @@
       "pageNumber": 159,
       "lineIndex": 35,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 315,
@@ -4118,12 +2533,7 @@
       "pageNumber": 159,
       "lineIndex": 35,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 316,
@@ -4131,12 +2541,7 @@
       "pageNumber": 159,
       "lineIndex": 35,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 317,
@@ -4144,12 +2549,7 @@
       "pageNumber": 159,
       "lineIndex": 35,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 318,
@@ -4157,12 +2557,7 @@
       "pageNumber": 159,
       "lineIndex": 35,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 319,
@@ -4170,12 +2565,7 @@
       "pageNumber": 159,
       "lineIndex": 35,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 320,
@@ -4183,12 +2573,7 @@
       "pageNumber": 159,
       "lineIndex": 35,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 321,
@@ -4196,12 +2581,7 @@
       "pageNumber": 159,
       "lineIndex": 36,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 322,
@@ -4209,12 +2589,7 @@
       "pageNumber": 159,
       "lineIndex": 36,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 323,
@@ -4222,12 +2597,7 @@
       "pageNumber": 159,
       "lineIndex": 36,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 324,
@@ -4235,12 +2605,7 @@
       "pageNumber": 159,
       "lineIndex": 36,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 325,
@@ -4248,12 +2613,7 @@
       "pageNumber": 159,
       "lineIndex": 36,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 326,
@@ -4261,12 +2621,7 @@
       "pageNumber": 159,
       "lineIndex": 37,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 327,
@@ -4274,12 +2629,7 @@
       "pageNumber": 159,
       "lineIndex": 37,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 328,
@@ -4287,12 +2637,7 @@
       "pageNumber": 159,
       "lineIndex": 37,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 329,
@@ -4300,12 +2645,7 @@
       "pageNumber": 159,
       "lineIndex": 37,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 330,
@@ -4313,12 +2653,7 @@
       "pageNumber": 159,
       "lineIndex": 37,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 331,
@@ -4326,12 +2661,7 @@
       "pageNumber": 159,
       "lineIndex": 37,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 332,
@@ -4339,12 +2669,7 @@
       "pageNumber": 159,
       "lineIndex": 37,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 333,
@@ -4352,12 +2677,7 @@
       "pageNumber": 159,
       "lineIndex": 38,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 334,
@@ -4365,12 +2685,7 @@
       "pageNumber": 159,
       "lineIndex": 38,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 335,
@@ -4378,12 +2693,7 @@
       "pageNumber": 159,
       "lineIndex": 38,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 336,
@@ -4391,12 +2701,7 @@
       "pageNumber": 159,
       "lineIndex": 38,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 337,
@@ -4404,12 +2709,7 @@
       "pageNumber": 159,
       "lineIndex": 38,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 338,
@@ -4417,12 +2717,7 @@
       "pageNumber": 159,
       "lineIndex": 38,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 339,
@@ -4430,12 +2725,7 @@
       "pageNumber": 159,
       "lineIndex": 39,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 340,
@@ -4443,12 +2733,7 @@
       "pageNumber": 159,
       "lineIndex": 39,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 341,
@@ -4456,12 +2741,7 @@
       "pageNumber": 159,
       "lineIndex": 39,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 342,
@@ -4469,12 +2749,7 @@
       "pageNumber": 159,
       "lineIndex": 39,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 343,
@@ -4482,12 +2757,7 @@
       "pageNumber": 159,
       "lineIndex": 39,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 344,
@@ -4495,12 +2765,7 @@
       "pageNumber": 159,
       "lineIndex": 39,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 345,
@@ -4508,12 +2773,7 @@
       "pageNumber": 159,
       "lineIndex": 39,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 346,
@@ -4521,12 +2781,7 @@
       "pageNumber": 159,
       "lineIndex": 40,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 347,
@@ -4534,12 +2789,7 @@
       "pageNumber": 159,
       "lineIndex": 40,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 348,
@@ -4547,12 +2797,7 @@
       "pageNumber": 159,
       "lineIndex": 40,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 349,
@@ -4560,12 +2805,7 @@
       "pageNumber": 159,
       "lineIndex": 40,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 350,
@@ -4573,12 +2813,7 @@
       "pageNumber": 159,
       "lineIndex": 40,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 351,
@@ -4586,12 +2821,7 @@
       "pageNumber": 159,
       "lineIndex": 40,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 352,
@@ -4599,12 +2829,7 @@
       "pageNumber": 159,
       "lineIndex": 40,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 353,
@@ -4612,12 +2837,7 @@
       "pageNumber": 159,
       "lineIndex": 41,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 354,
@@ -4625,12 +2845,7 @@
       "pageNumber": 159,
       "lineIndex": 41,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 355,
@@ -4638,12 +2853,7 @@
       "pageNumber": 159,
       "lineIndex": 41,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 356,
@@ -4651,12 +2861,7 @@
       "pageNumber": 159,
       "lineIndex": 41,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 357,
@@ -4664,12 +2869,7 @@
       "pageNumber": 159,
       "lineIndex": 41,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 358,
@@ -4677,12 +2877,7 @@
       "pageNumber": 160,
       "lineIndex": 0,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 359,
@@ -4690,12 +2885,7 @@
       "pageNumber": 160,
       "lineIndex": 0,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 360,
@@ -4703,12 +2893,7 @@
       "pageNumber": 160,
       "lineIndex": 0,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 361,
@@ -4716,12 +2901,7 @@
       "pageNumber": 160,
       "lineIndex": 0,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 362,
@@ -4729,12 +2909,7 @@
       "pageNumber": 160,
       "lineIndex": 0,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 363,
@@ -4742,12 +2917,7 @@
       "pageNumber": 160,
       "lineIndex": 0,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 364,
@@ -4755,12 +2925,7 @@
       "pageNumber": 160,
       "lineIndex": 0,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 365,
@@ -4768,12 +2933,7 @@
       "pageNumber": 160,
       "lineIndex": 1,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 366,
@@ -4781,12 +2941,7 @@
       "pageNumber": 160,
       "lineIndex": 1,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 367,
@@ -4794,12 +2949,7 @@
       "pageNumber": 160,
       "lineIndex": 1,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 368,
@@ -4807,12 +2957,7 @@
       "pageNumber": 160,
       "lineIndex": 1,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 369,
@@ -4820,12 +2965,7 @@
       "pageNumber": 160,
       "lineIndex": 1,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 370,
@@ -4833,12 +2973,7 @@
       "pageNumber": 160,
       "lineIndex": 1,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 371,
@@ -4846,12 +2981,7 @@
       "pageNumber": 160,
       "lineIndex": 1,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 372,
@@ -4859,12 +2989,7 @@
       "pageNumber": 160,
       "lineIndex": 2,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 373,
@@ -4872,12 +2997,7 @@
       "pageNumber": 160,
       "lineIndex": 3,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 374,
@@ -4885,12 +3005,7 @@
       "pageNumber": 160,
       "lineIndex": 3,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 375,
@@ -4898,12 +3013,7 @@
       "pageNumber": 160,
       "lineIndex": 3,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 376,
@@ -4911,12 +3021,7 @@
       "pageNumber": 160,
       "lineIndex": 3,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 377,
@@ -4924,12 +3029,7 @@
       "pageNumber": 160,
       "lineIndex": 3,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 378,
@@ -4937,12 +3037,7 @@
       "pageNumber": 160,
       "lineIndex": 3,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 379,
@@ -4950,12 +3045,7 @@
       "pageNumber": 160,
       "lineIndex": 3,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 380,
@@ -4963,12 +3053,7 @@
       "pageNumber": 160,
       "lineIndex": 4,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 381,
@@ -4976,12 +3061,7 @@
       "pageNumber": 160,
       "lineIndex": 4,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 382,
@@ -4989,12 +3069,7 @@
       "pageNumber": 160,
       "lineIndex": 4,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 383,
@@ -5002,12 +3077,7 @@
       "pageNumber": 160,
       "lineIndex": 4,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 384,
@@ -5015,12 +3085,7 @@
       "pageNumber": 160,
       "lineIndex": 4,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 385,
@@ -5028,12 +3093,7 @@
       "pageNumber": 160,
       "lineIndex": 4,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 386,
@@ -5041,12 +3101,7 @@
       "pageNumber": 160,
       "lineIndex": 5,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 387,
@@ -5054,12 +3109,7 @@
       "pageNumber": 160,
       "lineIndex": 5,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 388,
@@ -5067,12 +3117,7 @@
       "pageNumber": 160,
       "lineIndex": 5,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 389,
@@ -5080,12 +3125,7 @@
       "pageNumber": 160,
       "lineIndex": 5,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 390,
@@ -5093,12 +3133,7 @@
       "pageNumber": 160,
       "lineIndex": 5,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 391,
@@ -5106,12 +3141,7 @@
       "pageNumber": 160,
       "lineIndex": 5,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 392,
@@ -5119,12 +3149,7 @@
       "pageNumber": 160,
       "lineIndex": 5,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 393,
@@ -5132,12 +3157,7 @@
       "pageNumber": 160,
       "lineIndex": 6,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 394,
@@ -5145,12 +3165,7 @@
       "pageNumber": 160,
       "lineIndex": 6,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 395,
@@ -5158,12 +3173,7 @@
       "pageNumber": 160,
       "lineIndex": 6,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 396,
@@ -5171,12 +3181,7 @@
       "pageNumber": 160,
       "lineIndex": 6,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 397,
@@ -5184,12 +3189,7 @@
       "pageNumber": 160,
       "lineIndex": 6,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 398,
@@ -5197,12 +3197,7 @@
       "pageNumber": 160,
       "lineIndex": 6,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 399,
@@ -5210,12 +3205,7 @@
       "pageNumber": 160,
       "lineIndex": 6,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 400,
@@ -5223,12 +3213,7 @@
       "pageNumber": 160,
       "lineIndex": 7,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 401,
@@ -5236,12 +3221,7 @@
       "pageNumber": 160,
       "lineIndex": 7,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 402,
@@ -5249,12 +3229,7 @@
       "pageNumber": 160,
       "lineIndex": 7,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 403,
@@ -5262,12 +3237,7 @@
       "pageNumber": 160,
       "lineIndex": 7,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 404,
@@ -5275,12 +3245,7 @@
       "pageNumber": 160,
       "lineIndex": 7,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 405,
@@ -5288,12 +3253,7 @@
       "pageNumber": 160,
       "lineIndex": 7,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 406,
@@ -5301,12 +3261,7 @@
       "pageNumber": 160,
       "lineIndex": 7,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 407,
@@ -5314,12 +3269,7 @@
       "pageNumber": 160,
       "lineIndex": 7,
       "fragmentIndex": 0,
-      "wordIndex": 7,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 7
     },
     {
       "cueNumber": 408,
@@ -5327,12 +3277,7 @@
       "pageNumber": 160,
       "lineIndex": 7,
       "fragmentIndex": 0,
-      "wordIndex": 8,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 8
     },
     {
       "cueNumber": 409,
@@ -5340,12 +3285,7 @@
       "pageNumber": 160,
       "lineIndex": 8,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 410,
@@ -5353,12 +3293,7 @@
       "pageNumber": 160,
       "lineIndex": 8,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 411,
@@ -5366,12 +3301,7 @@
       "pageNumber": 160,
       "lineIndex": 8,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 412,
@@ -5379,12 +3309,7 @@
       "pageNumber": 160,
       "lineIndex": 8,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 413,
@@ -5392,12 +3317,7 @@
       "pageNumber": 160,
       "lineIndex": 8,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 414,
@@ -5405,12 +3325,7 @@
       "pageNumber": 160,
       "lineIndex": 8,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 415,
@@ -5418,12 +3333,7 @@
       "pageNumber": 160,
       "lineIndex": 9,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 416,
@@ -5431,12 +3341,7 @@
       "pageNumber": 160,
       "lineIndex": 9,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 417,
@@ -5444,12 +3349,7 @@
       "pageNumber": 160,
       "lineIndex": 9,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 418,
@@ -5457,12 +3357,7 @@
       "pageNumber": 160,
       "lineIndex": 9,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 419,
@@ -5470,12 +3365,7 @@
       "pageNumber": 160,
       "lineIndex": 9,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 420,
@@ -5483,12 +3373,7 @@
       "pageNumber": 160,
       "lineIndex": 9,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 421,
@@ -5496,12 +3381,7 @@
       "pageNumber": 160,
       "lineIndex": 9,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 422,
@@ -5509,12 +3389,7 @@
       "pageNumber": 160,
       "lineIndex": 10,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 423,
@@ -5522,12 +3397,7 @@
       "pageNumber": 160,
       "lineIndex": 10,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 424,
@@ -5535,12 +3405,7 @@
       "pageNumber": 160,
       "lineIndex": 10,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     },
     {
       "cueNumber": 425,
@@ -5548,12 +3413,7 @@
       "pageNumber": 160,
       "lineIndex": 10,
       "fragmentIndex": 0,
-      "wordIndex": 3,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 3
     },
     {
       "cueNumber": 426,
@@ -5561,12 +3421,7 @@
       "pageNumber": 160,
       "lineIndex": 10,
       "fragmentIndex": 0,
-      "wordIndex": 4,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 4
     },
     {
       "cueNumber": 427,
@@ -5574,12 +3429,7 @@
       "pageNumber": 160,
       "lineIndex": 10,
       "fragmentIndex": 0,
-      "wordIndex": 5,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 5
     },
     {
       "cueNumber": 428,
@@ -5587,12 +3437,7 @@
       "pageNumber": 160,
       "lineIndex": 10,
       "fragmentIndex": 0,
-      "wordIndex": 6,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 6
     },
     {
       "cueNumber": 429,
@@ -5600,12 +3445,7 @@
       "pageNumber": 160,
       "lineIndex": 11,
       "fragmentIndex": 0,
-      "wordIndex": 0,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 0
     },
     {
       "cueNumber": 430,
@@ -5613,12 +3453,7 @@
       "pageNumber": 160,
       "lineIndex": 11,
       "fragmentIndex": 0,
-      "wordIndex": 1,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 1
     },
     {
       "cueNumber": 431,
@@ -5626,12 +3461,7 @@
       "pageNumber": 160,
       "lineIndex": 11,
       "fragmentIndex": 0,
-      "wordIndex": 2,
-      "review": {
-        "source": "torah-audio-aligner",
-        "status": "pending",
-        "flags": []
-      }
+      "wordIndex": 2
     }
   ]
 }

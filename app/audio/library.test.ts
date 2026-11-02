@@ -105,7 +105,7 @@ test.each(['vezot-haberacha', 'vezos-haberacha'])(
         status: 'available',
       })
       expect(recording?.playSrc.split('?')[0])
-        .toBe(`/audio/yoni-davidov/vezot-haberacha/${aliyah.index}.m4a`)
+        .toBe(`/audio/yoni-davidov/54%20vezot-haberacha/${aliyah.index}.m4a`)
       expect(findAuthoringRecordingForRun(input)).toBe(recording)
     }
 
@@ -159,7 +159,7 @@ test('audio authoring creates a stable missing recording identity', () => {
     narratorId: 'new-reader',
     reading: { kind: 'parsha', id: 'beresheet' },
     aliyah: 3,
-    playSrc: '/audio/new-reader/beresheet/3.m4a',
+    playSrc: '/audio/new-reader/01%20beresheet/3.m4a',
     status: 'missing',
   })
 })

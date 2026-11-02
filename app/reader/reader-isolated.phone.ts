@@ -5,6 +5,7 @@ import { resolveParshaRun } from '../view-model/navigation/parsha-routes.ts'
 import { loadPassageSelection } from '../reading/passage-selection.ts'
 import { createBookmark, BOOKMARKS_STORAGE_KEY, type ReaderBookmark } from './bookmarks.ts'
 import { getVisibleReaderFocalWord } from '../reader-scroll.ts'
+import { PLAYBACK_LEAD_SPACE_ENABLED } from './playback-lead-space.ts'
 
 declare module 'vitest/internal/browser' {
   interface BrowserCommands {
@@ -434,6 +435,41 @@ test.each([false, true])('Play selecting another aliyah retains gesture authoriz
   button(doc, 'isolated-aliyah-next').click()
   await expectAliyah(doc, destination + 1)
   expect(paused).toBe(true)
+}, 30_000)
+
+test.skipIf(!PLAYBACK_LEAD_SPACE_ENABLED)('Play makes room above the opening words so the highlight starts on the focal row, with pasuk numbers moving along', async () => {
+  const doc = await openReader('#/torah/parsha/beresheet')
+  await expectAliyah(doc, 1)
+  const book = doc.querySelector<HTMLElement>('[data-target-id="tikkun-book"]')!
+  const audio = doc.querySelector<HTMLAudioElement>('[data-target-id="reader-audio"]')!
+  let paused = true
+  Object.defineProperties(audio, {
+    paused: { configurable: true, get: () => paused },
+    readyState: { configurable: true, value: 4 },
+    duration: { configurable: true, value: 300 },
+  })
+  vi.spyOn(audio, 'load').mockImplementation(() => {})
+  vi.spyOn(audio, 'pause').mockImplementation(() => { paused = true; audio.dispatchEvent(new Event('pause')) })
+  vi.spyOn(audio, 'play').mockImplementation(async () => {
+    paused = false
+    audio.dispatchEvent(new Event('play'))
+    audio.dispatchEvent(new Event('playing'))
+  })
+  const firstWord = book.querySelector<HTMLElement>('[data-reader-canonical="true"] .word:not([hidden])')!
+  const pasuk = [...book.querySelectorAll<HTMLElement>('.line-gutter.mod-verses .location-indicator')]
+    .find(label => label.getBoundingClientRect().height > 0)!
+  const pasukOffset = pasuk.getBoundingClientRect().top - firstWord.getBoundingClientRect().top
+  expect(getVisibleReaderFocalWord(book)?.dataset.tokenKey, 'the opening word starts above the focal row').not.toBe(firstWord.dataset.tokenKey)
+
+  button(doc, 'mobile-aliyah-play-toggle').click()
+  await vi.waitFor(() => expect(paused).toBe(false), { timeout: 10_000 })
+  await vi.waitFor(() => expectFocalRow(book, firstWord.dataset.tokenKey, 'the opening word reaches the focal row'), { timeout: 5_000 })
+  expect(doc.querySelector('.is-active-word')).toBe(firstWord)
+  expect(pasuk.getBoundingClientRect().top - firstWord.getBoundingClientRect().top).toBeCloseTo(pasukOffset, 0)
+
+  button(doc, 'isolated-aliyah-next').click()
+  await expectAliyah(doc, 2)
+  expect(book.style.getPropertyValue('--reader-playback-lead'), 'the next aliyah starts without the added room').toBe('')
 }, 30_000)
 
 async function openBookmark(doc: Document, bookmark: ReaderBookmark) {

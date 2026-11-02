@@ -26,7 +26,8 @@ const payload = (): CueExportPayload => ({
 
 test('imports generated cues and keeps flags through edits, draft reload and cue export', () => {
   const original = payload()
-  const cues = parseCueImport(JSON.parse(JSON.stringify(original)), recording, tokenKeys)
+  const { cues, audioIdentityMissing } = parseCueImport(JSON.parse(JSON.stringify(original)), recording, tokenKeys)
+  expect(audioIdentityMissing).toBe(false)
   const editor = createCueDraftEditor()
   editor.bind({ tokenKeys, sourceCues: cues, origin: 'published', savedAt: null })
   expect(Object.isFrozen(editor.snapshot().cues[0].review?.flags[0])).toBe(true)
@@ -47,12 +48,12 @@ test('imports generated cues and keeps flags through edits, draft reload and cue
   expect(exported.cues[2].timeStart).toBe(2.1)
 })
 
-test('reviewing a flag is a dirty metadata edit and retains the flag history', () => {
+test('reviewing a flag retains its history without changing what would be exported', () => {
   const cues = payload().cues
   const editor = createCueDraftEditor()
   editor.bind({ tokenKeys, sourceCues: cues, origin: 'published', savedAt: null })
   editor.replaceCues(cues.map(markCueReviewed))
-  expect(editor.snapshot().dirty).toBe(true)
+  expect(editor.snapshot().dirty).toBe(false)
   expect(pendingCueFlags(editor.snapshot().cues[0])).toHaveLength(0)
   expect(editor.snapshot().cues[0].review?.flags[0]).toMatchObject({ id: 'test:0', status: 'reviewed', message: 'Listen and check the onset.' })
   expect(cues[0].review?.flags[0].status).toBe('pending')
@@ -67,15 +68,21 @@ test('next flagged wraps and excludes resolved flags', () => {
   expect(nextFlaggedCueIndex([], -1)).toBe(-1)
 })
 
-test('rejects wrong media, missing identity, wrong text and damaged review flags', () => {
+test('rejects wrong media, wrong text and damaged review flags', () => {
   expect(() => parseCueImport({ ...payload(), audioId: 'other' }, recording, tokenKeys)).toThrow('different audio')
-  expect(() => parseCueImport({ ...payload(), mediaIdentity: undefined }, recording, tokenKeys)).toThrow('different audio')
+  expect(() => parseCueImport({ ...payload(), mediaIdentity: { ...recording.mediaIdentity!, digest: 'b'.repeat(64) } }, recording, tokenKeys)).toThrow('different audio')
   expect(() => parseCueImport(payload(), recording, ['2:0:0:0', ...tokenKeys.slice(1)])).toThrow('aliyah text')
   for (const review of [null, { source: 'unknown', status: 'pending', flags: [] },
     { source: 'torah-audio-aligner', status: 'reviewed', flags: payload().cues[0].review!.flags },
     { source: 'torah-audio-aligner', status: 'pending', flags: [{ ...payload().cues[0].review!.flags[0], sourceTime: NaN }] }]) {
     expect(parseWordCue({ ...payload().cues[0], review })).toBeNull()
   }
+})
+
+test('flags cues recorded with new audio so the import asks for confirmation', () => {
+  const result = parseCueImport({ ...payload(), mediaIdentity: undefined }, recording, tokenKeys)
+  expect(result.audioIdentityMissing).toBe(true)
+  expect(result.cues).toHaveLength(3)
 })
 
 test('legacy cue files still parse without review metadata', () => {

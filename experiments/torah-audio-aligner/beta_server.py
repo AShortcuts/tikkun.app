@@ -56,8 +56,6 @@ class BetaApp:
 
     def run_alignment(self, identifier):
         entry = self.store.get(identifier)
-        from analysis_runs import require_budget
-        require_budget(360)
         with self.job_lock:
             if self.job and self.job["status"] == "running":
                 raise RevisionConflict("One alignment is already running. Wait for it to finish.")

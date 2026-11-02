@@ -38,7 +38,7 @@
     align-items: center;
     justify-content: center;
     gap: 0.55rem;
-    padding: 0.42rem max(0.75rem, env(safe-area-inset-right, 0px)) 0.46rem
+    padding: 0.2rem max(0.75rem, env(safe-area-inset-right, 0px)) 0.46rem
       max(0.75rem, env(safe-area-inset-left, 0px));
     border-bottom: 1px solid
       color-mix(in srgb, var(--text-color) 8%, transparent);

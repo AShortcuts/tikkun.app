@@ -5,10 +5,13 @@ import json
 import subprocess
 import unittest
 
+import numpy as np
+
 from aligner import HERE, REPO
 from beta_store import initial_state, validate_state
 from core import AlignmentError
 from generated_cues import generated_draft
+from held_notes import late_start_hints
 from test_core import fixture
 
 
@@ -72,6 +75,66 @@ class GeneratedCueTests(unittest.TestCase):
         self.seed["occurrences"].pop()
         with self.assertRaisesRegex(AlignmentError, "No saved timing"):
             self.export()
+
+
+class ReviewerFlagTests(unittest.TestCase):
+    def setUp(self):
+        self.bundle, self.recording, self.proposal, _ = fixture()
+        self.seed = deepcopy(self.proposal)
+
+    def flags(self, hints=()):
+        payload = generated_draft(self.bundle, self.recording, self.proposal, initial_state(self.proposal), self.seed, hints)
+        return [[flag["kind"] for flag in cue["review"]["flags"]] for cue in payload["cues"]], payload
+
+    def test_region_anchors_and_close_restarts_are_not_shown(self):
+        self.proposal["events"] = [
+            {"kind": "uncertain_region_anchor", "beforeTokenKey": "1:0:0:1", "sourceSample": 15000, "quietAnchorFound": False},
+            {"kind": "ambiguous_repeated_prefix", "tokenKey": "1:0:0:1", "sourceStartSample": 16000, "secondPrefixSample": 16000 + 9280},
+            {"kind": "ambiguous_repeated_prefix", "tokenKey": "1:0:0:1", "sourceStartSample": 16000, "secondPrefixSample": 16000 + 12000},
+            {"kind": "candidate_skip", "tokenKey": "1:0:0:1"},
+        ]
+        kinds, payload = self.flags()
+        self.assertEqual(kinds, [[], ["ambiguous_repeated_prefix", "candidate_skip"]])
+        # Flag ids keep the original event positions, so saved reviews still match.
+        self.assertEqual([flag["id"].rsplit(":", 1)[1] for flag in payload["cues"][1]["review"]["flags"]], ["2", "3"])
+
+    def test_late_start_hint_becomes_a_pending_flag_at_the_suggested_time(self):
+        kinds, payload = self.flags([{"kind": "possible_late_start", "tokenKey": "1:0:0:1",
+                                      "sourceStartSample": 9600, "alignedStartSample": 16000}])
+        self.assertEqual(kinds, [[], ["possible_late_start"]])
+        flag = payload["cues"][1]["review"]["flags"][0]
+        self.assertEqual((flag["status"], flag["sourceTime"]), ("pending", 0.6))
+        self.assertIn("0.4 s earlier", flag["message"])
+        self.assertEqual(payload["cues"][1]["review"]["status"], "pending")
+
+
+class HeldNoteHintTests(unittest.TestCase):
+    """A held note (loud), a dip, then the next word's consonant before the aligned start."""
+    rate = 16000
+
+    def signals(self, dip_db=-40.0, letters=0.2):
+        frames = 200  # 2 s of 10 ms loudness frames
+        db = np.full(frames, -15.0)
+        db[100:105] = dip_db                     # dip at 1.00-1.05 s
+        model_frames = np.arange(0, frames * 160, 320)
+        letter = np.full(len(model_frames), letters)
+        return db, letter, model_frames
+
+    def hints(self, **options):
+        tokens = [{"tokenKey": "a"}, {"tokenKey": "b"}]
+        occurrences = [{"tokenKey": "a", "sourceStartSample": 0, "sourceEndSample": int(0.5 * self.rate)},
+                       {"tokenKey": "b", "sourceStartSample": int(1.6 * self.rate), "sourceEndSample": int(1.9 * self.rate)}]
+        db, letter, starts = self.signals(**options)
+        return late_start_hints(tokens, occurrences, db, letter, starts, self.rate)
+
+    def test_dip_and_letter_evidence_flag_an_earlier_start(self):
+        [hint] = self.hints()
+        self.assertEqual(hint["tokenKey"], "b")
+        self.assertAlmostEqual(hint["sourceStartSample"] / self.rate, 1.05, places=2)
+
+    def test_needs_both_a_clear_dip_and_letter_evidence(self):
+        self.assertEqual(self.hints(dip_db=-18.0), [])
+        self.assertEqual(self.hints(letters=0.01), [])
 
 
 if __name__ == "__main__":

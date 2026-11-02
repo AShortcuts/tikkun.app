@@ -11,3 +11,11 @@ Rules:
 Maftir:
 - There is no separate maftir cue file
 - Maftir reuses the seventh aliyah recording and resolves to `7.json`
+
+Saving:
+- To generate cues for new recordings, add the audio to the source recordings folder and run `npm run cues:generate`; it saves a ZIP to Downloads for Import cues
+- In the admin panel on the Mac running `npm run dev`, Export saves the cue file straight to its path here after the same checks the build runs
+- On any other computer, or the public site, Export offers Download Cues (and Download Audio after a microphone pass) to send to yourself
+- To place downloaded cue files later, run `npm run cues:save -- <file.json> [...]`, or import them in the admin panel and Export
+- Cues timed while recording new audio have no audio fingerprint: add the audio to the project first, then use Import cues on that aliyah and confirm it plays the new recording
+- Saving never commits; review the git diff as usual

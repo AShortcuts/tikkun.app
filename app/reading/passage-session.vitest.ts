@@ -38,6 +38,8 @@ function harness(choose = async (resolution: PassageAudioResolution): Promise<Pa
   return { run, audio, controller, session, choosePortion }
 }
 
+const playPath = (id: string) => audioRecordings.find(recording => recording.id === id)!.playSrc
+
 test('loads combined aliyah five with finite duration and seeks across source files', async () => {
   const { run, audio, session, controller, choosePortion } = harness()
   expect(session.lookup(run, 5).available).toBe(true)
@@ -47,10 +49,10 @@ test('loads combined aliyah five with finite duration and seeks across source fi
   expect(firstDuration).toBeGreaterThan(0)
   expect(controller.duration).toBeGreaterThan(firstDuration)
   controller.seek(firstDuration + 5)
-  expect(audio.src).toContain('/vayelech/4.mp3')
+  expect(new URL(audio.src).pathname).toBe(playPath('vayelech-4'))
   expect(audio.currentTime).toBe(5)
   controller.seek(2)
-  expect(audio.src).toContain('/vayelech/3.mp3')
+  expect(new URL(audio.src).pathname).toBe(playPath('vayelech-3'))
   expect(audio.currentTime).toBe(2)
   expect(choosePortion).not.toHaveBeenCalled()
 })

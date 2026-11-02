@@ -143,8 +143,9 @@ export class HighlightController {
     }
 
     const elements = this.getTokenElements(tokenKey)
-    elements.forEach((element) => element.classList.add(ACTIVE_CLASS))
-    this.activeElements = elements
+    const activeElements = [...elements, ...this.getJoinedElements(tokenKey, elements)]
+    activeElements.forEach((element) => element.classList.add(ACTIVE_CLASS))
+    this.activeElements = activeElements
     this.activeTokenKey = tokenKey
     this.activeSequenceIndex = this.sequenceIndexByTokenKey.get(tokenKey) ?? -1
     this.emitActiveTokenChanged(tokenKey)
@@ -221,6 +222,20 @@ export class HighlightController {
 
   private getPrimaryTokenElement(tokenKey: string) {
     return this.getTokenElements(tokenKey)[0] ?? null
+  }
+
+  // Reading layout joins a maqaf phrase that the Torah's physical rows split
+  // into separate tokens; the whole phrase lights up with any of its cues.
+  private getJoinedElements(tokenKey: string, elements: readonly HTMLElement[]) {
+    const partnerKeys = new Set<string>()
+    for (const element of elements) {
+      for (const key of element.dataset.maqafGroup?.split(' ') ?? []) {
+        if (key && key !== tokenKey) partnerKeys.add(key)
+      }
+    }
+    return [...partnerKeys]
+      .flatMap((key) => [...this.book.querySelectorAll<HTMLElement>(`[data-token-key="${key}"]`)])
+      .filter((element) => !element.hidden)
   }
 
   private getVisibleTokenElement(tokenKey: string) {

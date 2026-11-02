@@ -3,5 +3,5 @@
   "TIKKUN_ANALYTICS_APP_KEY": "iAu7GZxJiKU5",
   "TIKKUN_ANALYTICS_SITE_ORIGIN": "https://tikkunreader.com",
   "TIKKUN_ANALYTICS_APP_ORIGIN": "https://app.tikkunreader.com",
-  "TIKKUN_ANALYTICS_APP_COLLECTOR": "https://adamn.cc/api/echo"
+  "TIKKUN_ANALYTICS_APP_COLLECTOR": "https://collect.adamn.cc/api/echo"
 }

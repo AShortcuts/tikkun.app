@@ -148,7 +148,7 @@ it automatically.
 | Source of truth | Command | Generated output | Review owner |
 | --- | --- | --- | --- |
 | `text/torah-toc.json` | `npm run torah:index` | `generated/torah-index.json` | Reader data maintainer |
-| Curated narrator audio source | `npm run audio:sync -- <narrator> <source>` | `site/audio/**`, `generated/audio-manifest.ts` | Media maintainer |
+| Curated narrator audio source | `npm run audio:sync -- <narrator> <source>` | `audio/**`, `generated/audio-manifest.ts` | Media maintainer |
 | `audio-cues/**`, audio manifest, canonical reading tokens | `npm run reading:manifest` | `generated/public-reading-manifest.ts` | Cue/public-truth maintainer |
 | Validated local video outputs and registered links | `npm run video:manifest` | `generated/video-manifest.ts` | Media maintainer |
 | Application source and generated manifests | `npm run build` | `dist/**`, including `_headers` and `service-worker.js` | Release owner |

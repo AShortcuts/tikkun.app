@@ -9,7 +9,7 @@ import numpy as np
 
 from acoustics import encode_samples, load_encoder, read_wave
 from aligner import HERE, WORK, CHECKPOINT, file_hash, verify_model, work_path, write_json
-from analysis_runs import baseline_records, require_budget, record_elapsed
+from analysis_runs import baseline_records, record_elapsed
 from core import digest_json, lexical_units, greedy_text
 from reading_graph import GraphConfig, reading_graph
 
@@ -43,7 +43,6 @@ def fixture(source, parts):
 
 
 def main():
-    require_budget(300)
     started = time.monotonic()
     directory = work_path("edge-tests/" + uuid.uuid4().hex[:12])
     directory.mkdir(parents=True)

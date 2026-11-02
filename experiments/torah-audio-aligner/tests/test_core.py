@@ -12,7 +12,8 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from core import (AlignmentError, ctc_viterbi, digest_json, frame_geometry, greedy_text,
                   lexical_units, propose, replay_start, reviewed_draft, timing_metrics, validate_result)
-from aligner import assert_no_cue_labels, annotation_template, bounded_worker, work_path, write_json
+from aligner import (InferenceWorker, InferenceWorkerFailed, assert_no_cue_labels, annotation_template,
+                     bounded_worker, work_path, write_json)
 
 HERE = Path(__file__).resolve().parents[1]
 
@@ -277,6 +278,82 @@ class ProcessAndStorageTests(unittest.TestCase):
         result = bounded_worker([sys.executable, "-c", "import sys; print('expected', file=sys.stderr); sys.exit(7)"], timeout=2)
         self.assertEqual(result.returncode, 7)
         self.assertIn("expected", result.stderr)
+
+
+# Speaks the inference server's line protocol without loading a model.
+FAKE_INFERENCE_SERVER = r"""
+import json, os, subprocess, sys, time
+from pathlib import Path
+print(json.dumps({"ready": True, "implementation": {"version": Path(sys.argv[1]).read_text()}}), flush=True)
+for line in sys.stdin:
+    request = json.loads(line)
+    if request.get("crash"):
+        print("ERROR: simulated crash", file=sys.stderr, flush=True)
+        sys.exit(3)
+    if request.get("child"):
+        subprocess.Popen([sys.executable, "-c", request["child"]])
+    time.sleep(request.get("sleep", 0))
+    if request.get("fail"):
+        print("simulated traceback", file=sys.stderr, flush=True)
+        print(json.dumps({"ok": False, "error": "bad input"}), flush=True)
+        continue
+    print(json.dumps({"ok": True, "result": {"pid": os.getpid()}}), flush=True)
+"""
+
+
+class InferenceWorkerTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.version = self.root / "version"
+        self.version.write_text("1")
+        self.worker = self.make_worker(idle_seconds=60)
+
+    def make_worker(self, idle_seconds):
+        worker = InferenceWorker([sys.executable, "-c", FAKE_INFERENCE_SERVER, str(self.version)], idle_seconds,
+                                 lambda: {"implementation": {"version": self.version.read_text()}, "weights": [0]})
+        self.addCleanup(worker.stop)
+        return worker
+
+    def pid(self, worker=None, timeout=5):
+        return (worker or self.worker).run({}, timeout)["result"]["pid"]
+
+    def test_reuses_one_process_until_the_code_changes(self):
+        first = self.pid()
+        self.assertEqual(self.pid(), first)
+        self.version.write_text("2")
+        self.assertNotEqual(self.pid(), first)
+
+    def test_timeout_stops_the_process_group_and_the_next_recording_starts_fresh(self):
+        first = self.pid()
+        marker = self.root / "should-not-exist"
+        child = "import time; from pathlib import Path; time.sleep(.35); Path(" + repr(str(marker)) + ").write_text('orphan')"
+        with self.assertRaises(subprocess.TimeoutExpired):
+            self.worker.run({"child": child, "sleep": 3}, .15)
+        time.sleep(.3)
+        self.assertFalse(marker.exists())
+        self.assertNotEqual(self.pid(), first)
+
+    def test_a_crash_reports_its_stderr_and_the_next_recording_starts_fresh(self):
+        first = self.pid()
+        with self.assertRaises(InferenceWorkerFailed) as raised:
+            self.worker.run({"crash": True}, 5)
+        self.assertIn("ERROR: simulated crash", raised.exception.stderr)
+        self.assertNotEqual(self.pid(), first)
+
+    def test_a_failed_recording_returns_its_stderr_and_keeps_the_process(self):
+        first = self.pid()
+        reply = self.worker.run({"fail": True}, 5)
+        self.assertEqual((reply["ok"], reply["error"]), (False, "bad input"))
+        self.assertIn("simulated traceback", reply["stderr"])
+        self.assertEqual(self.pid(), first)
+
+    def test_replaces_the_process_before_its_idle_exit_can_race_a_request(self):
+        worker = self.make_worker(idle_seconds=5.2)
+        first = self.pid(worker)
+        time.sleep(.3)
+        self.assertNotEqual(self.pid(worker), first)
 
 
 if __name__ == "__main__":

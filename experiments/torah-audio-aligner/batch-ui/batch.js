@@ -88,7 +88,6 @@ function renderQueue() {
   const remaining = results.filter(item => !item.review.exportReady).length;
   $('batch-summary').textContent = `${waiting} waiting · ${remaining} to review${queue.running ? ' · aligning' : ''}`;
   $('queue-status').textContent = queue.clearPending ? 'Queue cleared. The current recording is finishing safely; its cues will stay available.' : queue.pauseReason || (queue.running ? 'Aligning one recording. You can review completed results now.' : waiting ? 'Queue saved. Start when you are ready.' : results.length ? 'Results saved. Review them at your pace.' : 'Add recordings to begin. Nothing starts until you choose Start queue.');
-  $('queue-budget').textContent = `${Math.floor(queue.remainingTestingSeconds / 60)} minutes remain in the approved testing allowance. No model downloads are needed.`;
   $('queue-start').disabled = busy || queue.clearPending || !waiting || !queue.paused;
   $('queue-start').textContent = queue.items.some(item => item.status === 'interrupted') ? 'Resume queue' : 'Start queue';
   $('queue-pause').disabled = busy || queue.paused;
@@ -313,7 +312,7 @@ document.addEventListener('aligner-review-change', updateQuickControls);
 document.addEventListener('aligner-selection', updateQuickControls);
 document.addEventListener('aligner-run-requested', action(async () => { showBatch(true); await refreshQueue(true); }));
 $('align').textContent = 'Queue fresh alignment';
-$('beta-about').textContent = 'Uses the existing local model, Tikkun recordings, and mapped MP3/M4A uploads. Batch alignment runs one recording at a time, with four CPU threads and a three-minute acoustic limit. Uploads are limited to 100 MB and 15 minutes per complete aliyah. Live following is not implemented. Timing review does not verify pronunciation or taamim correctness. Nothing here publishes to Tikkun.';
+$('beta-about').textContent = 'Uses the existing local model, Tikkun recordings, and mapped MP3/M4A uploads. Batch alignment runs one recording at a time, with eight CPU threads and a three-minute acoustic limit. Uploads are limited to 100 MB and 15 minutes per complete aliyah. Live following is not implemented. Timing review does not verify pronunciation or taamim correctness. Nothing here publishes to Tikkun.';
 
 try {
   const [sources, catalog] = await Promise.all([api('/api/batch/library'), api('/api/catalog')]);

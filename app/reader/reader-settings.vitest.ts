@@ -510,8 +510,9 @@ test('settings synchronize representative controls and release scheduled effects
   ).click()
   expect(state.preferences.customTextColor).not.toBe('#999999')
 
-  required<HTMLButtonElement>('[data-focal-point-mode="browser"]').click()
   expect(state.preferences.focalPointMode).toBe('browser')
+  required<HTMLButtonElement>('[data-focal-point-mode="reader"]').click()
+  expect(state.preferences.focalPointMode).toBe('reader')
 
   const autoScroll = required<HTMLInputElement>(
     '[data-target-id="settings-auto-scroll"]'

@@ -24,18 +24,24 @@ class ReviewEvidenceTests(unittest.TestCase):
             signal_quality(np.array([np.nan] * 2048))
         self.assertIn("near-silent-input", signal_quality(np.zeros(2048))["flags"])
 
-    def test_repeated_acoustic_prefix_retains_two_source_times(self):
+    def prefix_events(self, second_frame):
         values = np.full((70, 4), -12.0)
         values[:, 3] = -.001
-        for frame in [5, 40]:
+        for frame in [5, second_frame]:
             values[frame, :] = -12
             values[frame, 0] = -.001
         occurrence = {"lexicalKey": "a/0", "tokenKey": "a", "alignmentText": "ab",
                       "sourceStartSample": 1600, "sourceEndSample": 21000}
-        events = repeated_prefixes(values, [occurrence], {"a": 0, "b": 1}, 3)
+        return repeated_prefixes(values, [occurrence], {"a": 0, "b": 1}, 3)
+
+    def test_repeated_acoustic_prefix_retains_two_source_times(self):
+        events = self.prefix_events(45)
         self.assertEqual(events[0]["sourceStartSample"], 1600)
-        self.assertEqual(events[0]["secondPrefixSample"], 12800)
+        self.assertEqual(events[0]["secondPrefixSample"], 14400)
         self.assertEqual(events[0]["kind"], "ambiguous_repeated_prefix")
+
+    def test_chanted_rearticulation_under_three_quarters_of_a_second_is_not_a_restart(self):
+        self.assertEqual(self.prefix_events(40), [])
 
     def test_voiced_gap_is_a_review_region_without_rewriting_word_end(self):
         t = np.arange(48000) / 16000

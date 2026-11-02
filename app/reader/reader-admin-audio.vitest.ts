@@ -95,7 +95,8 @@ test.each([
   await clickPlay(width)
   await vi.waitFor(() => {
     expect(element(panelSelector).textContent).toContain('Vezot Haberacha Aliyah 7')
-    expect(element<HTMLAudioElement>('audio').currentSrc).toContain('/vezot-haberacha/7.m4a')
+    expect(new URL(element<HTMLAudioElement>('audio').currentSrc).pathname)
+      .toBe(new URL(recording.playSrc, location.origin).pathname)
     expectCueStatus(publishedStatus)
   }, { timeout: 10_000, interval: 50 })
   const audio = element<HTMLAudioElement>('audio')

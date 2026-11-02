@@ -15,12 +15,8 @@ import {
   listRecordings,
 } from '../audio/library.ts'
 import { isParshaAudioRecording } from '../audio/types.ts'
-import { LeiningGenerator } from '../calendar-model/generator.ts'
 import hebrewNumeral from '../hebrew-numeral.ts'
-import {
-  generateParshaUrl,
-  resolveParshaRun,
-} from '../view-model/navigation/parsha-routes.ts'
+import { generateParshaAliyahUrl } from '../view-model/navigation/parsha-aliyah-url.ts'
 import { generateAboutUrl } from '../view-model/navigation/url-parser.ts'
 import { iconMarkup } from './icons.ts'
 
@@ -32,30 +28,6 @@ const analyticsTimeFormat = new Intl.DateTimeFormat(undefined, {
   dateStyle: 'medium',
   timeStyle: 'short',
 })
-const analyticsRouteGenerator = new LeiningGenerator({
-  ashkenazi: true,
-  includeModernHolidays: false,
-  israel: false,
-})
-const analyticsRouteCache = new Map<string, ReturnType<typeof resolveParshaRun>>()
-
-function resolveAnalyticsParshaRun(parshaSlug: string) {
-  if (!analyticsRouteCache.has(parshaSlug)) {
-    analyticsRouteCache.set(
-      parshaSlug,
-      resolveParshaRun(analyticsRouteGenerator, parshaSlug)
-    )
-  }
-
-  return analyticsRouteCache.get(parshaSlug) ?? null
-}
-
-function generateAnalyticsAliyahUrl(parshaSlug: string, aliyah: number) {
-  const resolved = resolveAnalyticsParshaRun(parshaSlug)
-  const startRef = resolved?.run.aliyot.find((candidate) => candidate.index === aliyah)?.start
-
-  return generateParshaUrl(resolved?.canonicalSlug ?? parshaSlug, startRef)
-}
 
 function formatSeconds(seconds: number) {
   if (!Number.isFinite(seconds) || seconds <= 0) return '0.00s'
@@ -538,7 +510,7 @@ function renderCoverage(
                           : 'mod-empty'
                     const selectedClass =
                       selectedAliyah === aliyah ? ' is-selected' : ''
-                    const href = generateAnalyticsAliyahUrl(summary.parshaSlug, aliyah)
+                    const href = generateParshaAliyahUrl(summary.parshaSlug, aliyah)
                     return `
                       <a
                         class="analytics-coverage-pill ${state}${selectedClass}"

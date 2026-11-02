@@ -20,7 +20,7 @@ test('app uses native HTTP without changing browser fetch or sharing the website
   const post = vi.mocked(CapacitorHttp.post).mockResolvedValue({ status: 204, data: '', headers: {}, url: config.appCollector })
   const fetch = vi.fn(); vi.stubGlobal('fetch', fetch)
   await analyticsTransport(config, true)(payload)
-  expect(post).toHaveBeenCalledWith(expect.objectContaining({ url: 'https://adamn.cc/api/echo', data: payload,
+  expect(post).toHaveBeenCalledWith(expect.objectContaining({ url: 'https://collect.adamn.cc/api/echo', data: payload,
     headers: { 'Content-Type': 'application/json', 'User-Agent': 'TikkunReader/1.0 Mozilla/5.0 (iPhone)' },
     connectTimeout: 5000, readTimeout: 5000, disableRedirects: true }))
   expect(fetch).not.toHaveBeenCalled()

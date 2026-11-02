@@ -85,10 +85,10 @@ export const goldenSearchDocuments: readonly GoldenSearchDocument[] = [
     keywords: ['parsha'],
   },
   {
-    id: 'reading.chayei-sara',
-    destinationId: 'reading.chayei-sara',
-    primary: 'Chayei Sara',
-    aliases: ['Chayei S.', 'חיי שרה'],
+    id: 'reading.chayei-sarah',
+    destinationId: 'reading.chayei-sarah',
+    primary: 'Chayei Sarah',
+    aliases: ['Chayei Sara', 'Chayei S.', 'חיי שרה'],
     keywords: ['parsha'],
   },
   {
@@ -154,7 +154,7 @@ export const goldenRankingQueries: readonly GoldenRankingQuery[] = [
   {
     category: 'abbreviation',
     query: 'Chayei S.',
-    expectedId: 'reading.chayei-sara',
+    expectedId: 'reading.chayei-sarah',
     maxRank: 1,
   },
   {

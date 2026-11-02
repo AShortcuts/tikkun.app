@@ -1,18 +1,26 @@
 import { resolveReadingRun } from '../view-model/navigation/parsha-routes.ts'
-import { readingTitle } from '../calendar-model/model-types.ts'
 import { trackAnalytics } from '../analytics/client.ts'
 import { capturePrintSelection, selectedPrintRange } from '../printing/print-selection.ts'
 import { createPlaybackAnalytics, trackPreferenceChanges } from '../analytics/observers.ts'
 import { readerRouteKind } from '../analytics/schema.ts'
+import { readingTiming } from '../analytics/reading-timing.ts'
 import { getWebServiceWorker, isNativeApp } from '../platform/native.ts'
 import { mountReaderSwipeBack } from './reader-swipe-back.ts'
+import { createAliyahStartPopup, type AliyahStartPopup } from './aliyah-start-popup.ts'
+import { setupDebugFocalMeasure } from './debug-focal-measure.ts'
+import {
+  createReaderSearchActions as buildReaderSearchActions,
+  isBookmarkAction,
+  titleCaseBookmarkBadge,
+} from './reader-search-actions.ts'
+import { listenForRevealGesture } from './reveal-gesture.ts'
+import { createPlaybackLeadSpace, type PlaybackLeadSpace } from './playback-lead-space.ts'
 import { findReadingVerseStartWord, readingVerseAtWord } from './reading-verse-target.ts'
 import { createNativeUpdatePrompt } from '../updates/native-update-prompt.ts'
 import { loadPassageTokens } from '../audio/passage-tokens.ts'
 import { audioButtonState } from '../reading/audio-button-state.ts'
 import { createRecordingRangeResolver } from '../audio/recording-ranges.ts'
 import { PassageAudioResolver, type PassageAudioState } from '../reading/passage-audio.ts'
-import { HDate } from '@hebcal/hdate'
 import utils from '../components/utils.ts'
 import { ScrollViewModel } from '../view-model/scroll-view-model.ts'
 import { createIsolatedAliyahViewModel } from '../reading/isolated-aliyah-view.ts'
@@ -40,33 +48,17 @@ import {
 import { TopBarTracker } from '../view-model/navigation/top-bar-model.ts'
 import { createPrintContext } from '../printing/print-context.ts'
 import {
-  createAliyahNavigationActions,
-  createNavigationAction,
-  createPageNavigationActions,
-  type NavigationAction,
-} from '../navigation/actions.ts'
-import {
   createLazyCommandPalette,
   type LazyCommandPalette,
 } from '../navigation/lazy-command-palette.ts'
 import {
-  holidayLeiningKeywords,
-  selectCommandPaletteHolidayRun,
-} from '../navigation/holiday-actions.ts'
-import {
-  generateCueAnalyticsUrl,
-  generatePageUrl,
   generateAliyahUrl,
   parseUrl,
 } from '../view-model/navigation/url-parser.ts'
 import { isSemanticallyRoutableReaderHash } from '../view-model/navigation/routable-reader-hash.ts'
 import { isReaderHash } from '../view-model/navigation/reader-hash.ts'
 import { shareReadingLink } from './share-reading.ts'
-import {
-  generateParshaUrl,
-  getParshaSearchTermsForSlug,
-  resolveParshaRun,
-} from '../view-model/navigation/parsha-routes.ts'
+import { resolveParshaRun } from '../view-model/navigation/parsha-routes.ts'
 import { iconMarkup, type IconName } from '../components/icons.ts'
 import {
   applyReaderPreferences,
@@ -152,6 +144,7 @@ import {
 import { createMount, type MountScope } from '../lifecycle/mount.ts'
 import {
   createLastReadingHash,
+  isSameReadingPlace,
   loadEligibleLastReading,
   saveLastReading,
   type LastReading,
@@ -165,6 +158,7 @@ import {
 import { parseTokenKey } from '../reader/token-position.ts'
 import {
   BookmarkStorageError,
+  checkpointFromBookmark,
   createBookmark,
   loadBookmarksState,
   saveBookmarks,
@@ -228,10 +222,7 @@ import {
   isParshaAudioRecording,
   type AudioRecording,
 } from '../audio/types.ts'
-import {
-  type LeiningInstance,
-  type LeiningRun,
-} from '../calendar-model/model-types.ts'
+import type { LeiningRun } from '../calendar-model/model-types.ts'
 import { compareRefs } from '../calendar-model/ref-utils.ts'
 import {
   getAdminDraftStorageKey,
@@ -377,6 +368,8 @@ export function startReaderRuntime({
   let cueAuthoringGlobal: CueAuthoring | null = null
   let cueAuthoringLoaderGlobal: CueAuthoringLoader | null = null
   let readerPlaybackGlobal: ReaderPlayback | null = null
+  let playbackLeadSpaceGlobal: PlaybackLeadSpace | null = null
+  let playbackWasPlaying = false
   let readerSettingsGlobal: LazyReaderSettings | null = null
   let readerControlsGlobal: ReaderControls | null = null
   let openMediaGlobal: ((returnFocus?: HTMLElement) => void) | null = null
@@ -884,182 +877,6 @@ export function startReaderRuntime({
     )
   }
 
-  let debugFocalMeasureFrame = 0
-
-  function removeDebugFocalMeasure() {
-    if (debugFocalMeasureFrame) {
-      cancelAnimationFrame(debugFocalMeasureFrame)
-      debugFocalMeasureFrame = 0
-    }
-
-    document
-      .querySelectorAll('.debug-focal-line, .debug-focal-measure')
-      .forEach((el) => el.remove())
-  }
-
-  function toggleDebugFocalMeasure() {
-    if (document.querySelector('.debug-focal-line, .debug-focal-measure')) {
-      removeDebugFocalMeasure()
-      return
-    }
-
-    const makeLine = (color: string, label: string) => {
-      const line = document.createElement('div')
-      line.className = 'debug-focal-line'
-      line.style.cssText = `
-        position: fixed;
-        left: 0;
-        right: 0;
-        height: 0;
-        border-top: 2px solid ${color};
-        z-index: 999999;
-        pointer-events: none;
-        font: 13px sans-serif;
-        color: white;
-        text-shadow: 0 1px 2px black;
-      `
-      line.textContent = label
-      document.body.appendChild(line)
-      return line
-    }
-
-    const makeMeasure = (color: string, x: number, labelPrefix: string) => {
-      const line = document.createElement('div')
-      const label = document.createElement('div')
-      line.className = 'debug-focal-measure'
-      label.className = 'debug-focal-measure'
-
-      line.style.cssText = `
-        position: fixed;
-        left: ${x}px;
-        width: 0;
-        border-left: 2px dashed ${color};
-        z-index: 999999;
-        pointer-events: none;
-      `
-
-      label.style.cssText = `
-        position: fixed;
-        left: ${x + 8}px;
-        z-index: 999999;
-        pointer-events: none;
-        padding: 2px 6px;
-        border-radius: 4px;
-        background: rgba(0, 0, 0, 0.72);
-        color: white;
-        font: 13px sans-serif;
-        white-space: nowrap;
-      `
-
-      document.body.append(line, label)
-
-      return {
-        update(startY: number, endY: number) {
-          const top = Math.min(startY, endY)
-          const height = Math.abs(endY - startY)
-          line.style.top = `${top}px`
-          line.style.height = `${height}px`
-          label.style.top = `${top + height / 2 - 12}px`
-          label.textContent = `${labelPrefix}: ${Math.round(height)}px`
-        },
-      }
-    }
-
-    const readerBlue = 'lightskyblue'
-    const browser = makeLine('red', 'Browser center')
-    const reader = makeLine(readerBlue, 'Reader center')
-    const browserTop = makeMeasure('red', 24, 'Browser top')
-    const browserBottom = makeMeasure('red', 104, 'Browser bottom')
-    const readerTop = makeMeasure(readerBlue, 220, 'Reader top')
-    const readerBottom = makeMeasure(readerBlue, 300, 'Reader bottom')
-
-    const update = () => {
-      const book = document.querySelector<HTMLElement>('[data-target-id="tikkun-book"]')
-      if (!book || !browser.isConnected) {
-        removeDebugFocalMeasure()
-        return
-      }
-
-      const rect = book.getBoundingClientRect()
-      const browserTopY = 0
-      const browserBottomY = document.documentElement.clientHeight
-      const browserCenterY = browserBottomY / 2
-      const readerTopY = rect.top
-      const readerBottomY = rect.top + book.clientHeight
-      const readerCenterY = readerTopY + book.clientHeight / 2
-
-      browser.style.top = `${browserCenterY}px`
-      reader.style.top = `${readerCenterY}px`
-      browserTop.update(browserTopY, browserCenterY)
-      browserBottom.update(browserCenterY, browserBottomY)
-      readerTop.update(readerTopY, readerCenterY)
-      readerBottom.update(readerCenterY, readerBottomY)
-
-      debugFocalMeasureFrame = requestAnimationFrame(update)
-    }
-
-    update()
-  }
-
-  function setupDebugControls(scope: MountScope) {
-    document.addEventListener(
-      'click',
-      (event) => {
-        const target = event.target
-        if (!(target instanceof Element)) return
-        if (!target.closest('[data-target-id="debug-focal-measure-toggle"]')) {
-          return
-        }
-        toggleDebugFocalMeasure()
-      },
-      { signal: scope.signal }
-    )
-    scope.own(removeDebugFocalMeasure)
-  }
-
-  function listenForRevealGesture(scope: MountScope, book: HTMLElement) {
-    const PULL_THRESHOLD = 30
-    const PULL_MAXIMUM = 100
-
-    const endTouch = () => {
-      book.classList.add('mod-pull-releasing')
-      book.style.setProperty('--pull-translation', `0`)
-    }
-
-    let startX = 0
-
-    book.addEventListener(
-      'touchstart',
-      (e) => {
-        book.classList.remove('mod-pull-releasing')
-        startX = e.changedTouches[0].screenX
-      },
-      { signal: scope.signal }
-    )
-
-    book.addEventListener(
-      'touchmove',
-      (e) => {
-        const touchX = e.changedTouches[0].screenX
-        const pullDistance = -Math.max(touchX - startX, -PULL_MAXIMUM)
-        if (pullDistance < PULL_THRESHOLD) return
-
-        book.style.setProperty(
-          '--pull-translation',
-          `${PULL_THRESHOLD - pullDistance}px`
-        )
-      },
-      { signal: scope.signal }
-    )
-
-    book.addEventListener('touchend', endTouch, { signal: scope.signal })
-    book.addEventListener('touchcancel', endTouch, { signal: scope.signal })
-    scope.own(() => {
-      book.classList.remove('mod-pull-releasing')
-      book.style.removeProperty('--pull-translation')
-    })
-  }
-
   function selectAliyah(identity: AliyahIdentity) {
     explicitAliyahSelection = identity
     explicitAliyahSelectionHash =
@@ -1353,42 +1170,6 @@ export function startReaderRuntime({
       : readerRouteGlobal?.snapshot().currentReaderHash ?? ''
   }
 
-  function checkpointFromBookmark(bookmark: ReaderBookmark): Checkpoint {
-    return {
-      id: bookmark.id,
-      kind: 'bookmark',
-      source: 'bookmark',
-      label: bookmark.label,
-      hash: bookmark.hash,
-      audioId: bookmark.audioId,
-      tokenKey: bookmark.tokenKey,
-      timeStart: bookmark.timeStart,
-      createdAt: bookmark.createdAt,
-    }
-  }
-
-  function bookmarkReadingLabel(bookmark: ReaderBookmark) {
-    const runId = /^#\/run\/([^/]+)/.exec(bookmark.hash)?.[1]
-    if (runId) {
-      const run = resolveReadingRun(createCalendarGenerator(), runId)
-      return run ? displayTitleForLeiningRun(run) : null
-    }
-
-    const parshaSlug = /^#\/(?:torah|esther)\/parsha\/([^/]+)/.exec(bookmark.hash)?.[1]
-    return parshaSlug ? parshaSlug.replace(/-/g, ' ') : null
-  }
-
-  function titleCaseBookmarkBadge(label: string) {
-    if (!/[A-Za-z]/.test(label)) return label
-    return label.replace(/\S+/g, (word) =>
-      word.charAt(0).toLocaleUpperCase() + word.slice(1).toLocaleLowerCase()
-    )
-  }
-
-  function isBookmarkAction(action: NavigationAction) {
-    return action.id.startsWith('checkpoint.bookmark:')
-  }
-
   function getCurrentCheckpoints() {
     const checkpoints: Checkpoint[] = [
       ...bookmarks.map(checkpointFromBookmark),
@@ -1483,304 +1264,33 @@ export function startReaderRuntime({
     focusReaderSurface()
   }
 
-  function upcomingHolidayLeiningActions() {
-    const generator = createCalendarGenerator()
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const currentHebrewYear = new HDate(today).getFullYear()
-    const actions: NavigationAction[] = []
-    const seenRuns = new Set<string>()
-
-    for (let year = currentHebrewYear; year <= currentHebrewYear + 2; year += 1) {
-      for (const leiningDate of generator.forHebrewYear(year)) {
-        if (leiningDate.date < today) continue
-
-        for (const leining of leiningDate.leinings) {
-          const run = selectCommandPaletteHolidayRun(leining)
-          if (!run || seenRuns.has(run.id)) continue
-
-          seenRuns.add(run.id)
-          const label = `${leiningDate.title.en} / ${leiningDate.title.he}`
-          actions.push(
-            createNavigationAction({
-              id: `reading.holiday.${run.id}`,
-              group: 'reading',
-              label,
-              aliases: [leiningDate.title.en, leiningDate.title.he],
-              keywords: holidayLeiningKeywords(leiningDate.title, `${leining.id}`),
-              showWhenEmpty: false,
-              destinationId: createLastReadingHash(run),
-              href: createLastReadingHash(run),
-              run: () => readerRouteGlobal?.navigate(createLastReadingHash(run)),
-            })
-          )
-          if (actions.length >= 16) return actions
-        }
-      }
-    }
-
-    return actions
-  }
-
-  function displayTitleForLeiningRun(run: LeiningRun) {
-    return readingTitle(run.leining).he || readingTitle(run.leining).en
-  }
-
-  function searchableParshaActions() {
-    const generator = createCalendarGenerator()
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const currentHebrewYear = new HDate(today).getFullYear()
-    const actions: NavigationAction[] = []
-    const seenRuns = new Set<string>()
-
-    for (let year = currentHebrewYear; year <= currentHebrewYear + 2; year += 1) {
-      for (const leiningDate of generator.forHebrewYear(year)) {
-        if (leiningDate.date < today) continue
-        for (const leining of leiningDate.leinings) {
-          if (!leining.isParsha) continue
-          for (const run of leining.runs) {
-          if (run.scroll !== 'torah' || seenRuns.has(run.id)) continue
-          seenRuns.add(run.id)
-          const parshaSlug = parshaSlugForRun(run)
-          actions.push(
-            ...createAliyahNavigationActions({
-              run,
-              displayTitle: displayTitleForLeiningRun(run),
-              showWhenEmpty: false,
-              dedupeKeyPrefix: parshaSlug ? `reading.parsha.${parshaSlug}` : undefined,
-              navigate: (hash) => readerRouteGlobal?.navigate(hash),
-            })
-          )
-          }
-        }
-      }
-    }
-
-    return actions
-  }
-
-  function selectSearchableHolidayRuns(leining: LeiningInstance) {
-    const run = selectCommandPaletteHolidayRun(leining)
-    return run ? [run] : []
-  }
-
-  function searchableHolidayActions() {
-    const generator = createCalendarGenerator()
-    const today = new Date()
-    const currentHebrewYear = new HDate(today).getFullYear()
-    const actions: NavigationAction[] = []
-    const seenRuns = new Set<string>()
-
-    for (let year = currentHebrewYear; year <= currentHebrewYear + 1; year += 1) {
-      for (const leiningDate of generator.forHebrewYear(year)) {
-        for (const leining of leiningDate.leinings) {
-          if (leining.isParsha) continue
-          for (const run of selectSearchableHolidayRuns(leining)) {
-            if (seenRuns.has(run.id)) continue
-            seenRuns.add(run.id)
-            actions.push(
-              ...createAliyahNavigationActions({
-                run,
-                displayTitle: displayTitleForLeiningRun(run),
-                showWhenEmpty: false,
-                navigate: (hash) => readerRouteGlobal?.navigate(hash),
-              })
-            )
-          }
-        }
-      }
-    }
-
-    return actions
-  }
-
-  function recordingActionAliases(
-    recording: Extract<AudioRecording, { reading: { kind: 'parsha' } }>
-  ) {
-    const terms = [
-      recording.parshaSlug,
-      recording.parshaName,
-      ...getParshaSearchTermsForSlug(recording.parshaSlug),
-    ]
-    return [
-      ...terms,
-      ...terms.flatMap((term) => [
-        `${term} ${recording.aliyah}`,
-        `${term} Aliyah ${recording.aliyah}`,
-      ]),
-    ]
-  }
-
   function createReaderSearchActions() {
-    const actions: NavigationAction[] = [
-      createNavigationAction({
-        id: 'tools.print',
-        group: 'tools',
-        label: 'Print passage',
-        aliases: ['Print', 'Print preview'],
-        keywords: ['paper', 'pdf', 'aliyah'],
-        emptyPriority: 41,
-        run: () => openPrintGlobal?.(),
-      }),
-      createNavigationAction({
-        id: 'reading.current',
-        group: 'reading',
-        label: 'Today / Next Reading',
-        aliases: ['Today', 'Next Reading', 'Next Shabbat'],
-        keywords: ['current reading', 'upcoming reading'],
-        emptyPriority: 100,
-        destinationId: '#/next',
-        href: '#/next',
-        run: () => readerRouteGlobal?.navigate('#/next'),
-      }),
-      createNavigationAction({
-        id: 'tools.analytics',
-        group: 'tools',
-        label: 'Cue Analytics',
-        aliases: ['Playback Analytics', 'Word Analytics'],
-        keywords: ['timing'],
-        emptyPriority: 40,
-        run: () => readerRouteGlobal?.navigate(generateCueAnalyticsUrl()),
-      }),
-      createNavigationAction({
-        id: 'tools.media',
-        group: 'tools',
-        label: 'Media & Storage',
-        aliases: ['Downloads', 'Offline audio'],
-        keywords: ['download', 'storage', 'recordings'],
-        emptyPriority: 38,
-        run: () => openMediaGlobal?.(),
-      }),
-      createNavigationAction({
-        id: 'tools.settings',
-        group: 'tools',
-        label: 'Reader Settings',
-        aliases: ['Preferences'],
-        keywords: ['theme', 'highlight'],
-        emptyPriority: 39,
-        run: () => readerSettingsGlobal?.open(),
-      }),
-      createNavigationAction({
-        id: 'admin.open',
-        group: 'admin',
-        label: 'Cue Authoring',
-        keywords: ['timing', 'authoring', 'record cues'],
-        available: cueAuthoringLoaderGlobal?.isUnlocked() ?? false,
-        emptyPriority: 30,
-        run: () => cueAuthoringLoaderGlobal?.open(),
-      }),
-    ]
-
-    actions.push(...upcomingHolidayLeiningActions())
-
-    const activeDisplay = readerDisplaySessionGlobal?.capture()
-    if (activeDisplay) {
-      const anchors = getReaderDisplaySession().progressSnapshot().anchors
-      const activeRun =
-        getCurrentAliyahFromViewportRange(
-          readerDisplaySessionGlobal?.viewportRange() ?? null,
-          anchors
-        )?.run ??
-        anchors.find((anchor) => anchor.run)?.run ??
-        null
-      if (activeRun) {
-        const activeParshaSlug = activeRun.leining.isParsha
-          ? parshaSlugForRun(activeRun)
-          : null
-        actions.push(
-          ...createAliyahNavigationActions({
-            run: activeRun,
-            displayTitle: activeDisplay.viewModel.displayTitleForRun(activeRun),
-            dedupeKeyPrefix: activeParshaSlug
-              ? `reading.parsha.${activeParshaSlug}`
-              : undefined,
-            emptyPriority: 85,
-            showWhenEmpty: false,
-            navigate: (hash) => readerRouteGlobal?.navigate(hash),
-          })
-        )
-      }
-    }
-
-    for (const recording of listRecordings()) {
-      if (recording.status !== 'available' || !isParshaAudioRecording(recording)) continue
-      const resolved = resolveParshaRun(createCalendarGenerator(), recording.parshaSlug)
-      const aliyah = resolved?.run.aliyot.find(
-        (candidate) => candidate.index === recording.aliyah
-      )
-      const targetHash = resolved && aliyah
-        ? createLastReadingHash(resolved.run, aliyah.start)
-        : generateParshaUrl(recording.parshaSlug)
-      actions.push(
-        createNavigationAction({
-          id: `reading.${recording.id}`,
-          group: 'reading',
-          label: `${recording.parshaName} Aliyah ${recording.aliyah}`,
-          dedupeKey: `reading.parsha.${recording.parshaSlug}.${recording.aliyah}`,
-          destinationId: targetHash,
-          searchConstraint: {
-            kind: 'aliyah',
-            aliyah: recording.aliyah,
-            allowTerms: ['recording', 'audio'],
-          },
-          href: targetHash,
-          aliases: recordingActionAliases(recording),
-          keywords: ['recording', 'audio'],
-          showWhenEmpty: false,
-          run: () => readerRouteGlobal?.navigate(targetHash),
-        })
-      )
-    }
-
-    actions.push(...searchableParshaActions())
-    actions.push(...searchableHolidayActions())
-    actions.push(
-      ...createPageNavigationActions({
-        navigateToPage: (scroll, page) =>
-          readerRouteGlobal?.navigate(generatePageUrl(scroll, page)),
-      })
-    )
-
-    const lastReading = loadEligibleLastReading(
-      browserLocalStorage,
-      Date.now(),
-      isSemanticallyRoutableReaderHash
-    )
-    if (lastReading) {
-      actions.push(
-        createNavigationAction({
-          id: 'resume.last-reading',
-          group: 'resume',
-          label: `Resume ${lastReading.aliyahLabel ? `${lastReading.parshaName}, ${lastReading.aliyahLabel}` : lastReading.parshaName}`,
-          aliases: ['Resume Reading', 'Last Reading'],
-          keywords: ['resume', 'last reading'],
-          emptyPriority: 95,
-          destinationId: lastReading.hash,
-          href: lastReading.hash,
-          run: () => readerRouteGlobal?.navigate(lastReading.hash),
-        })
-      )
-    }
-
-    for (const checkpoint of getCurrentCheckpoints()) {
-      const bookmark = checkpoint.kind === 'bookmark'
-        ? bookmarks.find((candidate) => candidate.id === checkpoint.id)
-        : null
-      actions.push(
-        createNavigationAction({
-          id: `checkpoint.${checkpoint.id}`,
-          group: checkpoint.kind === 'bookmark' ? 'resume' : 'checkpoint',
-          label: checkpoint.label,
-          badgeLabel: bookmark ? bookmarkReadingLabel(bookmark) ?? undefined : undefined,
-          keywords: ['bookmark', 'checkpoint', checkpoint.tokenKey],
-          emptyPriority: checkpoint.kind === 'bookmark' ? 90 : 88,
-          run: () => jumpToCheckpoint(checkpoint),
-        })
-      )
-    }
-
-    return actions
+    return buildReaderSearchActions({
+      storage: browserLocalStorage,
+      createCalendarGenerator,
+      navigate: (hash) => readerRouteGlobal?.navigate(hash),
+      openPrint: () => openPrintGlobal?.(),
+      openMedia: () => openMediaGlobal?.(),
+      openSettings: () => readerSettingsGlobal?.open(),
+      isCueAuthoringUnlocked: () => cueAuthoringLoaderGlobal?.isUnlocked() ?? false,
+      openCueAuthoring: () => cueAuthoringLoaderGlobal?.open(),
+      currentReading: () => {
+        const activeDisplay = readerDisplaySessionGlobal?.capture()
+        if (!activeDisplay) return null
+        const anchors = getReaderDisplaySession().progressSnapshot().anchors
+        const run =
+          getCurrentAliyahFromViewportRange(
+            readerDisplaySessionGlobal?.viewportRange() ?? null,
+            anchors
+          )?.run ??
+          anchors.find((anchor) => anchor.run)?.run ??
+          null
+        return run ? { run, displayTitle: activeDisplay.viewModel.displayTitleForRun(run) } : null
+      },
+      checkpoints: getCurrentCheckpoints,
+      bookmarks: () => bookmarks,
+      jumpToCheckpoint,
+    })
   }
 
   function refreshReaderSearch() {
@@ -1802,213 +1312,19 @@ export function startReaderRuntime({
     nextTarget.focus({ preventScroll: true })
   }
 
-  let aliyahStartPopup: HTMLElement | null = null
-  let aliyahStartPopupLine: HTMLElement | null = null
-  let aliyahStartPopupMarker: HTMLElement | null = null
-
-  function getAliyahStartPopup() {
-    if (aliyahStartPopup) return aliyahStartPopup
-
-    aliyahStartPopup = document.createElement('div')
-    aliyahStartPopup.className = 'aliyah-start-popup u-hidden'
-    aliyahStartPopup.id = 'aliyah-start-popup'
-    aliyahStartPopup.setAttribute('role', 'dialog')
-    aliyahStartPopup.setAttribute('aria-label', 'Aliyah start')
-    document.body.appendChild(aliyahStartPopup)
-    return aliyahStartPopup
-  }
+  let aliyahStartPopup: AliyahStartPopup | null = null
 
   function closeAliyahStartPopup() {
-    aliyahStartPopup?.classList.add('u-hidden')
-    if (aliyahStartPopupMarker?.matches('.aliyah-start-marker')) {
-      aliyahStartPopupMarker.setAttribute('aria-expanded', 'false')
-    }
-    aliyahStartPopupLine = null
-    aliyahStartPopupMarker = null
-  }
-
-  function getVisibleAliyahStartMarker(line: HTMLElement) {
-    const marker = line.querySelector<HTMLButtonElement>('.aliyah-start-marker')
-    if (!marker) return null
-    const rect = marker.getBoundingClientRect()
-    return rect.width > 0 && rect.height > 0 ? marker : null
-  }
-
-  function getAliyahStartMarkerAtPointer(event: Event, book: HTMLElement) {
-    const marker = (event.target as Element | null)?.closest<HTMLElement>(
-      isCompactReaderViewport()
-        ? '.aliyah-start-marker'
-        : '.aliyah-badge[data-aliyah-marker="true"]'
-    )
-    return marker && book.contains(marker) ? marker : null
-  }
-
-  function getAliyahStartMarkerLine(marker: HTMLElement) {
-    return marker.closest<HTMLElement>('[data-line-index][data-aliyah-starts]')
-  }
-
-  function appendAliyahStartPopupRow(
-    popup: HTMLElement,
-    label: string,
-    value: string
-  ) {
-    if (!value) return
-
-    const row = document.createElement('div')
-    row.className = 'aliyah-start-popup-row'
-
-    const rowLabel = document.createElement('span')
-    rowLabel.className = 'aliyah-start-popup-label'
-    rowLabel.textContent = label
-
-    const rowValue = document.createElement('span')
-    rowValue.className = 'aliyah-start-popup-value'
-    rowValue.textContent = value
-
-    row.append(rowLabel, rowValue)
-    popup.appendChild(row)
-  }
-
-  function positionAliyahStartPopup(
-    popup: HTMLElement,
-    line: HTMLElement,
-    marker: HTMLElement | null = getVisibleAliyahStartMarker(line)
-  ) {
-    const content = line.querySelector<HTMLElement>('.line-content')
-    if (!content) return
-
-    const rect = (marker ?? content).getBoundingClientRect()
-    const popupRect = popup.getBoundingClientRect()
-    const margin = 8
-    const markerX = marker ? rect.left + rect.width / 2 : rect.right - 4
-    const markerY = rect.top
-    const left = Math.max(
-      margin,
-      Math.min(
-        markerX - popupRect.width / 2,
-        window.innerWidth - popupRect.width - margin
-      )
-    )
-    const topAbove = markerY - popupRect.height - margin
-    const top = topAbove >= margin ? topAbove : Math.min(markerY + 24, window.innerHeight - popupRect.height - margin)
-
-    popup.style.left = `${left}px`
-    popup.style.top = `${Math.max(margin, top)}px`
-  }
-
-  function openAliyahStartPopup(
-    line: HTMLElement,
-    marker: HTMLElement | null = getVisibleAliyahStartMarker(line)
-  ) {
-    if (
-      aliyahStartPopupLine === line &&
-      aliyahStartPopupMarker === marker &&
-      aliyahStartPopup &&
-      !aliyahStartPopup.classList.contains('u-hidden')
-    ) {
-      return
-    }
-
-    const popup = getAliyahStartPopup()
-    if (aliyahStartPopupMarker?.matches('.aliyah-start-marker')) {
-      aliyahStartPopupMarker.setAttribute('aria-expanded', 'false')
-    }
-    aliyahStartPopupLine = line
-    aliyahStartPopupMarker = marker
-    if (marker?.matches('.aliyah-start-marker')) {
-      marker.setAttribute('aria-expanded', 'true')
-    }
-    popup.replaceChildren()
-    appendAliyahStartPopupRow(popup, 'Parsha', line.dataset.aliyahStartTitle ?? '')
-    appendAliyahStartPopupRow(
-      popup,
-      'Aliyah',
-      marker?.dataset.aliyahStartLabel ?? line.dataset.aliyahStartLabel ?? ''
-    )
-    appendAliyahStartPopupRow(
-      popup,
-      'Verses:',
-      marker?.dataset.aliyahStartVerse ?? line.dataset.aliyahStartVerse ?? ''
-    )
-    popup.classList.remove('u-hidden')
-    positionAliyahStartPopup(popup, line, marker)
+    aliyahStartPopup?.close()
   }
 
   function setupAliyahStartPopup(scope: MountScope) {
     const book = getBook()
-
-    book.addEventListener(
-      'click',
-      (event) => {
-        if (!isCompactReaderViewport()) {
-          closeAliyahStartPopup()
-          return
-        }
-        if (!(event instanceof MouseEvent)) return
-        const marker = getAliyahStartMarkerAtPointer(event, book)
-        const line = marker ? getAliyahStartMarkerLine(marker) : null
-        if (!line || !marker) {
-          closeAliyahStartPopup()
-          return
-        }
-
-        event.preventDefault()
-        event.stopImmediatePropagation()
-        openAliyahStartPopup(line, marker)
-      },
-      { signal: scope.signal }
-    )
-
-    book.addEventListener(
-      'pointerover',
-      (event) => {
-        if (event.pointerType === 'touch') return
-        const marker = getAliyahStartMarkerAtPointer(event, book)
-        const line = marker ? getAliyahStartMarkerLine(marker) : null
-        if (!line || !marker) return
-
-        openAliyahStartPopup(line, marker)
-      },
-      { signal: scope.signal }
-    )
-
-    book.addEventListener(
-      'pointerout',
-      (event) => {
-        if (event.pointerType === 'touch') return
-        const marker = getAliyahStartMarkerAtPointer(event, book)
-        if (!marker) return
-        const nextTarget = event.relatedTarget
-        if (nextTarget instanceof Node && marker.contains(nextTarget)) return
-        closeAliyahStartPopup()
-      },
-      { signal: scope.signal }
-    )
-
-    book.addEventListener(
-      'focusin',
-      (event) => {
-        const marker = getAliyahStartMarkerAtPointer(event, book)
-        const line = marker ? getAliyahStartMarkerLine(marker) : null
-        if (line && marker) openAliyahStartPopup(line, marker)
-      },
-      { signal: scope.signal }
-    )
-
-    book.addEventListener(
-      'focusout',
-      (event) => {
-        const marker = getAliyahStartMarkerAtPointer(event, book)
-        if (!marker) return
-        if (event.relatedTarget instanceof Node && marker.contains(event.relatedTarget)) return
-        closeAliyahStartPopup()
-      },
-      { signal: scope.signal }
-    )
-
-    book.addEventListener('scroll', closeAliyahStartPopup, {
-      passive: true,
-      signal: scope.signal,
+    aliyahStartPopup = createAliyahStartPopup(scope, {
+      document,
+      view: window,
+      book,
+      isCompact: isCompactReaderViewport,
     })
     const refreshFontLayout = () => {
       if (scope.signal.aborted) return
@@ -2021,21 +1337,7 @@ export function startReaderRuntime({
     document.fonts.addEventListener('loadingdone', refreshFontLayout, {
       signal: scope.signal,
     })
-    document.addEventListener(
-      'pointerdown',
-      (event) => {
-        const target = event.target as Element | null
-        if (!aliyahStartPopup || aliyahStartPopup.classList.contains('u-hidden')) return
-        if (target && aliyahStartPopup.contains(target)) return
-        if (target?.closest('.aliyah-start-marker')) return
-        if (target?.closest('[data-aliyah-starts]')) return
-        closeAliyahStartPopup()
-      },
-      { signal: scope.signal }
-    )
     scope.own(() => {
-      closeAliyahStartPopup()
-      aliyahStartPopup?.remove()
       aliyahStartPopup = null
       if (aliyahStartMarkerLayoutFrame) {
         cancelAnimationFrame(aliyahStartMarkerLayoutFrame)
@@ -2622,6 +1924,7 @@ export function startReaderRuntime({
 
   function resetDisplayResources() {
     readerPlaybackGlobal?.resetRecordingCache()
+    playbackLeadSpaceGlobal?.clear()
     railScrollAction.cancel()
     if (!preservePlaybackDuringDisplayReplacement) playbackAction.cancel()
   }
@@ -2699,13 +2002,7 @@ export function startReaderRuntime({
     book: HTMLElement,
     root: ParentNode = book
   ) {
-    if (
-      aliyahStartPopupMarker &&
-      root instanceof Node &&
-      root.contains(aliyahStartPopupMarker)
-    ) {
-      closeAliyahStartPopup()
-    }
+    aliyahStartPopup?.closeWithin(root)
     root
       .querySelectorAll<HTMLButtonElement>('.aliyah-start-marker')
       .forEach((marker) => marker.remove())
@@ -3240,20 +2537,43 @@ export function startReaderRuntime({
     actionToken: number
   ) {
     const readerPlayback = readerPlaybackGlobal
-    if (!readerPlayback) return
+    if (!readerPlayback) return false
     selectAliyah({ runId, index: aliyahIndex })
     const session = await readerPlayback.loadRecording(
       { runId, aliyahIndex },
       { mode: 'authoring' }
     )
-    if (!playbackAction.isCurrent(actionToken)) return
+    if (!playbackAction.isCurrent(actionToken)) return false
     if (!session) {
       console.error(
         `Could not prepare ${runId}:${aliyahIndex} for audio authoring`
       )
-      return
+      return false
     }
     syncReaderPlaybackChrome()
+    return true
+  }
+
+  /** Shows a recording's aliyah, switching readings if needed, and loads it paused for cue review. */
+  async function openRecordingForCueReview(recording: AudioRecording) {
+    const aliyahIndex = isParshaAudioRecording(recording) ? parseAliyahIndex(String(recording.aliyah)) : null
+    const run = isParshaAudioRecording(recording)
+      ? resolveParshaRun(createCalendarGenerator(), recording.parshaSlug)?.run
+      : null
+    if (!run || aliyahIndex === null) throw new Error(`${recording.title} isn’t in the Reader.`)
+    const target = { runId: run.id, aliyahIndex }
+    // The aliyah link positions the scroll there; a distant aliyah may not be rendered yet.
+    const shown = readerDisplaySessionGlobal?.capture()?.viewModel.relevantRuns.some(candidate => candidate.id === run.id)
+    const navigated = isolatedReading && shown
+      ? await navigateIsolatedAliyah(target)
+      : await readerRouteGlobal?.navigateAndWait(generateAliyahUrl(run, aliyahIndex)) ?? false
+    if (!navigated) return
+    const actionToken = playbackAction.start()
+    const rendered = await getReaderDisplaySession().ensureAliyahDomTargetRendered(run.id, aliyahIndex)
+    if (!playbackAction.isCurrent(actionToken)) return
+    if (!rendered || !await loadAliyahForAudioAuthoring(target, actionToken)) {
+      if (playbackAction.isCurrent(actionToken)) throw new Error(`${recording.title} could not be loaded. Try again.`)
+    }
   }
 
   async function loadReaderPassage(playback: ReaderPlayback, target: AliyahNavigationTarget) {
@@ -4065,6 +3385,13 @@ export function startReaderRuntime({
         if (snapshot.playing) {
           offlineRecordingPromptGlobal?.clearPlaybackFailure()
         }
+        // On a phone, One aliyah gains room above its first line when Play starts.
+        if (snapshot.playing && !playbackWasPlaying && isolatedReading &&
+          document.documentElement.dataset.readerPhone === 'true' &&
+          readerPreferences.autoScrollWithPlayback) {
+          playbackLeadSpaceGlobal?.reveal()
+        }
+        playbackWasPlaying = snapshot.playing
         syncReaderPlaybackChrome()
       } else if (change.type === 'aliyah-playback') {
         aliyahNavigationGlobal?.syncPlayback(
@@ -4153,6 +3480,7 @@ export function startReaderRuntime({
           refreshReaderSearch()
         },
         showPersistenceNotice,
+        openRecording: openRecordingForCueReview,
       }),
     onMounted: (authoring) => {
       cueAuthoringGlobal = authoring
@@ -4281,6 +3609,10 @@ export function startReaderRuntime({
 
     setupAliyahStartPopup(scope)
     listenForRevealGesture(scope, book)
+    playbackLeadSpaceGlobal = createPlaybackLeadSpace(book, {
+      updateLayout: (mutation) => getReaderDisplaySession().updateAnnotations(mutation),
+    })
+    scope.own(() => { playbackLeadSpaceGlobal = null })
     setupReaderViewportResize(scope, book)
 
     if (isNativeApp()) createNativeUpdatePrompt(scope, document, () => {
@@ -4327,7 +3659,7 @@ export function startReaderRuntime({
         readerSettingsGlobal = null
       }
     })
-    setupDebugControls(scope)
+    setupDebugFocalMeasure(scope, document, window)
   const saveLastReadingDebounced = debounce(() => saveCurrentLastReading(), 1000)
   scope.own(saveLastReadingDebounced.cancel)
 
@@ -4781,7 +4113,12 @@ export function startReaderRuntime({
         aliyahNavigationGlobal?.revealWide('peek')
       },
       readerReady: () => {
-        trackAnalytics('reader_open', { layout: readerPreferences.readerTextLayout, sides: readerPreferences.readerSideMode, route: readerRouteKind(location.hash) })
+        trackAnalytics('reader_open', {
+          layout: readerPreferences.readerTextLayout,
+          sides: readerPreferences.readerSideMode,
+          route: readerRouteKind(location.hash),
+          timing: readingTiming(location.hash, createCalendarGenerator()),
+        })
         const lifetime = readerDisplaySession.capture()
         refreshReaderChrome()
         // Before layout settles, the focal anchor can still belong to the previous aliyah.
@@ -4873,7 +4210,15 @@ export function startReaderRuntime({
     lastReadingPromptGlobal?.hide()
   })
 
-  if (launchLastReading && !nativeLaunch) lastReadingPromptGlobal?.show(launchLastReading)
+  if (launchLastReading && !nativeLaunch) {
+    // Wait for the opening reading to land; skip the offer when it is already there.
+    // A failed startup is reported by the ready promise's own consumers.
+    void ready.then(() => {
+      if (scope.signal.aborted || hasUserScrolledReaderForLastReading) return
+      if (isSameReadingPlace(launchLastReading, captureCurrentLastReading())) return
+      lastReadingPromptGlobal?.show(launchLastReading)
+    }, () => undefined)
+  }
   })
 
   return { ready, destroy }

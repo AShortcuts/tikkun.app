@@ -12,6 +12,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import {
+  discoverAudioCatalog,
+  findChangedAudio,
   inferAliyah,
   importAudioCatalog,
   parseAudioSyncOptions,
@@ -61,7 +63,7 @@ test('selection rejects equally preferred files for the same aliyah', () => {
 test('audio sync canonicalizes source-library spellings', async () => {
   const root = await temporaryRoot()
   const sourceRoot = path.join(root, 'source')
-  const targetAudioRoot = path.join(root, 'site/audio/yoni-davidov')
+  const targetAudioRoot = path.join(root, 'audio/yoni-davidov')
   const targetFile = path.join(root, 'generated/audio-manifest.ts')
   const sources = [
     ['01 Bereshit', 'Bereshit 1.m4a'],
@@ -85,10 +87,10 @@ test('audio sync canonicalizes source-library spellings', async () => {
     { id: 'vayetzei-1', parshaName: 'Vayetzei' },
   ])
   await expect(
-    readdir(path.join(targetAudioRoot, 'beresheet'))
+    readdir(path.join(targetAudioRoot, '01 beresheet'))
   ).resolves.toEqual(['1.m4a'])
   await expect(
-    readdir(path.join(targetAudioRoot, 'vayetzei'))
+    readdir(path.join(targetAudioRoot, '07 vayetzei'))
   ).resolves.toEqual(['1.m4a'])
 })
 
@@ -96,7 +98,7 @@ test('audio sync is configurable, copies only selected files, and emits media id
   const root = await temporaryRoot()
   const sourceRoot = path.join(root, 'source')
   const parshaRoot = path.join(sourceRoot, '01 Beresheet')
-  const targetAudioRoot = path.join(root, 'site/audio/yoni-davidov')
+  const targetAudioRoot = path.join(root, 'audio/yoni-davidov')
   const targetFile = path.join(root, 'generated/audio-manifest.ts')
   await mkdir(parshaRoot, { recursive: true })
   await mkdir(targetAudioRoot, { recursive: true })
@@ -121,7 +123,7 @@ test('audio sync is configurable, copies only selected files, and emits media id
     'beresheet-1',
     'beresheet-2',
   ])
-  expect(await readdir(path.join(targetAudioRoot, 'beresheet'))).toEqual([
+  expect(await readdir(path.join(targetAudioRoot, '01 beresheet'))).toEqual([
     '1.m4a',
     '2.mp3',
   ])
@@ -140,7 +142,7 @@ test('failed discovery leaves the previous catalog and media untouched', async (
   const root = await temporaryRoot()
   const sourceRoot = path.join(root, 'source')
   const parshaRoot = path.join(sourceRoot, '01 Beresheet')
-  const targetAudioRoot = path.join(root, 'site/audio/yoni-davidov')
+  const targetAudioRoot = path.join(root, 'audio/yoni-davidov')
   const targetFile = path.join(root, 'generated/audio-manifest.ts')
   await mkdir(parshaRoot, { recursive: true })
   await mkdir(targetAudioRoot, { recursive: true })
@@ -182,7 +184,7 @@ test('startup import adds new recordings, keeps absent sources and cues, and ski
   await mkdir(firstFolder, { recursive: true })
   await writeFile(path.join(firstFolder, '1.m4a'), 'existing audio')
   const existingRecordings = await syncAudioCatalog({ sourceRoot, targetAudioRoot, targetFile })
-  const firstAudio = path.join(targetAudioRoot, 'beresheet/1.m4a')
+  const firstAudio = path.join(targetAudioRoot, '01 beresheet/1.m4a')
   const originalMtime = (await stat(firstAudio)).mtimeMs
   const cueFile = path.join(root, 'saved-cues.json')
   await writeFile(cueFile, 'saved timings')
@@ -202,7 +204,7 @@ test('startup import adds new recordings, keeps absent sources and cues, and ski
   expect((await stat(firstAudio)).mtimeMs).toBe(originalMtime)
   expect(await readFile(cueFile, 'utf8')).toBe('saved timings')
   const manifestMtime = (await stat(targetFile)).mtimeMs
-  const newAudio = path.join(targetAudioRoot, 'pinchas/7.m4a')
+  const newAudio = path.join(targetAudioRoot, '41 pinchas/7.m4a')
   const newMtime = (await stat(newAudio)).mtimeMs
 
   const repeated = await importAudioCatalog({ ...options, existingRecordings: imported.recordings })
@@ -231,8 +233,8 @@ test('startup import refuses changed registered audio before adding any new file
   await expect(importAudioCatalog({ sourceRoot, targetAudioRoot, targetFile, existingRecordings,
     narrator: { id: 'yoni-davidov' } })).rejects.toThrow(/will not replace audio tied to saved cues/)
   expect(await readFile(targetFile, 'utf8')).toBe(before)
-  expect(await readFile(path.join(targetAudioRoot, 'beresheet/1.m4a'), 'utf8')).toBe('original')
-  expect(await readdir(path.join(targetAudioRoot, 'beresheet'))).toEqual(['1.m4a'])
+  expect(await readFile(path.join(targetAudioRoot, '01 beresheet/1.m4a'), 'utf8')).toBe('original')
+  expect(await readdir(path.join(targetAudioRoot, '01 beresheet'))).toEqual(['1.m4a'])
 })
 
 test('startup import refuses an unregistered destination file with different contents', async () => {
@@ -245,11 +247,62 @@ test('startup import refuses an unregistered destination file with different con
   await writeFile(path.join(firstFolder, '1.m4a'), 'original')
   const existingRecordings = await syncAudioCatalog({ sourceRoot, targetAudioRoot, targetFile })
   await writeFile(path.join(firstFolder, '2.m4a'), 'new aliyah')
-  await writeFile(path.join(targetAudioRoot, 'beresheet/2.m4a'), 'unregistered recording')
+  await writeFile(path.join(targetAudioRoot, '01 beresheet/2.m4a'), 'unregistered recording')
   const before = await readFile(targetFile, 'utf8')
 
   await expect(importAudioCatalog({ sourceRoot, targetAudioRoot, targetFile, existingRecordings,
     narrator: { id: 'yoni-davidov' } })).rejects.toThrow(/Existing audio differs/)
   expect(await readFile(targetFile, 'utf8')).toBe(before)
-  expect(await readFile(path.join(targetAudioRoot, 'beresheet/2.m4a'), 'utf8')).toBe('unregistered recording')
+  expect(await readFile(path.join(targetAudioRoot, '01 beresheet/2.m4a'), 'utf8')).toBe('unregistered recording')
+})
+
+test('changed audio is replaced or kept only as chosen, alongside new recordings', async () => {
+  const root = await temporaryRoot()
+  const sourceRoot = path.join(root, 'source')
+  const folder = path.join(sourceRoot, '01 Beresheet')
+  const targetAudioRoot = path.join(root, 'audio')
+  const targetFile = path.join(root, 'manifest.ts')
+  await mkdir(folder, { recursive: true })
+  await writeFile(path.join(folder, '1.m4a'), 'original one')
+  await writeFile(path.join(folder, '2.m4a'), 'original two')
+  const existingRecordings = await syncAudioCatalog({ sourceRoot, targetAudioRoot, targetFile })
+  await writeFile(path.join(folder, '1.m4a'), 'new one')
+  await writeFile(path.join(folder, '2.m4a'), 'new two')
+  await writeFile(path.join(folder, '3.m4a'), 'new aliyah')
+  const discovered = await discoverAudioCatalog(sourceRoot)
+  expect(findChangedAudio({ discovered, existingRecordings }).map((change) => change.id)).toEqual(['beresheet-1', 'beresheet-2'])
+
+  const imported = await importAudioCatalog({ sourceRoot, targetAudioRoot, targetFile, existingRecordings, discovered,
+    narrator: { id: 'yoni-davidov' }, replace: new Set(['beresheet-1']), keep: new Set(['beresheet-2']) })
+  expect(imported).toMatchObject({ added: ['beresheet-3'], replaced: ['beresheet-1'] })
+  const folderAudio = path.join(targetAudioRoot, '01 beresheet')
+  expect(await readFile(path.join(folderAudio, '1.m4a'), 'utf8')).toBe('new one')
+  expect(await readFile(path.join(folderAudio, '2.m4a'), 'utf8')).toBe('original two')
+  expect((await readdir(folderAudio)).sort()).toEqual(['1.m4a', '2.m4a', '3.m4a'])
+  const digest = (text: string) => createHash('sha256').update(text).digest('hex')
+  const byId = new Map(imported.recordings.map((recording) => [recording.id, recording.mediaIdentity.digest]))
+  expect(byId.get('beresheet-1')).toBe(digest('new one'))
+  expect(byId.get('beresheet-2')).toBe(digest('original two'))
+  expect(await readFile(targetFile, 'utf8')).toContain(digest('new one'))
+})
+
+test('a failed replacement restores the previous audio and manifest', async () => {
+  const root = await temporaryRoot()
+  const sourceRoot = path.join(root, 'source')
+  const folder = path.join(sourceRoot, '01 Beresheet')
+  const targetAudioRoot = path.join(root, 'audio')
+  const targetFile = path.join(root, 'manifest.ts')
+  await mkdir(folder, { recursive: true })
+  await writeFile(path.join(folder, '1.m4a'), 'original one')
+  const existingRecordings = await syncAudioCatalog({ sourceRoot, targetAudioRoot, targetFile })
+  const before = await readFile(targetFile, 'utf8')
+  await writeFile(path.join(folder, '1.m4a'), 'new one')
+  const discovered = await discoverAudioCatalog(sourceRoot)
+  // The source changes after it was checked, so the copy fails verification.
+  await writeFile(path.join(folder, '1.m4a'), 'changed again')
+  await expect(importAudioCatalog({ sourceRoot, targetAudioRoot, targetFile, existingRecordings, discovered,
+    narrator: { id: 'yoni-davidov' }, replace: new Set(['beresheet-1']) })).rejects.toThrow(/changed during import/)
+  expect(await readFile(path.join(targetAudioRoot, '01 beresheet/1.m4a'), 'utf8')).toBe('original one')
+  expect(await readdir(path.join(targetAudioRoot, '01 beresheet'))).toEqual(['1.m4a'])
+  expect(await readFile(targetFile, 'utf8')).toBe(before)
 })

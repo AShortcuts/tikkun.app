@@ -13,6 +13,7 @@ import { tokenizeReaderWords } from '../../app/reader/word-tokenization.ts'
 import textFilter from '../../app/text-filter.ts'
 import { verseStartSequenceIndex } from '../../app/reading/exact-token-range.ts'
 import { readCanonicalTokenKeysForRecordings } from '../../scripts/public-reading-tokens.ts'
+import { recordingFilePath } from '../../scripts/audio-library.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const readJson = async (relative: string) => JSON.parse(await readFile(path.join(root, relative), 'utf8'))
@@ -88,7 +89,7 @@ const recordings = []
 const evaluation = []
 for (const [index, recording] of selected.entries()) {
   const input = inputs[index]
-  const mediaPath = path.join('site', recording.playSrc)
+  const mediaPath = path.relative(root, recordingFilePath(root, recording.playSrc))
   if (mediaPath !== input.mediaPath) throw new Error(`Media path changed: ${recording.id}`)
   const bytes = await readFile(path.join(root, mediaPath))
   const mediaIdentity = { algorithm: 'sha256', digest: hash(bytes), byteLength: bytes.length }

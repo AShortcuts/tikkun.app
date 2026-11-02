@@ -11,7 +11,7 @@ from types import SimpleNamespace
 import uuid
 
 from aligner import align, diagnose_cli, load_json, work_path, write_json
-from analysis_runs import record_elapsed, require_budget
+from analysis_runs import record_elapsed
 from beta_store import RevisionConflict, cue_payload, now
 from core import AlignmentError, digest_json
 
@@ -31,12 +31,11 @@ def review_status(store, identifier):
 
 
 class BatchQueue:
-    def __init__(self, store, library, runner=None, budget=None):
+    def __init__(self, store, library, runner=None):
         self.store, self.library = store, library
         self.path = store.root / "queue.json"
         self.lock = threading.RLock()
         self.runner = runner or self.run_recording
-        self.budget = budget or require_budget
         self.thread = None
         self.clearing = False
         self.closed = False
@@ -135,7 +134,6 @@ class BatchQueue:
         result.pop("requests", None)
         result["clearDownloadsSupported"] = True
         result["clearQueueSupported"] = True
-        result["remainingTestingSeconds"] = max(0, self.budget(0))
         result["running"] = result["clearPending"] or any(item["status"] == "running" for item in result["items"])
         for item in result["items"]:
             if item.get("resolvedBy") in self.store.entries:
@@ -186,14 +184,14 @@ class BatchQueue:
             if action == "start":
                 if self.clearing:
                     raise RevisionConflict("The queue is cleared. Let the current recording finish before starting a new batch.")
-                if type(minutes) is not int or not 1 <= minutes <= 60:
+                # None runs until the queue is empty; the cue generation command uses it.
+                if minutes is not None and (type(minutes) is not int or not 1 <= minutes <= 60):
                     raise AlignmentError("Choose a run limit from 1 to 60 minutes.")
                 if self.thread and self.thread.is_alive() and not self.state["paused"]:
                     return
                 if not any(row["status"] == "queued" for row in self.state["items"]):
                     raise AlignmentError("Add a recording or retry an interrupted item before starting.")
-                self.budget(360)
-                self.stop_at = time.monotonic() + minutes * 60
+                self.stop_at = None if minutes is None else time.monotonic() + minutes * 60
                 self.state.update(paused=False, pauseReason=None)
                 self.persist()
                 if not self.thread or not self.thread.is_alive():
@@ -231,13 +229,9 @@ class BatchQueue:
                 item = next((row for row in self.state["items"] if row["status"] == "queued"), None)
                 if not item:
                     self.state.update(paused=True, pauseReason=None); self.persist(); self.thread = None; return
-                if time.monotonic() >= self.stop_at:
+                if self.stop_at is not None and time.monotonic() >= self.stop_at:
                     self.state.update(paused=True, pauseReason="Run time limit reached. Remaining recordings are saved for later.")
                     self.persist(); self.thread = None; return
-                try:
-                    self.budget(360)
-                except AlignmentError as error:
-                    self.state.update(paused=True, pauseReason=str(error)); self.persist(); self.thread = None; return
                 item.update(status="running", startedAt=now(), phase="Preparing recording")
                 self.persist()
             started = time.monotonic()

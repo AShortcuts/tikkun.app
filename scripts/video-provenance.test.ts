@@ -23,7 +23,7 @@ async function temporaryAppRoot() {
     mkdir(path.join(root, 'audio-cues'), { recursive: true }),
     mkdir(path.join(root, 'css'), { recursive: true }),
     mkdir(path.join(root, 'generated'), { recursive: true }),
-    mkdir(path.join(root, 'site', 'audio'), { recursive: true }),
+    mkdir(path.join(root, 'audio'), { recursive: true }),
     mkdir(path.join(root, 'text'), { recursive: true }),
   ])
   await Promise.all([
@@ -36,7 +36,7 @@ async function temporaryAppRoot() {
       path.join(root, 'audio-cues', 'beresheet.json'),
       '{"cues":[]}'
     ),
-    writeFile(path.join(root, 'site', 'audio', 'beresheet.mp3'), 'audio'),
+    writeFile(path.join(root, 'audio', 'beresheet.mp3'), 'audio'),
     writeFile(path.join(root, 'text', 'torah-toc.json'), '{}'),
     writeFile(
       path.join(root, 'generated', 'video-manifest.ts'),
@@ -57,7 +57,7 @@ test('classifies rendered-app inputs without self-referential media outputs', ()
   expect(isAppBuildInput('scripts/video-server.mjs')).toBe(true)
   expect(isAppBuildInput('app/index.test.ts')).toBe(false)
   expect(isAppBuildInput('audio-cues/beresheet.json')).toBe(false)
-  expect(isAppBuildInput('site/audio/beresheet.mp3')).toBe(false)
+  expect(isAppBuildInput('audio/beresheet.mp3')).toBe(false)
   expect(isAppBuildInput('generated/video-manifest.ts')).toBe(false)
 })
 
@@ -71,7 +71,7 @@ test('hashes working-tree app content independently of excluded provenance input
       path.join(root, 'audio-cues', 'beresheet.json'),
       '{"cues":[{"timeStart":1}]}'
     ),
-    writeFile(path.join(root, 'site', 'audio', 'beresheet.mp3'), 'changed audio'),
+    writeFile(path.join(root, 'audio', 'beresheet.mp3'), 'changed audio'),
   ])
   expect(await currentAppBuildHash(root)).toBe(initialHash)
 

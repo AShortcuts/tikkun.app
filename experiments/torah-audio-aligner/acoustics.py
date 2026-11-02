@@ -20,7 +20,7 @@ def load_encoder(model_dir, cache_dir):
                       HF_HUB_DISABLE_TELEMETRY="1", HF_HOME=str(cache_dir))
     import torch
     from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2ForCTC
-    torch.set_num_threads(4)
+    torch.set_num_threads(8)
     torch.set_num_interop_threads(1)
     extractor = Wav2Vec2FeatureExtractor.from_pretrained(model_dir, local_files_only=True)
     model = Wav2Vec2ForCTC.from_pretrained(model_dir, local_files_only=True, use_safetensors=True)

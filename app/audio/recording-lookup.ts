@@ -15,6 +15,18 @@ import type {
   RangeReadingIdentity,
 } from './types.ts'
 import { isParshaAudioRecording, isRangeAudioRecording } from './types.ts'
+import { cueReadingFolderName } from './cue-file.ts'
+
+// Recordings sit in the same numbered reading folders as their cues, and the
+// URL mirrors the file: `/audio/<narrator>/<NN reading>/<aliyah>.m4a`.
+export function recordingMediaPath(
+  narratorId: string,
+  reading: AudioRecording['reading'],
+  aliyah: number,
+  format = 'm4a'
+) {
+  return `/audio/${encodeURIComponent(narratorId)}/${encodeURIComponent(cueReadingFolderName(reading))}/${aliyah}.${format}`
+}
 
 const audioRecordingSlugs = new Set(
   audioRecordings
@@ -122,7 +134,7 @@ export function findAuthoringRecordingForRun({
     )
     if (catalogRecording) return catalogRecording
 
-    const mediaPath = `/audio/${narratorId}/${rangeReading.id}/${normalizedAliyah}.m4a`
+    const mediaPath = recordingMediaPath(narratorId, rangeReading, normalizedAliyah)
     const recording: RangeAudioRecording = {
       id: `${rangeReading.id}-${normalizedAliyah}`,
       narratorId,
@@ -160,18 +172,19 @@ export function findAuthoringRecordingForRun({
     (parshaSlug === 'vezot-haberacha'
       ? 'Vezot Haberacha'
       : readingTitle(run.leining).en.replace(/^Parshat\s+/i, '').trim() || parshaSlug)
-  const mediaPath = `/audio/${narratorId}/${parshaSlug}/${normalizedAliyah}.m4a`
+  const reading: ParshaAudioRecording['reading'] = {
+    kind: 'parsha',
+    id: parshaSlug,
+    name: parshaName,
+    ...(relatedRecording?.parshaNumber
+      ? { order: relatedRecording.parshaNumber }
+      : {}),
+  }
+  const mediaPath = recordingMediaPath(narratorId, reading, normalizedAliyah)
   const recording: ParshaAudioRecording = {
     id: `${parshaSlug}-${normalizedAliyah}`,
     narratorId,
-    reading: {
-      kind: 'parsha',
-      id: parshaSlug,
-      name: parshaName,
-      ...(relatedRecording?.parshaNumber
-        ? { order: relatedRecording.parshaNumber }
-        : {}),
-    },
+    reading,
     parshaSlug,
     parshaName,
     ...(relatedRecording?.parshaNumber

@@ -3,7 +3,9 @@
   import ReaderSearchBar from '../search/ReaderSearchBar.svelte'
   import { createReaderSearch } from '../search/reader-search.ts'
   import UiIcon from './UiIcon.svelte'
+  import { trackAnalytics } from '../analytics/client.ts'
   import type { ParshaPickerComponentProps } from './ParshaPicker.ts'
+  import { COMPACT_READER_QUERY } from '../adaptive/reader-viewport.ts'
   import {
     ALIYAH_HOVER_FLYOUT_QUERY,
     POPUP_VIEWPORT_MARGIN,
@@ -527,7 +529,7 @@
 
   onMount(() => {
     flyoutMedia = view.matchMedia(ALIYAH_HOVER_FLYOUT_QUERY)
-    compactMedia = view.matchMedia('(max-width: 550px)')
+    compactMedia = view.matchMedia(COMPACT_READER_QUERY)
     flushSync(() => {
       hoverFlyout = flyoutMedia?.matches ?? false
       compactLibrary = compactMedia?.matches ?? false
@@ -648,11 +650,14 @@
             <section class="mobile-library-section">
               <h2>Coming Up</h2>
               <ol class="mobile-coming-up">
-                {#each mobileComingUp as reading (reading.id)}
+                {#each mobileComingUp as reading, index (reading.id)}
                   <li>
                     <a
                       href={reading.href}
-                      onclick={(event) => navigateLink(event, reading.href)}
+                      onclick={(event) => {
+                        trackAnalytics('coming_up_select', { position: (index + 1) as 1 | 2 | 3 })
+                        navigateLink(event, reading.href)
+                      }}
                     >
                       <strong dir="rtl">{reading.label}</strong>
                       <time datetime={reading.date.toISOString()}>
@@ -1040,7 +1045,7 @@
               class="cluster"
               style="list-style: none; display: table; margin-left: auto; margin-right: auto; white-space: nowrap;"
             >
-              {#each model.comingUp as reading (reading.id)}
+              {#each model.comingUp as reading, index (reading.id)}
                 <li
                   style="display: table-cell; width: calc(100% / 3); padding: 0 0.5em;"
                 >
@@ -1051,8 +1056,11 @@
                     <a
                       href={reading.href}
                       class="coming-up-button"
-                      onclick={(event) =>
-                        navigateLink(event, reading.href)}
+                      onclick={(event) => {
+                        // The desktop row lists the latest reading first; position 1 is always the next reading.
+                        trackAnalytics('coming_up_select', { position: (model.comingUp.length - index) as 1 | 2 | 3 })
+                        navigateLink(event, reading.href)
+                      }}
                     >
                       {reading.label}
                     </a>

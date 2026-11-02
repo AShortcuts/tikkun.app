@@ -71,7 +71,8 @@ export async function onRequest({ request, env }: AnalyticsFunctionContext) {
   try {
     const upstream = await fetch('https://adamn.cc/api/tikkun-echo', {
       method: 'POST', body: JSON.stringify(data), headers,
-      redirect: 'error', signal: AbortSignal.timeout(5000),
+      // Cloudflare's runtime rejects redirect: 'error'; 'manual' plus the 204 check below refuses redirects.
+      redirect: 'manual', signal: AbortSignal.timeout(5000),
     })
     // The dedicated route identifies itself; an HTML catch-all is never success.
     if (upstream.status !== 204 || upstream.headers.get('X-Tikkun-Collector') !== '1') {

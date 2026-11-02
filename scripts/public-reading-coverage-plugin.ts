@@ -26,11 +26,33 @@ export function isPublicReadingCoverageInput(root: string, file: string) {
     /^app\/view-model\/navigation\/parsha-routes\.ts$/.test(relative)
 }
 
+const generatedManifest = 'generated/public-reading-manifest.ts'
+
+/** Cue files and the catalog built from them, which the Reader reloads instead of hot-swapping. */
+export function isCueDataReloadFile(root: string, file: string) {
+  const relative = path.relative(root, file).split(path.sep).join('/')
+  return /^audio-cues\/.*\.json$/.test(relative) || relative === generatedManifest
+}
+
 export function publicReadingCoveragePlugin(): Plugin {
   let dispose: (() => Promise<void>) | undefined
+  let projectRoot: string | undefined
+  let cueDataChanged: (() => void) | undefined
   return {
     name: 'public-reading-coverage',
     apply: 'serve',
+    hotUpdate: {
+      // After Vite's glob plugin, which adds the module that lists cue files.
+      order: 'post',
+      handler({ file, modules }) {
+        if (!projectRoot || !cueDataChanged || !isCueDataReloadFile(projectRoot, file)) return
+        // Hot-swapping the Reader for new cue data crashes it, so rebuild these
+        // modules and reload the page once the reading catalog has caught up.
+        for (const module of modules) this.environment.moduleGraph.invalidateModule(module)
+        if (this.environment.name === 'client') cueDataChanged()
+        return []
+      },
+    },
     async configureServer(server) {
       // Test servers must not rewrite the developer's generated catalog.
       if (server.config.mode === 'test') return
@@ -41,6 +63,25 @@ export function publicReadingCoveragePlugin(): Plugin {
       let dirty = false
       let closed = false
       let failed = false
+      let reloadPending = false
+
+      function reloadPage() {
+        reloadPending = false
+        const manifest = path.join(root, generatedManifest)
+        for (const environment of Object.values(server.environments)) {
+          for (const module of environment.moduleGraph.getModulesByFile(manifest) ?? []) {
+            environment.moduleGraph.invalidateModule(module)
+          }
+        }
+        server.hot.send({ type: 'full-reload' })
+      }
+
+      projectRoot = root
+      cueDataChanged = () => {
+        reloadPending = true
+        // A catalog refresh is already due; reload after it finishes.
+        if (!timer && !running) reloadPage()
+      }
 
       function schedule() {
         clearTimeout(timer)
@@ -62,7 +103,9 @@ export function publicReadingCoveragePlugin(): Plugin {
             ], { cwd: root, signal: controller.signal })
             if (closed) return
             server.config.logger.info(stdout.trim())
-            if (failed) server.hot.send({ type: 'full-reload' })
+            // A recovered catalog also needs the page to pick it up.
+            if (failed) reloadPending = true
+            if (!dirty && reloadPending) reloadPage()
             failed = false
           } catch (error) {
             if (closed) return
@@ -89,6 +132,7 @@ export function publicReadingCoveragePlugin(): Plugin {
       server.watcher.on('all', changed)
       dispose = async () => {
         closed = true
+        cueDataChanged = undefined
         clearTimeout(timer)
         server.watcher.off('all', changed)
         controller.abort()

@@ -9,7 +9,7 @@ import wave
 import numpy as np
 
 from aligner import HERE, WORK, file_hash, write_json, work_path
-from analysis_runs import baseline_records, require_budget, record_elapsed
+from analysis_runs import baseline_records, record_elapsed
 from prosody import accent_names, interval_features, pitch_track
 
 
@@ -31,7 +31,6 @@ def summarize(rows):
 
 
 def main():
-    require_budget(120)
     started = time.monotonic()
     bundle, items = baseline_records()
     directory = work_path("taamim-analysis/" + uuid.uuid4().hex[:12])

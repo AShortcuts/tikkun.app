@@ -167,6 +167,108 @@ export const publicAliyotByParsha: Readonly<
       "readerHash": "#/torah/parsha/lech-lecha/1-17-7"
     }
   ],
+  "vayera": [
+    {
+      "number": 1,
+      "audioId": "vayera-1",
+      "cueStatus": "cued",
+      "expectedTokenCount": 164,
+      "readerHash": "#/torah/parsha/vayera/1-18-1"
+    },
+    {
+      "number": 2,
+      "audioId": "vayera-2",
+      "cueStatus": "cued",
+      "expectedTokenCount": 237,
+      "readerHash": "#/torah/parsha/vayera/1-18-15"
+    },
+    {
+      "number": 3,
+      "audioId": "vayera-3",
+      "cueStatus": "cued",
+      "expectedTokenCount": 273,
+      "readerHash": "#/torah/parsha/vayera/1-19-1"
+    },
+    {
+      "number": 4,
+      "audioId": "vayera-4",
+      "cueStatus": "cued",
+      "expectedTokenCount": 484,
+      "readerHash": "#/torah/parsha/vayera/1-19-21"
+    },
+    {
+      "number": 5,
+      "audioId": "vayera-5",
+      "cueStatus": "cued",
+      "expectedTokenCount": 196,
+      "readerHash": "#/torah/parsha/vayera/1-21-5"
+    },
+    {
+      "number": 6,
+      "audioId": "vayera-6",
+      "cueStatus": "cued",
+      "expectedTokenCount": 140,
+      "readerHash": "#/torah/parsha/vayera/1-21-22"
+    },
+    {
+      "number": 7,
+      "audioId": "vayera-7",
+      "cueStatus": "cued",
+      "expectedTokenCount": 305,
+      "readerHash": "#/torah/parsha/vayera/1-22-1"
+    }
+  ],
+  "chayei-sarah": [
+    {
+      "number": 1,
+      "audioId": "chayei-sarah-1",
+      "cueStatus": "cued",
+      "expectedTokenCount": 183,
+      "readerHash": "#/torah/parsha/chayei-sarah/1-23-1"
+    },
+    {
+      "number": 2,
+      "audioId": "chayei-sarah-2",
+      "cueStatus": "cued",
+      "expectedTokenCount": 169,
+      "readerHash": "#/torah/parsha/chayei-sarah/1-23-17"
+    },
+    {
+      "number": 3,
+      "audioId": "chayei-sarah-3",
+      "cueStatus": "cued",
+      "expectedTokenCount": 199,
+      "readerHash": "#/torah/parsha/chayei-sarah/1-24-10"
+    },
+    {
+      "number": 4,
+      "audioId": "chayei-sarah-4",
+      "cueStatus": "cued",
+      "expectedTokenCount": 330,
+      "readerHash": "#/torah/parsha/chayei-sarah/1-24-27"
+    },
+    {
+      "number": 5,
+      "audioId": "chayei-sarah-5",
+      "cueStatus": "cued",
+      "expectedTokenCount": 158,
+      "readerHash": "#/torah/parsha/chayei-sarah/1-24-53"
+    },
+    {
+      "number": 6,
+      "audioId": "chayei-sarah-6",
+      "cueStatus": "cued",
+      "expectedTokenCount": 111,
+      "readerHash": "#/torah/parsha/chayei-sarah/1-25-1"
+    },
+    {
+      "number": 7,
+      "audioId": "chayei-sarah-7",
+      "cueStatus": "cued",
+      "expectedTokenCount": 67,
+      "readerHash": "#/torah/parsha/chayei-sarah/1-25-12"
+    }
+  ],
   "toldot": [
     {
       "number": 1,
@@ -269,6 +371,465 @@ export const publicAliyotByParsha: Readonly<
       "readerHash": "#/torah/parsha/vayetzei/1-31-43"
     }
   ],
+  "vayishlach": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayishlach/1-32-4"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayishlach/1-32-14"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayishlach/1-32-31"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayishlach/1-33-6"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayishlach/1-34-1"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayishlach/1-35-12"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayishlach/1-36-20"
+    }
+  ],
+  "vayeshev": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayeshev/1-37-1"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayeshev/1-37-12"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayeshev/1-37-23"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayeshev/1-38-1"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayeshev/1-39-1"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayeshev/1-39-7"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayeshev/1-40-1"
+    }
+  ],
+  "miketz": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/miketz/1-41-1"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/miketz/1-41-15"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/miketz/1-41-39"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/miketz/1-41-53"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/miketz/1-42-19"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/miketz/1-43-16"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/miketz/1-43-30"
+    }
+  ],
+  "vayigash": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayigash/1-44-18"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayigash/1-44-31"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayigash/1-45-8"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayigash/1-45-19"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayigash/1-45-28"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayigash/1-46-28"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayigash/1-47-11"
+    }
+  ],
+  "vayechi": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayechi/1-47-28"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayechi/1-48-10"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayechi/1-48-17"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayechi/1-49-1"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayechi/1-49-19"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayechi/1-49-27"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayechi/1-50-21"
+    }
+  ],
+  "shemot": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shemot/2-1-1"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shemot/2-1-18"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shemot/2-2-11"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shemot/2-3-1"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shemot/2-3-16"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shemot/2-4-18"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shemot/2-5-1"
+    }
+  ],
+  "vaera": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vaera/2-6-2"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vaera/2-6-14"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vaera/2-6-29"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vaera/2-7-8"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vaera/2-8-7"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vaera/2-8-19"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vaera/2-9-17"
+    }
+  ],
+  "bo": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/bo/2-10-1"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/bo/2-10-12"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/bo/2-10-24"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/bo/2-11-4"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/bo/2-12-21"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/bo/2-12-29"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/bo/2-13-1"
+    }
+  ],
+  "beshalach": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/beshalach/2-13-17"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/beshalach/2-14-9"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/beshalach/2-14-15"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/beshalach/2-14-26"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/beshalach/2-15-27"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/beshalach/2-16-11"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/beshalach/2-17-1"
+    }
+  ],
   "yitro": [
     {
       "number": 1,
@@ -318,6 +879,873 @@ export const publicAliyotByParsha: Readonly<
       "cueStatus": "cued",
       "expectedTokenCount": 104,
       "readerHash": "#/torah/parsha/yitro/2-20-15"
+    }
+  ],
+  "mishpatim": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/mishpatim/2-21-1"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/mishpatim/2-21-20"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/mishpatim/2-22-4"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/mishpatim/2-22-27"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/mishpatim/2-23-6"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/mishpatim/2-23-20"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/mishpatim/2-23-26"
+    }
+  ],
+  "terumah": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/terumah/2-25-1"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/terumah/2-25-17"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/terumah/2-25-31"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/terumah/2-26-15"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/terumah/2-26-31"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/terumah/2-27-1"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/terumah/2-27-9"
+    }
+  ],
+  "tetzaveh": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/tetzaveh/2-27-20"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/tetzaveh/2-28-13"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/tetzaveh/2-28-31"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/tetzaveh/2-29-1"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/tetzaveh/2-29-19"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/tetzaveh/2-29-38"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/tetzaveh/2-30-1"
+    }
+  ],
+  "ki-tisa": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/ki-tisa/2-30-11"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/ki-tisa/2-31-18"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/ki-tisa/2-33-12"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/ki-tisa/2-33-17"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/ki-tisa/2-34-1"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/ki-tisa/2-34-10"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/ki-tisa/2-34-27"
+    }
+  ],
+  "vayakhel": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayakhel/2-35-1"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayakhel/2-35-21"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayakhel/2-35-30"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayakhel/2-36-8"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayakhel/2-36-20"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayakhel/2-37-17"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayakhel/2-38-1"
+    }
+  ],
+  "pekudei": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/pekudei/2-38-21"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/pekudei/2-39-2"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/pekudei/2-39-22"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/pekudei/2-39-33"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/pekudei/2-40-1"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/pekudei/2-40-17"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/pekudei/2-40-28"
+    }
+  ],
+  "vayikra": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayikra/3-1-1"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayikra/3-1-14"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayikra/3-2-7"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayikra/3-3-1"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayikra/3-4-1"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayikra/3-4-27"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vayikra/3-5-11"
+    }
+  ],
+  "tzav": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/tzav/3-6-1"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/tzav/3-6-12"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/tzav/3-7-11"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/tzav/3-8-1"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/tzav/3-8-14"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/tzav/3-8-22"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/tzav/3-8-30"
+    }
+  ],
+  "shmini": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shmini/3-9-1"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shmini/3-9-17"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shmini/3-9-24"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shmini/3-10-12"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shmini/3-10-16"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shmini/3-11-1"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shmini/3-11-33"
+    }
+  ],
+  "tazria": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/tazria/3-12-1"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/tazria/3-13-6"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/tazria/3-13-18"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/tazria/3-13-24"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/tazria/3-13-29"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/tazria/3-13-40"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/tazria/3-13-55"
+    }
+  ],
+  "metzora": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/metzora/3-14-1"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/metzora/3-14-13"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/metzora/3-14-21"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/metzora/3-14-33"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/metzora/3-14-54"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/metzora/3-15-16"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/metzora/3-15-29"
+    }
+  ],
+  "achrei-mot": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/achrei-mot/3-16-1"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/achrei-mot/3-16-18"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/achrei-mot/3-16-25"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/achrei-mot/3-17-1"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/achrei-mot/3-17-8"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/achrei-mot/3-18-6"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/achrei-mot/3-18-22"
+    }
+  ],
+  "kedoshim": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/kedoshim/3-19-1"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/kedoshim/3-19-15"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/kedoshim/3-19-23"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/kedoshim/3-19-33"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/kedoshim/3-20-1"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/kedoshim/3-20-8"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/kedoshim/3-20-23"
+    }
+  ],
+  "emor": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/emor/3-21-1"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/emor/3-21-16"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/emor/3-22-17"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/emor/3-23-1"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/emor/3-23-23"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/emor/3-23-33"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/emor/3-24-1"
+    }
+  ],
+  "behar": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/behar/3-25-1"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/behar/3-25-14"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/behar/3-25-19"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/behar/3-25-25"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/behar/3-25-29"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/behar/3-25-39"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/behar/3-25-47"
+    }
+  ],
+  "bechukotai": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/bechukotai/3-26-3"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/bechukotai/3-26-6"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/bechukotai/3-26-10"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/bechukotai/3-27-1"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/bechukotai/3-27-16"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/bechukotai/3-27-22"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/bechukotai/3-27-29"
+    }
+  ],
+  "bamidbar": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/bamidbar/4-1-1"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/bamidbar/4-1-20"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/bamidbar/4-2-1"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/bamidbar/4-3-1"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/bamidbar/4-3-14"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/bamidbar/4-3-40"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/bamidbar/4-4-1"
     }
   ],
   "nasso": [
@@ -422,6 +1850,57 @@ export const publicAliyotByParsha: Readonly<
       "readerHash": "#/torah/parsha/behalotecha/4-11-30"
     }
   ],
+  "shlach": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shlach/4-13-1"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shlach/4-13-21"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shlach/4-14-8"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shlach/4-14-26"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shlach/4-15-8"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shlach/4-15-17"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shlach/4-15-27"
+    }
+  ],
   "korach": [
     {
       "number": 1,
@@ -473,6 +1952,108 @@ export const publicAliyotByParsha: Readonly<
       "readerHash": "#/torah/parsha/korach/4-18-21"
     }
   ],
+  "chukat": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/chukat/4-19-1"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/chukat/4-19-18"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/chukat/4-20-7"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/chukat/4-20-14"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/chukat/4-20-22"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/chukat/4-21-10"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/chukat/4-21-21"
+    }
+  ],
+  "balak": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/balak/4-22-2"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/balak/4-22-13"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/balak/4-22-21"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/balak/4-22-39"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/balak/4-23-13"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/balak/4-23-27"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/balak/4-24-14"
+    }
+  ],
   "pinchas": [
     {
       "number": 1,
@@ -522,6 +2103,516 @@ export const publicAliyotByParsha: Readonly<
       "cueStatus": "missing",
       "expectedTokenCount": 286,
       "readerHash": "#/torah/parsha/pinchas/4-29-12"
+    }
+  ],
+  "matot": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/matot/4-30-2"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/matot/4-31-1"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/matot/4-31-13"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/matot/4-31-25"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/matot/4-31-42"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/matot/4-32-1"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/matot/4-32-20"
+    }
+  ],
+  "masei": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/masei/4-33-1"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/masei/4-33-11"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/masei/4-33-50"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/masei/4-34-16"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/masei/4-35-1"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/masei/4-35-9"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/masei/4-36-1"
+    }
+  ],
+  "devarim": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/devarim/5-1-1"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/devarim/5-1-11"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/devarim/5-1-22"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/devarim/5-1-39"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/devarim/5-2-2"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/devarim/5-2-31"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/devarim/5-3-15"
+    }
+  ],
+  "vaetchanan": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vaetchanan/5-3-23"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vaetchanan/5-4-5"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vaetchanan/5-4-41"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vaetchanan/5-5-1"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vaetchanan/5-5-19"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vaetchanan/5-6-4"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/vaetchanan/5-7-1"
+    }
+  ],
+  "eikev": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/eikev/5-7-12"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/eikev/5-8-11"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/eikev/5-9-4"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/eikev/5-10-1"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/eikev/5-10-12"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/eikev/5-11-10"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/eikev/5-11-22"
+    }
+  ],
+  "reeh": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/reeh/5-11-26"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/reeh/5-12-11"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/reeh/5-12-29"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/reeh/5-14-1"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/reeh/5-14-22"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/reeh/5-15-1"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/reeh/5-15-19"
+    }
+  ],
+  "shoftim": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shoftim/5-16-18"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shoftim/5-17-14"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shoftim/5-18-1"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shoftim/5-18-6"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shoftim/5-18-14"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shoftim/5-19-14"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/shoftim/5-20-10"
+    }
+  ],
+  "ki-teitzei": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/ki-teitzei/5-21-10"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/ki-teitzei/5-21-22"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/ki-teitzei/5-22-8"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/ki-teitzei/5-23-8"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/ki-teitzei/5-23-25"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/ki-teitzei/5-24-5"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/ki-teitzei/5-24-14"
+    }
+  ],
+  "ki-tavo": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/ki-tavo/5-26-1"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/ki-tavo/5-26-12"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/ki-tavo/5-26-16"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/ki-tavo/5-27-1"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/ki-tavo/5-27-11"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/ki-tavo/5-28-7"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/ki-tavo/5-29-1"
+    }
+  ],
+  "nitzavim": [
+    {
+      "number": 1,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/nitzavim/5-29-9"
+    },
+    {
+      "number": 2,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/nitzavim/5-29-12"
+    },
+    {
+      "number": 3,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/nitzavim/5-29-15"
+    },
+    {
+      "number": 4,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/nitzavim/5-30-1"
+    },
+    {
+      "number": 5,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/nitzavim/5-30-7"
+    },
+    {
+      "number": 6,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/nitzavim/5-30-11"
+    },
+    {
+      "number": 7,
+      "audioId": null,
+      "cueStatus": "empty",
+      "expectedTokenCount": null,
+      "readerHash": "#/torah/parsha/nitzavim/5-30-15"
     }
   ],
   "vayelech": [
@@ -677,4 +2768,61 @@ export const publicAliyotByParsha: Readonly<
       "readerHash": "#/torah/parsha/vezot-haberacha/5-34-1"
     }
   ]
+}
+
+export const publicParshaSlugByNumber: Readonly<Record<number, string>> = {
+  "1": "beresheet",
+  "2": "noach",
+  "3": "lech-lecha",
+  "4": "vayera",
+  "5": "chayei-sarah",
+  "6": "toldot",
+  "7": "vayetzei",
+  "8": "vayishlach",
+  "9": "vayeshev",
+  "10": "miketz",
+  "11": "vayigash",
+  "12": "vayechi",
+  "13": "shemot",
+  "14": "vaera",
+  "15": "bo",
+  "16": "beshalach",
+  "17": "yitro",
+  "18": "mishpatim",
+  "19": "terumah",
+  "20": "tetzaveh",
+  "21": "ki-tisa",
+  "22": "vayakhel",
+  "23": "pekudei",
+  "24": "vayikra",
+  "25": "tzav",
+  "26": "shmini",
+  "27": "tazria",
+  "28": "metzora",
+  "29": "achrei-mot",
+  "30": "kedoshim",
+  "31": "emor",
+  "32": "behar",
+  "33": "bechukotai",
+  "34": "bamidbar",
+  "35": "nasso",
+  "36": "behalotecha",
+  "37": "shlach",
+  "38": "korach",
+  "39": "chukat",
+  "40": "balak",
+  "41": "pinchas",
+  "42": "matot",
+  "43": "masei",
+  "44": "devarim",
+  "45": "vaetchanan",
+  "46": "eikev",
+  "47": "reeh",
+  "48": "shoftim",
+  "49": "ki-teitzei",
+  "50": "ki-tavo",
+  "51": "nitzavim",
+  "52": "vayelech",
+  "53": "haazinu",
+  "54": "vezot-haberacha"
 }

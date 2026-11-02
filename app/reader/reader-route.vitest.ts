@@ -867,7 +867,9 @@ test('offers a return to the previous reading after picker navigation', async ()
     savedAt: Date.now(),
   }
   const host = createHost()
-  vi.mocked(host.captureReadingPosition).mockReturnValue(previousReading)
+  vi.mocked(host.captureReadingPosition)
+    .mockReturnValueOnce(previousReading)
+    .mockReturnValue({ ...previousReading, hash: '#/torah/parsha/noach/1-6-9', parshaName: 'Noach' })
   const pickerOptions: Array<Parameters<ParshaPickerModule['default']>[1]> = []
   const createPicker = vi.fn<ParshaPickerModule['default']>(
     (_generator, options) => {
@@ -900,9 +902,51 @@ test('offers a return to the previous reading after picker navigation', async ()
     )
   )
 
-  expect(host.captureReadingPosition).toHaveBeenCalledOnce()
+  // Once before leaving, once to confirm the reader landed somewhere else.
+  expect(host.captureReadingPosition).toHaveBeenCalledTimes(2)
   expect(host.dismissLastReadingPrompt).toHaveBeenCalledOnce()
   expect(host.saveReadingPosition).toHaveBeenCalledOnce()
+})
+
+test('does not offer a return when navigation lands on the same aliyah through another link', async () => {
+  setHash('#/torah/parsha/beresheet')
+  const previousReading = {
+    hash: '#/run/2026-10-17:shacharis,main/1-1-1',
+    parshaName: 'Beresheet',
+    aliyahLabel: 'Aliyah 1',
+    savedAt: Date.now(),
+  }
+  const host = createHost()
+  vi.mocked(host.captureReadingPosition)
+    .mockReturnValueOnce(previousReading)
+    .mockReturnValue({ ...previousReading, hash: '#/torah/parsha/beresheet/1-1-1/aliyah/1' })
+  const pickerOptions: Array<Parameters<ParshaPickerModule['default']>[1]> = []
+  const createPicker = vi.fn<ParshaPickerModule['default']>(
+    (_generator, options) => {
+      pickerOptions.push(options)
+      const node = document.createElement('div')
+      return {
+        node,
+        onMount: vi.fn(),
+        focusSearch: vi.fn(),
+        refreshSearch: vi.fn(),
+        destroy: vi.fn(() => node.remove()),
+      }
+    }
+  )
+  const { route } = mountRoute({
+    host,
+    loadParshaPicker: async () => ({ default: createPicker }),
+  })
+  await flushRouteWork()
+
+  route.togglePicker()
+  await vi.waitFor(() => expect(createPicker).toHaveBeenCalledOnce())
+  pickerOptions[0]?.navigate('#/torah/parsha/beresheet/1-1-1/aliyah/1')
+  await vi.waitFor(() => expect(host.saveReadingPosition).toHaveBeenCalledOnce())
+
+  expect(host.captureReadingPosition).toHaveBeenCalledTimes(2)
+  expect(host.showReturnToPreviousReading).not.toHaveBeenCalled()
 })
 
 test('reveals the absolute page number after a direct page route renders', async () => {

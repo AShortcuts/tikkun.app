@@ -4,6 +4,10 @@ import { RecordingClock } from './recording-clock.ts'
 import { nextCaptureFrame } from './cue-frame-plan.ts'
 import { formatTokenKey } from '../reader/token-position.ts'
 import type { WordCue } from '../audio/types.ts'
+import { setReaderFocalPointMode } from '../reader-scroll.ts'
+
+// Recording mode always centers words in the reader (applyRecordingModePreferences); this file runs the clock without it.
+setReaderFocalPointMode('reader')
 
 const fixtures: HTMLElement[] = []
 const clocks: RecordingClock[] = []

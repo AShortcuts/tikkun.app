@@ -15,7 +15,7 @@
 .print-workspace button, .print-workspace select, .print-workspace input { font: inherit; }
 .print-workspace button { cursor: pointer; }
 .print-workspace button:focus-visible, .print-workspace input:focus-visible, .print-workspace select:focus-visible { outline: 3px solid var(--reader-focus-color, #1475ee); outline-offset: 3px; }
-.print-workspace .print-dialog { display: grid; grid-template-rows: 64px minmax(0, 1fr) 80px; height: calc(100svh - 40px); max-width: 1440px; margin: 0 auto; background: var(--print-surface); border: 1px solid var(--print-rule); border-radius: 12px; box-shadow: 0 10px 32px #293b6112; overflow: hidden; }
+.print-workspace .print-dialog { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 64px minmax(0, 1fr) 80px; height: calc(100svh - 40px); max-width: 1440px; margin: 0 auto; background: var(--print-surface); border: 1px solid var(--print-rule); border-radius: 12px; box-shadow: 0 10px 32px #293b6112; overflow: hidden; }
 .print-workspace .dialog-header { display: flex; justify-content: space-between; align-items: center; padding: 0 24px; border-bottom: 1px solid var(--print-rule); }
 .print-workspace .dialog-header h1 { margin: 0; font-size: 27px; letter-spacing: -0.8px; font-weight: 650; }
 .print-workspace .icon-button { display: grid; place-items: center; width: 40px; height: 40px; border: 0; background: transparent; color: inherit; border-radius: 7px; }
@@ -28,7 +28,9 @@
 .print-workspace .preview-status [role='alert'] { color: var(--media-danger, #a82830); font-size: 13px; }
 .print-workspace .document-wrap { position: relative; margin: 0 auto; filter: drop-shadow(0 3px 8px #2230491a); }
 .print-workspace .document-wrap.unavailable { visibility: hidden; }
-.print-workspace .document-wrap iframe { display: block; border: 0; transform-origin: top left; background: transparent; }
+/* The preview frame never takes touches, so pinching and panning reach the scroller. */
+.print-workspace .document-wrap iframe { display: block; border: 0; transform-origin: top left; background: transparent; pointer-events: none; }
+.print-workspace .preview-scroll { touch-action: pan-x pan-y; }
 .print-workspace .print-settings-pane { overflow-y: auto; border-left: 1px solid var(--print-rule); padding: 0 20px; scrollbar-gutter: stable; }
 .print-workspace .settings-group { padding: 14px 0 16px; border-bottom: 1px solid var(--print-rule); }
 .print-workspace .settings-group:last-child { border-bottom: 0; }
@@ -83,17 +85,40 @@
 @media (max-width: 1100px) { .print-workspace .dialog-body { grid-template-columns: minmax(0, 1fr) 360px; } .print-workspace .print-settings-pane { padding: 0 20px; } .print-workspace .range-fields { gap: 16px; } }
 @media (max-width: 720px) {
   .print-workspace { padding: 0; }
-  .print-workspace .print-dialog { height: 100svh; border-radius: 0; border: 0; grid-template-rows: 57px minmax(0, 1fr) 85px; }
-  .print-workspace .dialog-header { padding: 0 16px; }
+  .print-workspace .print-dialog { height: 100svh; border-radius: 0; border: 0; grid-template-rows: calc(56px + env(safe-area-inset-top, 0px)) minmax(0, 1fr) auto; }
+  .print-workspace .dialog-header { padding: env(safe-area-inset-top, 0px) max(12px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)); }
   .print-workspace .dialog-header h1 { font-size: 23px; }
-  .print-workspace .dialog-body { display: flex; flex-direction: column; overflow-y: auto; }
-  .print-workspace .preview-region { flex: 0 0 43svh; min-height: 240px; }
-  .print-workspace .print-settings-pane { overflow: visible; border-left: 0; padding: 0 20px; }
-  .print-workspace .dialog-footer { padding: 10px 16px; gap: 8px; flex-wrap: wrap; }
-  .print-workspace .dialog-footer p { order: 2; margin: 0; width: 100%; text-align: center; font-size: 10px; }
+  .print-workspace .dialog-body { display: flex; flex-direction: column; }
+  /* Keep the live preview in view while the options scroll beneath it. */
+  .print-workspace .preview-region { flex: 0 0 clamp(200px, 38svh, 420px); border-bottom: 1px solid var(--print-rule); }
+  .print-workspace .preview-scroll { overscroll-behavior: contain; scrollbar-gutter: auto; }
+  .print-workspace .preview-status { font-size: 12px; }
+  .print-workspace .print-settings-pane { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; border-left: 0; padding: 0 max(20px, env(safe-area-inset-right, 0px)) 0 max(20px, env(safe-area-inset-left, 0px)); scrollbar-gutter: auto; }
+  /* iOS zooms into form fields smaller than 16px. */
+  .print-workspace select { font-size: 16px; }
+  .print-workspace .dialog-footer { padding: 10px max(16px, env(safe-area-inset-right, 0px)) max(10px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); gap: 6px; flex-wrap: wrap; }
+  .print-workspace .dialog-footer p { order: 2; margin: 0; width: 100%; text-align: center; font-size: 12px; line-height: 1.4; }
   .print-workspace .dialog-footer > div { width: 100%; gap: 10px; }
-  .print-workspace .dialog-footer button { flex: 1; min-width: 0; padding: 9px 14px; }
+  .print-workspace .dialog-footer button { flex: 1; min-width: 0; min-height: 48px; padding: 10px 14px; font-size: 16px; }
 }
+/* Too short to split: scroll the preview and options together. */
+@media (max-width: 720px) and (max-height: 560px) {
+  .print-workspace .dialog-body { overflow-y: auto; overscroll-behavior: contain; }
+  .print-workspace .preview-region { flex-basis: 240px; }
+  .print-workspace .print-settings-pane { flex: none; overflow: visible; }
+}
+/* Landscape phones: full-bleed, clear of the notch and home indicator. */
+@media (min-width: 721px) and (max-height: 520px) {
+  .print-workspace { padding: 0; }
+  .print-workspace .print-dialog { height: 100svh; border: 0; border-radius: 0; grid-template-rows: 52px minmax(0, 1fr) calc(60px + env(safe-area-inset-bottom, 0px)); }
+  .print-workspace .dialog-header { padding: 0 max(12px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)); }
+  .print-workspace .dialog-header h1 { font-size: 22px; }
+  .print-workspace .preview-region { padding-left: env(safe-area-inset-left, 0px); }
+  .print-workspace .print-settings-pane { padding-right: max(20px, env(safe-area-inset-right, 0px)); overscroll-behavior: contain; }
+  .print-workspace .dialog-footer { padding: 0 max(16px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(16px, env(safe-area-inset-left, 0px)); }
+  .print-workspace .dialog-footer button { min-width: 120px; padding: 10px 18px; }
+}
+.print-workspace .dialog-footer .print-error { color: var(--media-danger, #a82830); }
 @media (prefers-reduced-motion: reduce) { .print-workspace .toggle-row input::after { transition: none; } }
 .print-workspace { position: fixed; inset: 0; margin: auto; border: 0; width: 100%; max-width: none; height: 100svh; max-height: none; overflow: hidden; direction: ltr; text-align: left; }
 .print-workspace::backdrop { background: var(--print-canvas); }

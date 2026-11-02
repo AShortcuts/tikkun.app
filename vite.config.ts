@@ -7,6 +7,8 @@ import { publicReadingCoveragePlugin } from './scripts/public-reading-coverage-p
 import { devServerRestartPlugin } from './scripts/dev-server-restart.mjs'
 import { nativeBuildConfig } from './scripts/native-build-config.mjs'
 import { contentInventoryPlugin } from './scripts/content-inventory-plugin.ts'
+import { audioAssetsPlugin } from './scripts/audio-assets-plugin.ts'
+import { cueFileSavePlugin } from './scripts/cue-file-save-plugin.ts'
 import { updateConfig } from './scripts/update-config.mjs'
 import { analyticsConfig } from './app/analytics/config.ts'
 import analyticsPublic from './config/analytics-public.json' with { type: 'json' }
@@ -19,7 +21,14 @@ const contentVersion = randomUUID()
 const updates = native.enabled ? updateConfig() : { enabled: false, publicKey: '' }
 
 export const viteConfig = {
-  plugins: [devServerRestartPlugin(), publicReadingCoveragePlugin(), sveltekit(), contentInventoryPlugin(contentVersion)],
+  plugins: [
+    devServerRestartPlugin(),
+    publicReadingCoveragePlugin(),
+    cueFileSavePlugin(),
+    audioAssetsPlugin(projectRoot),
+    sveltekit(),
+    contentInventoryPlugin(contentVersion),
+  ],
   define: {
     __TIKKUN_BUILD_ID__: JSON.stringify(buildIdentifier),
     __TIKKUN_ANALYTICS_CONFIG__: JSON.stringify(analyticsConfig({ ...analyticsPublic, ...process.env })),

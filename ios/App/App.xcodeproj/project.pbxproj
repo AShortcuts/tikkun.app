@@ -22,6 +22,7 @@
 		CB0000000000000000000003 /* TikkunMedia in Frameworks */ = {isa = PBXBuildFile; productRef = CB0000000000000000000004 /* TikkunMedia */; };
 		CB0000000000000000000006 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = CB0000000000000000000007 /* PrivacyInfo.xcprivacy */; };
 		CC0000000000000000000011 /* TikkunPracticePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000021 /* TikkunPracticePlugin.swift */; };
+		CD0000000000000000000001 /* TikkunPrintPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0000000000000000000002 /* TikkunPrintPlugin.swift */; };
 		CC0000000000000000000012 /* UpcomingReadingsIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000022 /* UpcomingReadingsIntent.swift */; };
 		CC0000000000000000000013 /* TikkunSystem in Frameworks */ = {isa = PBXBuildFile; productRef = CC0000000000000000000071 /* TikkunSystem */; };
 		CC0000000000000000000014 /* TikkunSystem in Frameworks */ = {isa = PBXBuildFile; productRef = CC0000000000000000000072 /* TikkunSystem */; };
@@ -70,6 +71,7 @@
 		CB0000000000000000000002 /* TikkunMediaPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TikkunMediaPlugin.swift; sourceTree = "<group>"; };
 		CB0000000000000000000007 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		CC0000000000000000000021 /* TikkunPracticePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TikkunPracticePlugin.swift; sourceTree = "<group>"; };
+		CD0000000000000000000002 /* TikkunPrintPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TikkunPrintPlugin.swift; sourceTree = "<group>"; };
 		CC0000000000000000000022 /* UpcomingReadingsIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpcomingReadingsIntent.swift; sourceTree = "<group>"; };
 		CC0000000000000000000023 /* TikkunWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TikkunWidgets.swift; sourceTree = "<group>"; };
 		CC0000000000000000000024 /* PracticeWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeWidgetView.swift; sourceTree = "<group>"; };
@@ -127,6 +129,7 @@
 				CA0000000000000000000002 /* TikkunPlaybackPlugin.swift */,
 				CB0000000000000000000002 /* TikkunMediaPlugin.swift */,
 				CC0000000000000000000021 /* TikkunPracticePlugin.swift */,
+				CD0000000000000000000002 /* TikkunPrintPlugin.swift */,
 				CC0000000000000000000022 /* UpcomingReadingsIntent.swift */,
 				CB0000000000000000000007 /* PrivacyInfo.xcprivacy */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -274,6 +277,7 @@
 				CA0000000000000000000001 /* TikkunPlaybackPlugin.swift in Sources */,
 				CB0000000000000000000001 /* TikkunMediaPlugin.swift in Sources */,
 				CC0000000000000000000011 /* TikkunPracticePlugin.swift in Sources */,
+				CD0000000000000000000001 /* TikkunPrintPlugin.swift in Sources */,
 				CC0000000000000000000012 /* UpcomingReadingsIntent.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
 			);

@@ -1,6 +1,7 @@
 """Portable, explicitly unreviewed timings with durable word-level review flags."""
 
 from core import AlignmentError, digest_json, validate_result
+from review_evidence import MIN_RESTART_SPACING_SECONDS
 
 LABELS = {
     "ambiguous_repeated_prefix": "Possible restart or rearticulation. Listen to the word and its lead-in.",
@@ -11,9 +12,21 @@ LABELS = {
     "unresolved_word": "This word could not be placed reliably.",
     "unclear_audio": "Audio quality limits what can be verified.",
 }
+# Region anchors describe how the engine split the recording, not the reading.
+HIDDEN_EVENT_KINDS = {"uncertain_region_anchor"}
 
 
-def generated_draft(bundle, recording, proposal, state, seed):
+def shown_to_reviewer(event, rate):
+    if event["kind"] in HIDDEN_EVENT_KINDS:
+        return False
+    if event["kind"] == "ambiguous_repeated_prefix" and "secondPrefixSample" in event:
+        # Older results were saved with a shorter spacing; apply the current one.
+        spacing = (event["secondPrefixSample"] - event["sourceStartSample"]) / rate
+        return spacing >= MIN_RESTART_SPACING_SECONDS
+    return True
+
+
+def generated_draft(bundle, recording, proposal, state, seed, late_start_hints=()):
     validate_result(bundle, recording, seed)
     expected_seed = proposal.get("seedProposalSha256")
     if expected_seed and expected_seed != digest_json(seed):
@@ -64,6 +77,8 @@ def generated_draft(bundle, recording, proposal, state, seed):
         raise AlignmentError("This recording has no generated timings to download.")
     positions = {token["tokenKey"]: index for index, token in enumerate(tokens)}
     for event_index, event in enumerate(proposal["events"]):
+        if not shown_to_reviewer(event, rate):
+            continue
         sample = event.get("sourceStartSample", event.get("sourceSample"))
         index = positions.get(event.get("tokenKey") or event.get("beforeTokenKey"))
         if index is None:
@@ -77,6 +92,15 @@ def generated_draft(bundle, recording, proposal, state, seed):
         if sample is not None:
             flag["sourceTime"] = sample / rate
         cues[index]["review"]["flags"].append(flag)
+    for hint in late_start_hints:
+        index = positions.get(hint["tokenKey"])
+        if index is None:
+            continue
+        earlier = (hint["alignedStartSample"] - hint["sourceStartSample"]) / rate
+        cues[index]["review"]["flags"].append({
+            "id": f"{basis}:late-start:{index}", "kind": "possible_late_start", "status": "pending",
+            "message": f"May start about {earlier:.1f} s earlier, after a held note. Listen to the lead-in.",
+            "sourceTime": hint["sourceStartSample"] / rate})
     for cue in cues:
         if any(flag["status"] == "pending" for flag in cue["review"]["flags"]):
             cue["review"]["status"] = "pending"

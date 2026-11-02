@@ -13,8 +13,8 @@ import numpy as np
 from acoustics import encode_samples, load_encoder, read_wave
 from aligner import (HERE, REPO, WORK, CHECKPOINT, current_input, recording_for, file_hash,
                      verify_sources, verify_model, probe, write_json, work_path, bounded_worker)
-from analysis_runs import comparison_stats, differences, require_budget, record_elapsed
-from core import AlignmentError, digest_json, propose
+from analysis_runs import comparison_stats, differences, record_elapsed
+from core import AlignmentError, digest_json, propose, resolve_media
 from prosody import pitch_track
 from review_evidence import signal_quality, repeated_prefixes, sustained_tail_regions
 
@@ -45,7 +45,7 @@ def worker(args):
         run_dir.mkdir()
         waveform = run_dir / "analysis.wav"
         subprocess.run(["ffmpeg", "-v", "error", "-nostdin", "-n", "-threads", "1", "-i",
-                        str(REPO / recording["mediaPath"]), "-map", "0:a:0", "-vn", "-ac", "1",
+                        str(resolve_media(REPO, recording["mediaPath"])), "-map", "0:a:0", "-vn", "-ac", "1",
                         "-ar", "16000", "-c:a", "pcm_s16le", str(waveform)], check=True, timeout=60)
         samples = read_wave(waveform)
         if abs(len(samples) / 16000 - recording["durationSeconds"]) > .1:
@@ -109,18 +109,17 @@ def main():
             raise AlignmentError("Worker needs an isolated output directory")
         worker(args)
         return
-    remaining = require_budget(1200)
     lock = work_path("analysis-job.lock").open("w")
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     directory = work_path("confirmation/" + uuid.uuid4().hex[:12])
     directory.mkdir(parents=True)
     write_json(directory / "job.json", {"status": "started", "input": args.input, "headSummary": args.head_summary,
-                                       "timeoutSeconds": min(1200, remaining)})
+                                       "timeoutSeconds": 1200})
     started = time.monotonic()
     try:
         result = bounded_worker([sys.executable, "-B", str(HERE / "confirm_corpus.py"), "--worker",
                                  "--input", args.input, "--head-summary", args.head_summary,
-                                 "--output", str(directory)], min(1200, remaining))
+                                 "--output", str(directory)], 1200)
         (directory / "worker.stdout").write_text(result.stdout)
         (directory / "worker.stderr").write_text(result.stderr)
         if result.returncode:

@@ -10,8 +10,8 @@ import numpy as np
 from acoustics import read_wave
 from aligner import (HERE, REPO, WORK, CHECKPOINT, current_input, recording_for, verify_sources,
                      file_hash, work_path, write_json, input_for_result)
-from analysis_runs import require_budget, record_elapsed
-from core import AlignmentError, digest_json, lexical_units, validate_result
+from analysis_runs import record_elapsed
+from core import AlignmentError, digest_json, lexical_units, resolve_media, validate_result
 from prosody import pitch_track
 from reading_graph import reading_graph
 from review_evidence import signal_quality, repeated_prefixes, sustained_tail_regions, uncertain_word_events
@@ -29,7 +29,7 @@ def verified_samples(directory, metadata, recording):
     else:
         # Older pilot caches predate the WAV digest. Re-derive PCM from the hashed original.
         raw = subprocess.check_output(["ffmpeg", "-v", "error", "-nostdin", "-threads", "1", "-i",
-            str(REPO / recording["mediaPath"]), "-map", "0:a:0", "-vn", "-ac", "1", "-ar", "16000",
+            str(resolve_media(REPO, recording["mediaPath"])), "-map", "0:a:0", "-vn", "-ac", "1", "-ar", "16000",
             "-f", "s16le", "pipe:1"], timeout=60)
         original = np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32768
         if not np.array_equal(original, samples):
@@ -94,7 +94,6 @@ def display_occurrences(recording, lexical):
 
 
 def diagnose(args):
-    require_budget(180)
     started = time.monotonic()
     directory = work_path("diagnostics/" + uuid.uuid4().hex[:12])
     try:
@@ -139,9 +138,7 @@ def diagnose(args):
                                "pathLogScore": graph["pathLogScore"], "signalQuality": local_quality})
         occurrences, grouping_events = display_occurrences(recording, lexical)
         events += grouping_events
-        for anchor in anchors:
-            if not anchor["quietAnchorFound"]:
-                events.append({"kind": "uncertain_region_anchor", **anchor})
+        # Region anchors stay in reviewDiagnostics; they are not reading flags.
         track = pitch_track(samples)
         tails = sustained_tail_regions(lexical, track)
         result = {**seed, "decoder": "bounded-torah-reading-graph-v1", "referenceProfile": "torah-spoken-v1",

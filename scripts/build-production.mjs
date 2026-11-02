@@ -3,6 +3,7 @@ import path from 'node:path'
 import process from 'node:process'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { publishAudio } from './audio-library.mjs'
 
 export async function prepareProductionRoutes(root, native = false) {
   const source = path.join(root, 'src/routes')
@@ -32,5 +33,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     cwd: root, env: { ...process.env, TIKKUN_PRODUCTION_ROUTES: routes }, stdio: 'inherit',
   })
   if (result.error) throw result.error
+  if (result.status) process.exit(result.status)
+  // The web artifact publishes the recordings; native bundles stream from the web host.
+  if (process.env.TIKKUN_NATIVE !== '1') await publishAudio(root, path.join(root, 'dist'))
   process.exit(result.status ?? 1)
 }

@@ -1,5 +1,7 @@
 import type { WordCue } from '../audio/types.ts'
 
+// Review notes are never exported, so they do not make a draft differ from
+// the published cues.
 function normalizedCue(cue: WordCue) {
   return {
     timeStart: cue.timeStart,
@@ -8,7 +10,6 @@ function normalizedCue(cue: WordCue) {
     lineIndex: cue.lineIndex,
     fragmentIndex: cue.fragmentIndex,
     wordIndex: cue.wordIndex,
-    review: cue.review,
   }
 }
 

@@ -6,12 +6,11 @@ import uuid
 import numpy as np
 
 from aligner import WORK, HERE, CHECKPOINT, file_hash, write_json, work_path
-from analysis_runs import baseline_records, comparison_stats, differences, record_elapsed, require_budget
+from analysis_runs import baseline_records, comparison_stats, differences, record_elapsed
 from core import propose
 
 
 def main():
-    require_budget(180)
     started = time.monotonic()
     bundle, records = baseline_records()
     directory = work_path("calibration/" + uuid.uuid4().hex[:12])

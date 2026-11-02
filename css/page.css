@@ -393,6 +393,26 @@ html[data-reader-reduced-motion='on'] .word {
   content: none;
 }
 
+/* Reading joins a maqaf phrase that physical Torah rows split into separate
+   tokens. Both halves light up together; squaring and clipping the seam side
+   makes their boxes read as one highlight. Hebrew runs right to left, so a
+   lead's seam is its left edge and a tail's seam is its right edge. */
+.word.mod-maqaf-join-lead.is-active-word {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+  clip-path: inset(-1em -1em -1em 0);
+}
+
+.word.mod-maqaf-join-tail.is-active-word {
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+  clip-path: inset(-1em 0 -1em -1em);
+}
+
+.word.mod-maqaf-join-lead.mod-maqaf-join-tail.is-active-word {
+  clip-path: inset(-1em 0 -1em 0);
+}
+
 .word[data-recording-issue] {
   --reader-recording-issue-highlight-color: #fb923c;
   --reader-recording-issue-highlight-fill-color: #fbbf24;
@@ -982,9 +1002,10 @@ html[data-reader-side-order='torah-right']
 
 .tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
   .word.mod-maqaf-boundary {
-  /* Inline boxes honor the joiner across source rows; retain mirrored widths. */
+  /* Inline boxes honor the joiner across source rows; padding keeps the
+     mirrored advance inside the box so the highlight spans the pairing gap. */
   display: inline;
-  margin-inline-end: var(--reader-paired-word-spacing, 0);
+  padding-inline-end: var(--reader-paired-word-spacing, 0);
 }
 
 .tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
@@ -994,7 +1015,7 @@ html[data-reader-side-order='torah-right']
 
 .tikkun-book[data-reader-layout='reading'][data-reader-sides='two']
   .tikkun-page.mod-measuring-paired-words .word.mod-maqaf-boundary {
-  margin-inline-end: 0;
+  padding-inline-end: 0;
 }
 
 .tikkun-book[data-reader-layout='reading'][data-reader-sides='two']

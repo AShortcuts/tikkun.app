@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { flushSync, onMount } from 'svelte'
   import { trackAnalytics } from '../analytics/client.ts'
   import { resolve } from '$app/paths'
   import UiIcon from '../components/UiIcon.svelte'
@@ -10,6 +10,10 @@
   import { printDetailsAliyot } from './print-details.ts'
   import type { UpcomingPrintReading } from './upcoming-print-readings.ts'
   import PrintSelect from './PrintSelect.svelte'
+  import { isNativeApp } from '../platform/native.ts'
+  import { nativePrintErrorMessage, printNatively } from '../platform/native-print.ts'
+  import { createPrintSnapshot } from './print-snapshot.ts'
+  import { preparePrintFonts, printPreparedPages, removePrintOutput } from './print-output.ts'
   import './print.css'
 
   let { context, upcoming = [], onclose, initialScope = 'current', initialRange }: { context: PrintContext; upcoming?: UpcomingPrintReading[]; onclose(): void; initialScope?: Scope; initialRange?: PassageRange } = $props()
@@ -57,17 +61,25 @@
   const dateLabel = (date: Date) => date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
   let frame: HTMLIFrameElement
   let preview: HTMLDivElement
+  let previewScroller: HTMLDivElement
+  let documentWrap: HTMLDivElement
   let frameReady = $state(false)
   let busy = $state(true)
   let failure = $state('')
   let pageCount = $state(0)
   let exceedsWidth = $state(false)
+  let printing = $state(false)
+  let printError = $state('')
   let documentHeight = $state(1056)
   let previewWidth = $state(800)
   let previewHeight = $state(800)
   let request = 0
   const paper = $derived(paperSize(orientation))
-  const previewScale = $derived(Math.min(1, Math.max(0.2, (previewWidth - 56) / paper.width), Math.max(0.2, (previewHeight - 62) / paper.height)))
+  const fitScale = $derived(Math.min(1, Math.max(0.2, (previewWidth - 56) / paper.width), Math.max(0.2, (previewHeight - 62) / paper.height)))
+  // Pinching zooms the preview itself, up to 3x actual paper size.
+  let previewZoom = $state(1)
+  const maxPreviewZoom = $derived(Math.max(1, 3 / fitScale))
+  const previewScale = $derived(fitScale * Math.min(previewZoom, maxPreviewZoom))
   const chapters = $derived(listScrollChapters(scroll, book))
   const startVerses = $derived(listScrollVerses(scroll, book, startChapter))
   const endChapters = $derived(listScrollChapters(scroll, endBook))
@@ -93,10 +105,73 @@
     upcomingToggle?.focus()
     upcomingOpen = false
   }
-  function print() {
-    if (!busy && !failure && pageCount && scaling > 0 && !exceedsWidth && frame.contentWindow) {
-      trackAnalytics('print_requested', { layout, sides, form, pages: pageCount })
-      frame.contentWindow.print()
+  async function print(event: MouseEvent & { currentTarget: HTMLButtonElement }) {
+    if (busy || failure || !pageCount || scaling <= 0 || exceedsWidth || printing || !frame.contentWindow) return
+    trackAnalytics('print_requested', { layout, sides, form, pages: pageCount })
+    if (!isNativeApp()) {
+      try { printPreparedPages(frame.contentDocument!, orientation) }
+      catch (error) {
+        console.error('Print failed', error)
+        trackAnalytics('print_error')
+        printError = error instanceof Error ? error.message : 'Printing could not start. Try again.'
+      }
+      return
+    }
+    // WKWebView ignores window.print(), so the app prints a copy of the prepared pages natively.
+    const { x, y, width, height } = event.currentTarget.getBoundingClientRect()
+    const request = { width: paper.width, height: paper.height, pages: pageCount, title: passageTitle(ranges, 'en'), anchor: { x, y, width, height } }
+    printing = true
+    printError = ''
+    try {
+      if (!frame.contentDocument) throw new Error('The prepared pages are not available. Close Print and try again.')
+      await printNatively({ ...request, html: await createPrintSnapshot(frame.contentDocument) })
+    } catch (error) {
+      console.error('Native print failed', error)
+      trackAnalytics('print_error')
+      printError = nativePrintErrorMessage(error)
+    } finally {
+      printing = false
+    }
+  }
+
+  function attachPinchZoom(scroller: HTMLElement) {
+    let gesture: { distance: number; zoom: number; x: number; y: number } | null = null
+    const distance = (touches: TouchList) => Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY)
+    const midpoint = (touches: TouchList) => ({ x: (touches[0].clientX + touches[1].clientX) / 2, y: (touches[0].clientY + touches[1].clientY) / 2 })
+    function start(event: TouchEvent) {
+      if (event.touches.length !== 2) return
+      const point = midpoint(event.touches)
+      const wrap = documentWrap.getBoundingClientRect()
+      // Remember which spot on the paper sits under the fingers.
+      gesture = { distance: distance(event.touches), zoom: Math.min(previewZoom, maxPreviewZoom), x: (point.x - wrap.left) / wrap.width, y: (point.y - wrap.top) / wrap.height }
+    }
+    function move(event: TouchEvent) {
+      if (!gesture || event.touches.length !== 2) return
+      event.preventDefault()
+      const point = midpoint(event.touches)
+      previewZoom = Math.min(maxPreviewZoom, Math.max(1, gesture.zoom * distance(event.touches) / gesture.distance))
+      flushSync()
+      // Keep that spot under the fingers so pinching also pans.
+      const wrap = documentWrap.getBoundingClientRect()
+      scroller.scrollLeft += wrap.left + gesture.x * wrap.width - point.x
+      scroller.scrollTop += wrap.top + gesture.y * wrap.height - point.y
+    }
+    function end(event: TouchEvent) { if (event.touches.length < 2) gesture = null }
+    // Safari's own pinch would zoom the whole dialog instead of the paper.
+    const blockPageZoom = (event: Event) => event.preventDefault()
+    scroller.addEventListener('touchstart', start, { passive: true })
+    scroller.addEventListener('touchmove', move, { passive: false })
+    scroller.addEventListener('touchend', end)
+    scroller.addEventListener('touchcancel', end)
+    scroller.addEventListener('gesturestart', blockPageZoom)
+    scroller.addEventListener('gesturechange', blockPageZoom)
+    return () => {
+      scroller.removeEventListener('touchstart', start)
+      scroller.removeEventListener('touchmove', move)
+      scroller.removeEventListener('touchend', end)
+      scroller.removeEventListener('touchcancel', end)
+      scroller.removeEventListener('gesturestart', blockPageZoom)
+      scroller.removeEventListener('gesturechange', blockPageZoom)
     }
   }
 
@@ -107,8 +182,13 @@
     document.body.style.overflow = 'hidden'
     // Fit once so native browser zoom can enlarge the paper instead of
     // triggering a resize that immediately shrinks it back into view.
-    previewWidth = preview.clientWidth
-    previewHeight = preview.clientHeight
+    const fitPreview = () => { previewWidth = preview.clientWidth; previewHeight = preview.clientHeight }
+    fitPreview()
+    // Rotating a phone changes the available space; refit then too.
+    const orientation = window.matchMedia('(orientation: portrait)')
+    const refit = () => requestAnimationFrame(fitPreview)
+    orientation.addEventListener('change', refit)
+    const detachPinchZoom = attachPinchZoom(previewScroller)
     const readyTimer = window.setTimeout(() => {
       if (frameReady) return
       console.error('Print document did not become ready')
@@ -124,6 +204,7 @@
       if (event.data?.request !== request) return
       if (event.data.kind === 'tikkun-print-result') {
         pageCount = event.data.pageCount; documentHeight = event.data.height; exceedsWidth = event.data.exceedsWidth; busy = false; failure = ''
+        if (!isNativeApp() && frame.contentDocument) void preparePrintFonts(frame.contentDocument).catch(error => console.error('Could not load print fonts', error))
       } else if (event.data.kind === 'tikkun-print-error') { trackAnalytics('print_error'); failure = event.data.message; busy = false; pageCount = 0 }
     }
     function keyboard(event: KeyboardEvent) {
@@ -131,7 +212,7 @@
     }
     window.addEventListener('message', receive)
     window.addEventListener('keydown', keyboard)
-    return () => { window.clearTimeout(readyTimer); document.body.style.overflow = previousOverflow; window.removeEventListener('message', receive); window.removeEventListener('keydown', keyboard) }
+    return () => { window.clearTimeout(readyTimer); document.body.style.overflow = previousOverflow; orientation.removeEventListener('change', refit); detachPinchZoom(); removePrintOutput(); window.removeEventListener('message', receive); window.removeEventListener('keydown', keyboard) }
   })
 
   $effect(() => {
@@ -158,9 +239,9 @@
     <header class="dialog-header"><h1>Print</h1><button class="icon-button" aria-label="Close print dialog" onclick={() => dialog.close()}><UiIcon name="x" /></button></header>
     <div class="dialog-body">
       <div class="preview-region" bind:this={preview} aria-busy={busy}>
-        <div class="preview-scroll">
+        <div class="preview-scroll" bind:this={previewScroller}>
           <div class="preview-status" aria-live="polite">{#if failure}<span role="alert">{failure}</span>{:else if busy}Preparing pages…{:else if scaling === 0}0% · Increase Scaling to print{:else if exceedsWidth}<span role="alert">Content exceeds the paper width. Reduce Scaling or choose One Sided.</span>{:else}{pageCount} {pageCount === 1 ? 'page' : 'pages'} · Scaling {scaling}%{/if}</div>
-          <div class="document-wrap" class:unavailable={Boolean(failure)} style:width={`${paper.width * previewScale}px`} style:height={`${documentHeight * previewScale}px`}>
+          <div class="document-wrap" bind:this={documentWrap} class:unavailable={Boolean(failure)} style:width={`${paper.width * previewScale}px`} style:height={`${documentHeight * previewScale}px`}>
             <iframe bind:this={frame} title={isEsther ? 'Live printable Esther preview' : 'Live printable Torah preview'} src={resolve('/print/document/')} style:width={`${paper.width}px`} style:height={`${documentHeight}px`} style:transform={`scale(${previewScale})`}></iframe>
           </div>
         </div>
@@ -233,6 +314,9 @@
         </section>
       </aside>
     </div>
-    <footer class="dialog-footer"><p>Choose your printer in the next dialog.</p><div><button onclick={() => dialog.close()}>Cancel</button><button class="primary" disabled={busy || Boolean(failure) || !pageCount || scaling === 0 || exceedsWidth} onclick={print}>Print…</button></div></footer>
+    <footer class="dialog-footer">
+      {#if printError}<p class="print-error" role="alert">{printError}</p>{:else}<p aria-live="polite">{printing ? 'Preparing pages for printing…' : 'Choose your printer in the next dialog.'}</p>{/if}
+      <div><button onclick={() => dialog.close()}>Cancel</button><button class="primary" aria-busy={printing} disabled={busy || printing || Boolean(failure) || !pageCount || scaling === 0 || exceedsWidth} onclick={print}>Print…</button></div>
+    </footer>
   </section>
 </dialog>

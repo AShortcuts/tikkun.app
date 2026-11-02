@@ -436,3 +436,21 @@ test('preserves versioned URLs and request preconditions while removing range he
   expect(forwarded.headers.has('if-range')).toBe(false)
   expect(fixture.value.request.headers.has('range')).toBe(true)
 })
+
+test('redirects the earlier unnumbered recording URLs to the numbered library paths', async () => {
+  const recording = audioRecordings.find((recording) => recording.status === 'available')!
+  const legacyPath = recording.playSrc.replace(/\/\d{2}%20/, '/')
+  expect(legacyPath).not.toBe(recording.playSrc)
+  const fixture = context('bytes=0-1')
+  fixture.value.request = new Request(`https://tikkun.test${legacyPath}?tikkun-media=${recording.mediaIdentity!.digest}`, {
+    headers: { range: 'bytes=0-1' },
+  })
+  const response = await onRequest(fixture.value)
+  expect(response.status).toBe(301)
+  expect(response.headers.get('location')).toBe(`https://tikkun.test${recording.playSrc}?tikkun-media=${recording.mediaIdentity!.digest}`)
+  expect(fixture.fetch).not.toHaveBeenCalled()
+
+  const current = context('bytes=0-1')
+  current.value.request = new Request(`https://tikkun.test${recording.playSrc}`, { headers: { range: 'bytes=0-1' } })
+  expect((await onRequest(current.value)).status).toBe(206)
+})

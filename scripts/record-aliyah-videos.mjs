@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process'
 import { Buffer } from 'node:buffer'
 import process from 'node:process'
 import { audioRecordings } from '../generated/audio-manifest.ts'
+import { recordingFilePath } from './audio-library.mjs'
 import {
   nextCaptureFrame,
   createCueConcatEntries,
@@ -30,7 +31,6 @@ const defaultOutputRoot = '/Users/adambh/Koofr/Tikkun Videos'
 const defaultWorkRoot = '/private/tmp/tikkun-video-render'
 const metadataPath = path.join(repoRoot, 'video-render-metadata.local.json')
 const reportPath = path.join(repoRoot, 'video-render-reports.local.json')
-const siteRoot = path.join(repoRoot, 'site')
 const cueRoot = path.join(repoRoot, 'audio-cues')
 let cuePayloadsByAudioId = null
 let appBuildHashPromise = null
@@ -180,10 +180,7 @@ function narratorInitials(narratorId) {
     .toLowerCase()
 }
 
-function siteAudioUrlToLocalPath(playSrc) {
-  const pathname = new URL(playSrc, 'https://tikkun.local').pathname
-  return path.join(siteRoot, decodeURIComponent(pathname.replace(/^\//, '')))
-}
+const recordingAudioPath = (recording) => recordingFilePath(repoRoot, recording.playSrc)
 
 async function sha256File(filePath) {
   const hash = createHash('sha256')
@@ -901,7 +898,7 @@ async function recordOne(recording, options) {
   let encoder
   try {
     options.checkpoint()
-    const audioPath = siteAudioUrlToLocalPath(recording.playSrc)
+    const audioPath = recordingAudioPath(recording)
     const cues = await getCuesForRecording(recording)
     if (!cues.length) throw new Error('missing cue data')
 
@@ -1132,7 +1129,7 @@ async function recordBatch(options) {
     if (saved?.outputHash && saved.fileName && path.basename(saved.fileName) === saved.fileName) {
       console.log(`[video] Checking completed file: ${recording.id}`)
       const generatedFrom = {
-        audioHash: await sha256File(siteAudioUrlToLocalPath(recording.playSrc)),
+        audioHash: await sha256File(recordingAudioPath(recording)),
         cueHash: sha256Json(cues),
       }
       completed = await completedVideoMatches({ metadata: saved, outputRoot: options.outputRoot,

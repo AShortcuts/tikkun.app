@@ -1,6 +1,7 @@
 import type { AnalyticsConfig } from './config.ts'
-import { analyticsPath, validEvent, type AnalyticsEvent, type AnalyticsProperties } from './schema.ts'
+import { analyticsPath, appStoreCampaigns, validEvent, type AnalyticsEvent, type AnalyticsProperties } from './schema.ts'
 import { ANALYTICS_PREFERENCE_EVENT, ANALYTICS_PREFERENCE_KEY, analyticsAllowed } from './preferences.ts'
+import { dueCheckIn, eventContext, type DeviceFacts } from './context.ts'
 
 export interface AnalyticsPayload {
   k: string
@@ -29,13 +30,18 @@ export function installAnalytics(client: AnalyticsClient) {
   return () => { if (activeClient === client) activeClient = noop; client.destroy() }
 }
 
-export function createAnalyticsClient({ view, config, native, enabled, send, now = () => performance.now() }: {
+export function createAnalyticsClient({ view, config, native, enabled, send, now = () => performance.now(), clock = () => new Date(), appSurface = false, deviceFacts }: {
   view: Window
   config: AnalyticsConfig
   native: boolean
   enabled: boolean
   send: AnalyticsSender
   now?: () => number
+  /** Wall clock for local hour, weekday, and the daily check-in. */
+  clock?: () => Date
+  /** Native app or Home Screen web app: sends the daily `app_active` check-in. */
+  appSurface?: boolean
+  deviceFacts?: () => Promise<DeviceFacts>
 }): AnalyticsClient {
   const key = native ? config.appKey : config.webKey
   const site = new URL(config.siteOrigin)
@@ -67,7 +73,7 @@ export function createAnalyticsClient({ view, config, native, enabled, send, now
         if (referrer.protocol === 'https:' || referrer.protocol === 'http:') payload.r = referrer.origin
       } catch { /* Browser-provided referrers can be absent or unparsable. */ }
     }
-    if (event) { payload.e = event; payload.p = properties ?? {} }
+    if (event) { payload.e = event; payload.p = { ...properties, ...eventContext(clock()) } }
     // No persistent queue: offline activity and failed deliveries are discarded.
     void Promise.resolve().then(() => {
       if (analyticsAllowed(view) && view.navigator.onLine && analyticsPath(new URL(view.location.href)) !== null) return send(payload)
@@ -100,9 +106,24 @@ export function createAnalyticsClient({ view, config, native, enabled, send, now
     const path = analyticsPath(new URL(view.location.href))
     if (path) sendAt(path, event, properties)
   }
+  let checkingIn = false
+  const checkIn = () => {
+    if (!appSurface || !deviceFacts || checkingIn || !permitted()) return
+    let due: ReturnType<typeof dueCheckIn>
+    try { due = dueCheckIn(view.localStorage, clock()) } catch { return }
+    if (!due) return
+    const pending = due
+    checkingIn = true
+    void deviceFacts().then(facts => {
+      if (!permitted()) return
+      pending.commit()
+      track('app_active', { first_this_month: pending.first_this_month, ...facts })
+    }).catch(() => { /* Older native builds lack device info; skip the check-in. */ })
+      .finally(() => { checkingIn = false })
+  }
   const visible = () => {
     if (document.visibilityState === 'hidden') { flushEngagement(); visibleSince = null }
-    else { page(); visibleSince = permitted() ? now() : null }
+    else { page(); visibleSince = permitted() ? now() : null; checkIn() }
   }
   const preference = () => { lastPath = null; visibleSince = null; engagement = 0; page() }
   const storage = (event: StorageEvent) => { if (!event.key || event.key === ANALYTICS_PREFERENCE_KEY) preference() }
@@ -111,7 +132,9 @@ export function createAnalyticsClient({ view, config, native, enabled, send, now
   const click = (event: MouseEvent) => {
     if (!(event.target instanceof Element)) return
     const link = event.target.closest<HTMLAnchorElement>('a[href]')
-    if (link?.hostname === 'apps.apple.com') track('app_store_open')
+    if (link?.hostname !== 'apps.apple.com') return
+    const campaign = new URL(link.href).searchParams.get('ct')
+    track('app_store_open', { campaign: appStoreCampaigns.find(known => known === campaign) ?? 'none' })
   }
   const heartbeat = view.setInterval(() => {
     if (document.visibilityState !== 'visible' || !permitted()) return
@@ -128,6 +151,7 @@ export function createAnalyticsClient({ view, config, native, enabled, send, now
   view.addEventListener('online', preference)
   view.addEventListener('offline', preference)
   view.addEventListener(ANALYTICS_PREFERENCE_EVENT, preference)
+  checkIn()
   return { isCollecting: permitted, page, track, destroy() {
     flushEngagement()
     destroyed = true

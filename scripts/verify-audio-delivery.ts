@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict'
 import { open } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { audioRecordings } from '../generated/audio-manifest.ts'
 import { rangeAudioRecordings } from '../app/data/range-audio-manifest.ts'
 import { appendRecordingMediaVersion } from '../app/data/deployment-media.ts'
+import { recordingFilePath } from './audio-library.mjs'
+
+const repoRoot = fileURLToPath(new URL('..', import.meta.url))
 
 const origin = process.argv[2]
 if (!origin || !/^https?:\/\//.test(origin)) {
@@ -23,7 +26,7 @@ async function verify(recording: typeof recordings[number]) {
   const identity = recording.mediaIdentity
   assert(identity, `Missing media identity: ${recording.playSrc}`)
   const url = new URL(appendRecordingMediaVersion(recording.playSrc, identity.digest), origin)
-  const file = await open(resolve('site', `.${recording.playSrc}`))
+  const file = await open(recordingFilePath(repoRoot, recording.playSrc))
   try {
     assert.equal((await file.stat()).size, identity.byteLength, `Local size: ${recording.playSrc}`)
     const size = identity.byteLength

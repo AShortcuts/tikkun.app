@@ -409,9 +409,9 @@ function readerFocalPointClientY(book: HTMLElement) {
       ? (storedPreferences as { focalPointMode?: unknown }).focalPointMode
       : null
   const focalY =
-    focalPointMode === 'browser'
-      ? ownerDocument.documentElement.clientHeight / 2
-      : rootRect.top + book.clientHeight / 2
+    focalPointMode === 'reader'
+      ? rootRect.top + book.clientHeight / 2
+      : ownerDocument.documentElement.clientHeight / 2
 
   return Math.max(rootRect.top, Math.min(rootRect.bottom - 1, focalY))
 }

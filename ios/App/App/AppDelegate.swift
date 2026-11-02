@@ -73,10 +73,21 @@ class TikkunHostViewController: UIViewController {
 class TikkunBridgeViewController: CAPBridgeViewController {
     override func router() -> Router { TikkunStaticRouter() }
 
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        // The web toolbar pads for the status bar and blurs its own surface.
+        // iOS 26 would otherwise dim the safe-area strip above it a second time.
+        if #available(iOS 26.0, *), let scrollView = webView?.scrollView {
+            scrollView.topEdgeEffect.isHidden = true
+            scrollView.bottomEdgeEffect.isHidden = true
+        }
+    }
+
     override func capacitorDidLoad() {
         bridge?.registerPluginInstance(TikkunPracticePlugin())
         bridge?.registerPluginInstance(TikkunPlaybackPlugin())
         bridge?.registerPluginInstance(TikkunMediaPlugin())
+        bridge?.registerPluginInstance(TikkunPrintPlugin())
     }
 }
 

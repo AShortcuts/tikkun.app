@@ -107,3 +107,29 @@ test('closing the server stops its generator and watcher', async () => {
   expect(await f.output()).toBe('[]')
   expect(f.errors).not.toHaveBeenCalled()
 }, 15_000)
+
+
+test('reloads the page once the catalog catches up instead of hot-swapping cue data', async () => {
+  const f = await fixture()
+  const plugin = server!.config.plugins.find((candidate) => candidate.name === 'public-reading-coverage')!
+  const hook = plugin.hotUpdate as { handler: (this: unknown, options: unknown) => unknown }
+  const update = (file: string) => hook.handler.call({ environment: server!.environments.client }, {
+    type: 'update', file: path.join(root!, file), modules: [], timestamp: Date.now(), read: () => '', server,
+  })
+  await vi.waitFor(async () => expect(await f.output()).toBe('[]'), { timeout: 5000 })
+  expect(update('app/reader/reader-runtime.ts')).toBeUndefined()
+
+  await writeFile(f.gate, '')
+  await f.write('1.json', 'first')
+  await vi.waitFor(async () => expect((await f.runs()).match(/captured/g)).toHaveLength(2), { timeout: 5000 })
+  expect(update('audio-cues/1.json')).toEqual([])
+  expect(f.send).not.toHaveBeenCalledWith({ type: 'full-reload' })
+  await rm(f.gate)
+  await vi.waitFor(() => expect(f.send).toHaveBeenCalledWith({ type: 'full-reload' }), { timeout: 5000 })
+  expect(await f.output()).toBe('["first"]')
+
+  // A catalog written outside a refresh reloads right away.
+  f.send.mockClear()
+  expect(update('generated/public-reading-manifest.ts')).toEqual([])
+  expect(f.send).toHaveBeenCalledWith({ type: 'full-reload' })
+}, 15_000)

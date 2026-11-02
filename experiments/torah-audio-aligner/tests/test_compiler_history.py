@@ -24,10 +24,10 @@ class CompilerHistoryTests(unittest.TestCase):
             archived = work / "compiler-history" / expected / source.name
             archived.parent.mkdir(parents=True)
             archived.write_bytes(original)
-            audio = root / "site/audio/fixture.mp3"
+            audio = root / "audio/fixture.mp3"
             audio.parent.mkdir(parents=True)
             audio.write_bytes(b"test audio")
-            recording = {"audioId": "fixture", "mediaPath": "site/audio/fixture.mp3",
+            recording = {"audioId": "fixture", "mediaPath": "audio/fixture.mp3",
                          "mediaIdentity": {"algorithm": "sha256", "digest": hashlib.sha256(audio.read_bytes()).hexdigest(), "byteLength": audio.stat().st_size}}
             bundle = {"compilerSources": {source.name: expected}, "textPagesSha256": hashlib.sha256(b"").hexdigest(),
                       "recordings": [recording]}

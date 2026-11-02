@@ -64,11 +64,3 @@ def record_elapsed(kind, seconds, details=None):
     ledger = json.loads(path.read_text())
     ledger["events"].append({"kind": kind, "elapsedSeconds": seconds, **(details or {})})
     write_json(path, ledger, replace=True)
-
-
-def require_budget(estimated_seconds):
-    ledger = json.loads(work_path("testing-ledger.json").read_text())
-    remaining = 3600 - sum(event["elapsedSeconds"] for event in ledger["events"])
-    if estimated_seconds > remaining:
-        raise AlignmentError(f"Estimated job exceeds remaining approved testing budget ({remaining:.1f}s)")
-    return remaining

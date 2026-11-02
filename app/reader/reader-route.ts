@@ -5,7 +5,7 @@ import PageNotFoundPage from '../components/PageNotFoundPage.ts'
 import { mountCueAnalyticsRoute } from '../components/cue-analytics-route.ts'
 import type { MountScope } from '../lifecycle/mount.ts'
 import type { NavigationAction } from '../navigation/actions.ts'
-import type { LastReading } from '../reading/last-reading.ts'
+import { isSameReadingPlace, type LastReading } from '../reading/last-reading.ts'
 import { ScrollViewModel } from '../view-model/scroll-view-model.ts'
 import { preserveSemanticParshaRoute } from '../view-model/navigation/reader-hash.ts'
 import {
@@ -168,6 +168,18 @@ export function createReaderRoute(
   const parseHash = (hash: string) =>
     parseUrl(options.createGenerator(), hashPath(hash).replace(/^#/, ''))
   const parseCurrentRoute = () => parseHash(view.location.hash)
+  // Presentation reads the view every scroll frame, and parsing builds a whole
+  // reading model. The view depends only on the path, the day, and settings.
+  let currentViewCache: { key: string; view: AppRoute['view'] | null } | null = null
+  const currentView = () => {
+    const generator = options.createGenerator()
+    const path = hashPath()
+    const key = JSON.stringify([path, new Date().toDateString(), generator.settings])
+    if (currentViewCache?.key !== key) {
+      currentViewCache = { key, view: parseUrl(generator, path.replace(/^#/, ''))?.view ?? null }
+    }
+    return currentViewCache.view
+  }
 
   const setTitle = (title: string) => {
     currentTitle = title
@@ -578,15 +590,17 @@ export function createReaderRoute(
     const readerReady = rendering.ready.then((line) => {
       if (!isCurrent()) return
       host.readerReady()
-      if (previousReading && previousReading.hash !== nextReaderHash) {
-        host.showReturnToPreviousReading(previousReading)
-      }
       return line
     })
 
     void Promise.all([readerReady, rendering.complete])
       .then(([line]) => {
         if (!isCurrent()) return
+        // Offer the way back only once the reader has landed somewhere else.
+        if (previousReading && previousReading.hash !== nextReaderHash &&
+          !isSameReadingPlace(previousReading, host.captureReadingPosition())) {
+          host.showReturnToPreviousReading(previousReading)
+        }
         if (shouldSaveReading) host.saveReadingPosition()
         revealPageNumber(nextReaderHash, rendering)
         if (!pageNumberFromPageRouteHash(nextReaderHash) && line instanceof HTMLElement) {
@@ -632,7 +646,7 @@ export function createReaderRoute(
   }
 
   const snapshot = (): ReaderRouteSnapshot => ({
-    view: parseCurrentRoute()?.view ?? null,
+    view: currentView(),
     hashPath: hashPath(),
     currentReaderHash,
     title: currentTitle,

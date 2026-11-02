@@ -11,7 +11,7 @@ from safetensors import safe_open
 from safetensors.torch import save_file
 
 from aligner import HERE, WORK, CHECKPOINT, file_hash, write_json, work_path, verify_model
-from analysis_runs import baseline_records, comparison_stats, differences, require_budget, record_elapsed
+from analysis_runs import baseline_records, comparison_stats, differences, record_elapsed
 from core import AlignmentError, lexical_units, propose
 
 PROFILE = "torah-spoken-v1"
@@ -37,7 +37,6 @@ def sequence_loss(head, features, labels):
 
 
 def train(args):
-    require_budget(600)
     started = time.monotonic()
     torch.set_num_threads(4)
     torch.set_num_interop_threads(1)

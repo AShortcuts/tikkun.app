@@ -26,7 +26,7 @@ export function analyticsConfig(environment: Record<string, string | undefined>)
     appKey: key('TIKKUN_ANALYTICS_APP_KEY'),
     siteOrigin: https('TIKKUN_ANALYTICS_SITE_ORIGIN', 'https://tikkunreader.com'),
     appOrigin: https('TIKKUN_ANALYTICS_APP_ORIGIN', 'https://app.tikkunreader.com'),
-    appCollector: https('TIKKUN_ANALYTICS_APP_COLLECTOR', 'https://adamn.cc/api/echo', false),
+    appCollector: https('TIKKUN_ANALYTICS_APP_COLLECTOR', 'https://collect.adamn.cc/api/echo', false),
   }
   if (config.webKey && config.webKey === config.appKey) throw new Error('Website and app analytics require separate Melytics site keys')
   return config

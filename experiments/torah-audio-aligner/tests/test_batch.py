@@ -54,8 +54,8 @@ class BatchTests(unittest.TestCase):
                 queue.thread.join(timeout=3)
         self.directory.cleanup()
 
-    def queue(self, runner=None, budget=None):
-        queue = BatchQueue(self.store, self.library, runner=runner, budget=budget or (lambda _: 3600))
+    def queue(self, runner=None):
+        queue = BatchQueue(self.store, self.library, runner=runner)
         self.queues.append(queue)
         return queue
 
@@ -350,18 +350,24 @@ class BatchTests(unittest.TestCase):
             self.wait(lambda: queue.thread is None)
         self.assertEqual([row["status"] for row in queue.state["items"]], ["failed", "ready"])
 
-    def test_cancel_waiting_and_budget_failure_never_start_work(self):
-        def budget(seconds):
-            if seconds:
-                raise AlignmentError("Testing allowance exhausted")
-            return 0
-        queue = self.queue(budget=budget)
+    def test_cancel_waiting_never_starts_work(self):
+        queue = self.queue()
         self.add(queue, "first", "second")
-        with self.assertRaises(AlignmentError):
-            queue.control("start")
-        self.assertIsNone(queue.thread)
         queue.control("cancel-waiting")
         self.assertTrue(all(row["status"] == "cancelled" for row in queue.state["items"]))
+
+    def test_unlimited_start_runs_every_waiting_recording_and_rejects_bad_limits(self):
+        queue = self.queue(lambda item, phase: "fixture-1")
+        self.add(queue, "first", "second")
+        for minutes in (0, 61, 2.5, "10"):
+            with self.assertRaises(AlignmentError):
+                queue.control("start", minutes=minutes)
+        with patch.object(self.store, "detail", return_value={}):
+            queue.control("start", minutes=None)
+            self.assertIsNone(queue.stop_at)
+            self.wait(lambda: queue.thread is None)
+        self.assertEqual([row["status"] for row in queue.state["items"]], ["ready", "ready"])
+        self.assertTrue(queue.state["paused"])
 
     def test_saved_review_migration_is_once_and_keeps_original_history(self):
         state = initial_state(self.proposal)

@@ -5,6 +5,11 @@ import numpy as np
 from core import AlignmentError
 from prosody import accent_names
 
+# Chanting re-articulates syllables; two first-letter hits closer than this are
+# ordinary singing, not a restart. Reviewed aliyot showed none of the
+# 0.18-0.58 s cases needed a correction.
+MIN_RESTART_SPACING_SECONDS = 0.75
+
 
 def signal_quality(samples, sample_rate=16000):
     samples = np.asarray(samples, dtype=np.float32)
@@ -56,7 +61,7 @@ def repeated_prefixes(emissions, occurrences, vocabulary, blank_id, frame_step=3
             previous = label
         if (len(runs) >= 2 and runs[0][1] == runs[1][1] == initial
                 and min(runs[0][2], runs[1][2]) >= .65
-                and runs[1][0] - runs[0][0] >= 9
+                and (runs[1][0] - runs[0][0]) * frame_step >= MIN_RESTART_SPACING_SECONDS * 16000
                 and not word["alignmentText"].startswith(word["alignmentText"][0] * 2)):
             events.append({"kind": "ambiguous_repeated_prefix", "lexicalKey": word["lexicalKey"],
                            "tokenKey": word["tokenKey"], "sourceStartSample": runs[0][0] * frame_step,

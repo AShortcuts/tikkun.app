@@ -1,4 +1,5 @@
 import type { MountScope } from '../lifecycle/mount.ts'
+import { COMPACT_READER_QUERY } from '../adaptive/reader-viewport.ts'
 
 export interface ReaderSwipeDestination {
   element: HTMLElement
@@ -32,7 +33,7 @@ export function mountReaderSwipeBack(scope: MountScope, options: {
   if (!view) throw new Error('Reader swipe requires a browser window')
   const reducedMotion = view.matchMedia('(prefers-reduced-motion: reduce)')
   const shouldReduceMotion = () => reducedMotion.matches || document.documentElement.dataset.readerReducedMotion === 'on'
-  const fullscreenPicker = view.matchMedia('(max-width: 550px)')
+  const fullscreenPicker = view.matchMedia(COMPACT_READER_QUERY)
   const toolbar = document.querySelector<HTMLElement>('.app-toolbar')
   const blocked = 'button, a, input, select, textarea, [contenteditable], [data-reader-no-form-toggle]'
   let swipe: Swipe | null = null

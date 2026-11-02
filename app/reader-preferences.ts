@@ -21,7 +21,7 @@ import {
   type ReaderSideOrder,
   type ReaderTextLayout,
 } from './reader-presentation.ts'
-import { isMobileReaderViewport } from './adaptive/reader-viewport.ts'
+import { COMPACT_READER_QUERY, isMobileReaderViewport } from './adaptive/reader-viewport.ts'
 
 const STORAGE_KEY = 'tikkun.reader-preferences'
 export const readingFontScaleRange = { min: 0.8, max: 1.5, step: 0.05 } as const
@@ -96,7 +96,7 @@ export const defaultReaderPreferences: ReaderPreferences = {
   radius: 10,
   glow: 3.5,
   autoScrollWithPlayback: true,
-  focalPointMode: 'reader',
+  focalPointMode: 'browser',
   disableShiftNekudotHide: false,
   themeMode: 'automatic',
   customBackgroundColor: defaultCustomThemeColors.background,
@@ -115,7 +115,7 @@ function defaultReaderTextLayout(): ReaderTextLayout {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
     return defaultReaderPreferences.readerTextLayout
   }
-  return window.matchMedia('(max-width: 550px)').matches ? 'reading' : 'match'
+  return window.matchMedia(COMPACT_READER_QUERY).matches ? 'reading' : 'match'
 }
 
 // Like the line layout, the first-launch default follows the window size; a

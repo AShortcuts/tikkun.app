@@ -15,6 +15,7 @@ import {
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { AUDIO_DIRECTORY, audioFolderName, audioUrlPath } from './audio-library.mjs'
 
 const repoRoot = path.resolve(fileURLToPath(new URL('..', import.meta.url)))
 
@@ -48,6 +49,8 @@ const canonicalParshaIdentities = new Map([
   ['beresheet', { slug: 'beresheet', name: 'Beresheet' }],
   ['vayetze', { slug: 'vayetzei', name: 'Vayetzei' }],
   ['vayetzei', { slug: 'vayetzei', name: 'Vayetzei' }],
+  ['chayei-sarah', { slug: 'chayei-sarah', name: 'Chayei Sarah' }],
+  ['chayei-sara', { slug: 'chayei-sarah', name: 'Chayei Sarah' }],
   ['vezot-haberacha', { slug: 'vezot-haberacha', name: 'Vezot Haberacha' }],
   ['vezos-haberacha', { slug: 'vezot-haberacha', name: 'Vezot Haberacha' }],
 ])
@@ -58,9 +61,6 @@ export const slugify = (value) =>
     .trim()
     .replace(/\s+/g, '-')
     .toLowerCase()
-
-const toSiteUrl = (narratorId, ...segments) =>
-  `/audio/${[narratorId, ...segments].map(encodeURIComponent).join('/')}`
 
 export function inferAliyah(filename) {
   const stem = path.basename(filename, path.extname(filename))
@@ -418,7 +418,8 @@ export async function discoverAudioCatalog(sourceRoot, narratorId = 'yoni-davido
     const selected = selectAliyahFiles(filenames, folder.name)
     if (!selected.size) continue
 
-    const targetFolderName = parshaSlug
+    // Numbered like audio-cues/; the URL mirrors the file path.
+    const targetFolderName = audioFolderName(parshaNumber, parshaSlug)
     for (const [aliyah, match] of [...selected].sort(
       (left, right) => left[0] - right[0]
     )) {
@@ -432,8 +433,8 @@ export async function discoverAudioCatalog(sourceRoot, narratorId = 'yoni-davido
         parshaNumber,
         aliyah,
         title: `${parshaName} Aliyah ${aliyah}`,
-        playSrc: toSiteUrl(narratorId, targetFolderName, targetFileName),
-        downloadSrc: toSiteUrl(narratorId, targetFolderName, targetFileName),
+        playSrc: audioUrlPath(`${narratorId}/${targetFolderName}/${targetFileName}`),
+        downloadSrc: audioUrlPath(`${narratorId}/${targetFolderName}/${targetFileName}`),
         format: match.format,
         status: 'available',
         mediaIdentity: await mediaIdentity(sourcePath),
@@ -452,21 +453,68 @@ export async function discoverAudioCatalog(sourceRoot, narratorId = 'yoni-davido
   return { recordings, files }
 }
 
-// Startup import is additive. Replacing registered audio remains an explicit audio:sync operation.
-export async function importAudioCatalog({ sourceRoot, targetAudioRoot, targetFile, narrator, existingRecordings }) {
+const audioChanged = (existing, incoming) =>
+  existing.mediaIdentity.digest !== incoming.mediaIdentity.digest || existing.playSrc !== incoming.playSrc
+
+/**
+ * Registered recordings whose source audio no longer matches the project copy.
+ * @param {{ discovered: { files: any[] }, existingRecordings: any[] }} options
+ * @returns {Array<{ id: string, title: string, existing: any, incoming: any, sourcePath: string }>}
+ */
+export function findChangedAudio({ discovered, existingRecordings }) {
+  const byId = new Map(existingRecordings.map(recording => [recording.id, recording]))
+  return discovered.files.flatMap(file => {
+    const existing = byId.get(file.recording.id)
+    return existing && audioChanged(existing, file.recording)
+      ? [{ id: existing.id, title: existing.title, existing, incoming: file.recording, sourcePath: file.sourcePath }]
+      : []
+  })
+}
+
+// Import is additive. Changed registered audio is replaced only when its id is
+// listed in `replace`, or left as it is when listed in `keep`; otherwise the
+// whole import stops before changing anything.
+/**
+ * @param {{
+ *   sourceRoot: string
+ *   targetAudioRoot: string
+ *   targetFile: string
+ *   narrator: { id: string }
+ *   existingRecordings: any[]
+ *   discovered?: { recordings: any[], files: any[] }
+ *   replace?: Set<string>
+ *   keep?: Set<string>
+ * }} options
+ */
+export async function importAudioCatalog({
+  sourceRoot, targetAudioRoot, targetFile, narrator, existingRecordings,
+  discovered: discoveredCatalog, replace = new Set(), keep = new Set(),
+}) {
   if (existingRecordings.some(recording => recording.narratorId !== narrator.id)) {
     throw new Error('Startup import must use the narrator already registered in the audio manifest.')
   }
   const previousManifest = await readFile(targetFile, 'utf8')
-  const { recordings: discovered, files } = await discoverAudioCatalog(sourceRoot, narrator.id)
+  const { recordings: discovered, files } = discoveredCatalog ?? await discoverAudioCatalog(sourceRoot, narrator.id)
   const byId = new Map(existingRecordings.map(recording => [recording.id, recording]))
   const copies = []
+  const replacements = []
+  const narratorPrefix = `/${AUDIO_DIRECTORY}/${narrator.id}/`
   for (const file of files) {
     const existing = byId.get(file.recording.id)
-    if (existing && (existing.mediaIdentity.digest !== file.recording.mediaIdentity.digest || existing.playSrc !== file.recording.playSrc)) {
-      throw new Error(`Source audio differs for ${existing.id}. Startup import will not replace audio tied to saved cues. Review the change and use npm run audio:sync explicitly.`)
-    }
     const destination = path.join(targetAudioRoot, file.relativePath)
+    if (existing && audioChanged(existing, file.recording)) {
+      if (keep.has(existing.id)) continue
+      if (!replace.has(existing.id)) {
+        throw new Error(`Source audio differs for ${existing.id}. Startup import will not replace audio tied to saved cues. Run npm run cues:generate to review and replace it.`)
+      }
+      const previousRelative = decodeURIComponent(new URL(existing.playSrc, 'https://tikkun.local').pathname)
+      if (!previousRelative.startsWith(narratorPrefix)) {
+        throw new Error(`Cannot locate the current audio file for ${existing.id}.`)
+      }
+      replacements.push({ ...file, destination, previous: path.join(targetAudioRoot, previousRelative.slice(narratorPrefix.length)) })
+      byId.set(existing.id, file.recording)
+      continue
+    }
     if (await pathExists(destination)) {
       if ((await mediaIdentity(destination)).digest !== file.recording.mediaIdentity.digest) {
         throw new Error(`Existing audio differs at ${destination}; no recordings were imported.`)
@@ -483,6 +531,7 @@ export async function importAudioCatalog({ sourceRoot, targetAudioRoot, targetFi
   const added = []
   const restored = []
   const created = []
+  const backups = []
   try {
     for (const file of copies) {
       await mkdir(path.dirname(file.destination), { recursive: true })
@@ -498,6 +547,26 @@ export async function importAudioCatalog({ sourceRoot, targetAudioRoot, targetFi
         await rm(temporary, { force: true })
       }
     }
+    for (const file of replacements) {
+      await mkdir(path.dirname(file.destination), { recursive: true })
+      const temporary = `${file.destination}.stage-${process.pid}`
+      try {
+        await copyFile(file.sourcePath, temporary)
+        if ((await mediaIdentity(temporary)).digest !== file.recording.mediaIdentity.digest) {
+          throw new Error(`Source audio changed during import: ${file.recording.id}`)
+        }
+        // Keep the previous audio until the new catalog is written, so a failure can restore it.
+        if (await pathExists(file.previous)) {
+          const backup = `${file.previous}.replaced-${process.pid}`
+          await rename(file.previous, backup)
+          backups.push({ backup, previous: file.previous })
+        }
+        await rename(temporary, file.destination)
+        created.push(file.destination)
+      } finally {
+        await rm(temporary, { force: true })
+      }
+    }
     if (manifest !== previousManifest) {
       await writeFile(stagedManifest, manifest)
       if (await readFile(targetFile, 'utf8') !== previousManifest) {
@@ -507,15 +576,21 @@ export async function importAudioCatalog({ sourceRoot, targetAudioRoot, targetFi
     }
   } catch (error) {
     await Promise.all(created.map(file => rm(file)))
+    for (const { backup, previous } of backups) await rename(backup, previous)
     throw error
   } finally {
     await rm(stagedManifest, { force: true })
   }
+  await Promise.all(backups.map(({ backup }) => rm(backup, { force: true })))
   for (const recording of discovered) {
     if (!existingRecordings.some(existing => existing.id === recording.id)) added.push(recording.id)
     else if (copies.some(file => file.recording.id === recording.id)) restored.push(recording.id)
   }
-  return { recordings, added, restored, copiedBytes: copies.reduce((total, file) => total + file.recording.mediaIdentity.byteLength, 0) }
+  return {
+    recordings, added, restored,
+    replaced: replacements.map(file => file.recording.id),
+    copiedBytes: [...copies, ...replacements].reduce((total, file) => total + file.recording.mediaIdentity.byteLength, 0),
+  }
 }
 
 export function parseAudioSyncOptions(argv, env = process.env) {
@@ -550,7 +625,7 @@ export function parseAudioSyncOptions(argv, env = process.env) {
 async function main() {
   const options = parseAudioSyncOptions(process.argv.slice(2))
   const targetFile = path.join(repoRoot, 'generated/audio-manifest.ts')
-  const targetAudioRoot = path.join(repoRoot, 'site/audio', options.narratorId)
+  const targetAudioRoot = path.join(repoRoot, AUDIO_DIRECTORY, options.narratorId)
   const recordings = await syncAudioCatalog({
     sourceRoot: options.sourceRoot,
     targetAudioRoot,

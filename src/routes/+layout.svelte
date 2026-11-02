@@ -11,6 +11,8 @@
   import { createAnalyticsClient, installAnalytics, type AnalyticsClient } from '../../app/analytics/client.ts'
   import { analyticsTransport } from '../../app/analytics/transport.ts'
   import { currentAnalyticsConfig } from '../../app/analytics/config.ts'
+  import { isHomeScreenApp, osMajorFromUserAgent, webDeviceKind } from '../../app/analytics/context.ts'
+  import { nativeDeviceFacts } from '../../app/platform/native-practice.ts'
 
   let analytics: AnalyticsClient | undefined
   afterNavigate(() => {
@@ -45,9 +47,14 @@
   onMount(() => {
     const native = isNativeApp()
     const config = currentAnalyticsConfig()
+    const homeScreen = !native && isHomeScreenApp(window)
     analytics = createAnalyticsClient({ view: window, config, native,
       enabled: !import.meta.env.DEV && window.top === window && !navigator.webdriver,
-      send: analyticsTransport(config, native) })
+      send: analyticsTransport(config, native),
+      appSurface: native || homeScreen,
+      deviceFacts: native
+        ? nativeDeviceFacts
+        : async () => ({ device: webDeviceKind(navigator.userAgent), os: osMajorFromUserAgent(navigator.userAgent), app_version: 'web' }) })
     const stopAnalytics = installAnalytics(analytics)
     analytics.page()
     publishNativePractice({ israel: loadCalendarSettings().israel })

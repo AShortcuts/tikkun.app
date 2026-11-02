@@ -1,12 +1,28 @@
+import { deviceKinds } from './context.ts'
+
 type Rule = (value: unknown) => boolean
 const choice = (...values: readonly (string | number | boolean)[]): Rule => value => values.includes(value as string | number | boolean)
 const number = (min: number, max: number): Rule => value => typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max
+const integer = (min: number, max: number): Rule => value => Number.isInteger(value) && (value as number) >= min && (value as number) <= max
 const boolean: Rule = value => typeof value === 'boolean'
+const version: Rule = value => typeof value === 'string' && /^(?:web|\d{1,3}(?:\.\d{1,3}){0,2})$/.test(value)
+
+export const appStoreCampaigns = ['tr-home', 'tr-reader', 'oot-home', 'oot-apps', 'yahrtzeit-app-recommended', 'adamn-home'] as const
+export const readingTimings = ['last_week', 'this_week', 'next_week', 'weeks_2_4', 'months_1_3', 'later', 'none'] as const
+
+// Local time on the device, added to every event. Shared contract: Adam’s Servers/melytics/EVENTS.md.
+export const contextRules = {
+  hour: integer(0, 23),
+  weekday: choice('sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'),
+} satisfies Record<string, Rule>
 
 // Only bounded product facts cross this boundary. Never add user text, URLs,
 // recording IDs, saved positions, error messages, or account/device identifiers.
 export const eventRules = {
-  reader_open: { layout: choice('reading', 'match'), sides: choice('one', 'two'), route: choice('calendar', 'parsha', 'page', 'reference', 'run', 'other') },
+  reader_open: { layout: choice('reading', 'match'), sides: choice('one', 'two'), route: choice('calendar', 'parsha', 'page', 'reference', 'run', 'other'), timing: choice(...readingTimings) },
+  coming_up_select: { position: choice(1, 2, 3) },
+  // Once per local day from the native app or a Home Screen web app; the collector adds region.
+  app_active: { first_this_month: boolean, device: choice(...deviceKinds), os: integer(0, 99), app_version: version },
   playback_start: { timed: boolean },
   playback_pause: {},
   playback_complete: {},
@@ -26,7 +42,7 @@ export const eventRules = {
   print_error: {},
   client_error: { kind: choice('navigation', 'uncaught', 'unhandled') },
   page_engagement: { seconds: number(1, 3600) },
-  app_store_open: {},
+  app_store_open: { campaign: choice(...appStoreCampaigns, 'none') },
   __ping: {},
 } satisfies Record<string, Record<string, Rule>>
 
@@ -37,8 +53,13 @@ export function validEvent(event: unknown, properties: unknown): properties is A
   if (typeof event !== 'string' || !Object.hasOwn(eventRules, event)) return false
   if (!properties || typeof properties !== 'object' || Array.isArray(properties)) return false
   const rules: Record<string, Rule> = eventRules[event as AnalyticsEvent]
-  const entries = Object.entries(properties)
-  return entries.length === Object.keys(rules).length && entries.every(([key, value]) => Object.hasOwn(rules, key) && rules[key](value))
+  const context: Record<string, Rule> = contextRules
+  const entries = Object.entries(properties).filter(([key]) => !Object.hasOwn(context, key))
+  const contextEntries = Object.entries(properties).filter(([key]) => Object.hasOwn(context, key))
+  // Local time is optional (older app builds omit it) but must be valid when present.
+  return entries.length === Object.keys(rules).length
+    && entries.every(([key, value]) => Object.hasOwn(rules, key) && rules[key](value))
+    && contextEntries.every(([key, value]) => context[key](value))
 }
 
 export const analyticsPaths = ['/', '/reader', '/readings', '/about', '/privacy', '/support', '/tidbits'] as const

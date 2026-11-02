@@ -35,7 +35,9 @@ describe('public reading coverage search adapter', () => {
         .search('', 'audio')
         .every(({ document }) => document.item.availableAliyot.length > 0)
     ).toBe(true)
-    expect(search.search('Noach', 'planned')).toEqual([])
+    const planned = search.search('Noach', 'planned')
+    expect(planned.map(({ document }) => document.item.parshaSlug)).not.toContain('noach')
+    expect(planned.every(({ document }) => document.item.statusKind === 'planned')).toBe(true)
     expect(search.search('Noach', 'audio')[0]?.document.item.parshaSlug).toBe(
       'noach'
     )

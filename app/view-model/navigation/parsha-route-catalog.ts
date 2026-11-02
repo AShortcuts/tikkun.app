@@ -43,7 +43,12 @@ const weeklyParshaRoutes: WeeklyParshaRoute[] = [
   },
   { kind: 'weekly', canonicalSlug: 'lech-lecha', titleSlugs: ['lechlecha'] },
   { kind: 'weekly', canonicalSlug: 'vayera', titleSlugs: ['vayera'] },
-  { kind: 'weekly', canonicalSlug: 'chayei-sara', titleSlugs: ['chayei-sara'] },
+  {
+    kind: 'weekly',
+    canonicalSlug: 'chayei-sarah',
+    titleSlugs: ['chayei-sara'],
+    aliases: ['chayei-sara'],
+  },
   { kind: 'weekly', canonicalSlug: 'toldot', titleSlugs: ['toldot'] },
   {
     kind: 'weekly',

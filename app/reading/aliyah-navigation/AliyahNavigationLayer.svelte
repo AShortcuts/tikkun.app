@@ -115,6 +115,26 @@
       : null
   }
 
+  function contentKey(
+    desktop: AliyahNavigationSnapshot | null,
+    compact: AliyahNavigationSnapshot | null,
+    authoring: boolean,
+    isolatedContent: boolean
+  ) {
+    const snapshotKey = (snapshot: AliyahNavigationSnapshot | null) => snapshot && [
+      snapshot.signature,
+      snapshot.active,
+      snapshot.playback,
+      snapshot.items.map((item) => [
+        aliyahNavigationItemResourceKey(item),
+        item.label,
+        item.compactLabel,
+        item.audioState?.message ?? null,
+      ]),
+    ]
+    return JSON.stringify([snapshotKey(desktop), snapshotKey(compact), authoring, isolatedContent])
+  }
+
   function requestKey(item: AliyahNavigationItem, requestRevision = revision) {
     return `${requestRevision}:${authoringEnabled}:${aliyahNavigationItemResourceKey(item)}`
   }
@@ -272,12 +292,16 @@
   }
 
   function syncContent(content: AliyahNavigationContent) {
-    flushSync(() => {
-      desktopSnapshot = cloneSnapshot(content.desktop)
-      compactSnapshot = cloneSnapshot(content.compact)
-      authoringEnabled = content.authoringEnabled
-      isolated = content.isolated ?? false
-    })
+    // Presentation calls this every scroll frame; redraw only when something shown changes.
+    if (contentKey(content.desktop, content.compact, content.authoringEnabled, content.isolated ?? false) !==
+      contentKey(desktopSnapshot, compactSnapshot, authoringEnabled, isolated)) {
+      flushSync(() => {
+        desktopSnapshot = cloneSnapshot(content.desktop)
+        compactSnapshot = cloneSnapshot(content.compact)
+        authoringEnabled = content.authoringEnabled
+        isolated = content.isolated ?? false
+      })
+    }
 
     if (desktopSnapshot && !isolated) {
       syncRailPosition()

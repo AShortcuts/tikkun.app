@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import atexit
 import hashlib
 import importlib.metadata
 import importlib.util
@@ -13,20 +14,27 @@ import os
 from pathlib import Path
 import resource
 import re
+import select
 import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
+import traceback
 import uuid
 
 from core import (AlignmentError, digest_json, lexical_units,
-                  propose, reviewed_draft, timing_metrics, validate_result)
+                  propose, resolve_media, reviewed_draft, timing_metrics, validate_result)
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 WORK = HERE / "work"
 CHECKPOINT = json.loads((HERE / "checkpoint.json").read_text())
+# The inference process imports exactly these files; its results record their hashes.
+IMPLEMENTATION_FILES = ["aligner.py", "acoustics.py", "core.py", "checkpoint.json"]
+# A loaded model holds over a gigabyte, so an unused inference process exits after this long.
+INFERENCE_IDLE_SECONDS = 120
 
 
 def load_json(path):
@@ -121,9 +129,9 @@ def verify_sources(bundle, recording=None):
     if text_hash.hexdigest() != bundle["textPagesSha256"]:
         raise AlignmentError("Canonical text changed since prepare")
     for item in [recording] if recording else bundle["recordings"]:
-        source = (REPO / item["mediaPath"]).resolve()
+        source = resolve_media(REPO, item["mediaPath"]).resolve()
         imported = WORK / "imported-audio"
-        if not source.is_relative_to(REPO / "site/audio") and not (
+        if not source.is_relative_to((REPO / "audio").resolve()) and not (
             source.parent == imported.resolve() and source.stem == item["mediaIdentity"]["digest"]
         ):
             raise AlignmentError("Source recording is outside the declared audio tree")
@@ -135,7 +143,7 @@ def verify_sources(bundle, recording=None):
 def probe(recording):
     command = ["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries",
                "format=duration,start_time:stream=sample_rate,channels,start_time", "-of", "json",
-               str(REPO / recording["mediaPath"])]
+               str(resolve_media(REPO, recording["mediaPath"]))]
     info = json.loads(subprocess.check_output(command, timeout=15))
     if len(info.get("streams", [])) != 1:
         raise AlignmentError("Expected one selected audio stream")
@@ -153,7 +161,7 @@ def decode_audio(recording, waveform):
     info = probe(recording)
     # Keep media timestamps, padding positive starts or trimming encoder delay before time zero.
     subprocess.run(["ffmpeg", "-v", "error", "-nostdin", "-n", "-threads", "1", "-copyts", "-i",
-                    str(REPO / recording["mediaPath"]), "-map", "0:a:0", "-vn", "-ac", "1",
+                    str(resolve_media(REPO, recording["mediaPath"])), "-map", "0:a:0", "-vn", "-ac", "1",
                     "-af", "aresample=16000:first_pts=0", "-ar", "16000", "-c:a", "pcm_s16le",
                     str(waveform)], check=True, timeout=60)
     return {"sourceOriginSeconds": 0, "presentationTimeMapping": {
@@ -264,14 +272,28 @@ def preflight(_args):
     return report
 
 
+_verified_weights = None
+
+
+def weights_signature():
+    weights = work_path("model") / CHECKPOINT["weights"]["filename"]
+    stat = weights.stat()
+    return [stat.st_size, stat.st_mtime_ns, stat.st_ino]
+
+
 def verify_model():
+    global _verified_weights
     directory = work_path("model")
     for name in CHECKPOINT["requiredFiles"]:
         if not (directory / name).is_file():
             raise AlignmentError(f"Model setup required: missing {name}; downloads are never automatic")
     weights = directory / CHECKPOINT["weights"]["filename"]
-    if weights.stat().st_size != CHECKPOINT["weights"]["byteLength"] or file_hash(weights) != CHECKPOINT["weights"]["sha256"]:
-        raise AlignmentError("Model weights do not match the pinned checkpoint")
+    # Hashing 1.2 GB per recording is slow; rehash only when the file itself changes.
+    signature = weights_signature()
+    if signature != _verified_weights:
+        if weights.stat().st_size != CHECKPOINT["weights"]["byteLength"] or file_hash(weights) != CHECKPOINT["weights"]["sha256"]:
+            raise AlignmentError("Model weights do not match the pinned checkpoint")
+        _verified_weights = signature
     config = load_json(directory / "config.json")
     vocabulary = load_json(directory / "vocab.json")
     feature = load_json(directory / "preprocessor_config.json")
@@ -300,29 +322,41 @@ def bounded_worker(command, timeout):
     return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
 
 
+def implementation_hashes():
+    return {name: file_hash(HERE / name) for name in IMPLEMENTATION_FILES}
+
+
+def load_inference_encoder():
+    from acoustics import load_encoder
+    return load_encoder(verify_model(), work_path("hf-cache"))
+
+
 def infer_worker(args):
-    # Executed only in a bounded child process. Missing dependencies fail before audio work.
+    # Executed only in a bounded child process: one recording, then exit.
+    implementation = implementation_hashes()
+    return run_inference(args.audio_id, args.run_dir, args.input, load_inference_encoder(), implementation)
+
+
+def run_inference(audio_id, run_dir, input_path, encoder, implementation):
     import numpy as np
-    from acoustics import encode_samples, load_encoder, read_wave
-    directory = work_path(args.run_dir)
-    bundle, _ = current_input(args.input)
-    recording = recording_for(bundle, args.audio_id)
+    from acoustics import encode_samples, read_wave
+    directory = work_path(run_dir)
+    bundle, _ = current_input(input_path)
+    recording = recording_for(bundle, audio_id)
     verify_sources(bundle, recording)
-    model_dir = verify_model()
     waveform = directory / "analysis.wav"
     timeline = decode_audio(recording, waveform)
     samples = read_wave(waveform)
     if abs(len(samples) / 16000 - recording["durationSeconds"]) > 0.1:
         raise AlignmentError("Decoded duration needs a more explicit presentation-time mapping")
-    evidence, geometry = encode_samples(samples, load_encoder(model_dir, work_path("hf-cache")),
-                                        CHECKPOINT, capture_features=True)
+    evidence, geometry = encode_samples(samples, encoder, CHECKPOINT, capture_features=True)
     metadata = {
         **geometry, **timeline,
         "analysisWaveSha256": file_hash(waveform),
         "packages": {name: importlib.metadata.version(name) for name in ["numpy", "torch", "transformers", "safetensors"]},
         "inputSha256": digest_json(bundle), "mediaIdentity": recording["mediaIdentity"],
         "checkpointRevision": CHECKPOINT["revision"],
-        "implementation": {name: file_hash(HERE / name) for name in ["aligner.py", "acoustics.py", "core.py", "checkpoint.json"]},
+        "implementation": implementation,
     }
     np.savez(directory / "emissions.npz", **evidence)
     metadata["emissionsSha256"] = file_hash(directory / "emissions.npz")
@@ -337,6 +371,131 @@ def infer_worker(args):
         "playbackLeadSamples": 0, "includeAcousticEnds": False, "acceptedEndOccurrenceIds": [],
     })
     return {"status": "proposal-ready-for-review", "directory": str(directory), "occurrences": len(result["occurrences"])}
+
+
+def infer_server(args):
+    """Aligns recordings sent on stdin with one loaded model, until the caller leaves or it sits idle."""
+    # Replies use a private copy of stdout; anything libraries print goes to stderr.
+    replies = os.fdopen(os.dup(sys.stdout.fileno()), "w", buffering=1)
+    os.dup2(sys.stderr.fileno(), sys.stdout.fileno())
+    implementation = implementation_hashes()
+    encoder = load_inference_encoder()
+    replies.write(json.dumps({"ready": True, "implementation": implementation}) + "\n")
+    while select.select([sys.stdin], [], [], args.idle_seconds)[0]:
+        line = sys.stdin.readline()
+        if not line:
+            break
+        request = json.loads(line)
+        try:
+            reply = {"ok": True, "result": run_inference(request["audioId"], request["runDir"], request["input"],
+                                                         encoder, implementation)}
+        except (AlignmentError, OSError, subprocess.SubprocessError, json.JSONDecodeError) as error:
+            traceback.print_exc()
+            reply = {"ok": False, "error": str(error)}
+        replies.write(json.dumps(reply, allow_nan=False) + "\n")
+    return 0
+
+
+class InferenceWorkerFailed(Exception):
+    def __init__(self, stderr):
+        super().__init__("The inference process stopped unexpectedly")
+        self.stderr = stderr
+
+
+def inference_fingerprint():
+    return {"implementation": implementation_hashes(), "weights": weights_signature()}
+
+
+class InferenceWorker:
+    """Keeps one inference process, so the model loads once per batch instead of once per recording.
+
+    The process owns its process group like bounded_worker: a timeout or cancellation kills the whole
+    group, and the next recording starts a fresh process. Changed code or weights also start a fresh one.
+    """
+
+    def __init__(self, command=None, idle_seconds=INFERENCE_IDLE_SECONDS, fingerprint=inference_fingerprint):
+        self.command = command or [sys.executable, "-B", str(HERE / "aligner.py"), "_infer_server",
+                                   "--idle-seconds", str(idle_seconds)]
+        self.idle_seconds = idle_seconds
+        self.fingerprint = fingerprint
+        self.lock = threading.Lock()
+        self.process = None
+        self.stderr = None
+        self.loaded = None
+        self.last_used = 0.0
+
+    def run(self, request, timeout):
+        with self.lock:
+            deadline = time.monotonic() + timeout
+            current = self.fingerprint()
+            # Restart a little before the process's own idle exit so a request never races it.
+            if (self.process is None or self.process.poll() is not None or self.loaded != current
+                    or time.monotonic() - self.last_used > self.idle_seconds - 5):
+                self.stop()
+                self.start(current, deadline)
+            offset = self.stderr.seek(0, os.SEEK_END)
+            try:
+                self.process.stdin.write(json.dumps(request) + "\n")
+                self.process.stdin.flush()
+                reply = self.read(deadline, timeout)
+            except (subprocess.TimeoutExpired, KeyboardInterrupt):
+                self.stop()
+                raise
+            except (BrokenPipeError, InferenceWorkerFailed):
+                failure = InferenceWorkerFailed(self.stderr_since(offset))
+                self.stop()
+                raise failure from None
+            self.last_used = time.monotonic()
+            if not reply.get("ok"):
+                reply = {**reply, "stderr": self.stderr_since(offset)}
+            return reply
+
+    def start(self, fingerprint, deadline):
+        self.stderr = tempfile.TemporaryFile()
+        self.process = subprocess.Popen(self.command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                        stderr=self.stderr, text=True, start_new_session=True)
+        try:
+            ready = self.read(deadline, deadline - time.monotonic())
+        except (subprocess.TimeoutExpired, KeyboardInterrupt):
+            self.stop()
+            raise
+        except InferenceWorkerFailed:
+            failure = InferenceWorkerFailed(self.stderr_since(0))
+            self.stop()
+            raise failure from None
+        # Record what the process actually loaded, in case files changed while it started.
+        self.loaded = {**fingerprint, "implementation": ready["implementation"]}
+
+    def read(self, deadline, timeout):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0 or not select.select([self.process.stdout], [], [], remaining)[0]:
+            raise subprocess.TimeoutExpired(self.command, timeout)
+        line = self.process.stdout.readline()
+        if not line:
+            raise InferenceWorkerFailed("")
+        return json.loads(line)
+
+    def stderr_since(self, offset):
+        self.stderr.seek(offset)
+        return self.stderr.read().decode("utf-8", "replace")
+
+    def stop(self):
+        process, self.process, self.loaded = self.process, None, None
+        if process is not None:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass  # The group already exited; macOS reports a finished leader's group as not permitted.
+            process.wait()
+            for stream in (process.stdin, process.stdout):
+                stream.close()
+        if self.stderr is not None:
+            self.stderr.close()
+            self.stderr = None
+
+
+INFERENCE = InferenceWorker()
+atexit.register(INFERENCE.stop)
 
 
 def align(args):
@@ -357,14 +516,17 @@ def align(args):
                                       "audioId": recording["audioId"], "timeoutSeconds": args.timeout})
     started = time.monotonic()
     try:
-        process = bounded_worker([sys.executable, "-B", str(HERE / "aligner.py"), "_infer",
-                                  "--audio-id", args.audio_id, "--run-dir", str(directory),
-                                  "--input", str(input_dir / "input.json")], args.timeout)
-        if process.returncode:
-            write_json(directory / "failure.json", {"status": "failed", "stderr": process.stderr[-8000:]})
-            reason = next((line.removeprefix("ERROR: ").strip() for line in reversed(process.stderr.splitlines())
-                           if line.startswith("ERROR: ")), None)
-            raise AlignmentError(f"{reason or 'Acoustic worker failed'}; details in {directory / 'failure.json'}")
+        reply = INFERENCE.run({"audioId": args.audio_id, "runDir": str(directory),
+                               "input": str(input_dir / "input.json")}, args.timeout)
+        if not reply["ok"]:
+            write_json(directory / "failure.json", {"status": "failed", "error": reply["error"],
+                                                    "stderr": reply["stderr"][-8000:]})
+            raise AlignmentError(f"{reply['error']}; details in {directory / 'failure.json'}")
+    except InferenceWorkerFailed as failure:
+        write_json(directory / "failure.json", {"status": "failed", "stderr": failure.stderr[-8000:]})
+        reason = next((line.removeprefix("ERROR: ").strip() for line in reversed(failure.stderr.splitlines())
+                       if line.startswith("ERROR: ")), None)
+        raise AlignmentError(f"{reason or 'Acoustic worker failed'}; details in {directory / 'failure.json'}") from None
     except subprocess.TimeoutExpired:
         write_json(directory / "failure.json", {"status": "timed-out", "timeoutSeconds": args.timeout})
         raise AlignmentError(f"Worker stopped at the wall-time limit; incomplete run retained at {directory}") from None
@@ -447,8 +609,7 @@ def verify(_args):
 
 
 def diagnose_cli(args):
-    from analysis_runs import require_budget, record_elapsed
-    require_budget(180)
+    from analysis_runs import record_elapsed
     proposal = work_path(args.proposal)
     started = time.monotonic()
     try:
@@ -478,6 +639,8 @@ def main():
     worker.add_argument("--audio-id", required=True)
     worker.add_argument("--run-dir", required=True)
     worker.add_argument("--input", required=True)
+    server = commands.add_parser("_infer_server", help=argparse.SUPPRESS)
+    server.add_argument("--idle-seconds", type=float, default=INFERENCE_IDLE_SECONDS)
     for name in ["diagnose", "_diagnose"]:
         diagnostic = commands.add_parser(name, help=argparse.SUPPRESS if name.startswith("_") else "Inspect cached reading evidence")
         diagnostic.add_argument("proposal", help="Original linear proposal path inside work/")
@@ -491,7 +654,8 @@ def main():
             command.add_argument("--review", required=True)
     args = parser.parse_args()
     handlers = {"prepare": prepare, "preflight": preflight, "verify": verify, "align": align,
-                "_infer": infer_worker, "evaluate": evaluate, "export-draft": export_draft, "diagnose": diagnose_cli}
+                "_infer": infer_worker, "_infer_server": infer_server, "evaluate": evaluate,
+                "export-draft": export_draft, "diagnose": diagnose_cli}
     if args.command == "_diagnose":
         from diagnostics import diagnose
         handlers["_diagnose"] = diagnose
@@ -502,6 +666,8 @@ def main():
         if isinstance(error, subprocess.CalledProcessError) and error.stderr:
             print(error.stderr, file=sys.stderr)
         return 1
+    if args.command == "_infer_server":
+        return output
     print(json.dumps(output, ensure_ascii=False, indent=2, allow_nan=False))
     return 0
 

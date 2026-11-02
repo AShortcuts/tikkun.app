@@ -2,6 +2,9 @@ import { expect, test } from 'vitest'
 import type { WordCue } from '../audio/types.ts'
 import { HighlightController } from './highlight-controller.ts'
 
+// Each stub book fills a 100px browser viewport, so the browser and reader focal points agree.
+const viewportDocument = { documentElement: { clientHeight: 100 } }
+
 function createBookStub() {
   return {
     addEventListener() {},
@@ -71,6 +74,7 @@ function createBookWithTokens(tokenKeys: string[]) {
     classList: { contains: () => true },
     addEventListener() {},
     clientHeight: 100,
+    ownerDocument: viewportDocument,
     scrollTop: 25,
     querySelectorAll(selector: string): HTMLElement[] {
       const match = selector.match(/\[data-token-key="(.+)"\]/)
@@ -158,6 +162,7 @@ function createBookWithVisibleTokens(tokenKeys: string[], tokenTop = 40) {
   return {
     addEventListener() {},
     clientHeight: 100,
+    ownerDocument: viewportDocument,
     scrollTop: 0,
     querySelectorAll(selector: string): HTMLElement[] {
       const match = selector.match(/\[data-token-key="(.+)"\]/)
@@ -259,6 +264,37 @@ test('scrolls whenever the highlighted token changes', async () => {
   expect(book.scrollCalls.length).toBe(3)
 })
 
+test('lights every token of a Reading maqaf join together and releases them as one', async () => {
+  const book = createBookWithTokens(['12:15:0:5', '12:15:0:6', '12:16:0:0', '12:16:0:1'])
+  const tokenElement = (tokenKey: string) => book.querySelectorAll<HTMLElement>(`[data-token-key="${tokenKey}"]`)[0]
+  const lead = tokenElement('12:15:0:6')
+  const tail = tokenElement('12:16:0:0')
+  lead.dataset.maqafGroup = '12:15:0:6 12:16:0:0'
+  tail.dataset.maqafGroup = '12:15:0:6 12:16:0:0'
+  const controller = new HighlightController(book)
+
+  await controller.activateTokenKey('12:15:0:6', { scroll: false })
+  expect(controller.getActiveTokenKey()).toBe('12:15:0:6')
+  expect(lead.classList.contains('is-active-word')).toBe(true)
+  expect(tail.classList.contains('is-active-word')).toBe(true)
+  expect(tokenElement('12:15:0:5').classList.contains('is-active-word')).toBe(false)
+
+  await controller.activateTokenKey('12:16:0:0', { scroll: false })
+  expect(controller.getActiveTokenKey()).toBe('12:16:0:0')
+  expect(lead.classList.contains('is-active-word')).toBe(true)
+  expect(tail.classList.contains('is-active-word')).toBe(true)
+
+  await controller.activateTokenKey('12:16:0:1', { scroll: false })
+  expect(lead.classList.contains('is-active-word')).toBe(false)
+  expect(tail.classList.contains('is-active-word')).toBe(false)
+  expect(tokenElement('12:16:0:1').classList.contains('is-active-word')).toBe(true)
+
+  await controller.activateTokenKey('12:15:0:6', { scroll: false })
+  controller.clear()
+  expect(lead.classList.contains('is-active-word')).toBe(false)
+  expect(tail.classList.contains('is-active-word')).toBe(false)
+})
+
 test('does not resubmit centering for highlighted tokens already at the focal point', async () => {
   const book = createBookWithVisibleTokens(['12:7:0:2', '12:7:0:3']) as HTMLElement & {
     scrollCalls: unknown[]
@@ -312,6 +348,7 @@ test('uses element geometry to center tokens inside the book', async () => {
   const book = {
     addEventListener() {},
     clientHeight: 100,
+    ownerDocument: viewportDocument,
     scrollTop: 0,
     querySelectorAll(): HTMLElement[] {
       return [token]
@@ -385,6 +422,7 @@ test('drops cached token elements when the display changes', async () => {
   const book = {
     addEventListener() {},
     clientHeight: 100,
+    ownerDocument: viewportDocument,
     scrollTop: 0,
     querySelectorAll(selector: string): HTMLElement[] {
       return selector === '[data-token-key="12:7:0:2"]' ? [activeToken] : []
@@ -423,6 +461,7 @@ test('mounts the cue page before activating a cue token', async () => {
   const book = {
     addEventListener() {},
     clientHeight: 100,
+    ownerDocument: viewportDocument,
     scrollTop: 0,
     querySelectorAll(selector: string): HTMLElement[] {
       return selector === `[data-token-key="${tokenKey}"]` ? [token] : []
@@ -598,6 +637,7 @@ test('evicts old token element cache entries instead of retaining every highligh
   const book = {
     addEventListener() {},
     clientHeight: 100,
+    ownerDocument: viewportDocument,
     scrollTop: 0,
     querySelectorAll(selector: string): HTMLElement[] {
       const match = selector.match(/\[data-token-key="(.+)"\]/)

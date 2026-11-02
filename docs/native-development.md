@@ -133,7 +133,7 @@ TIKKUN_NATIVE_MEDIA_ORIGIN=https://example.org npm run native:sync
 
 The default and confirmed production origin is `https://tikkunreader.com`.
 Recordings stay under their catalog paths, such as
-`/audio/yoni-davidov/beresheet/1.m4a`, with media digest query parameters intact.
+`/audio/yoni-davidov/01%20beresheet/1.m4a`, with media digest query parameters intact.
 Do not configure Capacitor `server.url` for production: the Reader must load its
 bundled assets offline, not a hosted replacement.
 

@@ -52,6 +52,8 @@ export function createDownloadLibrary({ assets, backend, intent, dependencies, i
       key, asset: Object.freeze({ ...asset }), phase: 'idle', downloadedBytes: 0, error: null, readiness: 'unchecked',
     }))
   }
+  const catalogKeys = new Set(entries.keys())
+  const catalogAudioIds = new Set(assets.map((asset) => asset.audioId))
   let inventory = new Map<string, StoredRecording>()
   let phase: DownloadLibrarySnapshot['phase'] = 'idle'
   let error: string | null = null
@@ -148,11 +150,30 @@ export function createDownloadLibrary({ assets, backend, intent, dependencies, i
         }
         initialized = true
         phase = 'ready'
+        clearSuperseded()
       } catch (failure) { phase = 'error'; error = message(failure); throw failure }
       finally { publish() }
     })().finally(() => { if (refreshing === request) refreshing = null })
     refreshing = request
     return request
+  }
+
+  // A recording re-published with new bytes gets a new URL, so an earlier copy
+  // can never play again; drop it to free space. Only idle copies go, and only
+  // when playback has released them. Withdrawn recordings stay for the user to
+  // remove. Nothing is downloaded in their place.
+  const clearSuperseded = () => {
+    const superseded = [...inventory.keys()].filter((key) =>
+      !catalogKeys.has(key) && catalogAudioIds.has(inventory.get(key)!.audioId) &&
+      !active.has(key) && entries.get(key)?.phase === 'stored')
+    if (!superseded.length) return
+    void serialize(async () => {
+      for (const key of superseded) {
+        if (!inventory.has(key) || entries.get(key)?.phase !== 'stored') continue
+        try { await removeOne(key) }
+        catch (failure) { console.error('Could not remove a superseded recording', failure) }
+      }
+    }).catch(() => {})
   }
 
   const pump = () => {
@@ -199,7 +220,8 @@ export function createDownloadLibrary({ assets, backend, intent, dependencies, i
       await backend.remove(entry.asset)
       inventory.delete(key)
       revision += 1
-      set(key, { phase: 'idle', downloadedBytes: 0, readiness: 'unchecked' })
+      if (catalogKeys.has(key)) set(key, { phase: 'idle', downloadedBytes: 0, readiness: 'unchecked' })
+      else { entries.delete(key); publish() }
       await persist([], [key])
     } catch (failure) { set(key, { phase: 'error', error: message(failure) }); throw failure }
   }

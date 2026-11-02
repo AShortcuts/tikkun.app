@@ -10,7 +10,7 @@ import { chromium } from 'playwright'
 
 const DEFAULT_DIST_ROOT = path.resolve('dist')
 const DEFAULT_READER_HASH = '#/torah/parsha/beresheet/1-1-1'
-const EXPECTED_RECORDING_PATH = '/audio/yoni-davidov/beresheet/1.m4a'
+const EXPECTED_RECORDING_PATH = '/audio/yoni-davidov/01%20beresheet/1.m4a'
 
 const CONTENT_TYPES = new Map([
   ['.css', 'text/css; charset=utf-8'],

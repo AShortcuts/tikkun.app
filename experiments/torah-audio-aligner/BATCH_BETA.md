@@ -1,5 +1,23 @@
 # Private batch beta
 
+## Generate cues in one step
+
+```sh
+npm run cues:generate
+```
+
+Run it from the Tikkun project root after adding recordings to the source
+folder. It imports new audio, warns about any recording whose source audio
+differs from the project copy and asks whether to replace or skip each one,
+then aligns every aliyah that has no cue file or a cue file for different
+audio. Saved results are reused. It uses a running aligner or starts one for
+the run, and saves a ZIP such as `~/Downloads/tikkun-cues-2026-10-29-1412.zip`.
+Import that ZIP in the Reader's admin panel. Ctrl+C stops after the current
+recording and still saves the finished aliyot. Options: `--out <folder>`,
+`--port`, and `--review-dir`.
+
+## Aligner page
+
 The cue-flag preview is at <http://127.0.0.1:8768> on this Mac. It contains a
 preserved copy of the existing queue, generated results, and review history.
 The earlier service on 8769 keeps its original storage. Continue new work in
@@ -13,7 +31,7 @@ Run this command from the Tikkun project root. Run `npm run dev` in another term
 
 Startup imports new recordings from the local source library before opening the aligner. Configure `work/audio-source.json` with `{"sourceRoot":"/path/to/source recordings"}`, or set `TIKKUN_AUDIO_SOURCE_ROOT`. The file is ignored by Git. Use the folder containing numbered parsha folders, such as `38 Korach` and `41 Pinchas`; M4A and MP3 filenames must identify aliyot 1 through 7. On this Mac, the source is already configured to the Yoni Davidov aliyah recordings folder.
 
-Import adds new audio under `site/audio/`, refreshes the local audio and reading manifests, and prints the new recording IDs. Unchanged files are skipped; missing copies of unchanged audio are restored. Existing recordings absent from the source folder and all cue files stay intact. Replacing registered audio requires an explicit `npm run audio:sync` after reviewing the change, because cues are bound to exact audio bytes. The latest import report is saved to `work/audio-import-report.json`. Import does not commit, publish, or start alignment jobs.
+Import adds new audio under `audio/`, refreshes the local audio and reading manifests, and prints the new recording IDs. Unchanged files are skipped; missing copies of unchanged audio are restored. Existing recordings absent from the source folder and all cue files stay intact. If any registered recording's source audio changed, startup import stops without importing anything, because cues are bound to exact audio bytes; run `npm run cues:generate` to review and replace it. The latest import report is saved to `work/audio-import-report.json`. Import does not commit, publish, or start alignment jobs.
 
 Running the command again refreshes a compatible running server's library; refresh the browser to see new parshiot. A server started before this update needs a one-time Ctrl+C and restart, which the command reports without stopping it automatically.
 
@@ -28,9 +46,9 @@ cue-flag preview for ongoing work.
    visible**, or **Select unaligned**. Each submission can contain up to 25.
 2. Choose **Add to queue**. Existing results are reused by default, including
    their saved reviews. **Run fresh alignments** creates separate results.
-3. Choose **Start queue**. One recording runs at a time with four CPU threads.
+3. Choose **Start queue**. One recording runs at a time with eight CPU threads.
    The default run window starts new recordings for ten minutes. **Run limits**
-   can change that window within the remaining approved testing allowance.
+   can change that window from 1 to 60 minutes.
 4. **Pause after current** finishes the active recording and retains waiting
    items. **Cancel waiting** retains cancelled history. **Retry** adds a new
    attempt for a failed, interrupted, or cancelled item, preserving the old one.
@@ -39,8 +57,7 @@ cue-flag preview for ongoing work.
 
 **Clear queue** removes every entry, including completed, failed, interrupted, cancelled, waiting, and active recordings. The empty list persists after a refresh or restart. Waiting work stops immediately; an active recording finishes safely and saves its cues without returning to the list. New selections stay paused until it finishes and you choose **Start queue**. Saved cues, reviews, audio, and downloads remain available; add a recording again to reuse its saved result.
 
-The library lists locally registered recordings, including newly imported parshiot. No model download is needed. The shared testing
-allowance is checked before each recording, and elapsed model work is recorded.
+The library lists locally registered recordings, including newly imported parshiot. No model download is needed. Elapsed model work is recorded.
 An active recording finishes before the run window or pause takes effect.
 
 ## Use your own audio
@@ -88,13 +105,21 @@ Audio decoding preserves presentation timestamps and pads or trims to playback t
 Use **Back to batch** from a recording to return with library filters and
 checkbox selections intact. Saving conflicts block navigation until resolved.
 
-Unzip the download. In Tikkun, load the matching complete aliyah, unlock the
-admin record panel, and choose **Import cues**. It verifies the recording hash,
-text identity, cue ordering, and review metadata before changing the local
-draft. Replacing existing timings needs confirmation. Orange rows show pending
+In Tikkun, open any aliyah, unlock the admin record panel, press play, and
+choose **Import cues** with the ZIP itself. A checklist shows every recording
+in the ZIP and what the project already has for it: no cues, an empty file,
+cues for different audio, the same timings, or how many words differ and by
+how much. It also warns when an unexported draft would be replaced. Aliyot
+without usable cues start checked; nothing loads until you choose **Load as
+drafts**. Each checked aliyah is verified against its recording and text, then
+saved as a local draft. The list then shows **Ready to review** or **Saved** for
+each one and stays in this browser until you choose **Close**. Choosing an
+aliyah in the list opens it with its draft loaded, ready to play. A single cue JSON still imports into the open aliyah. Orange rows show pending
 flags; **Next flagged** wraps through them. Timing edits keep flags pending.
 **Mark reviewed** clears their orange state while retaining their reasons and
-review history. Autosave, reload, and Export keep that metadata.
+review history. Autosave and reload keep that metadata in the local draft; Export leaves it out of the cue file. On the Mac
+running `npm run dev`, Export saves straight into `audio-cues/`; see
+[audio-cues/README.md](../../audio-cues/README.md).
 
 No review approval is created by downloading. Cue files contain optional
 `cues[].review` metadata with source, status, and flags (id, kind, message,

@@ -1,11 +1,10 @@
-import { isParshaAudioRecording } from '../../app/audio/types.ts'
-import { audioRecordings } from '../../app/data/audio-catalog.ts'
 import {
   recordingWorkRows,
   type RecordingWorkStatus,
 } from '../../app/data/about-progress.ts'
 import {
   publicAliyotByParsha,
+  publicParshaSlugByNumber,
   type GeneratedPublicAliyah,
   type PublicCueStatus,
 } from '../../generated/public-reading-manifest.ts'
@@ -50,15 +49,6 @@ function getPublicAliyot(parshaSlug: string | undefined) {
   return aliyot
 }
 
-const parshaSlugByNumber = new Map<number, string>()
-
-for (const recording of audioRecordings.filter(isParshaAudioRecording)) {
-  if (recording.status !== 'available' || recording.parshaNumber === undefined) {
-    continue
-  }
-  parshaSlugByNumber.set(recording.parshaNumber, recording.parshaSlug)
-}
-
 function publicStatus(
   workStatus: RecordingWorkStatus | undefined,
   aliyot: readonly PublicAliyah[]
@@ -96,7 +86,7 @@ export const readingCoverage: readonly PublicReading[] = recordingWorkRows.map(
     const parshaSlug =
       work.number === null
         ? undefined
-        : parshaSlugByNumber.get(work.number)
+        : publicParshaSlugByNumber[work.number]
     const aliyot = getPublicAliyot(parshaSlug)
     const availableAliyot = aliyot
       .filter((aliyah) => aliyah.audioId !== null)
@@ -117,6 +107,12 @@ export const readingCoverage: readonly PublicReading[] = recordingWorkRows.map(
 export const availableReadings = readingCoverage.filter(
   (reading): reading is PublicReading & { parshaSlug: string } =>
     reading.parshaSlug !== null && reading.availableAliyot.length > 0
+)
+
+/** Every weekly parsha in Torah order, recorded or not. */
+export const parshaReadings = readingCoverage.filter(
+  (reading): reading is PublicReading & { number: number; parshaSlug: string } =>
+    reading.number !== null && reading.parshaSlug !== null
 )
 
 export const coverageSummary = {

@@ -9,8 +9,8 @@
   "tokenizationVersion": "v2",
   "mediaIdentity": {
     "algorithm": "sha256",
-    "digest": "420bf546c3d387f81054f9baf762b01a7b2ad90ca3b73f57d1e8af32cc2dbcb1",
-    "byteLength": 5001072
+    "digest": "aca0193d3392fd78579572b2fed330454a000be590e809396c9fd85f8a02de52",
+    "byteLength": 4527656
   },
   "savedAt": "2026-07-15T18:57:25.628Z",
   "issues": [

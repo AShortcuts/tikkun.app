@@ -59,7 +59,7 @@ npm run audio:sync -- --source "/path/to/source recordings"
 
 The source directory must contain the narrator's complete recording library. Its folders use names such as `01 Beresheet`; supported `.m4a` and `.mp3` filenames identify aliyot 1 through 7.
 
-The command replaces that narrator's generated media under `site/audio/`, normalizes each recording to `<narrator>/<reading>/<aliyah>.<format>`, and regenerates `generated/audio-manifest.ts`. You can set `TIKKUN_AUDIO_SOURCE_ROOT` instead of passing `--source`.
+The command replaces that narrator's generated media under `audio/`, normalizes each recording to `<narrator>/<NN reading>/<aliyah>.<format>` (numbered like `audio-cues/`), and regenerates `generated/audio-manifest.ts`. You can set `TIKKUN_AUDIO_SOURCE_ROOT` instead of passing `--source`. The dev server and the production build publish those files at the matching URL, `/audio/<narrator>/<NN%20reading>/<aliyah>.<format>`.
 
 The generated manifest is deterministic and grouped by parsha so diffs stay reviewable in git.
 

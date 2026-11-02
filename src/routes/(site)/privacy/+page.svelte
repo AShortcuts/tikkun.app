@@ -29,8 +29,9 @@
   </section>
   <section aria-labelledby="privacy-analytics">
     <h2 id="privacy-analytics">Privacy-preserving analytics</h2>
-    <p>When enabled for this release, our self-hosted Melytics service receives page categories, feature actions, playback and visible-page time, and error categories. Website and app statistics are kept separate. We do not send search text, exact passages, bookmarks, recordings, full referrer URLs, or error messages in analytics.</p>
-    <p>The service processes your IP address and browser or app information to estimate daily visitors and report device and country statistics. It uses a daily salted hash instead of storing the raw IP address in analytics. We do not create a persistent analytics identifier or use analytics cookies. Raw analytics records are retained for 90 days; daily summaries are kept longer.</p>
+    <p>When enabled for this release, our self-hosted Melytics service receives page categories, feature actions, playback and visible-page time, error categories, your device's local hour and day of the week, and how far ahead an opened reading is scheduled (for example, this week or next month). Website and app statistics are kept separate. We do not send search text, exact passages, bookmarks, recordings, full referrer URLs, or error messages in analytics.</p>
+    <p>The app, and the website when added to your Home Screen, also send one check-in per day with the device type, major system version, and app version, so we can count active devices. Only the date of the last check-in is stored on your device.</p>
+    <p>The service processes your IP address and browser or app information to estimate daily visitors and report device, country, and approximate state or province. The state or province is looked up on our own server using <a href="https://db-ip.com" rel="noreferrer">IP geolocation by DB-IP</a>. It uses a daily salted hash instead of storing the raw IP address in analytics, and it never stores your IP address or city. We do not create a persistent analytics identifier or use analytics cookies. Raw analytics records are retained for 90 days; daily summaries are kept longer.</p>
     <p>You can turn collection off on this device here or in Reader Settings under More. Offline activity is not queued for later delivery.</p>
     <AnalyticsPreference />
   </section>

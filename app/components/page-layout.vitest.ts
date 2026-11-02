@@ -1148,6 +1148,15 @@ test('keeps Reading maqaf joins across mounted pages and restores annotation spa
       expect(suffix.getBoundingClientRect().top).toBeCloseTo(prefix.getBoundingClientRect().top, 0)
     }
   }
+  // The highlight treats the joined phrase as one unit across the page seam.
+  expect(prefix.dataset.maqafGroup).toBe('131:41:0:8 132:0:0:0')
+  expect(suffix.dataset.maqafGroup).toBe('131:41:0:8 132:0:0:0')
+  expect(prefix.classList.contains('mod-maqaf-join-lead')).toBe(true)
+  expect(prefix.classList.contains('mod-maqaf-join-tail')).toBe(false)
+  expect(suffix.classList.contains('mod-maqaf-join-tail')).toBe(true)
+  expect(suffix.classList.contains('mod-maqaf-join-lead')).toBe(false)
+  expect(requiredAll<HTMLElement>('[data-maqaf-group]', book).every(word =>
+    word.textContent?.endsWith('\u05be') || word.classList.contains('mod-maqaf-join-tail'))).toBe(true)
   applyAnnotationMode(book, false)
   applyReaderPageLayouts(pages, presentation)
   expect(boundary.toString()).toBe(originalSpacing)

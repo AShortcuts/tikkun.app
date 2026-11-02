@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { audioRecordings } from '../../generated/audio-manifest.ts'
 import { rangeAudioRecordings } from '../../app/data/range-audio-manifest.ts'
+import { recordingFilePath } from '../../scripts/audio-library.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const pageRoot = path.join(root, 'text/pages/torah')
@@ -14,7 +15,7 @@ for (const filename of (await readdir(pageRoot)).filter(name => /^\d+\.json$/.te
 const sources = []
 for (const recording of [...audioRecordings, ...rangeAudioRecordings]) {
   if (!recording.mediaIdentity || recording.status !== 'available') continue
-  const mediaPath = path.join('site', recording.playSrc)
+  const mediaPath = path.relative(root, recordingFilePath(root, recording.playSrc))
   let size: number
   try { size = (await stat(path.join(root, mediaPath))).size }
   catch (error) {

@@ -1,6 +1,12 @@
 import type { Destroy, MountScope } from '../lifecycle/mount.ts'
 
-export const COMPACT_READER_QUERY = '(max-width: 550px)'
+/**
+ * Phone layouts apply at this CSS width and below. Media queries in the
+ * stylesheets cannot read a variable, so they repeat 550px and 551px.
+ */
+export const COMPACT_READER_MAX_WIDTH = 550
+export const COMPACT_READER_QUERY = `(max-width: ${COMPACT_READER_MAX_WIDTH}px)`
+export const WIDE_READER_QUERY = `(min-width: ${COMPACT_READER_MAX_WIDTH + 1}px)`
 
 interface ReaderViewportWindow {
   readonly innerWidth: number
@@ -26,7 +32,7 @@ export function isMobileReaderViewport(
     Number.isFinite(height) &&
     width > 0 &&
     height > 0 &&
-    Math.min(width, height) <= 550
+    Math.min(width, height) <= COMPACT_READER_MAX_WIDTH
   )
 }
 

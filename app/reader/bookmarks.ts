@@ -1,4 +1,4 @@
-import { isValidTokenKey } from './checkpoints.ts'
+import { isValidTokenKey, type Checkpoint } from './checkpoints.ts'
 import {
   createPersistedJsonStore,
   requirePersistedJsonMutation,
@@ -21,6 +21,20 @@ export interface ReaderBookmark {
 export interface LoadedBookmarks {
   bookmarks: ReaderBookmark[]
   revision: PersistedJsonRevision | null
+}
+
+export function checkpointFromBookmark(bookmark: ReaderBookmark): Checkpoint {
+  return {
+    id: bookmark.id,
+    kind: 'bookmark',
+    source: 'bookmark',
+    label: bookmark.label,
+    hash: bookmark.hash,
+    audioId: bookmark.audioId,
+    tokenKey: bookmark.tokenKey,
+    timeStart: bookmark.timeStart,
+    createdAt: bookmark.createdAt,
+  }
 }
 
 export function createBookmark({

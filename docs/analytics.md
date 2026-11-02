@@ -17,14 +17,16 @@ Website requests go to same-origin `POST /api/echo`, implemented by `functions/a
 
 The Pages Function sends requests to the dedicated `https://adamn.cc/api/tikkun-echo` relay. That route requires a server-only shared secret before trusting the forwarded visitor IP and country. This is necessary because [Cloudflare replaces the client IP on cross-zone Worker subrequests](https://developers.cloudflare.com/fundamentals/reference/http-headers/#cf-connecting-ip-in-worker-subrequests). Forwarding directly to the existing unmodified portfolio collector would merge distinct visitors. The integration does not expose the private dashboard or any admin API.
 
-The app uses [CapacitorHttp](https://capacitorjs.com/docs/apis/http) directly, with a named Tikkun User-Agent plus the WebView's device information, a five-second timeout, and no global fetch patch. Its default public collector is the already configured `https://adamn.cc/api/echo`; `TIKKUN_ANALYTICS_APP_COLLECTOR` can name a dedicated HTTPS collector later. Native HTTP avoids browser CORS and preserves the device's public IP through the existing tunnel.
+The app uses [CapacitorHttp](https://capacitorjs.com/docs/apis/http) directly, with a named Tikkun User-Agent plus the WebView's device information, a five-second timeout, and no global fetch patch. Its public collector is the shared `https://collect.adamn.cc/api/echo` (since October 29, 2026; earlier builds use `https://adamn.cc/api/echo`, which still works). Both routes pass through the work-server collector, which adds an approximate region to `app_active` only. Native HTTP avoids browser CORS and preserves the device's public IP through the existing tunnel. The shared event contract for all of Adam's apps is `Adam’s Servers/melytics/EVENTS.md`.
 
 ## What the reports mean
 
 | Event | Useful question | Properties / counting rule |
 | --- | --- | --- |
 | Pageview (no event name) | Which public sections attract visits? | One initial view and one per changed page category; reader hash changes and scrolling do not inflate views |
-| `reader_open` | Do visitors reach a usable reading? | Emitted after reader render; layout, sides, and broad route kind, never exact passages |
+| `reader_open` | Do visitors reach a usable reading? How far ahead do people prepare? | Emitted after reader render; layout, sides, broad route kind, and `timing` (`last_week`, `this_week`, `next_week`, `weeks_2_4`, `months_1_3`, `later`, `none`) computed from the user's Israel/diaspora calendar; never exact passages |
+| `coming_up_select` | Which upcoming shortcut do people use? | `position` 1 (next reading), 2, or 3 from the picker's Coming Up list |
+| `app_active` | How many devices use the app each day and month? | Native app and Home Screen web app only; once per local day; `first_this_month`, `device` family (`iphone`, `ipad`, `mac`, `apple_vision`, `apple_tv`, `android_phone`, `android_tablet`, `windows`, `chromebook`, `linux`, web-only `ipad_or_mac`, `other`), `os` major version, `app_version`; the collector adds `region` |
 | `page_engagement` | How long does a page remain visible? | Incremental visible seconds; idle reading counts, hidden time does not |
 | `playback_start` | How often is audio actually used? | First playing state per loaded session; `timed` distinguishes recordings with word cues |
 | `playback_pause`, `playback_complete` | Where do listening sessions stop? | State transitions; completion means the recording reached its end, including after seeking |
@@ -36,9 +38,11 @@ The app uses [CapacitorHttp](https://capacitorjs.com/docs/apis/http) directly, w
 | `bookmark_change` | Are saved places useful? | Add/remove action only; no location, labels, or stored bookmarks |
 | `share_reading` | Are readings being shared? | Shared/copied/cancelled/failed; no shared content or destination |
 | `print_open`, `print_requested`, `print_error` | Do people reach printing successfully? | Layout, sides, form, page count; requested means browser print was invoked, not confirmed paper/PDF output |
-| `app_store_open` | Does the website send people to the app? | App Store link activation; not an install |
+| `app_store_open` | Does the website send people to the app? | App Store link activation with the link's known `ct` campaign tag or `none`; not an install |
 | `client_error` | Are navigation or runtime failures occurring? | Navigation/uncaught/unhandled category only; existing detailed support reports remain local |
 | `__ping` | Is the live-visitor view current? | Every two minutes while visible and online |
+
+Every custom event also carries the device's local `hour` (0–23) and `weekday` (`sun`–`sat`), so usage times are in each person's own time zone. Pageviews do not.
 
 Use Melytics's event-property explorer for distributions and numeric sums. Both properties have goals for `reader_open`, `playback_start`, `download_complete`, `share_reading`, and `print_requested`; the website also has `app_store_open`. The sharing goal is named **Share attempted**, because its event includes cancellation and failure; use the `outcome` property to distinguish success. Each property has an offline funnel (`download_start` -> `download_complete`). The website's listening funnel is page `/` -> `reader_open` -> `playback_start`; the app's is `reader_open` -> `playback_start`. Website visitors landing directly in the reader do not enter the homepage funnel. All 11 goals and four funnels were saved and verified.
 

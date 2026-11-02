@@ -15,6 +15,7 @@ import {
   generateParshaUrl,
   resolveParshaRun,
 } from '../app/view-model/navigation/parsha-routes.ts'
+import { singleParshaRouteSpecs } from '../app/view-model/navigation/parsha-route-catalog.ts'
 import { audioRecordings } from '../generated/audio-manifest.ts'
 import { formatTokenKey } from '../app/reader/token-position.ts'
 import { readCanonicalTokenKeysForRecordings } from './public-reading-tokens.ts'
@@ -168,9 +169,36 @@ export async function readPublishedCueCoverage(options = {}) {
   return coverageByAudioId
 }
 
+/**
+ * Maps every numbered parsha work row to its canonical reader slug, in Torah
+ * order, so unrecorded parshiot still get public aliyah links.
+ */
+export function createPublicParshaSlugByNumber({ recordings, workRows }) {
+  const slugByNumber = new Map()
+  for (const work of workRows) {
+    if (work.number === null) continue
+    const slug = singleParshaRouteSpecs[work.number - 1]?.canonicalSlug
+    if (!slug) throw new Error(`No reader route for parsha ${work.number}`)
+    slugByNumber.set(work.number, slug)
+  }
+  for (const recording of recordings.filter(isParshaAudioRecording)) {
+    if (recording.status !== 'available' || recording.parshaNumber === undefined) {
+      continue
+    }
+    const expectedSlug = slugByNumber.get(recording.parshaNumber)
+    if (expectedSlug && expectedSlug !== recording.parshaSlug) {
+      throw new Error(
+        `Recording ${recording.id} uses ${recording.parshaSlug}; parsha ${recording.parshaNumber} is ${expectedSlug}`
+      )
+    }
+  }
+  return slugByNumber
+}
+
 export function createPublicAliyotByParsha({
   recordings,
   cueCoverage,
+  parshaSlugByNumber = new Map(),
   now = routeReferenceDate,
 }) {
   const generator = new LeiningGenerator({
@@ -180,6 +208,10 @@ export function createPublicAliyotByParsha({
   })
   const recordingsByParsha = new Map()
   const availableRecordingIds = new Set()
+
+  for (const [parshaNumber, parshaSlug] of parshaSlugByNumber) {
+    recordingsByParsha.set(parshaSlug, { parshaNumber, recordings: new Map() })
+  }
 
   for (const recording of recordings.filter(isParshaAudioRecording)) {
     if (recording.status !== 'available') continue
@@ -288,7 +320,7 @@ export function validateRecordingWorkPlans({
   }
 }
 
-export function renderPublicReadingManifest(publicAliyotByParsha) {
+export function renderPublicReadingManifest(publicAliyotByParsha, parshaSlugByNumber) {
   return `export type PublicCueStatus = 'cued' | 'draft' | 'missing' | 'empty'
 
 export interface GeneratedPublicAliyah {
@@ -305,6 +337,8 @@ export interface GeneratedPublicAliyah {
 export const publicAliyotByParsha: Readonly<
   Record<string, readonly GeneratedPublicAliyah[]>
 > = ${JSON.stringify(publicAliyotByParsha, null, 2)}
+
+export const publicParshaSlugByNumber: Readonly<Record<number, string>> = ${JSON.stringify(Object.fromEntries(parshaSlugByNumber), null, 2)}
 `
 }
 
@@ -314,9 +348,11 @@ export async function generatePublicReadingManifestSource({
   root = cueRoot,
 } = {}) {
   const cueCoverage = await readPublishedCueCoverage({ root, recordings })
+  const parshaSlugByNumber = createPublicParshaSlugByNumber({ recordings, workRows })
   const publicAliyotByParsha = createPublicAliyotByParsha({
     recordings,
     cueCoverage,
+    parshaSlugByNumber,
   })
   validateRecordingWorkPlans({
     recordings,
@@ -324,7 +360,7 @@ export async function generatePublicReadingManifestSource({
     publicAliyotByParsha,
   })
   return {
-    contents: renderPublicReadingManifest(publicAliyotByParsha),
+    contents: renderPublicReadingManifest(publicAliyotByParsha, parshaSlugByNumber),
     aliyahCount: Object.values(publicAliyotByParsha).flat().length,
   }
 }

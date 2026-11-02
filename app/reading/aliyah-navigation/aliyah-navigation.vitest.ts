@@ -230,9 +230,18 @@ test('isolated rail and smaller edge controls reserve clearance in portrait and 
     if (width === 320) expect(rail.scrollWidth).toBeGreaterThan(rail.clientWidth)
     expect(document.documentElement.scrollWidth).toBe(width)
     const selected = required('.mobile-aliyah-segment[aria-current="location"]')
-    await expect.poll(() => getComputedStyle(selected, '::before').backgroundColor).toBe('rgb(10, 132, 255)')
+    const indicator = () => getComputedStyle(selected, '::before').backgroundColor
+    const readerColor = (token: string) => {
+      const probe = document.createElement('span')
+      probe.style.backgroundColor = `var(${token})`
+      selected.parentElement!.append(probe)
+      const color = getComputedStyle(probe).backgroundColor
+      probe.remove()
+      return color
+    }
+    await expect.poll(indicator).toBe(readerColor('--mobile-reader-blue'))
     navigation.syncPlayback({ target: completeSnapshot.items[0].target, playing: true, progressLabel: '0:10/2:05' })
-    await expect.poll(() => getComputedStyle(selected, '::before').backgroundColor).toBe('rgb(245, 197, 66)')
+    await expect.poll(indicator).toBe(readerColor('--mobile-reader-gold'))
     navigation.syncPlayback(idlePlayback)
     next.focus()
     expect(document.activeElement).toBe(next)

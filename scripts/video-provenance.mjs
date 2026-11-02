@@ -39,7 +39,7 @@ export function isAppBuildInput(relativePath) {
     return false
   }
   if (normalized === 'generated/video-manifest.ts') return false
-  if (normalized.startsWith('site/audio/')) return false
+  if (normalized.startsWith('audio/')) return false
   return true
 }
 

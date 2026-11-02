@@ -23,6 +23,14 @@ test('forwards validated events with authenticated visitor headers and strips si
   expect(init.headers.get('X-Tikkun-Client-IP')).toBe('203.0.113.17')
   expect(init.headers.get('X-Tikkun-Country')).toBe('US')
   expect(JSON.parse(init.body)).toEqual(payload)
+  // Cloudflare Workers reject redirect: 'error' at request construction, so every event would fail.
+  expect(init.redirect).toBe('manual')
+})
+test('a redirect from the relay is never treated as delivered', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 302, headers: { Location: 'https://elsewhere.example/' } })))
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+  expect((await onRequest({ request: request(), env })).status).toBe(502)
+  error.mockRestore()
 })
 test.each([
   { ...payload, k: 'another-key' }, { ...payload, i: 'persistentvisitor' },

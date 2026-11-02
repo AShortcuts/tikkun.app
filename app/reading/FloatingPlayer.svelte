@@ -2,7 +2,7 @@
   import { flushSync, onMount } from 'svelte'
   import UiIcon from '../components/UiIcon.svelte'
   import { observeReaderResize } from '../adaptive/reader-resize.ts'
-  import { readerLayoutViewport } from '../adaptive/reader-viewport.ts'
+  import { COMPACT_READER_MAX_WIDTH, readerLayoutViewport } from '../adaptive/reader-viewport.ts'
   import type {
     FloatingPlayer,
     FloatingPlayerAction,
@@ -510,7 +510,7 @@
       send({ type: 'layout' })
       if (!cornerControls) return
       const { width, height } = readerLayoutViewport(view)
-      if (!snapshot.visible || width > 550) {
+      if (!snapshot.visible || width > COMPACT_READER_MAX_WIDTH) {
         cornerControls.style.removeProperty('--corner-controls-player-bottom')
         return
       }

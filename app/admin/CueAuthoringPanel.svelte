@@ -7,6 +7,7 @@
     CueAuthoringPanelProgress,
     CueAuthoringPanelSnapshot,
   } from './cue-authoring-panel.ts'
+  import type { CueBundleProgressRowView } from './cue-bundle-review.ts'
 
   let { action, connect }: CueAuthoringPanelComponentProps = $props()
   let importInput: HTMLInputElement
@@ -78,6 +79,18 @@
       ? 'Export local cue changes that differ from published cue data'
       : 'Export the current timing draft as cue data'
   )
+
+  function progressLabel(row: CueBundleProgressRowView) {
+    switch (row.status) {
+      case 'saved': return 'Saved'
+      case 'not-loaded': return 'Not loaded'
+      case 'checking': return 'Checking…'
+      default:
+        return row.pendingFlags
+          ? `Ready to review · ${row.pendingFlags} ${row.pendingFlags === 1 ? 'flag' : 'flags'}`
+          : 'Ready to review'
+    }
+  }
   const resumeLabel = $derived(
     snapshot.resumeWord === null
       ? 'Resume the incomplete timing draft from the next unsaved word'
@@ -368,14 +381,91 @@
   <div class="admin-panel-actions mod-secondary">
     <button type="button" class="toolbar-button" data-target-id="admin-import"
       disabled={!snapshot.canImport} onclick={() => importInput.click()}>Import cues</button>
-    <input bind:this={importInput} type="file" accept=".json,application/json" hidden
-      aria-label="Import cue JSON for the loaded recording"
+    <input bind:this={importInput} type="file"
+      accept=".json,application/json,.zip,application/zip" hidden
+      aria-label="Import cue JSON or an aligner ZIP for the loaded recording"
       onchange={() => {
         const file = importInput.files?.[0]
         if (file) action({ type: 'import', file })
         importInput.value = ''
       }} />
   </div>
+  {#if snapshot.bundle?.mode === 'choosing'}
+    {@const bundle = snapshot.bundle}
+    <section class="admin-cue-bundle" data-target-id="admin-cue-bundle"
+      aria-label={`Choose aliyot to load from ${bundle.name}`} aria-busy={bundle.checking || bundle.loading}>
+      <div class="admin-cue-bundle-header">
+        <span class="admin-cue-bundle-name" title={bundle.name}>{bundle.name}</span>
+        <span class="admin-cue-bundle-count" role="status">
+          {bundle.checking ? 'Checking…' : `${bundle.selectedCount} of ${bundle.rows.length} selected`}
+        </span>
+      </div>
+      <ul class="admin-cue-bundle-list mod-choices">
+        {#each bundle.rows as row (row.audioId)}
+          <li class="admin-cue-bundle-choice" class:is-disabled={row.disabled}>
+            <label>
+              <input type="checkbox" checked={row.checked} disabled={row.disabled}
+                data-bundle-row={row.audioId}
+                onchange={(event) => action({
+                  type: 'toggle-bundle-row',
+                  audioId: row.audioId,
+                  checked: event.currentTarget.checked,
+                })} />
+              <span class="admin-cue-bundle-choice-copy">
+                <span class="admin-cue-bundle-title">{row.title}</span>
+                <span class="admin-cue-bundle-detail">{row.detail}</span>
+                {#if row.note}
+                  <span class="admin-cue-bundle-note mod-{row.note.tone}">{row.note.text}</span>
+                {/if}
+              </span>
+            </label>
+          </li>
+        {/each}
+      </ul>
+      <div class="admin-cue-bundle-actions">
+        <button type="button" class="toolbar-button" data-target-id="admin-bundle-load"
+          disabled={bundle.checking || bundle.loading || !bundle.selectedCount}
+          onclick={() => action({ type: 'load-bundle' })}>
+          {bundle.loading ? 'Loading…' : `Load ${bundle.selectedCount} as drafts`}
+        </button>
+        <button type="button" class="toolbar-button" data-target-id="admin-bundle-cancel"
+          disabled={bundle.loading}
+          onclick={() => action({ type: 'cancel-bundle' })}>Cancel</button>
+      </div>
+    </section>
+  {:else if snapshot.bundle?.mode === 'progress'}
+    {@const bundle = snapshot.bundle}
+    <section class="admin-cue-bundle" data-target-id="admin-cue-bundle"
+      aria-label={`Aliyot from ${bundle.name}`}>
+      <div class="admin-cue-bundle-header">
+        <span class="admin-cue-bundle-name" title={bundle.name}>{bundle.name}</span>
+        <span class="admin-cue-bundle-count">
+          {bundle.savedCount} of {bundle.rows.length} saved
+        </span>
+        <button type="button" class="toolbar-button admin-cue-bundle-close"
+          data-target-id="admin-bundle-close"
+          onclick={() => action({ type: 'close-bundle' })}>Close</button>
+      </div>
+      <ol class="admin-cue-bundle-list">
+        {#each bundle.rows as row (row.audioId)}
+          <li class="admin-cue-bundle-entry" class:is-current={row.current}
+            aria-current={row.current ? 'true' : undefined}>
+            {#if row.openable && !row.current}
+              <button type="button" class="admin-cue-bundle-title mod-open"
+                data-bundle-open={row.audioId}
+                onclick={() => action({ type: 'open-bundle-row', audioId: row.audioId })}>{row.title}</button>
+            {:else}
+              <span class="admin-cue-bundle-title">{row.title}</span>
+            {/if}
+            <span class="admin-cue-bundle-state" class:is-saved={row.status === 'saved'}
+              class:is-pending={row.status === 'not-loaded'}>
+              {progressLabel(row)}
+            </span>
+          </li>
+        {/each}
+      </ol>
+    </section>
+  {/if}
   <div class="admin-panel-draft" data-target-id="admin-draft-status">
     {snapshot.draftStatusText}
   </div>

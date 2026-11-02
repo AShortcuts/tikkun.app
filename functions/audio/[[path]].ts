@@ -15,6 +15,24 @@ const publishedLengths = new Map([...audioRecordings, ...rangeAudioRecordings]
   .filter((recording) => recording.status === 'available' && recording.mediaIdentity)
   .map((recording) => [recording.playSrc, recording.mediaIdentity!.byteLength]))
 
+// Recording URLs now mirror the numbered library folders. Installed app builds
+// and saved links still request the earlier unnumbered paths; send them on.
+const legacyRecordingPaths = new Map<string, string>(audioRecordings
+  .filter((recording) => recording.status === 'available')
+  .map((recording): [string, string] => [
+    recording.playSrc.replace(/\/\d{2}%20([^/]+)\/(\d+\.[a-z0-9]+)$/i, '/$1/$2'),
+    recording.playSrc,
+  ])
+  .filter(([legacy, current]) => legacy !== current))
+
+export function legacyRecordingRedirect(request: Request) {
+  const url = new URL(request.url)
+  const current = legacyRecordingPaths.get(url.pathname)
+  if (!current) return null
+  url.pathname = current
+  return Response.redirect(url.toString(), 301)
+}
+
 interface AssetFetcher {
   fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
 }
@@ -159,6 +177,8 @@ export async function onRequest({
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     return env.ASSETS.fetch(request)
   }
+  const redirect = legacyRecordingRedirect(request)
+  if (redirect) return redirect
 
   const rangeHeader = request.headers.get('range')
   // Pages ignores Range and bypasses its asset cache for ranged requests.

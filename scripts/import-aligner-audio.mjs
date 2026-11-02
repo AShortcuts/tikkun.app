@@ -5,6 +5,7 @@ import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { audioNarrators, audioRecordingsByParsha } from '../generated/audio-manifest.ts'
 import { importAudioCatalog } from './generate-audio-manifest.mjs'
+import { AUDIO_DIRECTORY } from './audio-library.mjs'
 
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)))
 const work = path.join(root, 'experiments/torah-audio-aligner/work')
@@ -33,7 +34,7 @@ async function main() {
   const narratorId = process.env.TIKKUN_AUDIO_NARRATOR_ID || 'yoni-davidov'
   const narrator = audioNarrators.find(entry => entry.id === narratorId)
   if (!narrator) throw new Error(`Narrator ${narratorId} is not registered in the audio manifest.`)
-  const targetAudioRoot = path.join(root, 'site/audio', narrator.id)
+  const targetAudioRoot = path.join(root, AUDIO_DIRECTORY, narrator.id)
   console.log(`Checking audio import: ${path.resolve(sourceRoot)} -> ${targetAudioRoot}`)
   const result = await importAudioCatalog({
     sourceRoot,

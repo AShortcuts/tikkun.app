@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest'
 import { page } from 'vitest/browser'
+import { getReaderFocalPointClientY } from '../reader-scroll.ts'
 
 let frame: HTMLIFrameElement | null = null
 let savedStorage: Map<string, string> | null = null
@@ -59,7 +60,7 @@ test.each([
     }
   }
   await settle()
-  const focal = book.getBoundingClientRect().top + book.clientHeight / 2
+  const focal = getReaderFocalPointClientY(book)
   const beforeRect = readerTextLayout === 'reading' ? visibleWordBounds(before) : before.getBoundingClientRect()
   const afterRect = after.getBoundingClientRect()
   const above = Math.round(book.scrollTop + beforeRect.top + beforeRect.height / 2 - focal)

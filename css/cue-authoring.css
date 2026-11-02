@@ -634,6 +634,182 @@
   line-height: 1.35;
 }
 
+.admin-cue-bundle {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--light-accent-color);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--paper-color) 96%, transparent);
+}
+
+.admin-cue-bundle-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  font-size: 0.82rem;
+}
+
+.admin-cue-bundle-name {
+  overflow: hidden;
+  color: var(--text-color);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-cue-bundle-count {
+  flex: 1 0 auto;
+  color: var(--light-text-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-cue-bundle-close {
+  padding-inline: 0.55rem;
+  font-size: 0.78rem;
+}
+
+.admin-cue-bundle-list {
+  display: grid;
+  gap: 0.15rem;
+  max-height: min(24vh, 220px);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.admin-cue-bundle-entry {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: 8px;
+  font-size: 0.84rem;
+}
+
+.admin-cue-bundle-entry.is-current {
+  background: color-mix(in srgb, var(--paper-color) 84%, hsl(199, 100%, 82%));
+}
+
+.admin-cue-bundle-title {
+  overflow: hidden;
+  color: var(--text-color);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-cue-bundle-title.mod-open {
+  justify-self: start;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  font: inherit;
+  text-align: start;
+  text-decoration: underline;
+  text-decoration-color: var(--medium-accent-color);
+  text-underline-offset: 0.18em;
+  cursor: pointer;
+}
+
+.admin-cue-bundle-title.mod-open:hover {
+  text-decoration-color: currentColor;
+}
+
+.admin-cue-bundle-title.mod-open:focus-visible {
+  outline: 2px solid color-mix(in srgb, dodgerblue 75%, white);
+  outline-offset: 2px;
+}
+
+.admin-cue-bundle-entry.is-current .admin-cue-bundle-title {
+  font-weight: 600;
+}
+
+.admin-cue-bundle-state {
+  color: var(--light-text-color);
+  font-size: 0.76rem;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-cue-bundle-state.is-saved {
+  color: color-mix(in srgb, seagreen 80%, var(--text-color));
+  font-weight: 600;
+}
+
+.admin-cue-bundle-list.mod-choices {
+  max-height: min(34vh, 320px);
+}
+
+.admin-cue-bundle-choice label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: start;
+  padding: 0.35rem 0.4rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.admin-cue-bundle-choice:not(.is-disabled) label:hover {
+  background: color-mix(in srgb, var(--paper-color) 88%, var(--medium-accent-color));
+}
+
+.admin-cue-bundle-choice.is-disabled label {
+  cursor: default;
+}
+
+.admin-cue-bundle-choice input {
+  margin: 0.15rem 0 0;
+  accent-color: dodgerblue;
+}
+
+.admin-cue-bundle-choice input:focus-visible {
+  outline: 2px solid color-mix(in srgb, dodgerblue 75%, white);
+  outline-offset: 2px;
+}
+
+.admin-cue-bundle-choice-copy {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+  font-size: 0.84rem;
+}
+
+.admin-cue-bundle-detail,
+.admin-cue-bundle-note {
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.admin-cue-bundle-detail,
+.admin-cue-bundle-note.mod-info {
+  color: var(--light-text-color);
+}
+
+.admin-cue-bundle-note.mod-warning {
+  color: #9a6700;
+  font-weight: 600;
+}
+
+.admin-cue-bundle-note.mod-problem {
+  color: #b91c1c;
+}
+
+.admin-cue-bundle-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.4rem;
+}
+
+.admin-cue-bundle-actions .toolbar-button {
+  min-width: 0;
+  padding-inline: 0.6rem;
+  white-space: nowrap;
+}
+
 .admin-cue-list {
   display: grid;
   gap: 0.35rem;

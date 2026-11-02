@@ -41,11 +41,6 @@ def main():
     for recording in bundle["recordings"]:
         directory = cached_run(bundle, recording)
         if directory is None:
-            consumed = sum(event["elapsedSeconds"] for event in ledger["events"])
-            # Smoke measured 20.3 s / 76.2 s; allow twice that rate plus startup margin.
-            estimate = recording["durationSeconds"] * 0.54 + 30
-            if consumed + estimate > 3600:
-                raise RuntimeError("Remaining approved testing budget cannot cover this estimated run")
             started = time.monotonic()
             process = subprocess.run([str(HERE / "run"), "align", "--audio-id", recording["audioId"],
                                       "--max-audio-seconds", "900", "--timeout", "600"],

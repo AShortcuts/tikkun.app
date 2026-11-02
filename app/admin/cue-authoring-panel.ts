@@ -1,5 +1,6 @@
 import { flushSync, mount, unmount } from 'svelte'
 import type { MountScope } from '../lifecycle/mount.ts'
+import type { CueBundleView } from './cue-bundle-review.ts'
 import CueAuthoringPanelView from './CueAuthoringPanel.svelte'
 
 export type CueAuthoringPanelAction =
@@ -15,6 +16,11 @@ export type CueAuthoringPanelAction =
   | { type: 'resume' }
   | { type: 'export' }
   | { type: 'import'; file: File }
+  | { type: 'toggle-bundle-row'; audioId: string; checked: boolean }
+  | { type: 'load-bundle' }
+  | { type: 'cancel-bundle' }
+  | { type: 'close-bundle' }
+  | { type: 'open-bundle-row'; audioId: string }
 
 export type CueAuthoringCaptureTone =
   | 'normal'
@@ -65,6 +71,7 @@ export interface CueAuthoringPanelSnapshot {
   canReset: boolean
   canExport: boolean
   canImport?: boolean
+  bundle?: CueBundleView | null
   exportChanged: boolean
   resumeWord: number | null
 }

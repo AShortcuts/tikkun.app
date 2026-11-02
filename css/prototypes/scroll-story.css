@@ -1040,7 +1040,10 @@
 
 .prototype-scroll-story .scroll-readings-grid {
   margin-top: clamp(3.5rem, 9vw, 6rem);
-  border-bottom: 1px solid var(--scroll-line);
+  border: 1px solid var(--scroll-line);
+  border-radius: clamp(1rem, 2.5vw, 1.5rem);
+  padding: 0 clamp(1rem, 3vw, 2.25rem);
+  background: rgba(255, 255, 255, 0.018);
 }
 
 .prototype-scroll-story .home-reading-card {
@@ -1050,9 +1053,39 @@
   padding: 1.6rem 0;
 }
 
+.prototype-scroll-story .home-reading-card:first-child {
+  border-top: 0;
+}
+
 .prototype-scroll-story .home-reading-card-header {
   justify-content: space-between;
   gap: 1rem;
+}
+
+.prototype-scroll-story .home-reading-number {
+  flex: 0 0 auto;
+  min-width: 1.75rem;
+  color: var(--scroll-muted);
+  font-family: var(--scroll-ui-font);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.prototype-scroll-story .home-reading-number + .home-reading-title-link {
+  margin-inline-end: auto;
+}
+
+@media (max-width: 47.999rem) {
+  /* Keep all seven aliyah bubbles on one row inside the inset frame on phones. */
+  .prototype-scroll-story .scroll-readings-grid {
+    margin-inline: -0.5rem;
+    padding-inline: 0.75rem;
+  }
+
+  .prototype-scroll-story .scroll-readings-grid .home-reading-bubbles {
+    justify-content: space-between;
+    gap: 0.25rem;
+  }
 }
 
 .prototype-scroll-story .home-reading-title-link {
@@ -1129,6 +1162,23 @@
   font-weight: 680;
   text-underline-offset: 0.25rem;
   transition: color var(--scroll-motion-color) var(--scroll-ease-standard);
+}
+
+.prototype-scroll-story .scroll-readings-grid .home-reading-open {
+  gap: 0.4em;
+  text-decoration-style: dotted;
+  text-decoration-thickness: 1.5px;
+}
+
+.prototype-scroll-story .home-reading-open .ui-icon {
+  width: 1.05em;
+  height: 1.05em;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .prototype-scroll-story .scroll-project-note {

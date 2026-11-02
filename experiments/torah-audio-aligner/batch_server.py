@@ -98,7 +98,7 @@ def batch_handler_for(app):
                 if path == "/api/health":
                     return self.json({"app": APP_ID, "workspace": digest_json(str(HERE)),
                                       "storage": digest_json(str(app.store.root)), "status": "ready",
-                                      "libraryRefresh": True, "clearQueue": True})
+                                      "libraryRefresh": True, "clearQueue": True, "unlimitedRun": True})
                 if path == "/api/batch/library":
                     with app.queue.lock:
                         app.library.reload()
@@ -167,7 +167,7 @@ def main():
         health = None
     if health:
         if health.get("app") == APP_ID and health.get("storage") == digest_json(str(work_path(args.review_dir))):
-            if not health.get("libraryRefresh") or not health.get("clearQueue"):
+            if not health.get("libraryRefresh") or not health.get("clearQueue") or not health.get("unlimitedRun"):
                 raise SystemExit("Audio import finished. The running aligner needs a one-time restart to load the latest controls and library: "
                                  "press Ctrl+C in its terminal, then run npm run dev:aligner again. Saved cues are preserved.")
             with urlopen(url + "/api/batch/library", timeout=95) as response:

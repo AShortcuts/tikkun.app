@@ -27,6 +27,7 @@ import { replaceAuthoringSessionCues } from './authoring-session.ts'
 import { createCueAuthoring, type CueAuthoring } from './cue-authoring.ts'
 import { incompleteCueSessionFixture } from './cue-authoring.fixture.ts'
 import { saveAdminDraftPayload } from './draft-storage.ts'
+import { buildZipFixture } from './zip.fixture.ts'
 
 let fixture: HTMLElement | null = null
 let destroy: (() => void) | null = null
@@ -1435,6 +1436,7 @@ function createOptions(
     onCueNavigationChange: () => {},
     onLocalRecordingIssuesChanged: () => {},
     showPersistenceNotice: () => {},
+    saveCueFile: async () => ({ status: 'unavailable' as const }),
     ...optionOverrides,
   }
 }
@@ -1569,7 +1571,7 @@ function createCueAuthoringPlaybackAdapter(
 
 const tokenKeys = ['1:0:0:0', '1:0:0:1']
 
-test('imports generated flags, navigates and adjusts them, then preserves their review state in exports and reloads', async () => {
+test('imports generated flags, keeps their review state in the draft across reloads, and leaves it out of exports', async () => {
   const { audioController, highlightController } = createFixture()
   const writeText = vi.fn().mockResolvedValue(undefined)
   installClipboard(writeText)
@@ -1602,12 +1604,13 @@ test('imports generated flags, navigates and adjusts them, then preserves their 
     })),
   }
   const chooseFile = () => {
-    const input = required<HTMLInputElement>('[aria-label="Import cue JSON for the loaded recording"]')
+    const input = required<HTMLInputElement>('[aria-label="Import cue JSON or an aligner ZIP for the loaded recording"]')
     const files = new DataTransfer()
     files.items.add(new File([JSON.stringify(imported)], 'generated-cues.json', { type: 'application/json' }))
     input.files = files.files
     input.dispatchEvent(new Event('change', { bubbles: true }))
   }
+  const plainRowBackground = getComputedStyle(required('.admin-cue-row:not(.is-selected)')).backgroundColor
   chooseFile()
   await vi.waitFor(() => expect(confirm).toHaveBeenCalledTimes(1))
   expect(document.querySelectorAll('.admin-cue-row.is-flagged')).toHaveLength(0)
@@ -1615,7 +1618,7 @@ test('imports generated flags, navigates and adjusts them, then preserves their 
   chooseFile()
   await vi.waitFor(() => expect(document.querySelectorAll('.admin-cue-row.is-flagged')).toHaveLength(2))
   await vi.waitFor(() => expect(notice).toHaveBeenCalledWith(expect.stringContaining('2 pending flags')))
-  expect(getComputedStyle(required('.admin-cue-row.is-flagged:not(.is-selected)')).backgroundColor).toBe('rgb(255, 240, 220)')
+  expect(getComputedStyle(required('.admin-cue-row.is-flagged:not(.is-selected)')).backgroundColor).not.toBe(plainRowBackground)
   required<HTMLButtonElement>('[data-target-id="admin-next-flag"]').click()
   await vi.waitFor(() => expect(required('[data-admin-cue-index="1"]').classList.contains('is-selected')).toBe(true))
   required<HTMLButtonElement>('[data-admin-nudge="0.05"]').click()
@@ -1623,7 +1626,9 @@ test('imports generated flags, navigates and adjusts them, then preserves their 
   expect(document.querySelectorAll('.admin-cue-row.is-flagged')).toHaveLength(2)
   required<HTMLButtonElement>('[data-target-id="admin-export"]').click()
   await vi.waitFor(() => expect(writeText).toHaveBeenCalledTimes(1))
-  expect(JSON.parse(writeText.mock.calls[0][0]).cues[1].review.flags[0].status).toBe('pending')
+  const exported = JSON.parse(writeText.mock.calls[0][0])
+  expect(exported.cues[1].timeStart).toBe(3.3)
+  expect(exported.cues.some((exportedCue: { review?: unknown }) => 'review' in exportedCue)).toBe(false)
   required<HTMLButtonElement>('[data-target-id="export-close"]').click()
   required<HTMLButtonElement>('[data-target-id="admin-review-flag"]').click()
   await vi.waitFor(() => expect(document.querySelectorAll('.admin-cue-row.is-flagged')).toHaveLength(1))
@@ -1635,8 +1640,183 @@ test('imports generated flags, navigates and adjusts them, then preserves their 
   required<HTMLButtonElement>('[data-target-id="admin-export"]').click()
   await vi.waitFor(() => expect(writeText).toHaveBeenCalledTimes(2))
   const reexport = JSON.parse(writeText.mock.calls[1][0])
-  expect(reexport.cues[0].review.flags[0].status).toBe('pending')
-  expect(reexport.cues[1].review.flags[0]).toMatchObject({ status: 'reviewed', message: 'Check this onset.' })
+  expect(reexport.cues.some((exportedCue: { review?: unknown }) => 'review' in exportedCue)).toBe(false)
+})
+
+async function mountWithCurrentRecording(overrides: CueAuthoringTestOverrides = {}) {
+  const { audioController, highlightController } = createFixture()
+  let authoring!: CueAuthoring
+  const mountAuthoring = () => {
+    destroy = createMount()((scope) => {
+      authoring = createCueAuthoring(scope, createOptions(audioController, highlightController, overrides))
+    })
+  }
+  mountAuthoring()
+  await audioController.loadSession(createActiveAudioSession(buildPlaybackPlan({
+    target: { runId: 'run', index: 1 }, tokenKeys,
+    current: { recording: recording('current', 1), cues: [cue(tokenKeys[0], 0), cue(tokenKeys[1], 3.25)] },
+  })!))
+  highlightController.setSequence(tokenKeys)
+  await authoring.bindSession()
+  return {
+    audioController,
+    remount: async () => {
+      destroy!()
+      mountAuthoring()
+      await authoring.bindSession()
+    },
+  }
+}
+
+const generatedCueFile = (audioId: string, aliyah: number, starts = [0, 3]) => ({
+  ...draftRecordingIdentity(recording(audioId, aliyah)), tokenCount: 2, cueCount: 2,
+  tokenizationVersion: TOKENIZATION_VERSION,
+  cues: tokenKeys.map((key, index) => ({ ...cue(key, starts[index]), cueNumber: index + 1 })),
+})
+
+function chooseImportFile(file: File) {
+  const input = required<HTMLInputElement>('[aria-label="Import cue JSON or an aligner ZIP for the loaded recording"]')
+  const files = new DataTransfer()
+  files.items.add(file)
+  input.files = files.files
+  input.dispatchEvent(new Event('change', { bubbles: true }))
+}
+
+const bundleRecordings = () => [recording('current', 1), recording('other', 2)]
+const bundleOptions = {
+  listRecordings: bundleRecordings,
+  loadRecordingTokenKeys: async () => tokenKeys,
+}
+const encodeJson = (value: unknown) => new TextEncoder().encode(JSON.stringify(value))
+const cueZip = (files: Array<[string, unknown]>) => new File(
+  [buildZipFixture(files.map(([name, value]) => ({ name, bytes: encodeJson(value) })))],
+  'tikkun-generated-cues.zip', { type: 'application/zip' })
+const textOf = (selector: string) => [...document.querySelectorAll(selector)]
+  .map((row) => row.textContent?.replace(/\s+/g, ' ').trim())
+const storedDraftStarts = (audioId: string) =>
+  JSON.parse(localStorage.getItem('tikkun-admin-draft:' + audioId) ?? 'null')?.cues.map((saved: WordCue) => saved.timeStart)
+
+test('checks a cue ZIP against the project, loads the chosen aliyot as drafts, and tracks them until closed', async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined)
+  installClipboard(writeText)
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:bundle-test')
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+  const confirm = vi.spyOn(window, 'confirm')
+  const notice = vi.fn()
+  const saveCueFile = vi.fn<(serialized: string) => Promise<{ status: 'saved'; path: string; replaced: boolean; unchanged: boolean }>>(async () => ({
+    status: 'saved' as const, path: 'audio-cues/reader/test/1.json', replaced: false, unchanged: false,
+  }))
+  // Unexported work on another aliyah from the ZIP.
+  const other = recording('other', 2)
+  await saveAdminDraftPayload(createCueDraftPayload({
+    recording: other, tokenCount: tokenKeys.length, tokenKeys, tokenPointer: 1, updatedAt: Date.now(),
+    cues: [cue(tokenKeys[0], 0), cue(tokenKeys[1], 1.1)],
+  }), other, tokenKeys, { writerToken: 'earlier-tab', expectedRevision: null })
+  const { audioController, remount } = await mountWithCurrentRecording({ ...bundleOptions, saveCueFile, showPersistenceNotice: notice })
+
+  chooseImportFile(cueZip([
+    ['manifest.json', { private: true }],
+    ['current-tikkun-cues.json', generatedCueFile('current', 1, [0, 2.5])],
+    ['other-tikkun-cues.json', generatedCueFile('other', 2, [0, 3])],
+    ['stranger-tikkun-cues.json', generatedCueFile('stranger', 3)],
+  ]))
+  await vi.waitFor(() => expect(textOf('.admin-cue-bundle-count')).toEqual(['1 of 3 selected']))
+  expect(textOf('.admin-cue-bundle-choice')).toEqual([
+    'current No cues yet',
+    'other No cues yet Unexported draft here will be replaced',
+    'test Aliyah 3 Can’t load This recording isn’t in the project yet',
+  ])
+  const box = (audioId: string) => required<HTMLInputElement>('[data-bundle-row="' + audioId + '"]')
+  expect([box('current').checked, box('other').checked, box('stranger').disabled]).toEqual([true, false, true])
+  // Nothing loads until the choice is confirmed.
+  expect(audioController.session?.cues[1].timeStart).toBe(3.25)
+  expect(storedDraftStarts('other')).toEqual([0, 1.1])
+
+  box('other').click()
+  await vi.waitFor(() => expect(required('[data-target-id="admin-bundle-load"]').textContent?.trim()).toBe('Load 2 as drafts'))
+  required<HTMLButtonElement>('[data-target-id="admin-bundle-load"]').click()
+  await vi.waitFor(() => expect(textOf('.admin-cue-bundle-entry')).toEqual(['current Ready to review', 'other Ready to review']))
+  expect(audioController.session?.cues[1].timeStart).toBe(2.5)
+  expect(storedDraftStarts('other')).toEqual([0, 3])
+  expect(confirm).not.toHaveBeenCalled()
+  expect(notice).toHaveBeenCalledWith('Loaded 2 aliyot as drafts to review.')
+  expect(textOf('.admin-cue-bundle-count')).toEqual(['0 of 2 saved'])
+
+  required<HTMLButtonElement>('[data-target-id="admin-export"]').click()
+  await vi.waitFor(() => expect(textOf('.admin-cue-bundle-entry')).toEqual(['current Saved', 'other Ready to review']))
+  expect(JSON.parse(saveCueFile.mock.calls[0][0]).cues[1].timeStart).toBe(2.5)
+  required<HTMLButtonElement>('[data-target-id="export-close"]').click()
+
+  // The list outlives the tab; closing it forgets only the list.
+  await remount()
+  await vi.waitFor(() => expect(textOf('.admin-cue-bundle-entry')).toHaveLength(2))
+  required<HTMLButtonElement>('[data-target-id="admin-bundle-close"]').click()
+  await vi.waitFor(() => expect(document.querySelector('[data-target-id="admin-cue-bundle"]')).toBeNull())
+  expect(localStorage.getItem('tikkun-admin-cue-bundle')).toBeNull()
+  expect(storedDraftStarts('other')).toEqual([0, 3])
+})
+
+test('cancelling the ZIP checklist leaves every draft and the earlier list alone', async () => {
+  const { audioController } = await mountWithCurrentRecording(bundleOptions)
+  chooseImportFile(cueZip([['current-tikkun-cues.json', generatedCueFile('current', 1, [0, 2.5])]]))
+  await vi.waitFor(() => expect(required<HTMLInputElement>('[data-bundle-row="current"]').checked).toBe(true))
+  required<HTMLButtonElement>('[data-target-id="admin-bundle-cancel"]').click()
+  await vi.waitFor(() => expect(document.querySelector('[data-target-id="admin-cue-bundle"]')).toBeNull())
+  expect(audioController.session?.cues[1].timeStart).toBe(3.25)
+  expect(localStorage.getItem('tikkun-admin-cue-bundle')).toBeNull()
+})
+
+test('a list restored on a later visit checks each aliyah before one is loaded and opens the chosen one', async () => {
+  localStorage.setItem('tikkun-admin-cue-bundle', JSON.stringify({ version: 2, name: 'earlier.zip', audioIds: ['current', 'other'] }))
+  const other = recording('other', 2)
+  await saveAdminDraftPayload(createCueDraftPayload({
+    recording: other, tokenCount: tokenKeys.length, tokenKeys, tokenPointer: 1, updatedAt: Date.now(),
+    cues: [cue(tokenKeys[0], 0), cue(tokenKeys[1], 3)],
+  }), other, tokenKeys, { writerToken: 'earlier-tab', expectedRevision: null })
+  const openRecording = vi.fn(async () => {})
+  const { audioController, highlightController } = createFixture()
+  destroy = createMount()((scope) => {
+    createCueAuthoring(scope, createOptions(audioController, highlightController, { ...bundleOptions, openRecording }))
+  })
+
+  await vi.waitFor(() => expect(textOf('.admin-cue-bundle-entry')).toEqual(['current Not loaded', 'other Ready to review']))
+  required<HTMLButtonElement>('[data-bundle-open="other"]').click()
+  await vi.waitFor(() => expect(openRecording).toHaveBeenCalledWith(other))
+})
+
+test('falls back to clipboard and downloads when this computer cannot save into the project', async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined)
+  installClipboard(writeText)
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fallback-test')
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+  const saveCueFile = vi.fn()
+    .mockRejectedValueOnce(new Error('Cue Data diverges at cue 2'))
+    .mockResolvedValueOnce({ status: 'unavailable' })
+  await mountWithCurrentRecording({ saveCueFile })
+  const status = () => required('[data-target-id="export-copy-status"]').textContent ?? ''
+
+  required<HTMLButtonElement>('[data-target-id="admin-export"]').click()
+  await vi.waitFor(() => expect(status()).toBe(
+    'Could not save to the project: Cue Data diverges at cue 2 Copied to clipboard. Paste into audio-cues/reader/test/1.json.'
+  ))
+  required<HTMLButtonElement>('[data-target-id="export-close"]').click()
+  required<HTMLButtonElement>('[data-target-id="admin-export"]').click()
+  await vi.waitFor(() => expect(status()).toBe('Copied to clipboard. Paste into audio-cues/reader/test/1.json.'))
+  expect(writeText).toHaveBeenCalledTimes(2)
+  expect(required<HTMLAnchorElement>('[data-target-id="export-download"]').getAttribute('href')).toBe('blob:fallback-test')
+})
+
+test('asks before importing cues timed with new audio that has no fingerprint', async () => {
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+  const { audioController } = await mountWithCurrentRecording()
+  const withoutFingerprint = { ...generatedCueFile('current', 1, [0, 1.5]), mediaIdentity: undefined }
+  const file = () => new File([JSON.stringify(withoutFingerprint)], '1.json', { type: 'application/json' })
+  chooseImportFile(file())
+  await vi.waitFor(() => expect(confirm).toHaveBeenCalledWith(expect.stringContaining('no audio fingerprint')))
+  expect(audioController.session?.cues[1].timeStart).toBe(3.25)
+  confirm.mockReturnValue(true)
+  chooseImportFile(file())
+  await vi.waitFor(() => expect(audioController.session?.cues[1].timeStart).toBe(1.5))
 })
 
 function createFixture(keys: readonly string[] = tokenKeys) {

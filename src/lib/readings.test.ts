@@ -1,10 +1,12 @@
 import { expect, test, vi } from 'vitest'
+import { publicAliyotByParsha } from '../../generated/public-reading-manifest.ts'
 import {
   availableReadings,
   coverageSummary,
   filterReadingCoverage,
   getReadingAvailabilitySummary,
   getRequiredReading,
+  parshaReadings,
   readingCoverage,
 } from './readings.ts'
 
@@ -37,11 +39,15 @@ vi.mock('../../generated/public-reading-manifest.ts', async (importOriginal) => 
 
 test('builds public coverage from generated recordings and cue data', () => {
   expect(readingCoverage).toHaveLength(56)
+  // Audio counts grow as recordings are added, so they come from the generated manifest.
+  const recordedAliyot = Object.values(publicAliyotByParsha)
+    .map((aliyot) => aliyot.filter((aliyah) => aliyah.audioId !== null).length)
   expect(coverageSummary).toEqual({
-    readingsWithAudio: 13,
-    availableAliyot: 91,
+    readingsWithAudio: recordedAliyot.filter((count) => count > 0).length,
+    availableAliyot: recordedAliyot.reduce((total, count) => total + count, 0),
     syncedReadings: 6,
   })
+  expect(coverageSummary.availableAliyot).toBeGreaterThanOrEqual(coverageSummary.syncedReadings * 7)
   expect(availableReadings.every((reading) => reading.availableAliyot.length > 0)).toBe(
     true
   )
@@ -121,4 +127,21 @@ test('fails the build-facing lookup when a featured reading is absent', () => {
   expect(() => getRequiredReading('not-a-reading')).toThrow(
     'Public reading catalog is missing not-a-reading'
   )
+})
+
+test('lists every weekly parsha in order with links for all seven aliyot', () => {
+  expect(parshaReadings.map((reading) => reading.number)).toEqual(
+    Array.from({ length: 54 }, (_, index) => index + 1)
+  )
+  expect(parshaReadings.find((reading) => reading.number === 8)).toMatchObject({
+    parshaSlug: 'vayishlach',
+    availableAliyot: [],
+    statusKind: 'planned',
+  })
+  for (const reading of parshaReadings) {
+    expect(reading.aliyot).toHaveLength(7)
+    expect(reading.aliyot.every((aliyah) =>
+      aliyah.readerHash.startsWith(`#/torah/parsha/${reading.parshaSlug}/`)
+    )).toBe(true)
+  }
 })

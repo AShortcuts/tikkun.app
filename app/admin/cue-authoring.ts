@@ -8,12 +8,25 @@ import {
 import { TOKENIZATION_VERSION } from '../audio/cue-schema.ts'
 import {
   getCueDataResolutionForRecording,
+  listRecordings,
   retryCueDataResolutionForRecording,
 } from '../audio/library.ts'
 import type { CueDataResolution } from '../audio/cue-data.ts'
 import { normalizeFirstCueStart } from '../audio/normalize-first-cue.ts'
 import { pendingCueFlags, nextFlaggedCueIndex, markCueReviewed } from '../audio/cue-review.ts'
 import { parseCueImport } from './cue-import.ts'
+import { cueBundleStorageKey, isZipFile } from './cue-bundle.ts'
+import {
+  createCueBundleReview,
+  type PublishedCues,
+} from './cue-bundle-review.ts'
+import { loadPassageTokens } from '../audio/passage-tokens.ts'
+import { createRecordingRangeResolver } from '../audio/recording-ranges.ts'
+import {
+  saveCueFileToProject,
+  type CueFileSaveResult,
+} from './cue-file-save.ts'
+import { aliyahLabel } from '../calendar-model/aliyah-label.ts'
 import { getWordProgress } from '../audio/progress.ts'
 import {
   createRecordingIssue,
@@ -29,6 +42,7 @@ import type {
   CueExportPayload,
   WordCue,
 } from '../audio/types.ts'
+import { isParshaAudioRecording } from '../audio/types.ts'
 import type { MountScope } from '../lifecycle/mount.ts'
 import {
   writeStorageItem,
@@ -126,6 +140,14 @@ export interface CueAuthoringOptions {
     revision: PersistedJsonRevision
   ) => void
   showPersistenceNotice: (message: string) => void
+  /** Writes exported cue JSON into this checkout; defaults to the dev server endpoint. */
+  saveCueFile?: (serialized: string) => Promise<CueFileSaveResult>
+  /** Recordings that ZIP imports can load into; defaults to the audio library. */
+  listRecordings?: () => readonly AudioRecording[]
+  /** Word order of a recording's aliyah; defaults to loading its passage text. */
+  loadRecordingTokenKeys?: (recording: AudioRecording) => Promise<readonly string[]>
+  /** Shows a recording's aliyah in the Reader and loads it for review. */
+  openRecording?: (recording: AudioRecording) => Promise<void>
 }
 
 export interface CueAuthoring {
@@ -230,6 +252,107 @@ export function createCueAuthoring(
   let issueDialog: CueAuthoringIssueDialog | null = null
   let exportSheet: CueAuthoringExportSheet | null = null
   let waveform: CueWaveform | null = null
+  const saveCueFile = options.saveCueFile ?? saveCueFileToProject
+
+  // Saving a cue file makes the dev server reload the page, so the save
+  // confirmation is repeated briefly after that reload.
+  const saveNoticeKey = 'tikkun-admin-cue-save-notice'
+  const rememberSaveNotice = (message: string) => {
+    try {
+      options.sessionStorage?.setItem(saveNoticeKey, JSON.stringify({ message, savedAt: Date.now() }))
+    } catch (error) {
+      console.error('Failed to keep the cue save confirmation', error)
+    }
+  }
+  const replaySaveNotice = () => {
+    const raw = options.sessionStorage?.getItem(saveNoticeKey)
+    if (!raw) return
+    options.sessionStorage?.removeItem(saveNoticeKey)
+    try {
+      const { message, savedAt } = JSON.parse(raw) as { message?: unknown; savedAt?: unknown }
+      if (typeof message === 'string' && typeof savedAt === 'number' && Date.now() - savedAt < 20_000) {
+        options.showPersistenceNotice(message)
+      }
+    } catch (error) {
+      console.error('Failed to read the cue save confirmation', error)
+    }
+  }
+  replaySaveNotice()
+  const rangeForRecording = createRecordingRangeResolver()
+  const loadRecordingTokenKeys = options.loadRecordingTokenKeys ?? (async (recording: AudioRecording) => {
+    const range = rangeForRecording(recording)
+    if (!range) throw new Error(`No passage text is known for ${recording.title}.`)
+    return loadPassageTokens(range)
+  })
+
+  const publishedForBundle = async (
+    recording: AudioRecording,
+    tokenKeys: readonly string[]
+  ): Promise<PublishedCues> => {
+    const resolution = await cueData.resolve(recording)
+    if (resolution.status === 'missing') return { kind: 'none' }
+    if (resolution.status !== 'ready') {
+      return { kind: resolution.problem.code === 'recording-mismatch' ? 'other-audio' : 'unreadable' }
+    }
+    if (!resolution.payload.cueCount) return { kind: 'empty' }
+    return { kind: 'cues', cues: cloneCues(selectCuesForTokenKeys(resolution.payload.cues, tokenKeys)) }
+  }
+
+  // Drafts written for aliyot that are not open; the open aliyah goes through its editor.
+  const writeBundleDraft = async (
+    recording: AudioRecording,
+    tokenKeys: readonly string[],
+    cues: WordCue[],
+    publishedCues: WordCue[]
+  ) => {
+    const existing = loadAdminDraftResult(recording, tokenKeys)
+    if (existing.status === 'unavailable') throw new Error('Browser storage is unavailable.')
+    const editor = createCueDraftEditor()
+    editor.bind({ tokenKeys, sourceCues: publishedCues, cues, origin: 'local', savedAt: null })
+    const editorSnapshot = editor.snapshot()
+    const payload = createCueDraftPayload({
+      recording,
+      tokenCount: tokenKeys.length,
+      tokenKeys,
+      tokenPointer: editorSnapshot.tokenPointer,
+      updatedAt: Math.max(Date.now(), (existing.status === 'ready' ? existing.draft.updatedAt : 0) + 1),
+      cues: cloneCues(editorSnapshot.cues),
+    })
+    await saveAdminDraftPayload(payload, recording, tokenKeys, {
+      writerToken: draftWriterToken,
+      expectedRevision: existing.revision,
+    })
+  }
+
+  // Earlier versions kept the ZIP list for one tab only.
+  options.sessionStorage?.removeItem(cueBundleStorageKey)
+  const bundleReview = createCueBundleReview({
+    storage: options.localStorage,
+    recordings: options.listRecordings ?? listRecordings,
+    tokenKeys: loadRecordingTokenKeys,
+    published: publishedForBundle,
+    readDraft: (recording, tokenKeys) => {
+      const result = loadAdminDraftResult(recording, tokenKeys)
+      if (result.status === 'unavailable') return 'unavailable'
+      return result.status === 'ready' ? result.draft.cues : null
+    },
+    loadIntoOpenAliyah: async (recording, cues) => {
+      const session = getSession()
+      if (!session || session.recording.id !== recording.id) return false
+      if (!await replaceDraftCues(cues, session, sessionBindingGeneration, false)) {
+        throw new Error(`${recording.title} could not be saved as a draft.`)
+      }
+      return true
+    },
+    writeDraft: writeBundleDraft,
+    draftsChanged: () => options.onChange('draft'),
+    canOpen: (recording) => Boolean(options.openRecording) && isParshaAudioRecording(recording),
+    titleFor: (payload) => (options.listRecordings ?? listRecordings)()
+      .find((recording) => recording.id === payload.audioId)?.title ??
+      `${payload.readingId} ${aliyahLabel(payload.aliyah, undefined, 'en')}`,
+    notify: options.showPersistenceNotice,
+    changed: () => syncPanel(),
+  })
 
   const query = <ElementType extends Element>(selector: string) =>
     document.querySelector<ElementType>(selector)
@@ -354,6 +477,7 @@ export function createCueAuthoring(
         return true
       }
       draftRevision = savedDraft.revision
+      if (bundleReview.hasProgress()) void bundleReview.refresh()
       state.volatileDraftRecovery =
         volatileDraftRecoveries.get(session.recording.id) ?? null
     } catch (error) {
@@ -548,6 +672,7 @@ export function createCueAuthoring(
     state.cueDataLoading = false
     state.cueDataRetrying = false
     syncPanel()
+    if (bundleReview.hasProgress()) void bundleReview.refresh()
   }
 
   const isMicrophoneCaptureActive = () =>
@@ -1007,6 +1132,7 @@ export function createCueAuthoring(
         sessionReady && (hasCues || draft.recording || draft.tokenPointer >= 0),
       canExport: sessionReady && draft.exportReady,
       canImport: sessionReady && !draft.recording && !microphoneBusy && !draft.saveProblem,
+      bundle: bundleReview.view(session?.recording.id),
       exportChanged: hasLocalCueChanges(),
       resumeWord: canResumeDraft ? draft.cues.length + 1 : null,
     }
@@ -1190,6 +1316,8 @@ export function createCueAuthoring(
       capturedAudio?.audioId === session.recording.id
         ? capturedAudio.capture
         : null
+    // Exporting is the review step, so the aligner's pending/flag notes stay in
+    // the local draft and are left out of the published cue file.
     const exportCues = normalizeFirstCueStart(
       cloneCues(draft.cues)
     ).map(
@@ -1201,7 +1329,6 @@ export function createCueAuthoring(
         lineIndex: cue.lineIndex,
         fragmentIndex: cue.fragmentIndex,
         wordIndex: cue.wordIndex,
-        ...(cue.review ? { review: cue.review } : {}),
       })
     )
     const payload: CueExportPayload = {
@@ -1269,22 +1396,57 @@ export function createCueAuthoring(
       targetPath: exportPath,
       serialized,
     })
+    const audioFailureNote = audioFinalizationFailed
+      ? ' The microphone audio could not be finalized.'
+      : ''
+    let saveProblem = ''
+    // Cues timed with new microphone audio need that audio registered first, so
+    // they always go out as downloads.
+    if (!readyAudio) {
+      sheet.setCopyStatus(`Saving to ${exportPath}...`)
+      try {
+        const saved = await saveCueFile(serialized)
+        if (
+          scope.signal.aborted ||
+          exportSheet !== sheet ||
+          exportPresentationRevision !== exportRevision
+        ) {
+          return
+        }
+        if (saved.status === 'saved') {
+          bundleReview.recordSave(payload.audioId, exportCues)
+          const savedMessage =
+            `Saved ${session.recording.title} to ${saved.path}. ` +
+            (saved.unchanged
+              ? 'It already matched this export.'
+              : saved.replaced
+                ? 'Replaced the previous cue file.'
+                : 'Created a new cue file.') +
+            audioFailureNote
+          if (!saved.unchanged) rememberSaveNotice(savedMessage)
+          sheet.setCopyStatus(savedMessage)
+          return
+        }
+      } catch (error) {
+        console.error('Saving cue file to the project failed', error)
+        saveProblem = `Could not save to the project: ${error instanceof Error ? error.message : String(error)} `
+      }
+    }
+    // Cues timed with new audio cannot be published until that audio is added.
+    const newAudioNote =
+      ' Download the cues and the synchronized audio. After that audio is added to the project, import these cues on this aliyah to save them.'
     const copiedMessage =
-      `Copied to clipboard. Paste into ${exportPath}.` +
+      saveProblem +
       (capturedAudioFileName
-        ? ' The synchronized audio file is ready to download.'
-        : '') +
-      (audioFinalizationFailed
-        ? ' The microphone audio could not be finalized.'
-        : '')
+        ? `Copied to clipboard.${newAudioNote}`
+        : `Copied to clipboard. Paste into ${exportPath}.`) +
+      audioFailureNote
     const blockedMessage =
-      `Automatic clipboard copy was blocked. Paste the JSON below into ${exportPath}.` +
+      saveProblem +
       (capturedAudioFileName
-        ? ' The synchronized audio file is ready to download.'
-        : '') +
-      (audioFinalizationFailed
-        ? ' The microphone audio could not be finalized.'
-        : '')
+        ? `Automatic clipboard copy was blocked.${newAudioNote}`
+        : `Automatic clipboard copy was blocked. Paste the JSON below into ${exportPath}.`) +
+      audioFailureNote
     try {
       await view.navigator.clipboard.writeText(serialized)
       if (
@@ -1825,35 +1987,84 @@ export function createCueAuthoring(
     syncPanel()
   }
 
+  /** Replaces the open aliyah's draft with already validated cues and saves it. */
+  const replaceDraftCues = async (
+    cues: readonly WordCue[],
+    session: ReaderPlaybackCueAuthoringSessionSnapshot,
+    generation: number,
+    announce: boolean
+  ) => {
+    if (generation !== sessionBindingGeneration || getSession() !== session) {
+      throw new Error('The recording changed while opening the file. Select it again for the matching recording.')
+    }
+    if (!getPanelSnapshot().canImport) throw new Error('Stop recording and resolve any draft save problem before importing.')
+    playback.pause()
+    const committed = applyDraftMutation(() => {
+      draftEditor.replaceCues(cues)
+      draftEditor.select(0)
+      return true
+    })
+    if (!committed) return false
+    const saved = await saveDraft()
+    options.onChange('playback')
+    syncPanel()
+    if (saved && announce) options.showPersistenceNotice(`Imported ${cues.length} cues with ${cues.reduce((sum, cue) => sum + pendingCueFlags(cue).length, 0)} pending flags. Saved as a local draft.`)
+    return saved
+  }
+
+  /** Imports one cue JSON into the open aliyah. Returns false when the user cancels. */
+  const applyCueImport = async (
+    value: unknown,
+    session: ReaderPlaybackCueAuthoringSessionSnapshot,
+    generation: number
+  ) => {
+    if (generation !== sessionBindingGeneration || getSession() !== session) {
+      throw new Error('The recording changed while opening the file. Select it again for the matching recording.')
+    }
+    const { cues, audioIdentityMissing } = parseCueImport(value, session.recording, draftSnapshot().tokenKeys)
+    if (!getPanelSnapshot().canImport) throw new Error('Stop recording and resolve any draft save problem before importing.')
+    if (audioIdentityMissing && !view.confirm(
+      `These cues were timed while recording new audio, so they have no audio fingerprint. Import them only if ${session.recording.title} now plays that new recording.`
+    )) return false
+    if (draftSnapshot().cues.length && !view.confirm(
+      `Import ${cues.length} cues for ${session.recording.title} and replace its current local timings? Cancel to export your current draft first.`
+    )) return false
+    return replaceDraftCues(cues, session, generation, true)
+  }
+
   const importCues = async (file: File) => {
     const session = getSession()
     const generation = sessionBindingGeneration
     if (!session || !getPanelSnapshot().canImport) return
     try {
-      if (file.size > 5 * 1024 * 1024) throw new Error('Choose one cue JSON file smaller than 5 MB. Unzip bulk downloads first.')
-      const value: unknown = JSON.parse(await file.text())
-      if (generation !== sessionBindingGeneration || getSession() !== session) {
-        throw new Error('The recording changed while opening the file. Select it again for the matching recording.')
+      if (isZipFile(file)) {
+        await bundleReview.open(file)
+        return
       }
-      const cues = parseCueImport(value, session.recording, draftSnapshot().tokenKeys)
-      if (!getPanelSnapshot().canImport) throw new Error('Stop recording and resolve any draft save problem before importing.')
-      if (draftSnapshot().cues.length && !view.confirm(
-        `Import ${cues.length} cues for ${session.recording.title} and replace its current local timings? Cancel to export your current draft first.`
-      )) return
-      playback.pause()
-      const committed = applyDraftMutation(() => {
-        draftEditor.replaceCues(cues)
-        draftEditor.select(0)
-        return true
-      })
-      if (!committed) return
-      const saved = await saveDraft()
-      options.onChange('playback')
-      syncPanel()
-      if (saved) options.showPersistenceNotice(`Imported ${cues.length} cues with ${cues.reduce((sum, cue) => sum + pendingCueFlags(cue).length, 0)} pending flags. Saved as a local draft.`)
+      if (file.size > 5 * 1024 * 1024) throw new Error('Choose one cue JSON file smaller than 5 MB, or the ZIP from the aligner.')
+      const value: unknown = JSON.parse(await file.text())
+      await applyCueImport(value, session, generation)
     } catch (error) {
       console.error('Cue import failed', error)
       options.showPersistenceNotice(error instanceof Error ? error.message : 'Cue import failed. Your current draft is retained.')
+    }
+  }
+
+  const openBundleRecording = async (audioId: string) => {
+    const recording = (options.listRecordings ?? listRecordings)().find((candidate) => candidate.id === audioId)
+    if (!recording || !options.openRecording) {
+      options.showPersistenceNotice('This aliyah can’t be opened from the list.')
+      return
+    }
+    if (draftSnapshot().recording || isMicrophoneCaptureActive()) {
+      options.showPersistenceNotice('Stop recording before opening another aliyah.')
+      return
+    }
+    try {
+      await options.openRecording(recording)
+    } catch (error) {
+      console.error(`Could not open ${recording.id} from the ZIP list`, error)
+      options.showPersistenceNotice(error instanceof Error ? error.message : `${recording.title} could not be opened.`)
     }
   }
 
@@ -1897,6 +2108,21 @@ export function createCueAuthoring(
         break
       case 'import':
         void importCues(action.file)
+        break
+      case 'toggle-bundle-row':
+        bundleReview.toggle(action.audioId, action.checked)
+        break
+      case 'load-bundle':
+        void bundleReview.load()
+        break
+      case 'cancel-bundle':
+        bundleReview.cancel()
+        break
+      case 'close-bundle':
+        bundleReview.close()
+        break
+      case 'open-bundle-row':
+        void openBundleRecording(action.audioId)
         break
     }
   }
@@ -2018,6 +2244,8 @@ export function createCueAuthoring(
   })
 
   syncPanel()
+  // A list restored from an earlier visit has no states until it is checked.
+  if (bundleReview.hasProgress()) void bundleReview.refresh()
 
   return {
     isUnlocked: () => state.unlocked,

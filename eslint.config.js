@@ -22,7 +22,7 @@ export default [
       'dist/',
       '.svelte-kit/',
       '.tsimp/',
-      'site/audio/**',
+      'audio/**',
       'generated/**',
     ],
   },

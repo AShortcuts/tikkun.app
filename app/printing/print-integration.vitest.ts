@@ -3,7 +3,7 @@ import { afterEach, expect, test, vi } from 'vitest'
 let frame: HTMLIFrameElement | undefined
 afterEach(() => { frame?.remove(); frame = undefined })
 
-function required<T extends Element>(root: Document, selector: string): T {
+function required<T extends Element>(root: ParentNode, selector: string): T {
   const element = root.querySelector<T>(selector)
   if (!element) throw new Error(`Missing ${selector}`)
   return element
@@ -102,15 +102,27 @@ test('reader keyboard opens the current passage, prints the prepared frame, and 
   expect(paper.querySelector('.paper-heading')?.textContent).toContain('ז:יז')
   removeCredits.click()
   await vi.waitFor(() => expect(paper.querySelectorAll('.paper-signature').length).toBe(paper.querySelectorAll('.paper-sheet').length))
-  const nativePrint = vi.spyOn(prepared.contentWindow!, 'print').mockImplementation(() => {})
+  // Safari only honors print() from the document that received the tap.
+  const pagePrint = vi.spyOn(view, 'print').mockImplementation(() => {})
+  const framePrint = vi.spyOn(prepared.contentWindow!, 'print').mockImplementation(() => {})
   await vi.waitFor(() => expect(required<HTMLButtonElement>(doc, '.dialog-footer .primary').disabled).toBe(false))
   required<HTMLButtonElement>(doc, '.dialog-footer .primary').click()
-  expect(nativePrint).toHaveBeenCalledOnce()
+  expect(pagePrint).toHaveBeenCalledOnce()
+  expect(framePrint).not.toHaveBeenCalled()
+  const printed = required(doc, '.tikkun-print-output').shadowRoot!
+  expect(printed.querySelectorAll('.print-page > .paper-sheet')).toHaveLength(paper.querySelectorAll('.paper-sheet').length)
+  expect(required(printed, '.paper-heading').textContent).toBe(required(paper, '.paper-heading').textContent)
+  // Root-scoped reader rules must still match the copied sheets.
+  const tikkunColumn = (root: ParentNode) => required(root, '.reader-text-side.mod-tikkun')
+  expect(prepared.contentWindow!.getComputedStyle(tikkunColumn(paper)).gridColumnStart).toBe('3')
+  expect(view.getComputedStyle(tikkunColumn(printed)).gridColumnStart).toBe('3')
   required<HTMLButtonElement>(doc, '[aria-label="Close print dialog"]').click()
   await vi.waitFor(() => expect(doc.querySelector('.print-workspace')).toBeNull())
+  expect(doc.querySelector('.tikkun-print-output')).toBeNull()
   expect(doc.activeElement).toBe(trigger)
   expect(doc.body.style.overflow).not.toBe('hidden')
-  nativePrint.mockRestore()
+  pagePrint.mockRestore()
+  framePrint.mockRestore()
 
   const selectedWord = [...doc.querySelectorAll<HTMLElement>('.tikkun-book .word')].find(word =>
     word.dataset.annotationsOnText?.normalize('NFD').replace(/\p{M}/gu, '').includes('צהר'))!

@@ -10,7 +10,7 @@ import { afterEach, expect, test } from 'vitest'
 import { page } from 'vitest/browser'
 import '../../css/home.css'
 import ReadingCard from '../lib/components/ReadingCard.svelte'
-import { getRequiredReading } from '../lib/readings.ts'
+import { getRequiredReading, readingCoverage } from '../lib/readings.ts'
 import SiteLayout from './(site)/+layout.svelte'
 import AboutPage from './(site)/about/+page.svelte'
 import ReadingsPage from './(site)/readings/+page.svelte'
@@ -106,7 +106,9 @@ test('filters public coverage by text and status, then restores the catalog', as
     required<HTMLButtonElement>('.coverage-filters button:nth-child(5)')
       .getAttribute('aria-pressed')
   ).toBe('true')
-  expect(resultNames()).toContain('Vayeira')
+  const planned = readingCoverage.filter(reading => reading.statusKind === 'planned').map(reading => reading.parshaName)
+  expect(planned.length).toBeGreaterThan(0)
+  expect([...resultNames()].sort()).toEqual([...planned].sort())
   expect(resultNames()).not.toContain('Beresheet')
 
   input.value = 'Beresheet'

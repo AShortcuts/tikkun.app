@@ -4,6 +4,7 @@
   import { nativeControlHaptic } from '../platform/native-haptics.ts'
   import { isNativeApp } from '../platform/native.ts'
   import { observeReaderResize } from '../adaptive/reader-resize.ts'
+  import { COMPACT_READER_QUERY } from '../adaptive/reader-viewport.ts'
   import type {
     ReaderShell,
     ReaderShellComponentProps,
@@ -43,7 +44,6 @@
   let annotationsPressed = $state(false)
   const nativeApp = isNativeApp()
 
-  const mobileTitleQuery = '(max-width: 550px)'
   const mobileTitleFontProperty = '--mobile-parsha-title-font-size'
   const minimumMobileTitleFontSize = 9
 
@@ -75,7 +75,7 @@
     if (!ownerWindow) {
       throw new Error('Reader Shell title requires a browser window')
     }
-    if (!ownerWindow.matchMedia(mobileTitleQuery).matches) return
+    if (!ownerWindow.matchMedia(COMPACT_READER_QUERY).matches) return
 
     const style = ownerWindow.getComputedStyle(titleButton)
     const inlinePadding =

@@ -166,16 +166,29 @@ test.each([
   await settle(view)
   book.scrollTop += 160
   await settle(view)
-  const centerY = () => book.getBoundingClientRect().top + book.clientHeight / 2
+  // The default Browser reading center; the reader preserves the word there.
+  const centerY = () => {
+    const rect = book.getBoundingClientRect()
+    return Math.max(rect.top, Math.min(rect.bottom - 1, doc.documentElement.clientHeight / 2))
+  }
   const offset = (word: HTMLElement) => {
     const rect = word.getBoundingClientRect()
     return (rect.top + rect.bottom) / 2 - centerY()
   }
-  const word = [...book.querySelectorAll<HTMLElement>('[data-reader-canonical="true"] .word:not([hidden])')]
+  const visibleWords = () => [...book.querySelectorAll<HTMLElement>('[data-reader-canonical="true"] .word:not([hidden])')]
     .filter((candidate) => candidate.getClientRects().length > 0)
-    .sort((a, b) => Math.abs(offset(a)) - Math.abs(offset(b)))[0]
-  expect(word).toBeDefined()
-  const before = offset(word)
+  // Pointed and plain forms use different elements and wrap differently, so a
+  // word can move to a neighboring row. Follow the focal row by its words'
+  // letters: at least one of them must stay where the row was.
+  const letters = (candidate: HTMLElement) => candidate.textContent!.replace(/[\u0591-\u05C7]/g, '').trim()
+  const focalWord = visibleWords().sort((a, b) => Math.abs(offset(a)) - Math.abs(offset(b)))[0]
+  expect(focalWord).toBeDefined()
+  const before = offset(focalWord)
+  const focalRow = new Set(visibleWords().filter((candidate) => Math.abs(offset(candidate) - before) < 1).map(letters))
+  const focalLetters = [...focalRow].join(' ')
+  const drift = () => Math.min(...visibleWords()
+    .filter((candidate) => focalRow.has(letters(candidate)))
+    .map((candidate) => Math.abs(offset(candidate) - before)))
   const labels = [...book.querySelectorAll<HTMLElement>('.location-indicator.mod-verses')]
     .filter((label) => label.textContent?.trim())
   expect(labels.length).toBeGreaterThan(0)
@@ -183,9 +196,7 @@ test.each([
     toggle.click()
     await settle(view)
     expect(toggle.getAttribute('aria-pressed')).toBe(String(enabled))
-    expect(word.isConnected).toBe(true)
-    expect(word.hidden).toBe(false)
-    expect(Math.abs(offset(word) - before), `${layout} ${width}px ${word.dataset.tokenKey}`).toBeLessThan(2)
+    expect(drift(), `${layout} ${width}px ${focalLetters}`).toBeLessThan(2)
     for (const label of labels) {
       expect(view.getComputedStyle(label).display).not.toBe('none')
       expect(label.getBoundingClientRect().width).toBeGreaterThan(0)
@@ -207,7 +218,7 @@ test.each([
       await reader.click({ position: { x: x - mainRect.left, y: y - mainRect.top } })
       await settle(view)
       expect(toggle.getAttribute('aria-pressed'), 'tap in the blank reading margin').toBe(String(enabled))
-      expect(Math.abs(offset(word) - before)).toBeLessThan(2)
+      expect(drift()).toBeLessThan(2)
     }
 
     const pointer = (type: string, clientY = y) => gap.dispatchEvent(new PointerEvent(type, {

@@ -15,7 +15,7 @@ import wave
 
 import numpy as np
 
-from aligner import (HERE, REPO, WORK, file_hash, input_for_result, load_json,
+from aligner import (CHECKPOINT, HERE, REPO, WORK, file_hash, input_for_result, load_json,
                      recording_for, work_path, write_json)
 from core import AlignmentError, digest_json, reviewed_draft, validate_result
 
@@ -278,8 +278,12 @@ class BetaStore:
                 raise AlignmentError("Unknown export format.")
             if kind == "generated-cues":
                 from generated_cues import generated_draft
+                from held_notes import late_start_hints_for_run
+                hints = late_start_hints_for_run(entry["recording"]["tokens"], entry["proposal"]["occurrences"],
+                                                 entry["seedPath"].parent, CHECKPOINT["blankId"],
+                                                 entry["proposal"]["sampleRate"])
                 payload = generated_draft(entry["bundle"], entry["recording"], entry["proposal"], state,
-                                          load_json(entry["seedPath"]))
+                                          load_json(entry["seedPath"]), hints)
             else:
                 payload = cue_payload(entry["bundle"], entry["recording"], entry["proposal"], state)
             result = subprocess.run(["node", "--import", "tsx", str(HERE / "check-draft.mts")],

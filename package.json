@@ -11,6 +11,8 @@
   },
   "scripts": {
     "audio:sync": "node scripts/generate-audio-manifest.mjs",
+    "cues:save": "node --import tsx scripts/save-cue-file.mjs",
+    "cues:generate": "node --import tsx scripts/generate-cues.mjs",
     "reading:manifest": "node --import tsx scripts/generate-public-reading-manifest.mjs",
     "search:measure": "node --import tsx scripts/measure-search-performance.ts",
     "esther:index": "node scripts/generate-esther-index.mjs",
