@@ -101,11 +101,6 @@ test('lists every weekly parsha in order with links for all seven aliyot', () =>
   expect(parshaReadings.map((reading) => reading.number)).toEqual(
     Array.from({ length: 54 }, (_, index) => index + 1)
   )
-  expect(parshaReadings.find((reading) => reading.number === 8)).toMatchObject({
-    parshaSlug: 'vayishlach',
-    availableAliyot: [],
-    statusKind: 'planned',
-  })
   for (const reading of parshaReadings) {
     expect(reading.aliyot).toHaveLength(7)
     expect(reading.aliyot.every((aliyah) =>

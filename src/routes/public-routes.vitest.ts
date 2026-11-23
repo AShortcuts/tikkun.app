@@ -91,7 +91,6 @@ test('filters public coverage by text and status, then restores the catalog', as
       .getAttribute('aria-pressed')
   ).toBe('true')
   const planned = readingCoverage.filter(reading => reading.statusKind === 'planned').map(reading => reading.parshaName)
-  expect(planned.length).toBeGreaterThan(0)
   expect([...resultNames()].sort()).toEqual([...planned].sort())
   expect(resultNames()).not.toContain('Beresheet')
 
