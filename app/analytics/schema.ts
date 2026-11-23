@@ -21,8 +21,8 @@ export const contextRules = {
 export const eventRules = {
   reader_open: { layout: choice('reading', 'match'), sides: choice('one', 'two'), route: choice('calendar', 'parsha', 'page', 'reference', 'run', 'other'), timing: choice(...readingTimings) },
   coming_up_select: { position: choice(1, 2, 3) },
-  // Once per local day from the native app or a Home Screen web app; the collector adds region.
-  app_active: { first_this_month: boolean, device: choice(...deviceKinds), os: integer(0, 99), app_version: version },
+  // Once per local day from the app and the website; the collector adds region.
+  app_active: { first_this_month: boolean, first_this_week: boolean, returning: boolean, device: choice(...deviceKinds), os: integer(0, 99), app_version: version },
   playback_start: { timed: boolean },
   playback_pause: {},
   playback_complete: {},

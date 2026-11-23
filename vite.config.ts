@@ -68,4 +68,7 @@ export const viteConfig = {
   },
 } satisfies UserConfig
 
-export default defineConfig(viteConfig)
+// The dev server keeps its prebuilt dependencies in a folder of its own. Builds and test runs
+// reset node_modules/.vite while they work, and a dev server sharing it is left serving files that
+// no longer exist, so the reader stays on its loading screen until the server restarts.
+export default defineConfig(({ command }) => command === 'serve' ? { ...viteConfig, cacheDir: 'node_modules/.vite-dev' } : viteConfig)

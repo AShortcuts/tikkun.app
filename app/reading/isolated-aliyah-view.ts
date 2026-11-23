@@ -85,6 +85,8 @@ export async function createIsolatedAliyahViewModel(
 }
 
 class IsolatedAliyahViewModel extends ScrollViewModel {
+  override readonly excerpt: boolean
+
   constructor(
     base: ScrollViewModel,
     override readonly isolatedAliyah: IsolatedAliyahSelection,
@@ -94,6 +96,7 @@ class IsolatedAliyahViewModel extends ScrollViewModel {
     super(base.generator, base.relevantRuns, initialRef,
       Object.fromEntries(base.relevantRuns.map(run => [run.id, base.displayTitleForRun(run)])),
       isolatedAliyah.runId)
+    this.excerpt = base.excerpt
   }
 
   protected override async contentSourceFromIndex(index: number): Promise<ScrollContentSource | null> {

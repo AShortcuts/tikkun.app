@@ -12,21 +12,8 @@
     "digest": "b793b7e783e0349247a2350db514f7903aaf202db8c1310effcbcb97af72d8ff",
     "byteLength": 4949326
   },
-  "savedAt": "2026-10-20T02:01:28.181Z",
-  "issues": [
-    {
-      "audioId": "korach-6",
-      "tokenKey": "176:17:0:3",
-      "timeStart": 537.832,
-      "kind": "mistaken-pronunciation",
-      "visibility": "readerVisible",
-      "severity": "medium",
-      "note": "Pronounced \"Heev\"",
-      "createdAt": 1792461645536,
-      "tokenizationVersion": "v2",
-      "id": "issue:korach-6:176:17:0:3:mistaken-pronunciation:1792461645536"
-    }
-  ],
+  "savedAt": "2026-11-23T14:35:59.541Z",
+  "issues": [],
   "cues": [
     {
       "cueNumber": 1,

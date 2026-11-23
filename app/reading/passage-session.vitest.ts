@@ -68,3 +68,13 @@ test('partial selection loads only the available suffix and cancellation loads n
   expect(await cancelled.session.load({ runId: cancelled.run.id, aliyahIndex: 4 })).toBeNull()
   expect(cancelled.controller.session).toBeNull()
 })
+
+test('an untimed excerpt loads its whole containing recording without asking', async () => {
+  const { run, audio, session, choosePortion } = harness()
+  const loaded = await session.load({ runId: run.id, aliyahIndex: 'Maftir' })
+  expect(choosePortion).not.toHaveBeenCalled()
+  expect(loaded?.status).toBe('passage')
+  expect(loaded?.passage).toMatchObject({ wholeRecording: true, cueComplete: false })
+  expect(loaded?.segments.map(segment => [segment.recording.id, segment.startTime, segment.endTime])).toEqual([['vayelech-7', 0, null]])
+  expect(new URL(audio.src).pathname).toBe(playPath('vayelech-7'))
+})

@@ -23,7 +23,7 @@ export interface PlaybackPlan {
   segments: PlaybackSegment[]
   status: PlaybackPlanStatus
   readingLabel?: string
-  passage?: { range: RecordingRange; requestedRange: RecordingRange; cueComplete: boolean }
+  passage?: { range: RecordingRange; requestedRange: RecordingRange; cueComplete: boolean; wholeRecording?: boolean }
 }
 
 type RecordingWithCues = {

@@ -60,6 +60,14 @@ for (const testCase of [{
   })
 }
 
+test('marks only readings limited to their own columns as excerpts', async () => {
+  await renderRun('2026-11-11:shacharis,main')
+  expect(root.hasAttribute('data-reader-excerpt')).toBe(true)
+  displays.splice(0).forEach((display) => display.destroy())
+  await renderRun('2025-06-21:shacharis,main')
+  expect(root.hasAttribute('data-reader-excerpt')).toBe(false)
+})
+
 test('renders the next page', async () => {
   // פרשת ויקהל is near the bottom of the page, so we
   // will fetch the previous page, not the next page.

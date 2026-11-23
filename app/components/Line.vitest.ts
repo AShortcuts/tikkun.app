@@ -102,6 +102,32 @@ test('keeps a small letter inside one stable word token in both display modes', 
   expect(unannotatedLetter?.dataset.specialLetterPosition).toBe('2')
 })
 
+test('Two Sided Reading shows the kri on the Tikkun side and the ketiv on the Torah side', () => {
+  const container = document.createElement('div')
+  container.innerHTML = Line({
+    pageNumber: 8,
+    lineIndex: 36,
+    text: [['עַל־הָאָ֖רֶץ הוצא#[הַיְצֵ֣א] אִתָּ֑ךְ']],
+    verses: [{ b: 1, c: 8, v: 17 }],
+    focalRef: { b: 1, c: 8, v: 17 },
+    isPetucha: false,
+    labels: [],
+    aliyot: [],
+    aliyahStarts: [],
+    run: undefined,
+    presentation: { layout: 'reading', sides: 'two' },
+  })
+  const sideWords = (surface: string) =>
+    [...container.querySelectorAll<HTMLElement>(`.reader-text-side.mod-${surface} .word`)]
+  const tikkun = sideWords('tikkun')
+  const torah = sideWords('torah')
+
+  expect(torah.map((word) => word.dataset.tokenKey)).toEqual(tikkun.map((word) => word.dataset.tokenKey))
+  expect(tikkun[1].textContent).toBe('הַיְצֵ֣א')
+  expect(torah[1].textContent).toBe('הוצא')
+  expect(torah.map((word) => word.textContent)).toEqual(['על־הארץ', 'הוצא', 'אתך'])
+})
+
 test('keeps semantic shirah geometry in Match and out of Reading', () => {
   const renderHaazinu = (layout: 'match' | 'reading') =>
     htmlToElement(

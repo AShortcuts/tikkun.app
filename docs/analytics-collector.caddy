@@ -16,7 +16,12 @@ handle /api/tikkun-echo {
         rewrite * /api/echo
         header X-Tikkun-Collector 1
         header Cache-Control no-store
-        reverse_proxy 192.168.1.181:8910 {
+        # Collector first (adds region to app_active, keeps events through a
+        # Melytics outage); Melytics directly if the collector is down.
+        reverse_proxy 127.0.0.1:8920 127.0.0.1:8911 {
+            lb_policy first
+            lb_try_duration 2s
+            fail_duration 30s
             header_up CF-Connecting-IP {http.request.header.X-Tikkun-Client-IP}
             header_up CF-IPCountry {http.request.header.X-Tikkun-Country}
             header_up -Cookie

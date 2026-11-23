@@ -74,6 +74,20 @@
   display: table-caption;
 }
 
+/* A holiday reading never mounts a column above its first one, so that
+   column's number sits in the space under the toolbar, centered in it. */
+.tikkun-book[data-reader-excerpt] .tikkun-page:first-child .tikkun-page-number {
+  --page-number-lift: calc(var(--reader-top-gap) / 2 + 0.5em);
+  display: table-caption;
+  margin-block-start: calc(-1 * var(--page-number-lift));
+  margin-block-end: var(--page-number-lift);
+}
+
+/* Its hover area covers that space only, never the first line of text. */
+.tikkun-book[data-reader-excerpt] .tikkun-page:first-child .tikkun-page-number::before {
+  height: var(--reader-top-gap);
+}
+
 .tikkun-page-number.mod-route-reveal {
   animation: page-number-route-reveal 1.8s ease-out;
 }
@@ -394,23 +408,75 @@ html[data-reader-reduced-motion='on'] .word {
 }
 
 /* Reading joins a maqaf phrase that physical Torah rows split into separate
-   tokens. Both halves light up together; squaring and clipping the seam side
-   makes their boxes read as one highlight. Hebrew runs right to left, so a
-   lead's seam is its left edge and a tail's seam is its right edge. */
-.word.mod-maqaf-join-lead.is-active-word {
+   tokens. Both halves light up together and must read as one highlight, so
+   each is cut off where it meets the next. WebKit ignores a clip on an inline
+   box, so each half draws on a pseudo-element behind its text.
+
+   A box edge leaves a hairline of outline color wherever it shows, so no edge
+   may land on the seam. Hebrew runs right to left: a lead's seam is its left
+   edge and a tail's its right. The tail's box runs on to the right, underneath
+   the lead, which is raised above it and cut a pixel short of the seam; both
+   cuts pass through solid fill. The tail does the reaching because WebKit
+   widens the page for a box that extends left of its word. */
+.word:is(.mod-maqaf-join-lead, .mod-maqaf-join-tail) {
+  isolation: isolate;
+}
+
+.word.mod-maqaf-join-lead {
+  z-index: 1;
+}
+
+.word.mod-maqaf-join-lead:not(.mod-maqaf-join-tail) {
+  z-index: 2;
+}
+
+.word:is(.mod-maqaf-join-lead, .mod-maqaf-join-tail).is-active-word {
+  background-color: transparent;
+  box-shadow: none;
+}
+
+.word:is(.mod-maqaf-join-lead, .mod-maqaf-join-tail)::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: var(--reader-highlight-inner-radius);
+  background-color: transparent;
+  box-shadow:
+    0 0 0 0 transparent,
+    0 0 0 0 transparent,
+    0 0 0 0 transparent;
+  /* Fades with the word's own highlight timing, including reduced motion. */
+  transition: inherit;
+  pointer-events: none;
+}
+
+.word:is(.mod-maqaf-join-lead, .mod-maqaf-join-tail).is-active-word::before {
+  background-color: var(--reader-active-highlight-fill-surface);
+  box-shadow:
+    0 0 0 var(--reader-highlight-outline-offset)
+      var(--reader-active-highlight-fill-surface),
+    0 0 0 var(--reader-highlight-expansion)
+      var(--reader-active-highlight-outline-color),
+    0 0 var(--reader-highlight-glow) var(--reader-highlight-expansion)
+      var(--reader-active-highlight-fill-tint);
+}
+
+.word.mod-maqaf-join-lead::before {
   border-start-end-radius: 0;
   border-end-end-radius: 0;
-  clip-path: inset(-1em -1em -1em 0);
+  clip-path: inset(-1em -1em -1em 1px);
 }
 
-.word.mod-maqaf-join-tail.is-active-word {
+.word.mod-maqaf-join-tail::before {
+  inset-inline-start: -4px;
   border-start-start-radius: 0;
   border-end-start-radius: 0;
-  clip-path: inset(-1em 0 -1em -1em);
+  clip-path: inset(-1em 2px -1em -1em);
 }
 
-.word.mod-maqaf-join-lead.mod-maqaf-join-tail.is-active-word {
-  clip-path: inset(-1em 0 -1em 0);
+.word.mod-maqaf-join-lead.mod-maqaf-join-tail::before {
+  clip-path: inset(-1em 2px -1em 1px);
 }
 
 .word[data-recording-issue] {

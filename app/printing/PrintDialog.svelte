@@ -7,13 +7,14 @@
   import { listScrollChapters, listScrollVerses } from '../location.ts'
   import { validateRanges, normalizeRanges, passageTitle, paperSize, type PassageRange, type PrintOptions } from './print-model.ts'
   import type { PrintContext } from './print-context.ts'
-  import { printDetailsAliyot } from './print-details.ts'
+  import { printReadingHeading } from './print-details.ts'
   import type { UpcomingPrintReading } from './upcoming-print-readings.ts'
   import PrintSelect from './PrintSelect.svelte'
   import { isNativeApp } from '../platform/native.ts'
   import { nativePrintErrorMessage, printNatively } from '../platform/native-print.ts'
   import { createPrintSnapshot } from './print-snapshot.ts'
   import { preparePrintFonts, printPreparedPages, removePrintOutput } from './print-output.ts'
+  import { loadPrintPreferences, savePrintPreferences } from './print-preferences.ts'
   import './print.css'
 
   let { context, upcoming = [], onclose, initialScope = 'current', initialRange }: { context: PrintContext; upcoming?: UpcomingPrintReading[]; onclose(): void; initialScope?: Scope; initialRange?: PassageRange } = $props()
@@ -35,11 +36,15 @@
   let form = $state<PrintOptions['form']>('tikkun')
   let surrounding = $state(true)
   let removeCredits = $state(false)
-  let pageNumbers = $state(false)
-  let detailsPage = $state(false)
-  let replaceDivineNames = $state(true)
+  let pageNumbers = $state(true)
+  // Prerendering has no saved preferences; the browser reads them when the dialog starts.
+  const savedPreferences = typeof window === 'undefined' ? { replaceDivineNames: true, verseNumbers: true } : loadPrintPreferences()
+  let replaceDivineNames = $state(savedPreferences.replaceDivineNames)
+  let verseNumbers = $state(savedPreferences.verseNumbers)
   let orientation = $state<PrintOptions['orientation']>('portrait')
   let scaling = $state(100)
+  let fontSize = $state(25)
+  let pasukSpacing = $state(0)
   let overflow = $state<PrintOptions['overflow']>('shrink')
   let passageOpen = $state(true)
   let appearanceOpen = $state(true)
@@ -88,9 +93,19 @@
     if (scope === 'custom') return [{ start: { scroll, b: book, c: startChapter, v: startVerse }, end: { scroll, b: endBook, c: endChapter, v: endVerse } }]
     return normalizeRanges(activeContext.aliyot.filter(aliyah => scope === 'whole' || (scope === 'current' ? aliyah.key === activeContext.currentKey : selectedAliyot.includes(aliyah.key))).map(({ start, end }) => ({ start, end })))
   })
-  const aliyahLabels = $derived(printDetailsAliyot(ranges, activeContext,
-    scope === 'current' ? [activeContext.currentKey] : scope === 'several' ? selectedAliyot : scope === 'whole' ? [] : undefined))
-  const options = $derived<PrintOptions>({ ranges, layout, sides, form, surrounding: layout === 'match' && surrounding, orientation, scaling, overflow, removeCredits, pageNumbers, detailsPage, aliyahLabels, replaceDivineNames })
+  const chosenAliyot = $derived(scope === 'current' ? [activeContext.currentKey] : scope === 'several' ? selectedAliyot : scope === 'whole' ? [] : undefined)
+  // Text selected on the page keeps the reading's name; a range typed in by verse prints its verses.
+  const customIsSelection = $derived(Boolean(initialRange && !selectedReading &&
+    book === initialRange.start.b && startChapter === initialRange.start.c && startVerse === initialRange.start.v &&
+    endBook === initialRange.end.b && endChapter === initialRange.end.c && endVerse === initialRange.end.v))
+  // The masthead names a reading chosen by name; a range typed in by verse is named from what it covers.
+  const title = $derived(scope === 'custom' && !customIsSelection ? undefined : printReadingHeading(ranges, activeContext, chosenAliyot))
+  // Reading reflows the text at a chosen font size; Match zooms its fitted columns, and 0% hides them.
+  const printFontSize = $derived(Math.min(48, Math.max(12, Math.round(fontSize || 25))))
+  // Negative values pull pesukim closer than the usual line spacing; 0 is the usual spacing.
+  const printPasukSpacing = $derived(Math.min(50, Math.max(-50, Math.round(pasukSpacing || 0))))
+  const hiddenByScaling = $derived(layout === 'match' && scaling === 0)
+  const options = $derived<PrintOptions>({ ranges, layout, sides, form, surrounding: layout === 'match' && surrounding, orientation, scaling, fontSize: printFontSize, pasukSpacing: printPasukSpacing, overflow, removeCredits, pageNumbers, title, replaceDivineNames, verseNumbers })
 
   function changeBook(event: Event & { currentTarget: HTMLSelectElement }) { book = Number(event.currentTarget.value); endBook = book; startChapter = 1; startVerse = 1; endChapter = 1; endVerse = Math.min(13, listScrollVerses(scroll, book, 1).length) }
   function toggleAliyah(index: string) { selectedAliyot = selectedAliyot.includes(index) ? selectedAliyot.filter(value => value !== index) : [...selectedAliyot, index].sort() }
@@ -106,7 +121,7 @@
     upcomingOpen = false
   }
   async function print(event: MouseEvent & { currentTarget: HTMLButtonElement }) {
-    if (busy || failure || !pageCount || scaling <= 0 || exceedsWidth || printing || !frame.contentWindow) return
+    if (busy || failure || !pageCount || hiddenByScaling || exceedsWidth || printing || !frame.contentWindow) return
     trackAnalytics('print_requested', { layout, sides, form, pages: pageCount })
     if (!isNativeApp()) {
       try { printPreparedPages(frame.contentDocument!, orientation) }
@@ -240,7 +255,7 @@
     <div class="dialog-body">
       <div class="preview-region" bind:this={preview} aria-busy={busy}>
         <div class="preview-scroll" bind:this={previewScroller}>
-          <div class="preview-status" aria-live="polite">{#if failure}<span role="alert">{failure}</span>{:else if busy}Preparing pages…{:else if scaling === 0}0% · Increase Scaling to print{:else if exceedsWidth}<span role="alert">Content exceeds the paper width. Reduce Scaling or choose One Sided.</span>{:else}{pageCount} {pageCount === 1 ? 'page' : 'pages'} · Scaling {scaling}%{/if}</div>
+          <div class="preview-status" aria-live="polite">{#if failure}<span role="alert">{failure}</span>{:else if busy}Preparing pages…{:else if hiddenByScaling}0% · Increase Scaling to print{:else if exceedsWidth}<span role="alert">Content exceeds the paper width. Reduce Scaling or choose One Sided.</span>{:else}{pageCount} {pageCount === 1 ? 'page' : 'pages'} · {layout === 'reading' ? `${printFontSize}px` : `Scaling ${scaling}%`}{/if}</div>
           <div class="document-wrap" bind:this={documentWrap} class:unavailable={Boolean(failure)} style:width={`${paper.width * previewScale}px`} style:height={`${documentHeight * previewScale}px`}>
             <iframe bind:this={frame} title={isEsther ? 'Live printable Esther preview' : 'Live printable Torah preview'} src={resolve('/print/document/')} style:width={`${paper.width}px`} style:height={`${documentHeight}px`} style:transform={`scale(${previewScale})`}></iframe>
           </div>
@@ -288,26 +303,27 @@
             <div class="field"><span>Sides</span><div class="segmented"><button aria-pressed={sides === 'one'} onclick={() => sides = 'one'}>One Sided</button><button aria-pressed={sides === 'two'} onclick={() => sides = 'two'}>Two Sided</button></div></div>
             {#if sides === 'one'}<div class="field"><span>Text</span><div class="segmented"><button aria-pressed={form === 'tikkun'} onclick={() => form = 'tikkun'}>Tikkun<small>Nekudot &amp; taamim</small></button><button aria-pressed={form === 'torah'} onclick={() => form = 'torah'}>{isEsther ? 'Megillah' : 'Torah'}<small>Without marks</small></button></div></div>{/if}
             {#if layout === 'match'}<label class="toggle-row"><span>Show surrounding text</span><input type="checkbox" role="switch" bind:checked={surrounding} /></label><p class="hint">Keep the full column; fade unselected text.</p>{/if}
+            <label class="toggle-row verse-numbers-option"><span>Pasuk numbers</span><input type="checkbox" role="switch" bind:checked={verseNumbers} onchange={event => savePrintPreferences({ replaceDivineNames, verseNumbers: event.currentTarget.checked })} /></label>
+            <label class="toggle-row divine-names-option"><span>Use substitute spellings</span><input type="checkbox" role="switch" bind:checked={replaceDivineNames} onchange={event => savePrintPreferences({ replaceDivineNames: event.currentTarget.checked, verseNumbers })} aria-describedby="print-divine-names-hint" /></label>
+            <p class="hint" id="print-divine-names-hint">Uses <bdi lang="he">ידוה</bdi> and <bdi lang="he">אלקים</bdi>, and splits other names with faded dashes, as in <bdi lang="he">ש-ד-י</bdi>, so pages print <bdi lang="he">בס״ד</bdi>.</p>
           {/if}
         </section>
         <section class="settings-group page-group">
           <button class="group-title" aria-expanded={pageOpen} onclick={() => pageOpen = !pageOpen}>Page setup<UiIcon name={pageOpen ? 'chevronUp' : 'chevronDown'} /></button>
-          {#if !pageOpen}<p class="page-summary">{orientation === 'portrait' ? 'Portrait' : 'Landscape'} · {scaling}%{#if layout === 'match'} · {overflow === 'shrink' ? 'Shrink to fit' : 'Continue onto next page'}{/if}</p>{/if}
+          {#if !pageOpen}<p class="page-summary">{orientation === 'portrait' ? 'Portrait' : 'Landscape'}{#if layout === 'reading'} · {printFontSize}px{#if printPasukSpacing} · {printPasukSpacing}px between pesukim{/if}{:else} · {scaling}% · {overflow === 'shrink' ? 'Shrink to fit' : 'Continue onto next page'}{/if}</p>{/if}
           {#if pageOpen}
             <div class="field"><span>Orientation</span><div class="segmented"><button aria-pressed={orientation === 'portrait'} onclick={() => orientation = 'portrait'}>Portrait</button><button aria-pressed={orientation === 'landscape'} onclick={() => orientation = 'landscape'}>Landscape</button></div></div>
-            <label class="field">Scaling<div class="scaling-control"><div class="scaling-range"><input type="range" min="0" max="200" step="5" bind:value={scaling} aria-label="Scaling" aria-valuetext={`${scaling}%`} /><span class="scaling-stops" aria-hidden="true"><span>0%</span><span>100%</span><span>200%</span></span></div><output>{scaling}%</output></div></label>
+            {#if layout === 'reading'}<label class="number-row font-size-option"><span>Text size</span><span class="number-field"><input type="number" inputmode="numeric" min="12" max="48" step="1" bind:value={fontSize} onchange={() => fontSize = printFontSize} /><span aria-hidden="true">px</span></span></label>
+            {:else}            <label class="field">Scaling<div class="scaling-control"><div class="scaling-range"><input type="range" min="0" max="200" step="5" bind:value={scaling} aria-label="Scaling" aria-valuetext={`${scaling}%`} /><span class="scaling-stops" aria-hidden="true"><span>0%</span><span>100%</span><span>200%</span></span></div><output>{scaling}%</output></div></label>{/if}
+            {#if layout === 'reading'}<label class="number-row pasuk-spacing-option"><span>Space between pesukim</span><span class="number-field"><input type="number" min="-50" max="50" step="1" bind:value={pasukSpacing} onchange={() => pasukSpacing = printPasukSpacing} /><span aria-hidden="true">px</span></span></label>{/if}
             {#if layout === 'match'}<label class="field">Column overflow<PrintSelect><select bind:value={overflow}><option value="shrink">Shrink to fit</option><option value="continue">Continue onto next page</option></select></PrintSelect></label>{/if}
             <label class="toggle-row page-numbers-option"><span>Page numbers</span><input type="checkbox" role="switch" bind:checked={pageNumbers} /></label>
-            <label class="toggle-row details-page-option"><span>Include details page</span><input type="checkbox" role="switch" bind:checked={detailsPage} aria-describedby="print-details-hint" /></label>
-            <p class="hint" id="print-details-hint">Adds a separate page with {isEsther ? 'the Megillah name' : 'parsha and applicable aliyah names'}, verse range, and original column numbers.</p>
           {/if}
         </section>
         <section class="settings-group advanced-group">
           <button class="group-title" aria-expanded={advancedOpen} aria-controls="print-advanced-options" onclick={() => advancedOpen = !advancedOpen}>Advanced<UiIcon name={advancedOpen ? 'chevronUp' : 'chevronDown'} /></button>
           {#if advancedOpen}
             <div id="print-advanced-options">
-              <label class="toggle-row divine-names-option"><span>Use substitute spellings</span><input type="checkbox" role="switch" bind:checked={replaceDivineNames} aria-describedby="print-divine-names-hint" /></label>
-              <p class="hint" id="print-divine-names-hint">Uses <bdi lang="he">ידוה</bdi> and <bdi lang="he">אלקים</bdi> forms for Hashem's names.</p>
               <label class="toggle-row credits-option"><span>Remove Credits</span><input type="checkbox" role="switch" bind:checked={removeCredits} /></label>
             </div>
           {/if}
@@ -316,7 +332,7 @@
     </div>
     <footer class="dialog-footer">
       {#if printError}<p class="print-error" role="alert">{printError}</p>{:else}<p aria-live="polite">{printing ? 'Preparing pages for printing…' : 'Choose your printer in the next dialog.'}</p>{/if}
-      <div><button onclick={() => dialog.close()}>Cancel</button><button class="primary" aria-busy={printing} disabled={busy || printing || Boolean(failure) || !pageCount || scaling === 0 || exceedsWidth} onclick={print}>Print…</button></div>
+      <div><button onclick={() => dialog.close()}>Cancel</button><button class="primary" aria-busy={printing} disabled={busy || printing || Boolean(failure) || !pageCount || hiddenByScaling || exceedsWidth} onclick={print}>Print…</button></div>
     </footer>
   </section>
 </dialog>

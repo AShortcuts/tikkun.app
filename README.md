@@ -29,6 +29,8 @@ Audio and word timing are being added progressively. The [coverage page](https:/
 - Make cue editing and contributions easier with clearer documentation and review workflows.
 - Complete iPhone and iPad acceptance checks for offline playback, system integrations, and updates before wider native releases.
 
+The full list of planned and shelved work is in [docs/roadmap.md](docs/roadmap.md).
+
 ## Develop locally
 
 Use Node.js **22.23.2** (see [`.nvmrc`](.nvmrc)) and npm **11.19.0**.

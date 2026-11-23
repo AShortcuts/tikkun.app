@@ -3,6 +3,16 @@
     {
       "idiom" : "universal",
       "filename" : "Tikkun.png"
+    },
+    {
+      "appearances" : [
+        {
+          "appearance" : "luminosity",
+          "value" : "dark"
+        }
+      ],
+      "idiom" : "universal",
+      "filename" : "Tikkun-dark.png"
     }
   ],
   "info" : {

@@ -374,51 +374,51 @@ export const publicAliyotByParsha: Readonly<
   "vayishlach": [
     {
       "number": 1,
-      "audioId": null,
-      "cueStatus": "empty",
-      "expectedTokenCount": null,
+      "audioId": "vayishlach-1",
+      "cueStatus": "cued",
+      "expectedTokenCount": 130,
       "readerHash": "#/torah/parsha/vayishlach/1-32-4"
     },
     {
       "number": 2,
-      "audioId": null,
-      "cueStatus": "empty",
-      "expectedTokenCount": null,
+      "audioId": "vayishlach-2",
+      "cueStatus": "cued",
+      "expectedTokenCount": 195,
       "readerHash": "#/torah/parsha/vayishlach/1-32-14"
     },
     {
       "number": 3,
-      "audioId": null,
-      "cueStatus": "empty",
-      "expectedTokenCount": null,
+      "audioId": "vayishlach-3",
+      "cueStatus": "cued",
+      "expectedTokenCount": 96,
       "readerHash": "#/torah/parsha/vayishlach/1-32-31"
     },
     {
       "number": 4,
-      "audioId": null,
-      "cueStatus": "empty",
-      "expectedTokenCount": null,
+      "audioId": "vayishlach-4",
+      "cueStatus": "cued",
+      "expectedTokenCount": 163,
       "readerHash": "#/torah/parsha/vayishlach/1-33-6"
     },
     {
       "number": 5,
-      "audioId": null,
-      "cueStatus": "empty",
-      "expectedTokenCount": null,
+      "audioId": "vayishlach-5",
+      "cueStatus": "cued",
+      "expectedTokenCount": 515,
       "readerHash": "#/torah/parsha/vayishlach/1-34-1"
     },
     {
       "number": 6,
-      "audioId": null,
-      "cueStatus": "empty",
-      "expectedTokenCount": null,
+      "audioId": "vayishlach-6",
+      "cueStatus": "cued",
+      "expectedTokenCount": 401,
       "readerHash": "#/torah/parsha/vayishlach/1-35-12"
     },
     {
       "number": 7,
-      "audioId": null,
-      "cueStatus": "empty",
-      "expectedTokenCount": null,
+      "audioId": "vayishlach-7",
+      "cueStatus": "cued",
+      "expectedTokenCount": 215,
       "readerHash": "#/torah/parsha/vayishlach/1-36-20"
     }
   ],
@@ -2058,7 +2058,7 @@ export const publicAliyotByParsha: Readonly<
     {
       "number": 1,
       "audioId": "pinchas-1",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 137,
       "readerHash": "#/torah/parsha/pinchas/4-25-10"
     },
@@ -2086,7 +2086,7 @@ export const publicAliyotByParsha: Readonly<
     {
       "number": 5,
       "audioId": "pinchas-5",
-      "cueStatus": "missing",
+      "cueStatus": "cued",
       "expectedTokenCount": 173,
       "readerHash": "#/torah/parsha/pinchas/4-28-1"
     },

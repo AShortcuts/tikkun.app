@@ -1,5 +1,6 @@
 import type { MountScope } from '../lifecycle/mount.ts'
 import type { LastReading } from '../reading/last-reading.ts'
+import { READER_BANNER_AUTO_DISMISS_MS } from './banner-timing.ts'
 
 export interface LastReadingPromptOptions {
   document: Document
@@ -32,14 +33,37 @@ export function createLastReadingPrompt(
     '[data-target-id="last-reading-resume"]'
   )
   let target: LastReading | null = null
+  let autoDismissTimer: number | null = null
+  const view = options.document.defaultView
+
+  const cancelAutoDismiss = () => {
+    if (autoDismissTimer === null) return
+    view?.clearTimeout(autoDismissTimer)
+    autoDismissTimer = null
+  }
 
   const hide = () => {
+    cancelAutoDismiss()
     prompt?.classList.add('u-hidden')
   }
 
   const dismiss = () => {
     target = null
     hide()
+  }
+
+  // A Return offer is a passing convenience and leaves on its own, but never
+  // while someone is pointing at it or has keyboard focus inside it.
+  let autoDismisses = false
+  const scheduleAutoDismiss = ({ focusLeaving = false } = {}) => {
+    cancelAutoDismiss()
+    if (!autoDismisses || !view || !prompt || scope.signal.aborted || prompt.classList.contains('u-hidden')) return
+    if (prompt.matches(':hover')) return
+    if (!focusLeaving && prompt.contains(options.document.activeElement)) return
+    autoDismissTimer = view.setTimeout(() => {
+      autoDismissTimer = null
+      dismiss()
+    }, READER_BANNER_AUTO_DISMISS_MS)
   }
 
   const show = (
@@ -59,8 +83,18 @@ export function createLastReadingPrompt(
     )
     target = lastReading
     prompt.classList.remove('u-hidden')
+    autoDismisses = mode === 'return'
+    scheduleAutoDismiss()
   }
 
+  prompt?.addEventListener('pointerenter', cancelAutoDismiss, { signal: scope.signal })
+  prompt?.addEventListener('focusin', cancelAutoDismiss, { signal: scope.signal })
+  prompt?.addEventListener('pointerleave', () => scheduleAutoDismiss(), { signal: scope.signal })
+  prompt?.addEventListener('focusout', (event) => {
+    // Browsers disagree on the active element during focusout; the event says where focus is going.
+    const staysInside = event.relatedTarget instanceof Node && prompt.contains(event.relatedTarget)
+    if (!staysInside) scheduleAutoDismiss({ focusLeaving: true })
+  }, { signal: scope.signal })
   dismissButton?.addEventListener('click', dismiss, { signal: scope.signal })
   resumeButton?.addEventListener(
     'click',

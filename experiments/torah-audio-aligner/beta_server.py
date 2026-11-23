@@ -197,8 +197,8 @@ def handler_for(app):
                 assets = {"/": (HERE / "private-ui/index.html", "text/html; charset=utf-8"),
                           "/app.js": (HERE / "private-ui/app.js", "text/javascript; charset=utf-8"),
                           "/style.css": (HERE / "private-ui/style.css", "text/css; charset=utf-8"),
-                          "/fonts/stam.ttf": (REPO / "site/assets/fonts/ShlomosemiStam.ttf", "font/ttf"),
-                          "/fonts/lora.ttf": (REPO / "site/assets/fonts/Lora-Regular.ttf", "font/ttf")}
+                          "/fonts/stam.woff2": (REPO / "site/assets/fonts/ShlomosemiStam.woff2", "font/woff2"),
+                          "/fonts/lora.woff2": (REPO / "site/assets/fonts/Lora-Regular.woff2", "font/woff2")}
                 if path in assets:
                     return self.file(*assets[path])
             match = re.fullmatch(r"/api/recordings/([a-z0-9_-]+)/(detail|waveform|audio|save|history|revision|export|align)", path)

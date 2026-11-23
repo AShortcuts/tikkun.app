@@ -72,7 +72,7 @@
 </main>
 
 <style>
-  @font-face { font-family: 'TOC Hebrew'; src: url('/assets/fonts/NotoSansHebrew-Variable.ttf') format('truetype'); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: 'TOC Hebrew'; src: url('/assets/fonts/NotoSansHebrew-Variable.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
   :global(body) { margin: 0; }
   main { --paper: #222; --ink: #bfbfbf; --muted: #aaa; --line: #414141; --hover: #333; min-height: 100vh; box-sizing: border-box; padding: 48px 32px; background: var(--paper); color: var(--ink); font-family: 'TOC Hebrew', -apple-system, sans-serif; }
   main[data-theme='light'] { --paper: #fafafa; --ink: #4b4b4b; --muted: #707070; --line: #ddd; --hover: #eee; }

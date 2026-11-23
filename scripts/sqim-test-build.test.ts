@@ -65,6 +65,7 @@ test('records numbering before sync, embeds target 8, temporarily stamps the arc
     expect(await readReleaseBuildState(f.root)).toEqual(allocated)
     expect(JSON.parse(env.TIKKUN_RELEASE_IDENTITY!)).toEqual({ version: '1.1', build: 13 })
     expect(env.TIKKUN_TEST_BUILD).toBe('1')
+    expect(env.TIKKUN_ANALYTICS_APP_KEY).toBe('')
     const native = readProjectRelease(await readFile(f.projectFile, 'utf8'))
     if (command === 'npm') {
       expect(args).toEqual(['run', 'native:sync'])

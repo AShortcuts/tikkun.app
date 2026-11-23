@@ -31,6 +31,7 @@ src/.routes-web/
 src/.routes-native/
 .native-site/
 .svelte-kit-native/
+.svelte-kit-web/
 native-bundle-report.json
 tsconfig.native.json
 .tsimp

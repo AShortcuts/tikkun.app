@@ -2,11 +2,14 @@ import { asset } from '$app/paths'
 import Page from '../components/Page.ts'
 import { applyReaderPageLayout } from '../components/reader-page-layout.ts'
 import type { PrintOptions } from './print-model.ts'
-import { loadPrintPassage, passageTitle, paperSize } from './print-model.ts'
+import { loadPrintPassage, passageRangesLabel, paperSize } from './print-model.ts'
 import { compareRefs } from '../calendar-model/ref-utils.ts'
 import type { ReaderPagePresentation } from '../reader-presentation.ts'
-import { containsDivineName, replacePrintDivineNames } from './print-divine-names.ts'
-import { printColumnNumbers, printDetailsTitles } from './print-details.ts'
+import { findDivineNames, replacePrintDivineNames } from './print-divine-names.ts'
+import { joinReadingTitle, printColumnNumbers, printDetailsTitles } from './print-details.ts'
+
+/** Match at 0% Scaling shows only the bare columns and cannot print. */
+const hiddenByScaling = (options: PrintOptions) => options.layout === 'match' && options.scaling === 0
 
 function createBook(options: PrintOptions) {
   const book = document.createElement('div')
@@ -15,37 +18,110 @@ function createBook(options: PrintOptions) {
   book.dataset.readerSides = 'two'
   book.dataset.printSides = options.sides
   book.dataset.printForm = options.form
+  book.dataset.printVerseNumbers = String(options.verseNumbers)
   // Fit Match once at the same column width; orientation only changes the paper.
   book.style.width = `${paperSize(options.layout === 'match' ? 'portrait' : options.orientation).width - 96}px`
-  const fontScale = options.layout === 'reading' && options.scaling > 0 ? options.scaling / 100 : 1
-  book.style.setProperty('--print-font-size', `${(options.layout === 'match' ? 21 : 25) * fontScale}px`)
+  book.style.setProperty('--print-font-size', `${options.layout === 'match' ? 21 : options.fontSize}px`)
+  book.style.setProperty('--print-pasuk-spacing', `${options.pasukSpacing}px`)
   return book
 }
 
-function newSheet(root: HTMLElement, options: PrintOptions, pageIndex: number, kind: 'reading' | 'details' = 'reading') {
+type Bilingual = { he: string; en: string }
+/** What page 1's masthead shows; later pages repeat only the name and aliyot. */
+type Masthead = { name: Bilingual; aliyot: Bilingual; columnLabel: string; columns: string; range: Bilingual }
+/** Later pages' running head keeps the old heading's height, so their text area is unchanged. */
+const RUNNING_HEAD_HEIGHT = 45
+
+function mastheadContent(options: PrintOptions, columnNumbers: number[]): Masthead {
+  // A reading chosen by name carries its title; a passage chosen by verse is named from what it covers.
+  const titles = printDetailsTitles(options.ranges)
+  const join = (parts: Bilingual[], separator: string) => ({ he: parts.map(part => part.he).join(separator), en: parts.map(part => part.en).join(separator) })
+  const scroll = options.ranges[0].start.scroll === 'esther' ? 'Megillah' : 'Torah'
+  return {
+    name: options.title?.name ?? join(titles, ' · '),
+    aliyot: options.title?.aliyot ?? { he: '', en: '' },
+    columnLabel: `${scroll} ${new Set(columnNumbers).size === 1 ? 'column' : 'columns'}`,
+    columns: printColumnNumbers(columnNumbers),
+    range: { he: passageRangesLabel(options.ranges), en: passageRangesLabel(options.ranges, 'en') },
+  }
+}
+
+function element<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, ...children: (Node | string)[]) {
+  const node = document.createElement(tag)
+  if (className) node.className = className
+  node.append(...children)
+  return node
+}
+
+function bidiText(text: string, language: 'he' | 'en', className = '') {
+  const node = element('bdi', className, text)
+  node.lang = language
+  node.dir = language === 'he' ? 'rtl' : 'ltr'
+  return node
+}
+
+/** English on the left of the slash and Hebrew on the right, as in "Aliyah 3 / שלישי". */
+function bilingualPair(text: Bilingual) {
+  const parts = [text.en && bidiText(text.en, 'en'), text.he && bidiText(text.he, 'he')].filter(part => part !== '')
+  if (!parts.length) return []
+  const pair = element('span', 'masthead-pair', parts[0])
+  if (parts[1]) pair.append(element('span', 'masthead-slash', '/'), parts[1])
+  return [pair]
+}
+
+/**
+ * Page 1's masthead. Each half sits on one side of the fold: English to the
+ * left of the center line, Hebrew to the right, so nothing is printed on it.
+ */
+function createMasthead(masthead: Masthead) {
+  const header = element('header', 'paper-heading paper-masthead')
+  header.dir = 'ltr'
+  const rule = () => element('span', 'masthead-rule')
+  const names = element('div', 'masthead-names',
+    element('div', 'masthead-half', rule(), bidiText(masthead.name.en, 'en', 'masthead-name')),
+    element('div', 'masthead-half', bidiText(masthead.name.he, 'he', 'masthead-name'), rule()))
+  const columns = element('span', 'masthead-columns', `${masthead.columnLabel} `, element('b', '', masthead.columns))
+  const details = element('div', 'masthead-details',
+    element('div', 'masthead-half', columns, ...bilingualPair(masthead.aliyot)),
+    element('div', 'masthead-half', ...bilingualPair(masthead.range)))
+  header.append(names, details)
+  return header
+}
+
+/** Shrinks both names together until each fits its half beside a short rule. */
+function fitMastheadNames(header: HTMLElement) {
+  const names = [...header.querySelectorAll<HTMLElement>('.masthead-name')]
+  const overflows = () => names.some(name => {
+    const half = name.parentElement!
+    const rule = half.querySelector<HTMLElement>('.masthead-rule')!
+    return rule.getBoundingClientRect().width < 24 || name.scrollWidth > name.clientWidth + 0.5
+  })
+  for (let scale = 1; scale >= 0.55 && overflows(); scale -= 0.03) {
+    header.style.setProperty('--masthead-name-scale', scale.toFixed(2))
+  }
+  // A name still too long at the smallest size wraps within its half.
+  if (overflows()) header.classList.add('mod-wrapped-names')
+}
+
+function createRunningHead(masthead: Masthead) {
+  const title = joinReadingTitle({ name: masthead.name, aliyot: masthead.aliyot })
+  const header = element('header', 'paper-heading paper-running-head',
+    element('div', 'masthead-half', bidiText(title.en, 'en')),
+    element('div', 'masthead-half', bidiText(title.he, 'he')))
+  header.dir = 'ltr'
+  return header
+}
+
+function newSheet(root: HTMLElement, options: PrintOptions, pageIndex: number, masthead: Masthead) {
   const sheet = document.createElement('article')
   sheet.className = 'paper-sheet'
-  sheet.dataset.pageKind = kind
+  sheet.dataset.pageKind = 'reading'
   sheet.setAttribute('aria-label', `Printed page ${pageIndex + 1}`)
   const invocation = document.createElement('div')
   invocation.className = 'paper-invocation'
   invocation.lang = 'he'
   invocation.dir = 'rtl'
-  const heading = document.createElement('header')
-  heading.className = 'paper-heading'
-  heading.dir = 'ltr'
-  const english = document.createElement('bdi')
-  english.lang = 'en'
-  english.dir = 'ltr'
-  english.textContent = passageTitle(options.ranges, 'en')
-  const separator = document.createElement('span')
-  separator.setAttribute('aria-hidden', 'true')
-  separator.textContent = '|'
-  const hebrew = document.createElement('bdi')
-  hebrew.lang = 'he'
-  hebrew.dir = 'rtl'
-  hebrew.textContent = passageTitle(options.ranges)
-  heading.append(english, separator, hebrew)
+  const heading = pageIndex === 0 ? createMasthead(masthead) : createRunningHead(masthead)
   const forms = document.createElement('div')
   forms.className = `paper-forms ${options.sides === 'two' ? 'paired' : ''}`
   for (const form of options.sides === 'two' ? ['torah', 'tikkun'] : [options.form]) {
@@ -88,70 +164,23 @@ function newSheet(root: HTMLElement, options: PrintOptions, pageIndex: number, k
   if (!options.removeCredits) footer.append(signature)
   if (options.pageNumbers) footer.append(pageNumber)
   footer.append(sacredNotice)
-  if (options.scaling === 0) sheet.append(body)
+  if (hiddenByScaling(options)) sheet.append(body)
   else {
-    sheet.append(invocation, heading)
-    if (kind === 'reading') sheet.append(forms)
-    sheet.append(body, footer)
+    sheet.append(invocation, heading, forms, body, footer)
   }
   root.append(sheet)
+  if (heading.classList.contains('paper-masthead') && !hiddenByScaling(options)) fitMastheadNames(heading)
   return body
 }
 
-function appendDetailsPage(root: HTMLElement, options: PrintOptions, pageIndex: number, columns: number[]) {
-  const body = newSheet(root, options, pageIndex, 'details')
-  const titles = printDetailsTitles(options.ranges)
-  const card = document.createElement('aside')
-  card.className = 'paper-details-card'
-  card.classList.toggle('multiple-parshiot', titles.length > 1)
-  card.setAttribute('aria-label', 'Reading details')
-  const hebrew = document.createElement('div')
-  hebrew.className = 'paper-details-hebrew'
-  hebrew.lang = 'he'
-  hebrew.dir = 'rtl'
-  hebrew.textContent = titles.map(title => title.he).join(' · ')
-  const english = document.createElement('div')
-  english.className = 'paper-details-english'
-  english.lang = 'en'
-  english.dir = 'ltr'
-  english.textContent = titles.map(title => title.en).join(' · ')
-  const columnDetails = document.createElement('dl')
-  const label = document.createElement('dt')
-  const scroll = options.ranges[0].start.scroll === 'esther' ? 'Megillah' : 'Torah'
-  label.textContent = `${scroll} ${columns.length === 1 ? 'column' : 'columns'}`
-  const numbers = document.createElement('dd')
-  numbers.textContent = printColumnNumbers(columns)
-  columnDetails.append(label, numbers)
-  card.append(hebrew, english, columnDetails)
-  if (options.aliyahLabels.length) {
-    const aliyot = document.createElement('div')
-    aliyot.className = 'paper-details-aliyot paper-details-section'
-    for (const name of options.aliyahLabels) {
-      const entry = document.createElement('div')
-      appendBilingualDetail(entry, name)
-      aliyot.append(entry)
-    }
-    card.append(aliyot)
-  }
-  const passage = document.createElement('dl')
-  passage.className = 'paper-details-passage'
-  const passageLabel = document.createElement('dt')
-  passageLabel.textContent = 'Verse range'
-  const passageValue = document.createElement('dd')
-  appendBilingualDetail(passageValue, { he: passageTitle(options.ranges), en: passageTitle(options.ranges, 'en') })
-  passage.append(passageLabel, passageValue)
-  card.append(passage)
-  body.append(card)
-}
-
-function appendBilingualDetail(parent: HTMLElement, text: { he: string; en: string }) {
-  for (const language of ['he', 'en'] as const) {
-    const line = document.createElement('div')
-    line.lang = language
-    line.dir = language === 'he' ? 'rtl' : 'ltr'
-    line.textContent = text[language]
-    parent.append(line)
-  }
+/** How much taller page 1's masthead is than later pages' running head. */
+function mastheadExtraHeight(root: HTMLElement, options: PrintOptions, masthead: Masthead) {
+  if (hiddenByScaling(options)) return 0
+  newSheet(root, options, 0, masthead)
+  const sheet = root.lastElementChild as HTMLElement
+  const height = sheet.querySelector<HTMLElement>('.paper-masthead')!.getBoundingClientRect().height
+  sheet.remove()
+  return Math.max(0, height - RUNNING_HEAD_HEIGHT)
 }
 
 function alignColumnHeadings(body: HTMLElement, book: HTMLElement, options: PrintOptions) {
@@ -182,8 +211,9 @@ function alignFooter(body: HTMLElement, book: HTMLElement, options: PrintOptions
 }
 
 export async function renderPrintDocument(root: HTMLElement, options: PrintOptions, isCurrent: () => boolean) {
-  const { pages, selected, selectedUnannotated } = await loadPrintPassage(options.ranges)
-  await document.fonts.load('21px ShlomosemiStam')
+  const { pages, selected, selectedUnannotated, words } = await loadPrintPassage(options.ranges)
+  await Promise.all(['21px ShlomosemiStam', 'italic 16px "Crimson Pro"', '16px "Crimson Pro"', 'bold 16px "Frank Ruhl Libre"']
+    .map(font => document.fonts.load(font, font.includes('Frank') ? 'אב' : undefined)))
   await document.fonts.ready
   if (!isCurrent()) return null
   const paper = paperSize(options.orientation)
@@ -209,6 +239,21 @@ export async function renderPrintDocument(root: HTMLElement, options: PrintOptio
     section.innerHTML = Page(printablePage, { presentation, annotationsEnabled: options.form === 'tikkun' })
     stage.append(section)
   }
+  // Match with surrounding text prints whole columns; otherwise only the passage's words print.
+  const printedNames = findDivineNames(words).filter(name => (options.layout === 'match' && options.surrounding) || selected.has(name.tokenKey))
+  // Names without a substitute spelling are split with faded dashes. Match's Torah side
+  // numbers words in scroll form, where maqaf groups are separate words.
+  const unsplit = options.replaceDivineNames ? printedNames.filter(name => !name.respelled && options.layout === 'match' && !name.scrollTarget) : []
+  if (options.replaceDivineNames) {
+    const wordsByKey = Map.groupBy(stage.querySelectorAll<HTMLElement>('.word'), word => `${word.dataset.annotationsMode}|${word.dataset.tokenKey ?? word.dataset.contextKey}`)
+    for (const name of printedNames.filter(name => !name.respelled)) {
+      wordsByKey.get(`on|${name.tokenKey}`)?.forEach(word => insertNameBreaks(word, name.breakBeforeLetters))
+      const scroll = options.layout === 'reading' ? name : name.scrollTarget
+      if (scroll) wordsByKey.get(`off|${scroll.tokenKey}`)?.forEach(word => insertNameBreaks(word, scroll.breakBeforeLetters))
+    }
+  }
+  const printsName = options.replaceDivineNames ? unsplit.length > 0 : printedNames.length > 0
+  if (unsplit.length) console.error('Print could not split these divine names', unsplit.map(name => name.word))
   for (const word of stage.querySelectorAll<HTMLElement>('.word')) {
     const wordSelection = word.dataset.annotationsMode === 'off' && options.layout === 'match' ? selectedUnannotated : selected
     const inRange = wordSelection.has(word.dataset.tokenKey ?? '')
@@ -235,9 +280,27 @@ export async function renderPrintDocument(root: HTMLElement, options: PrintOptio
       }
       other.remove()
     }
+    // A line break cannot take margin in every browser, so a block after each shown pasuk
+    // break carries the space. None follows a side's last word, which would add an empty page.
+    if (options.pasukSpacing !== 0) {
+      for (const side of first.querySelectorAll<HTMLElement>('.reader-reading-page-side')) {
+        const lastWord = [...side.querySelectorAll('.word')].at(-1)
+        for (const pasukBreak of side.querySelectorAll<HTMLElement>('.reader-pasuk-break')) {
+          if (pasukBreak.style.display === 'none' || !lastWord || !(pasukBreak.compareDocumentPosition(lastWord) & Node.DOCUMENT_POSITION_FOLLOWING)) continue
+          const gap = document.createElement('span')
+          gap.className = 'print-pasuk-gap'
+          gap.setAttribute('aria-hidden', 'true')
+          pasukBreak.after(gap)
+        }
+      }
+    }
   }
   let pageCount = 0
   let exceedsWidth = false
+  const masthead = mastheadContent(options, pages.map(page => page.pageNumber))
+  const firstPageExtra = mastheadExtraHeight(root, options, masthead)
+  // Page 1 gives the masthead's extra height back from its text area.
+  const textHeight = () => paper.height - 164 - (pageCount === 0 ? firstPageExtra : 0)
   for (const section of stage.querySelectorAll<HTMLElement>('.tikkun-page')) {
     applyReaderPageLayout(section, presentation)
     if (options.sides === 'one') {
@@ -246,7 +309,10 @@ export async function renderPrintDocument(root: HTMLElement, options: PrintOptio
         // Center the selected, already-fitted column without changing its width.
         const column = section.querySelector<HTMLElement>(`.reader-text-side.mod-${options.form}`)!.getBoundingClientRect()
         const page = section.getBoundingClientRect()
-        section.style.setProperty('--print-single-offset', `${page.left + page.width / 2 - column.left - column.width / 2}px`)
+        const offset = page.left + page.width / 2 - column.left - column.width / 2
+        section.style.setProperty('--print-single-offset', `${offset}px`)
+        // Pasuk numbers hang past the line's edge; move them to the centered column's edge.
+        section.style.setProperty('--print-single-number-offset', `${column.right + offset - page.right}px`)
       }
     }
     if (options.layout === 'match' && !options.surrounding) {
@@ -256,9 +322,8 @@ export async function renderPrintDocument(root: HTMLElement, options: PrintOptio
     }
     const sectionTop = section.getBoundingClientRect().top
     const height = section.getBoundingClientRect().height
-    const availableHeight = paper.height - 164
-    const baselineScale = options.layout === 'match' && options.overflow === 'shrink' ? Math.min(1, availableHeight / height) : 1
-    const scale = options.layout === 'match' ? baselineScale * options.scaling / 100 : options.scaling === 0 ? 0 : 1
+    const baselineScale = options.layout === 'match' && options.overflow === 'shrink' ? Math.min(1, textHeight() / height) : 1
+    const scale = options.layout === 'match' ? baselineScale * options.scaling / 100 : 1
     if (options.layout === 'match') {
       const contentWidth = options.sides === 'one'
         ? section.querySelector<HTMLElement>(`.reader-text-side.mod-${options.form}`)!.getBoundingClientRect().width
@@ -270,10 +335,11 @@ export async function renderPrintDocument(root: HTMLElement, options: PrintOptio
       : [...new Set([...section.querySelectorAll<HTMLElement>(`${options.sides === 'one' ? `.reader-text-side.mod-${options.form}` : '[data-reader-canonical="true"]'} .word`)].map(word => word.getBoundingClientRect().bottom - sectionTop))]
     let offset = 0
     while (offset < height - 1) {
+      const availableHeight = textHeight()
       const capacity = scale === 0 ? height : availableHeight / scale
       const end = height - offset <= capacity ? height : Math.max(offset, ...breakPoints.filter(point => point > offset && point <= offset + capacity))
       if (end <= offset) throw new Error('This content is too large for a page. Reduce Scaling or use Shrink to fit.')
-      const body = newSheet(root, options, pageCount++)
+      const body = newSheet(root, options, pageCount++, masthead)
       const copyBook = createBook(options)
       const copy = section.cloneNode(true) as HTMLElement
       copyBook.append(copy)
@@ -287,12 +353,6 @@ export async function renderPrintDocument(root: HTMLElement, options: PrintOptio
     }
   }
   stage.remove()
-  if (options.detailsPage && options.scaling > 0) {
-    appendDetailsPage(root, options, pageCount++, pages.map(page => page.pageNumber))
-  }
-  // Faded surrounding text is printed too, so it counts; hidden sides and omitted words do not.
-  const printsName = [...root.querySelectorAll<HTMLElement>('.paper-sheet .word')].some(word =>
-    containsDivineName(word.dataset.annotationsOnText ?? '') && word.checkVisibility({ visibilityProperty: true }))
   root.querySelectorAll<HTMLElement>('.paper-invocation').forEach(invocation => {
     invocation.textContent = printsName ? 'ב״ה' : 'בס״ד'
   })
@@ -302,4 +362,26 @@ export async function renderPrintDocument(root: HTMLElement, options: PrintOptio
   })
   root.dataset.ready = 'true'
   return { pageCount, exceedsWidth, width: paper.width, height: pageCount * (paper.height + 28) - 28, selectedTokens: selected.size }
+}
+
+/** Puts a faded dash before each given letter of a word, after the previous letter's pointing. */
+function insertNameBreaks(word: HTMLElement, letterIndexes: number[]) {
+  const walker = document.createTreeWalker(word, NodeFilter.SHOW_TEXT)
+  const targets: { text: Text, index: number }[] = []
+  let seen = 0
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node as Text
+    for (const { index } of text.data.matchAll(/[א-ת]/gu)) {
+      if (letterIndexes.includes(seen++)) targets.push({ text, index })
+    }
+  }
+  if (targets.length !== letterIndexes.length) throw new Error(`Could not split the divine name in ${word.textContent}.`)
+  // Split from the end so earlier offsets in the same text node stay valid.
+  for (const { text, index } of targets.reverse()) {
+    const dash = document.createElement('span')
+    dash.className = 'print-name-break'
+    dash.setAttribute('aria-hidden', 'true')
+    dash.textContent = '-'
+    text.splitText(index).before(dash)
+  }
 }

@@ -36,10 +36,8 @@ export function osMajorFromUserAgent(userAgent: string) {
   return match ? Number(match[1]) : 0
 }
 
-export function isHomeScreenApp(view: Window) {
-  try {
-    return view.matchMedia('(display-mode: standalone)').matches || (view.navigator as Navigator & { standalone?: boolean }).standalone === true
-  } catch { return false }
+export function webDeviceFacts(userAgent: string, appVersion = 'web'): DeviceFacts {
+  return { device: webDeviceKind(userAgent), os: osMajorFromUserAgent(userAgent), app_version: appVersion }
 }
 
 function localDay(now: Date) {
@@ -47,17 +45,27 @@ function localDay(now: Date) {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
 }
 
+/** The Sunday that starts the local week containing a stored YYYY-MM-DD day. */
+function weekStart(day: string) {
+  const [year, month, date] = day.split('-').map(Number)
+  const start = new Date(year, month - 1, date)
+  start.setDate(date - start.getDay())
+  return localDay(start)
+}
+
 /**
  * Decides whether today's check-in is due. Only the last local day is stored, never an identifier.
  * Returns null when a check-in was already sent today or storage is unavailable.
  */
-export function dueCheckIn(storage: Storage, now: Date): { first_this_month: boolean; commit(): void } | null {
+export function dueCheckIn(storage: Storage, now: Date): { first_this_month: boolean; first_this_week: boolean; returning: boolean; commit(): void } | null {
   const today = localDay(now)
   let last: string | null
   try { last = storage.getItem(LAST_ACTIVE_DAY_KEY) } catch { return null }
   if (last === today) return null
   return {
     first_this_month: last?.slice(0, 7) !== today.slice(0, 7),
+    first_this_week: !last || weekStart(last) !== weekStart(today),
+    returning: last !== null,
     commit() { try { storage.setItem(LAST_ACTIVE_DAY_KEY, today) } catch { /* Next foreground retries. */ } },
   }
 }

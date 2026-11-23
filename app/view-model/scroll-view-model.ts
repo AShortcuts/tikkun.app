@@ -188,6 +188,8 @@ export interface RenderedLineInfo {
 /** Tracks scrolling through a single "view" of a scroll, associated with one or more LeiningRuns. */
 export abstract class ScrollViewModel {
   readonly isolatedAliyah: IsolatedAliyahSelection | null = null
+  /** True when the view holds only its reading's own columns, so none ever mounts above the first. */
+  readonly excerpt: boolean = false
   readonly initialLocation: StartLocation
   private contentCursorPromise: Promise<ContentCursor> | undefined
   private readonly pageEntryPromises = new Map<
@@ -575,6 +577,7 @@ export function isVezosHabracha(r: LeiningRun): boolean {
 
 /** A view that only renders pages containing the actual leinings.  Used for יום טוב. */
 class HolidayViewModel extends ScrollViewModel {
+  override readonly excerpt = true
   private readonly pages: Promise<ScrollContentSource[]>
 
   constructor(

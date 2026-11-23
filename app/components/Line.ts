@@ -9,7 +9,7 @@ import { verseRangeLabel } from './verse-range-label.ts'
 import { createLastReadingHash } from '../reading/last-reading.ts'
 import { isInvertedNun, tokenizeReaderWords } from '../reader/word-tokenization.ts'
 import { createSpecialLetterRenderer } from '../special-letters.ts'
-import textFilter from '../text-filter.ts'
+import textFilter, { pairedKetiv } from '../text-filter.ts'
 import { iconMarkup } from './icons.ts'
 import { seaShirahLayout } from './sea-shirah-layout.ts'
 import {
@@ -97,7 +97,7 @@ const renderWords = ({
     return `<span
         class="word ${activeWord?.isKri ? 'ktiv-kri' : ''}${endsPasuk ? ' mod-sof-pasuk' : ''}${contextWord ? ' mod-passage-context' : ''}"
         ${decorationOnly || contextWord ? '' : `data-token-key="${tokenKey}"`}
-        ${contextWord ? 'aria-hidden="true"' : `data-page-number="${pageNumber}"
+        ${contextWord ? `aria-hidden="true" data-context-key="${tokenKey}"` : `data-page-number="${pageNumber}"
         data-line-index="${lineIndex}"
         data-fragment-index="${fragmentIndex}"
         data-word-index="${wordIndex}"`}
@@ -273,7 +273,7 @@ export const renderTextFlow = ({
               })
               const unannotatedText =
                 presentation.layout === 'reading' && presentation.sides === 'two'
-                  ? stripHebrewMarks(annotatedText)
+                  ? stripHebrewMarks(pairedKetiv(fragment))
                   : textFilter({ text: fragment, annotated: false })
 
               return `

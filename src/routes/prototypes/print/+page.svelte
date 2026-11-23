@@ -7,7 +7,7 @@
 
   let open = $state(true)
   const context: PrintContext = {
-    title: 'Sample reading · Beresheet', isParsha: true, currentKey: '1',
+    title: 'Sample reading · Beresheet', englishTitle: 'Beresheet', isParsha: true, currentKey: '1',
     aliyot: sampleAliyot().map(aliyah => ({ ...aliyah, key: `${aliyah.index}`, label: aliyahLabel(aliyah.index, undefined, 'en'), hebrewLabel: aliyahLabel(aliyah.index) })),
   }
 </script>

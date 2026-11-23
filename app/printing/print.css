@@ -1,4 +1,4 @@
-@font-face { font-family: 'Noto Sans Hebrew UI'; src: url('/assets/fonts/NotoSansHebrew-Variable.ttf'); font-display: swap; }
+@font-face { font-family: 'Noto Sans Hebrew UI'; src: url('/assets/fonts/NotoSansHebrew-Variable.woff2') format('woff2'); font-display: swap; }
 .print-workspace {
   --print-surface: var(--paper-color, #fcfcfd);
   --print-ink: var(--text-color, #202532);
@@ -29,7 +29,8 @@
 .print-workspace .document-wrap { position: relative; margin: 0 auto; filter: drop-shadow(0 3px 8px #2230491a); }
 .print-workspace .document-wrap.unavailable { visibility: hidden; }
 /* The preview frame never takes touches, so pinching and panning reach the scroller. */
-.print-workspace .document-wrap iframe { display: block; border: 0; transform-origin: top left; background: transparent; pointer-events: none; }
+/* Match the paper's light scheme; Firefox otherwise paints an opaque backdrop over the gaps between sheets in dark mode. */
+.print-workspace .document-wrap iframe { display: block; border: 0; transform-origin: top left; background: transparent; pointer-events: none; color-scheme: light; }
 .print-workspace .preview-scroll { touch-action: pan-x pan-y; }
 .print-workspace .print-settings-pane { overflow-y: auto; border-left: 1px solid var(--print-rule); padding: 0 20px; scrollbar-gutter: stable; }
 .print-workspace .settings-group { padding: 14px 0 16px; border-bottom: 1px solid var(--print-rule); }
@@ -63,12 +64,16 @@
 .print-workspace .toggle-row input:checked { background: var(--print-accent); }
 .print-workspace .toggle-row input:checked::after { transform: translateX(16px); }
 .print-workspace .hint, .print-workspace .page-summary { font-size: 13px; color: var(--print-muted); line-height: 1.45; margin: 5px 0 0; }
+.print-workspace .hint bdi { white-space: nowrap; }
 .print-workspace .page-summary { font-size: 13px; margin-top: 4px; }
 .print-workspace .scaling-control { display: flex; gap: 12px; align-items: center; }
 .print-workspace .scaling-control input { flex: 1; width: 100%; accent-color: var(--print-accent); }
 .print-workspace .scaling-control output { min-width: 44px; text-align: right; }
 .print-workspace .scaling-range { flex: 1; min-width: 0; }
 .print-workspace .scaling-stops { display: flex; justify-content: space-between; color: var(--print-muted); font-size: 11px; padding: 3px 2px 0; }
+.print-workspace .number-field { display: inline-flex; align-items: center; gap: 6px; color: var(--print-muted); }
+.print-workspace .number-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 13px; }
+.print-workspace .number-field input { width: 64px; min-height: 36px; padding: 6px 8px; text-align: right; background: var(--print-surface); color: var(--print-ink); border: 1px solid var(--print-rule); border-radius: 8px; }
 .print-workspace .sample-reading { margin: 12px 0 0; display: grid; gap: 4px; }
 .print-workspace .sample-reading > span { font-size: 18px; }
 .print-workspace .sample-reading small { color: var(--print-muted); }
@@ -95,7 +100,7 @@
   .print-workspace .preview-status { font-size: 12px; }
   .print-workspace .print-settings-pane { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; border-left: 0; padding: 0 max(20px, env(safe-area-inset-right, 0px)) 0 max(20px, env(safe-area-inset-left, 0px)); scrollbar-gutter: auto; }
   /* iOS zooms into form fields smaller than 16px. */
-  .print-workspace select { font-size: 16px; }
+  .print-workspace select, .print-workspace .number-field input { font-size: 16px; }
   .print-workspace .dialog-footer { padding: 10px max(16px, env(safe-area-inset-right, 0px)) max(10px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); gap: 6px; flex-wrap: wrap; }
   .print-workspace .dialog-footer p { order: 2; margin: 0; width: 100%; text-align: center; font-size: 12px; line-height: 1.4; }
   .print-workspace .dialog-footer > div { width: 100%; gap: 10px; }

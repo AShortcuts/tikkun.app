@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import textFilter from './text-filter.ts'
+import textFilter, { pairedKetiv } from './text-filter.ts'
 
 test('simple unannotated text removes everything but simple letters', () => {
   expect(textFilter({
@@ -89,4 +89,24 @@ test(`converts ktiv & kri for multiple on the same line`, () => {
   expect(actual).toBe('הָעַמִּ֑ים וְלִהְי֨וֹת {הַיְּהוּדִ֤ים} {עֲתִידִים֙} לַיּ֣וֹם הַזֶּ֔ה לְהִנָּקֵ֖ם')
 
   expect(textFilter({ text: multiKtivKri, annotated: false })).toBe('העמים ולהיות היהודיים עתודים ליום הזה להנקם')
+})
+
+test('paired Torah side shows the ketiv in the kri word slot', () => {
+  expect(pairedKetiv(
+    'וּבְכָל־הָרֶ֛מֶשׂ הָרֹמֵ֥שׂ עַל־הָאָ֖רֶץ הוצא#[הַיְצֵ֣א] אִתָּ֑ךְ',
+  )).toBe('וּבְכָל־הָרֶ֛מֶשׂ הָרֹמֵ֥שׂ עַל־הָאָ֖רֶץ הוצא אִתָּ֑ךְ')
+  expect(pairedKetiv('וְאֶת־בנו#[בָּנָ֖יו] לֹ֣א יָדָ֑ע')).toBe('וְאֶת־בנו לֹ֣א יָדָ֑ע')
+  expect(pairedKetiv('מזה#[מַה־זֶּ֣ה] בְיָדֶ֑ךָ')).toBe('מזה בְיָדֶ֑ךָ')
+})
+
+test('paired Torah side keeps one slot per kri word when the ketiv is shorter', () => {
+  const ketiv = pairedKetiv('לֵאָ֖ה בגד#[בָּ֣א גָ֑ד] וַתִּקְרָ֥א')
+  const kri = textFilter({ text: 'לֵאָ֖ה בגד#[בָּ֣א גָ֑ד] וַתִּקְרָ֥א', annotated: true })
+  expect(ketiv).toBe('לֵאָ֖ה בגד \u200b וַתִּקְרָ֥א')
+  expect(ketiv.split(' ')).toHaveLength(kri.split(' ').length)
+  expect(pairedKetiv('בָּלָ֗ק לך#[לְכָה־ ]נָּ֨א אִתִּ֜י')).toBe('בָּלָ֗ק לך נָּ֨א אִתִּ֜י')
+})
+
+test('paired Torah side leaves words without a kri untouched', () => {
+  expect(pairedKetiv('וַיֹּ֥אכְלוּ שָׁ֖ם עַל־')).toBe('וַיֹּ֥אכְלוּ שָׁ֖ם עַל־')
 })

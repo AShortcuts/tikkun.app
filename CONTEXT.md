@@ -57,7 +57,7 @@ One visible occurrence of the reading. Torah and Tikkun forms occupy the same re
 _Avoid_: Single column
 
 **Two Sided**:
-Two mirrored visual occurrences of one logical token sequence. Both occurrences use identical content, sizing, spacing, wrapping, and scroll geometry; only nekudot and taamim differ. Each form's title is centered over its text, and the sole swap control sits on the forehead between the titles over the pane divider. This placement applies to desktop and mobile-landscape Two Sided modes; the desktop bottom-right form button remains exclusive to One Side. The default order is Tikkun on the right and Torah on the left. A single persisted Two Sided order is shared across readings, reloads, Reading Layout, Match Torah Lines, desktop, and mobile landscape; it does not affect the active One Side form.
+Two mirrored visual occurrences of one logical token sequence. Both occurrences use the same word slots, sizing, spacing, wrapping, and scroll geometry. The Tikkun side shows nekudot, taamim, and the kri; the Torah side shows the ketiv without marks, leaving an empty slot where one ketiv word is read as two kri words. Each form's title is centered over its text, and the sole swap control sits on the forehead between the titles over the pane divider. This placement applies to desktop and mobile-landscape Two Sided modes; the desktop bottom-right form button remains exclusive to One Side. The default order is Tikkun on the right and Torah on the left. A single persisted Two Sided order is shared across readings, reloads, Reading Layout, Match Torah Lines, desktop, and mobile landscape; it does not affect the active One Side form.
 _Avoid_: Independent columns, loosely paired translations
 
 **Two Sided Swap Motion**:

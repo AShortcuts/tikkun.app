@@ -3,12 +3,12 @@
 
 @font-face {
   font-family: 'ShlomosemiStam';
-  src: url('/assets/fonts/ShlomosemiStam.ttf');
+  src: url('/assets/fonts/ShlomosemiStam.woff2') format('woff2');
 }
 
 @font-face {
   font-family: 'Lora';
-  src: url('/assets/fonts/Lora-Regular.ttf') format('truetype');
+  src: url('/assets/fonts/Lora-Regular.woff2') format('woff2');
   font-display: swap;
   font-style: normal;
   font-weight: 400;
@@ -16,7 +16,7 @@
 
 @font-face {
   font-family: 'Noto Sans Hebrew';
-  src: url('/assets/fonts/NotoSansHebrew-Variable.ttf') format('truetype');
+  src: url('/assets/fonts/NotoSansHebrew-Variable.woff2') format('woff2');
   font-display: swap;
   font-style: normal;
   font-weight: 100 900;

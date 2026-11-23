@@ -56,7 +56,7 @@ test.each([['2026-10-04', false, 6, 7]] as const)('service %s preserves its divi
 })
 
 test('picker and search preserve the entry point context', () => {
-  const now = new Date('2026-10-02T12:00:00')
+  const now = new Date('2026-10-03T12:00:00')
   const model = buildParshaPickerModel(generator(), new HDate(now), now)
   expect(model.comingUp.find(entry => entry.label === 'שמחת תורה')?.href).toBe('#/run/2026-10-04:shacharis,main')
   expect(model.holidayColumns.flat().find(entry => entry.label === 'שמחת תורה')?.href).toBe('#/run/2026-10-04:shacharis,main')
@@ -64,6 +64,18 @@ test('picker and search preserve the entry point context', () => {
   expect(parsha.aliyahGroups[0].choices).toHaveLength(7)
   expect(model.search('Vezot Haberacha 7')[0].href).toBe('#/torah/parsha/vezot-haberacha/5-34-1')
   expect(model.search('Simchat Torah 7')[0].href).toBe('#/run/2026-10-04:shacharis,last-aliyah/1-1-1')
+})
+
+test.each([['2026-11-11T01:06:00', 'ראש חודש כסלו', 'תולדות', 'toldot'], ['2026-11-12T09:00:00', 'תולדות', 'ויצא', 'vayetzei'], ['2026-11-14T10:00:00', 'תולדות', 'ויצא', 'vayetzei']] as const)('Coming Up at %s starts with the reading `#/next` opens', (iso, label, following, slug) => {
+  const now = new Date(iso)
+  const g = generator()
+  // A reading held today is still the next reading, so it leads the list under the `#/next` link.
+  const [first, second] = [...buildParshaPickerModel(g, new HDate(now), now).comingUp].reverse()
+  expect(first).toMatchObject({ label, href: '#/next' })
+  expect(second).toMatchObject({ label: following, href: `#/torah/parsha/${slug}` })
+  const opened = parseUrl(g, '/next', { now })
+  if (opened?.view !== 'reader') throw new Error('Missing reader route')
+  expect(opened.model.initialTitle).toContain(label)
 })
 
 test('the eighth reading is searchable and selectable in Israel', () => {

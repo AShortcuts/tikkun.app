@@ -139,14 +139,14 @@ const manifest = {
   'app/components/ParshaPicker.ts': {
     file: '_app/immutable/chunks/parsha-picker.js',
   },
-  '.svelte-kit/generated/client-optimized/app.js': {
+  '.svelte-kit-web/generated/client-optimized/app.js': {
     file: '_app/immutable/entry/app.js',
     isEntry: true,
     dynamicImports: [
-      '.svelte-kit/generated/client-optimized/nodes/10.js',
+      '.svelte-kit-web/generated/client-optimized/nodes/10.js',
     ],
   },
-  '.svelte-kit/generated/client-optimized/nodes/10.js': {
+  '.svelte-kit-web/generated/client-optimized/nodes/10.js': {
     file: '_app/immutable/nodes/prototype-index.js',
     isEntry: true,
     imports: ['_BCaVwE0w.js', '_CZtLFM2E.js'],
@@ -155,7 +155,7 @@ const manifest = {
       '_app/immutable/assets/site.css',
     ],
   },
-  '.svelte-kit/generated/client-optimized/nodes/2.js': {
+  '.svelte-kit-web/generated/client-optimized/nodes/2.js': {
     file: '_app/immutable/nodes/site-layout.js',
     isEntry: true,
     imports: ['_CZtLFM2E.js'],
@@ -209,18 +209,21 @@ test('precache keeps the app shell small and excludes deferred content', () => {
   expect(shouldPrecache('_app/immutable/assets/movie.mp4', excludedFiles)).toBe(false)
   expect(shouldPrecache('google-site-verification.html', excludedFiles)).toBe(false)
   expect(
-    shouldPrecache('assets/fonts/NotoSansHebrew-Variable.ttf', excludedFiles)
+    shouldPrecache('assets/fonts/NotoSansHebrew-Variable.woff2', excludedFiles)
   ).toBe(true)
-  expect(shouldPrecache('assets/fonts/Lora-Regular.ttf', excludedFiles)).toBe(false)
+  expect(shouldPrecache('assets/fonts/Lora-Regular.woff2', excludedFiles)).toBe(false)
+  expect(shouldPrecache('assets/fonts/CrimsonPro-Italic.woff2', excludedFiles)).toBe(false)
+  expect(shouldPrecache('assets/fonts/FrankRuhlLibre-Bold.woff2', excludedFiles)).toBe(false)
+  expect(shouldPrecache('assets/fonts/licenses/CrimsonPro-OFL.txt', excludedFiles)).toBe(false)
   expect(
     shouldPrecache(
-      '_app/immutable/assets/Lora-Regular.abc123.ttf',
+      '_app/immutable/assets/Lora-Regular.abc123.woff2',
       excludedFiles
     )
   ).toBe(false)
   expect(
     shouldPrecache(
-      '_app/immutable/assets/ShlomosemiStam.abc123.ttf',
+      '_app/immutable/assets/ShlomosemiStam.abc123.woff2',
       excludedFiles
     )
   ).toBe(true)

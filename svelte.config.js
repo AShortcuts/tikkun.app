@@ -18,8 +18,10 @@ if (basePath && !basePath.startsWith('/')) {
 export default {
   preprocess: vitePreprocess(),
   kit: {
-    // A running dev server must not replace the browser tests' app template.
-    outDir: native.enabled ? '.svelte-kit-native' : process.env.VITEST ? '.svelte-kit-test' : '.svelte-kit',
+    // Each kind of run keeps its own generated app, so a build or test run never replaces the
+    // page list a running dev server is serving (which leaves every page on a 500 error).
+    outDir: native.enabled ? '.svelte-kit-native' : process.env.VITEST ? '.svelte-kit-test'
+      : process.env.TIKKUN_PRODUCTION_ROUTES ? '.svelte-kit-web' : '.svelte-kit',
     adapter: adapter({
       pages: native.enabled ? 'dist-native' : 'dist',
       assets: native.enabled ? 'dist-native' : 'dist',

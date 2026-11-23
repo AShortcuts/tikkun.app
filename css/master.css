@@ -20,12 +20,12 @@
 @layer tokens {
   @font-face {
     font-family: 'ShlomosemiStam';
-    src: url('/assets/fonts/ShlomosemiStam.ttf');
+    src: url('/assets/fonts/ShlomosemiStam.woff2') format('woff2');
   }
 
   @font-face {
     font-family: 'Lora';
-    src: url('/assets/fonts/Lora-Regular.ttf') format('truetype');
+    src: url('/assets/fonts/Lora-Regular.woff2') format('woff2');
     font-weight: 400;
     font-style: normal;
     font-display: swap;
@@ -33,7 +33,7 @@
 
   @font-face {
     font-family: 'Noto Sans Hebrew UI';
-    src: url('/assets/fonts/NotoSansHebrew-Variable.ttf') format('truetype');
+    src: url('/assets/fonts/NotoSansHebrew-Variable.woff2') format('woff2');
     font-weight: 100 900;
     font-style: normal;
     font-display: swap;
@@ -234,10 +234,13 @@
 
 @layer reader {
   .tikkun-book {
-    padding-top: 1em;
+    --reader-book-font-size: 1.8rem;
+    /* Space above the first column, in a length the column number can reuse. */
+    --reader-top-gap: var(--reader-book-font-size);
+    padding-top: var(--reader-top-gap);
     padding-bottom: 5em;
     /* basically some scroll overflow so that when you get to the end of a Scroll, you can scroll past the annotations toggle so that it doesn't block the last few lines of text */
-    font-size: 1.8rem;
+    font-size: var(--reader-book-font-size);
     height: 100%;
     min-height: 0;
     overflow-y: auto;

@@ -1,7 +1,7 @@
 import { registerPlugin } from '@capacitor/core'
 import { isNativeApp } from './native.ts'
 import type { LastReadingInput } from '../reading/last-reading.ts'
-import type { DeviceFacts, DeviceKind } from '../analytics/context.ts'
+import { webDeviceFacts, type DeviceFacts, type DeviceKind } from '../analytics/context.ts'
 
 interface PracticePlugin {
   update(options: { israel?: boolean; reading?: LastReadingInput }): Promise<void>
@@ -18,6 +18,13 @@ export function publishNativePractice(options: { israel?: boolean; reading?: Las
 /** Device type from the operating system, so an iPad reports as an iPad and an iPad app on a Mac as a computer. */
 export async function nativeDeviceFacts(): Promise<DeviceFacts> {
   plugin ??= registerPlugin<PracticePlugin>('TikkunPractice')
-  const info = await plugin.deviceInfo()
-  return { device: info.device, os: info.os, app_version: info.appVersion }
+  try {
+    const info = await plugin.deviceInfo()
+    return { device: info.device, os: info.os, app_version: info.appVersion }
+  } catch (error) {
+    // App Store builds before deviceInfo existed: use the WebView identity and the app plugin's version.
+    if ((error as { code?: string } | null)?.code !== 'UNIMPLEMENTED') throw error
+    const { App } = await import('@capacitor/app')
+    return webDeviceFacts(navigator.userAgent, (await App.getInfo()).version)
+  }
 }

@@ -104,6 +104,7 @@ export class ScrollDisplay {
   ) {
     this.presentation = readPagePresentation(root)
     applyPagePresentation(root, this.presentation)
+    root.toggleAttribute('data-reader-excerpt', viewModel.excerpt)
     const view = root.ownerDocument.defaultView
     if (!view) throw new Error('Reader layout requires a browser window')
     this.pageLayoutSubscription = observeReaderResize(view, 'content', () => {

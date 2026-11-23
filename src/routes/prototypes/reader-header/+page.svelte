@@ -148,9 +148,9 @@
 </main>
 
 <style>
-  @font-face { font-family: 'Noto Hebrew'; src: url('/assets/fonts/NotoSansHebrew-Variable.ttf'); font-weight: 100 900; }
-  @font-face { font-family: 'Torah'; src: url('/assets/fonts/ShlomosemiStam.ttf'); }
-  @font-face { font-family: 'Lora'; src: url('/assets/fonts/Lora-Regular.ttf'); }
+  @font-face { font-family: 'Noto Hebrew'; src: url('/assets/fonts/NotoSansHebrew-Variable.woff2') format('woff2'); font-weight: 100 900; }
+  @font-face { font-family: 'Torah'; src: url('/assets/fonts/ShlomosemiStam.woff2') format('woff2'); }
+  @font-face { font-family: 'Lora'; src: url('/assets/fonts/Lora-Regular.woff2') format('woff2'); }
   :global(body) { margin: 0; }
   main { --paper: #222; --ink: #cdcdcd; --muted: #a6a6a6; --control: #2d2d2d; --border: #444; --blue: #0a84ff; --blue-ink: #62b3ff; --blue-surface: #203349; --gold: #f5c542; --studio: #171717; --press: #3b3b3b; background: var(--studio); color: var(--ink); min-height: 100vh; font: 14px/1.5 'Noto Hebrew', -apple-system, sans-serif; color-scheme: dark; }
   main[data-theme='light'] { --paper: #fafafa; --ink: #303030; --muted: #686868; --control: #f1f1f1; --border: #dadada; --blue-ink: #006bc7; --blue-surface: #e3f0ff; --studio: #efefec; --press: #e4e4e4; color-scheme: light; }

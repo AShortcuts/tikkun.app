@@ -5,14 +5,21 @@ import { loadPassageSelection, type PassageRange } from '../reading/passage-sele
 import type { RenderedPageInfo } from '../view-model/scroll-view-model.ts'
 import type { RefWithScroll } from '../ref.ts'
 import { chapterVerseLabel, verseRangeLabel } from '../components/verse-range-label.ts'
+import { printSourceWords, type PrintSourceWord } from './print-divine-names.ts'
+import type { PrintReadingTitle } from './print-details.ts'
 
 export type { PassageRange } from '../reading/passage-selection.ts'
 export type PrintOptions = {
   removeCredits: boolean
   pageNumbers: boolean
-  detailsPage: boolean
-  aliyahLabels: { he: string; en: string }[]
+  /**
+   * The reading's name and aliyot for the masthead, when the passage was chosen as a reading.
+   * A range typed in by verse has none: the masthead names its parsha and shows no aliyah.
+   */
+  title?: PrintReadingTitle
   replaceDivineNames: boolean
+  /** Shows pasuk numbers beside the line where each pasuk starts, as in the reader. */
+  verseNumbers: boolean
   ranges: PassageRange[]
   layout: 'reading' | 'match'
   sides: 'one' | 'two'
@@ -20,6 +27,10 @@ export type PrintOptions = {
   surrounding: boolean
   orientation: 'portrait' | 'landscape'
   scaling: number
+  /** Reading layout's font size in px; Match uses scaling instead. */
+  fontSize: number
+  /** Space added after each pasuk in Reading layout, in px; negative values pull the next pasuk closer. */
+  pasukSpacing: number
   overflow: 'shrink' | 'continue'
 }
 
@@ -51,21 +62,35 @@ export function validateRanges(ranges: PassageRange[]) {
 }
 
 export function passageTitle(ranges: PassageRange[], language: 'he' | 'en' = 'he') {
+  return ranges.map(range => rangeLabel(range, language, true)).join(' · ')
+}
+
+/**
+ * The masthead's verse range: ranges in the same book name it once, as in
+ * "Beresheet 6:9–8:14, 9:8–17" and "בראשית ו:ט–ח:יד, ט:ח–יז".
+ */
+export function passageRangesLabel(ranges: PassageRange[], language: 'he' | 'en' = 'he') {
+  return ranges.map((range, index) => {
+    const previous = ranges[index - 1]?.end
+    const sameBook = previous && previous.scroll === range.start.scroll && previous.b === range.start.b
+    return rangeLabel(range, language, !sameBook)
+  }).join(', ')
+}
+
+function rangeLabel({ start, end }: PassageRange, language: 'he' | 'en', withBook: boolean) {
   const reference = language === 'he' ? chapterVerseLabel : (ref: RefWithScroll) => `${ref.c}:${ref.v}`
   const bookName = (ref: RefWithScroll) => {
     if (ref.scroll === 'esther') return language === 'he' ? 'אסתר' : 'Esther'
     const book = listTorahBooks().find(book => book.number === ref.b)
     return (language === 'he' ? book?.hebrew : book?.label) ?? ''
   }
-  return ranges.map(({ start, end }) => {
-    if (start.b !== end.b) {
-      return `${bookName(start)} ${reference(start)}–${bookName(end)} ${reference(end)}`
-    }
-    const range = language === 'he' ? verseRangeLabel({ start, end }, '–')
-      : compareRefs(start, end) === 0 ? reference(start)
-        : `${reference(start)}–${start.c === end.c ? end.v : reference(end)}`
-    return `${bookName(start)} ${range}`
-  }).join(' · ')
+  if (start.b !== end.b) {
+    return `${withBook ? `${bookName(start)} ` : ''}${reference(start)}–${bookName(end)} ${reference(end)}`
+  }
+  const range = language === 'he' ? verseRangeLabel({ start, end }, '–')
+    : compareRefs(start, end) === 0 ? reference(start)
+      : `${reference(start)}–${start.c === end.c ? end.v : reference(end)}`
+  return withBook ? `${bookName(start)} ${range}` : range
 }
 
 export async function loadPrintPassage(ranges: PassageRange[]) {
@@ -83,5 +108,10 @@ export async function loadPrintPassage(ranges: PassageRange[]) {
       return { ...line, scroll, verses, focalRef, labels: [], aliyahStarts: [], aliyot: [] }
     }),
   }))
-  return { pages: pages.filter(page => selectedPages.has(page.pageNumber)), selected, selectedUnannotated: projection.unannotated }
+  // Every word on the printed pages, in reading order with its pasuk, for divine-name checks.
+  const words: PrintSourceWord[] = loaded.filter(page => selectedPages.has(page.pageNumber)).flatMap(({ pageNumber, lines }) => {
+    const previousLines = loaded.find(page => page.pageNumber === pageNumber - 1)?.lines
+    return printSourceWords({ pageNumber, lines, previousLines, scroll })
+  })
+  return { pages: pages.filter(page => selectedPages.has(page.pageNumber)), selected, selectedUnannotated: projection.unannotated, words }
 }

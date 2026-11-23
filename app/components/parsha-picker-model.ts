@@ -1,4 +1,5 @@
 import { HDate } from '@hebcal/hdate'
+import { englishLeiningTitle } from '../calendar-model/english-leining-title.ts'
 import type { LeiningGenerator } from '../calendar-model/generator.ts'
 import { getBookName } from '../calendar-model/hebcal-conversions.ts'
 import {
@@ -10,6 +11,7 @@ import {
   readingTitle,
   type LeiningRun,
 } from '../calendar-model/model-types.ts'
+import { fromISODateString, toISODateString } from '../calendar-model/utils.ts'
 import { listReadingSearchLeinings } from '../search/reading-catalog.ts'
 import { createReadingSearch } from '../search/reading-search.ts'
 import { isVezosHabracha } from '../view-model/scroll-view-model.ts'
@@ -27,12 +29,6 @@ export const ALIYAH_HOVER_FLYOUT_QUERY =
 export const POPUP_VIEWPORT_MARGIN = 12
 
 const POPUP_ANCHOR_GAP = 6
-const ordinalDayByRoman = new Map([
-  ['I', '1st day'],
-  ['II', '2nd day'],
-  ['VII', '7th day'],
-  ['VIII', '8th day'],
-])
 
 const aliyahLabels = new Map<LeiningAliyah['index'], string>([
   [1, '1st - ראשון'],
@@ -184,16 +180,6 @@ function englishBookLabel(ref: LeiningAliyah['start']) {
     return torahBookLabelByNumber.get(ref.b) ?? getBookName(ref)
   }
   return getBookName(ref)
-}
-
-function englishLeiningTitle(leining: ReadingInstance) {
-  let title = readingTitle(leining).en
-    .replace(/\b(VIII|VII|II|I)\b/, (day) => ordinalDayByRoman.get(day) ?? day)
-    .replace(/\s+\((on [^)]+)\)$/i, ' $1')
-
-  if (leining.id === LeiningInstanceId.Mincha) title += ' Mincha'
-  if (leining.id === LeiningInstanceId.Maariv) title += ' Maariv'
-  return title
 }
 
 function englishReadingLabel(leining: ReadingInstance) {
@@ -489,8 +475,11 @@ export function buildParshaPickerModel(
     parshaBooks[book] = entries
   }
 
+  // Start from today's own reading, as `#/next` does, so the first entry
+  // names the reading its link opens.
+  const startOfToday = fromISODateString(toISODateString(today))
   const comingUp = leinings
-    .filter((leining) => leining.date.date > today)
+    .filter((leining) => leining.date.date >= startOfToday)
     .slice(0, 3)
     .map((leining, index) => ({
       id: leiningKey(leining),

@@ -682,6 +682,69 @@ function install(markup: string) {
   document.body.appendChild(fixture)
 }
 
+
+test('a holiday reading keeps its first column number, hover-only and centered in the space above', async () => {
+  await page.viewport(1280, 900)
+  const presentation = { layout: 'match', sides: 'one' } as const
+  const book = (excerpt: boolean) => `<div class="tikkun-book" data-target-id="tikkun-book" ${excerpt ? 'data-reader-excerpt' : ''} data-reader-layout="match" data-reader-sides="one" dir="rtl">
+    <section class="tikkun-page">${Page(renderedPage(78, beshalachPageJson), { presentation })}</section></div>`
+  install(book(true))
+  await document.fonts.ready
+  const number = required<HTMLElement>('.tikkun-page-number')
+  const style = getComputedStyle(number)
+  expect([style.display, style.opacity]).toEqual(['table-caption', '0'])
+  const gapTop = required<HTMLElement>('.tikkun-book').getBoundingClientRect().top
+  const columnTop = required<HTMLElement>('.tikkun-page table').getBoundingClientRect().top
+  expect(columnTop - gapTop).toBeGreaterThan(40)
+  expect(number.getBoundingClientRect().top + Number.parseFloat(style.fontSize) / 2).toBeCloseTo((gapTop + columnTop) / 2, 0)
+
+  fixture?.remove()
+  install(book(false))
+  expect(getComputedStyle(required<HTMLElement>('.tikkun-page-number')).display).toBe('none')
+  expect(required<HTMLElement>('.tikkun-page table').getBoundingClientRect().top - required<HTMLElement>('.tikkun-book').getBoundingClientRect().top)
+    .toBeCloseTo(columnTop - gapTop, 1)
+})
+
+test.each([{ width: 390, sides: 'one' as const }, { width: 1280, sides: 'two' as const }])('a maqaf phrase joined across Torah rows highlights as one box with no line at the seam: $sides', async ({ width, sides }) => {
+  await page.viewport(width, 844)
+  document.documentElement.dataset.readerTheme = 'dark'
+  document.documentElement.dataset.readerSideOrder = 'tikkun-right'
+  const presentation = { layout: 'reading', sides } as const
+  install(`<div class="tikkun-book" data-reader-layout="reading" data-reader-sides="${sides}" dir="rtl" style="background: var(--paper-color)">
+    <section class="tikkun-page">${Page(renderedPage(78, beshalachPageJson), { presentation })}</section></div>`)
+  await document.fonts.ready
+  applyReaderPageLayout(required<HTMLElement>('.tikkun-page'), presentation)
+  const lead = required<HTMLElement>('.word.mod-maqaf-join-lead:not(.mod-maqaf-join-tail)')
+  const [, tail] = lead.dataset.maqafGroup!.split(' ').map(key => required<HTMLElement>(`[data-token-key="${key}"]`))
+  for (const word of [lead, tail]) {
+    word.style.transition = 'none'
+    word.classList.add('is-active-word')
+  }
+  lead.scrollIntoView({ block: 'center' })
+
+  // WebKit does not clip inline boxes, so only painted pixels show whether the seam is clean.
+  const image = new Image()
+  image.src = `data:image/png;base64,${await page.screenshot({ save: false })}`
+  await image.decode()
+  const canvas = document.createElement('canvas')
+  canvas.width = image.width
+  canvas.height = image.height
+  const context = canvas.getContext('2d')!
+  context.drawImage(image, 0, 0)
+  const scale = image.width / innerWidth
+  const leadRect = lead.getBoundingClientRect()
+  const middle = leadRect.top + leadRect.height / 2
+  const outlineBetween = (from: number, to: number) => {
+    const width = Math.max(1, Math.round((to - from) * scale))
+    const { data } = context.getImageData(Math.round(from * scale), Math.round(middle * scale), width, 1)
+    return Array.from({ length: width }, (_, index) => data.subarray(index * 4, index * 4 + 3))
+      .some(([red, green, blue]) => red > 150 && green > 120 && blue < 110)
+  }
+  expect(leadRect.left).toBeCloseTo(tail.getBoundingClientRect().right, 0)
+  expect(outlineBetween(leadRect.right, leadRect.right + 8), 'outer outline').toBe(true)
+  expect(outlineBetween(leadRect.left - 8, leadRect.left + 8), 'seam').toBe(false)
+})
+
 function verticalCenter(element: Element) {
   const rect = element.getBoundingClientRect()
   return rect.top + rect.height / 2

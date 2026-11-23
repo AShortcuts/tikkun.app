@@ -39,11 +39,25 @@ test('joins whole uncued recordings with complete audio coverage', async () => {
   expect(result.portions[0].segments.map(s => [s.recording.id, s.startTime, s.endTime])).toEqual([['a', 0, null], ['b', 0, null]])
 })
 
-test('does not guess an excerpt start from the next available cue', async () => {
+test('plays the whole containing recording instead of guessing an untimed excerpt start', async () => {
   const result = await resolver([{ id: 'seventh', range: range(25, 30), cues: [cue(29, 12)] }]).resolve(range(28, 30), 'reader')
-  expect(result.problem).toBe('timing-needed')
-  expect(result.portions).toEqual([])
-  expect(result).toMatchObject({ issue: 'cue', canPlay: false })
+  expect(result).toMatchObject({ problem: 'incomplete-cues', issue: 'cue', canPlay: true, missing: [],
+    message: 'Plays the full recording, without highlighting.' })
+  expect(result.portions).toHaveLength(1)
+  expect(result.portions[0]).toMatchObject({ wholeRecording: true, range: range(28, 30), tokenKeys: [token(28), token(29), token(30)] })
+  expect(result.portions[0].segments.map(s => [s.recording.id, s.startTime, s.endTime, s.cues.length])).toEqual([['seventh', 0, null, 0]])
+  expect(passagePlaybackPlan(result, result.portions[0], { runId: 'excerpt', index: 1 }, 'Excerpt').passage)
+    .toMatchObject({ wholeRecording: true, cueComplete: false })
+})
+
+test('prefers the containing recording with the least lead-in', async () => {
+  const result = await resolver([{ id: 'long', range: range(1, 9) }, { id: 'short', range: range(3, 8) }]).resolve(range(4, 6), 'reader')
+  expect(result.portions[0].segments.map(s => s.recording.id)).toEqual(['short'])
+})
+
+test('an untimed excerpt across two recordings still needs timing', async () => {
+  const result = await resolver([{ id: 'a', range: range(1, 3) }, { id: 'b', range: range(4, 9) }]).resolve(range(2, 5), 'reader')
+  expect(result).toMatchObject({ problem: 'timing-needed', issue: 'cue', canPlay: false, portions: [] })
 })
 
 test('partial coverage caused only by missing timing remains a cue problem', async () => {
@@ -104,7 +118,9 @@ test('real Nitzavim-Vayelech maps available aliyot and missing opening from cano
   expect(fourth.missing).toEqual([{ start: { scroll: 'torah', b: 5, c: 30, v: 15 }, end: { scroll: 'torah', b: 5, c: 30, v: 20 } }])
   expect(fourth.portions[0].segments.map(s => s.recording.id)).toEqual(['vayelech-1', 'vayelech-2'])
   const maftir = await subject.resolve(run.aliyot.find(a => a.index === 'Maftir')!, 'yoni-davidov')
-  expect(maftir.problem).toBe('timing-needed')
+  expect(maftir.problem).toBe('incomplete-cues')
+  expect(maftir.portions[0]).toMatchObject({ wholeRecording: true })
+  expect(maftir.portions[0].segments.map(s => s.recording.id)).toEqual(['vayelech-7'])
 })
 
 test('dated Simchat Torah joins the sixth and seventh Vezot recordings by passage', async () => {

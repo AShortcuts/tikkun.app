@@ -17,6 +17,8 @@ export interface PassageAudioPortion {
   range: RecordingRange
   tokenKeys: string[]
   segments: PlaybackSegment[]
+  /** The whole untimed recording that contains the passage; it may begin before and end after it. */
+  wholeRecording?: boolean
 }
 export interface PassageAudioResolution extends PassageAudioState {
   portions: PassageAudioPortion[]
@@ -196,19 +198,30 @@ export class PassageAudioResolver {
         current.segments.push(step.segment)
       }
     }
+    const absent = refs.filter(ref => !candidates.some(source => compareRefs(source.range.start, ref) <= 0 && compareRefs(source.range.end, ref) >= 0))
+    // Every verse is recorded but no cut is timed: play the recording that
+    // contains the passage, whole and unhighlighted, with the least lead-in.
+    const container = portions.length || absent.length ? undefined : candidates
+      .filter(source => compareRefs(source.range.start, range.start) <= 0 && compareRefs(source.range.end, range.end) >= 0)
+      .sort((a, b) => compareRefs(b.range.start, a.range.start) || compareRefs(a.range.end, b.range.end))[0]
+    if (container) {
+      portions.push({ range, tokenKeys: [...tokenKeys], wholeRecording: true,
+        segments: [{ recording: container.recording, tokenKeys: [...tokenKeys], cues: [], startTime: 0, endTime: null }] })
+      missing.length = 0
+    }
     const complete = portions.length === 1 && sameRange(portions[0].range, range)
     const cueComplete = complete && portions[0].segments.every(segment => segment.cues.length === segment.tokenKeys.length)
     timingNeeded = missing.some(gap => candidates.some(source => compareRefs(source.range.start, gap.end) <= 0 && compareRefs(source.range.end, gap.start) >= 0)) && timingNeeded
     const problem: PassageAudioProblem = complete ? cueComplete ? null : 'incomplete-cues' :
       portions.length ? 'partial-audio' : timingNeeded ? 'timing-needed' : 'missing-audio'
-    const absent = refs.filter(ref => !candidates.some(source => compareRefs(source.range.start, ref) <= 0 && compareRefs(source.range.end, ref) >= 0))
     const issue = absent.length ? 'audio' : complete && cueComplete ? undefined : 'cue'
     const missingReferences = missing.map(gap =>
       [listTorahBooks().find(book => book.number === gap.start.b)?.label, passageRangeLabel(gap)].filter(Boolean).join(' '))
     const missingMessage = absent.length
       ? `Audio unavailable for ${missingReferences.join(', ')} ${missing.length === 1 ? 'portion' : 'portions'}`
       : `Excerpt timing needed: ${missingReferences.join(', ')}`
-    const message = complete ? cueComplete ? '' : 'Full audio available. Some highlighting is missing.' :
+    const message = complete ? cueComplete ? '' : container ? 'Plays the full recording, without highlighting.' :
+      'Full audio available. Some highlighting is missing.' :
       `${missingMessage}${absent.length && timingNeeded ? '. Some excerpts also need timing cues.' : ''}`
     return { problem, message, recording: portions[0]?.segments[0]?.recording ?? candidates[0]?.recording ?? null,
       portions, missing, tokenKeys, range, cueComplete, issue, canPlay: portions.length > 0 }
@@ -222,6 +235,7 @@ export function passagePlaybackPlan(resolution: PassageAudioResolution, portion:
     tokenKeys: portion.tokenKeys,
     segments: portion.segments,
     status: resolution.problem === 'partial-audio' ? 'partial-passage' : 'passage',
-    passage: { range: portion.range, requestedRange: resolution.range, cueComplete: portion.segments.every(segment => segment.cues.length === segment.tokenKeys.length) },
+    passage: { range: portion.range, requestedRange: resolution.range, cueComplete: portion.segments.every(segment => segment.cues.length === segment.tokenKeys.length),
+      ...(portion.wholeRecording ? { wholeRecording: true } : {}) },
   }
 }

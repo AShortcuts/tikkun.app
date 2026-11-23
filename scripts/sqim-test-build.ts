@@ -30,7 +30,8 @@ export async function shareTestBuild(root: string, args: string[], execute: Run 
   // Record attempts with the source so Pages can advance past tests, including
   // failed uploads. No Git operation is performed by this command.
   await writeReleaseBuildState(root, state)
-  const environment = { ...process.env, TIKKUN_TEST_BUILD: '1',
+  // A blank app key keeps test installs out of the app's analytics.
+  const environment = { ...process.env, TIKKUN_TEST_BUILD: '1', TIKKUN_ANALYTICS_APP_KEY: '',
     TIKKUN_RELEASE_IDENTITY: JSON.stringify({ version: state.version, build: state.build }) }
   const sync = await execute('npm', ['run', 'native:sync'], root, environment)
   if (sync !== 0) return sync

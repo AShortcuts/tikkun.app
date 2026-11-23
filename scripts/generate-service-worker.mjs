@@ -5,6 +5,7 @@ import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { transform } from 'esbuild'
+import { gzipSync } from 'node:zlib'
 import { recordingDependencyManifest } from './recording-dependency-manifest.mjs'
 import { renderRecordingDependenciesWorker } from './recording-dependencies-worker.mjs'
 import { renderOfflineTransferQueue } from './offline-transfer-queue.mjs'
@@ -12,9 +13,11 @@ import { renderRecordingMutationLocks } from './recording-mutation-locks.mjs'
 
 const repoRoot = path.resolve(fileURLToPath(new URL('..', import.meta.url)))
 const distRoot = path.join(repoRoot, 'dist')
+// Production web builds write SvelteKit's output here (svelte.config.js), apart from the dev server's.
+export const WEB_BUILD_OUT_DIR = '.svelte-kit-web'
 const clientManifestPath = path.join(
   repoRoot,
-  '.svelte-kit',
+  WEB_BUILD_OUT_DIR,
   'output',
   'client',
   '.vite',
@@ -22,7 +25,7 @@ const clientManifestPath = path.join(
 )
 const clientAppPath = path.join(
   repoRoot,
-  '.svelte-kit',
+  WEB_BUILD_OUT_DIR,
   'generated',
   'client-optimized',
   'app.js'
@@ -36,6 +39,8 @@ const excludedPathPrefixes = [
   '.vite/',
   'prototypes/',
   'assets/images/prototypes/',
+  // Font license texts are for redistribution, never fetched by the app.
+  'assets/fonts/licenses/',
   'old-v2.html',
   'about/',
   'privacy/',
@@ -75,11 +80,14 @@ const deferredSourcePatterns = [
   /^src\/routes\/\(site\)\/old-v2\.html\//,
 ]
 const verificationFilePattern = /^google[A-Za-z0-9_-]+\.html$/
-const nonCriticalFontPattern = /(?:^|\/)Lora-Regular(?:\.[A-Za-z0-9_-]+)?\.ttf$/
+// The print masthead's serifs load when someone first prints, then stay cached.
+const nonCriticalFontPattern = /(?:^|\/)(?:Lora-Regular|CrimsonPro-(?:Regular|Italic)|FrankRuhlLibre-Bold)(?:\.[A-Za-z0-9_-]+)?\.woff2$/
 const hostControlFiles = new Set(['_headers', '_redirects'])
 
-// Movable reader settings add about 3.2 KB of script and styles before compression.
-export const MAX_SHELL_PRECACHE_RAW_BYTES = 1_610_000
+// Guards growth of what a first visit downloads for offline use, measured compressed
+// (gzip level 9, like check-build-budgets.mjs) because that is what browsers fetch.
+// Set 2026-11-02 a little above the 566 KB shell; raise it deliberately when growth is worth it.
+export const MAX_SHELL_PRECACHE_GZIP_BYTES = 600_000
 
 function normalizePath(filePath) {
   return filePath.split(path.sep).join('/')
@@ -174,7 +182,7 @@ export function deferredRouteNodeSources(clientAppSource) {
   }
   return new Set(
     [...nodeIds].map(
-      (nodeId) => `.svelte-kit/generated/client-optimized/nodes/${nodeId}.js`
+      (nodeId) => `${WEB_BUILD_OUT_DIR}/generated/client-optimized/nodes/${nodeId}.js`
     )
   )
 }
@@ -235,6 +243,8 @@ export function shouldPrecache(relativePath, excludedFiles = new Set()) {
   if (/^_app\/immutable\/assets\/recording-dependencies\.[a-f0-9]+\.json$/.test(normalized)) return false
   if (normalized === 'service-worker.js') return false
   if (hostControlFiles.has(normalized)) return false
+  // Finder metadata can sit in local static folders; it is never part of the site.
+  if (path.basename(normalized) === '.DS_Store') return false
   if (excludedFiles.has(normalized)) return false
   if (excludedPathPrefixes.some((prefix) => normalized.startsWith(prefix))) {
     return false
@@ -324,10 +334,10 @@ export function assertPrecachedHtmlDependencies({
   }
 }
 
-export function warnShellPrecacheBudget({ rawBytes }) {
-  if (rawBytes > MAX_SHELL_PRECACHE_RAW_BYTES) {
+export function warnShellPrecacheBudget({ gzipBytes }) {
+  if (gzipBytes > MAX_SHELL_PRECACHE_GZIP_BYTES) {
     console.warn(
-      `Service-worker shell precache budget exceeded: ${rawBytes} raw bytes exceeds ${MAX_SHELL_PRECACHE_RAW_BYTES}-byte limit. Defer nonessential routes or assets.`
+      `Service-worker shell precache budget exceeded: ${gzipBytes} gzip bytes exceeds ${MAX_SHELL_PRECACHE_GZIP_BYTES}-byte limit. Defer nonessential routes or assets.`
     )
   }
 }
@@ -2034,14 +2044,17 @@ export async function generateServiceWorker(
   const buildFiles = [...new Set([...shellFiles, ...torahPageFiles])].sort()
   const shellFileSet = new Set(shellFiles)
   let shellRawBytes = 0
+  let shellGzipBytes = 0
   for (const relativePath of buildFiles) {
     const contents = await readFile(path.join(root, relativePath))
     hash.update(relativePath)
     hash.update(contents)
-    if (shellFileSet.has(relativePath)) shellRawBytes += contents.byteLength
+    if (!shellFileSet.has(relativePath)) continue
+    shellRawBytes += contents.byteLength
+    shellGzipBytes += gzipSync(contents, { level: 9 }).byteLength
   }
   warnShellPrecacheBudget({
-    rawBytes: shellRawBytes,
+    gzipBytes: shellGzipBytes,
   })
 
   const buildHash = hash.digest('hex').slice(0, 16)
@@ -2072,7 +2085,7 @@ export async function generateServiceWorker(
   }
 
   console.log(
-    `Generated service-worker.js with ${shellUrls.length} shell URLs, ${shellRawBytes} shell raw bytes, and ${torahPageUrls.length} opt-in Torah pages (${buildHash}, ${generatedAt})`
+    `Generated service-worker.js with ${shellUrls.length} shell URLs, ${shellRawBytes} shell raw bytes (${shellGzipBytes} gzip), and ${torahPageUrls.length} opt-in Torah pages (${buildHash}, ${generatedAt})`
   )
 }
 

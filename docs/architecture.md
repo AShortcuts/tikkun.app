@@ -102,7 +102,7 @@ the same Reader for iOS; the native app does not depend on the web service worke
 - `site/manifest.webmanifest` defines install metadata, display mode, colors, and relative install URLs.
 - `src/app.html` includes Apple mobile web app metadata and icon links.
 - `scripts/generate-service-worker.mjs` creates a versioned cache after each build and compiles the worker with esbuild minification. Protocol property names are preserved.
-- Shell precache has no file-count cap. Shell bytes, per-file raw/gzip sizes, static asset sizes, and offline dependency sizes produce warnings when over budget; they do not block the build. Missing output and dependency integrity checks still fail.
+- Shell precache has no file-count cap. Shell bytes (measured gzipped, since that is what a first visit downloads; budget 600 KB), per-file raw/gzip sizes, static asset sizes, and offline dependency sizes produce warnings when over budget; they do not block the build. Missing output and dependency integrity checks still fail.
 - The generated service worker precaches the app shell, page chunks, and first-use core reader chunks, then uses cache-first behavior for requested same-origin assets.
 - Navigation requests use network-first behavior with an exact cached clean-route match, then the cached Home page as a final fallback.
 - Cue Data, prototype routes/assets, Optional Feature bundles, the recording-only harness, and large media files are intentionally excluded from the initial precache so installation does not download content the reader has not requested.

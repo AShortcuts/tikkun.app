@@ -7,8 +7,14 @@ const recording = audioRecordings[0]
 const state = (problem: PassageAudioState['problem'], extra: Partial<PassageAudioState> = {}): PassageAudioState =>
   ({ problem, recording, message: '', ...extra })
 
-test.each([[state(null), 'normal', false, false], [state('timing-needed'), 'cue', true, false], [state('missing-audio', { recording: null }), 'empty', true, true]] as const)('separates color, dimming and action availability for %j', (state, tone, dimmed, actionDisabled) => {
+test.each([[state(null), 'normal', false, false], [state('timing-needed'), 'cue', true, false], [state('incomplete-cues', { issue: 'cue', canPlay: true }), 'cue', false, false], [state('missing-audio', { recording: null }), 'empty', true, true]] as const)('separates color, dimming and action availability for %j', (state, tone, dimmed, actionDisabled) => {
   expect(audioButtonState({ state, available: Boolean(state.recording) })).toMatchObject({ tone, dimmed, actionDisabled })
+})
+
+test('a playable passage with missing highlighting explains itself with its own message', () => {
+  const message = 'Plays the full recording, without highlighting.'
+  expect(audioButtonState({ available: true, state: state('incomplete-cues', { issue: 'cue', canPlay: true, message }) }))
+    .toMatchObject({ tone: 'cue', dimmed: false, actionDisabled: false, tooltip: message })
 })
 
 test('admin missing audio stays gray and faded while recording selection remains enabled', () => {

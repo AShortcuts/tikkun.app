@@ -30,7 +30,7 @@ export function installAnalytics(client: AnalyticsClient) {
   return () => { if (activeClient === client) activeClient = noop; client.destroy() }
 }
 
-export function createAnalyticsClient({ view, config, native, enabled, send, now = () => performance.now(), clock = () => new Date(), appSurface = false, deviceFacts }: {
+export function createAnalyticsClient({ view, config, native, enabled, send, now = () => performance.now(), clock = () => new Date(), checkIns = false, deviceFacts }: {
   view: Window
   config: AnalyticsConfig
   native: boolean
@@ -39,8 +39,8 @@ export function createAnalyticsClient({ view, config, native, enabled, send, now
   now?: () => number
   /** Wall clock for local hour, weekday, and the daily check-in. */
   clock?: () => Date
-  /** Native app or Home Screen web app: sends the daily `app_active` check-in. */
-  appSurface?: boolean
+  /** Sends the daily `app_active` check-in. */
+  checkIns?: boolean
   deviceFacts?: () => Promise<DeviceFacts>
 }): AnalyticsClient {
   const key = native ? config.appKey : config.webKey
@@ -108,7 +108,7 @@ export function createAnalyticsClient({ view, config, native, enabled, send, now
   }
   let checkingIn = false
   const checkIn = () => {
-    if (!appSurface || !deviceFacts || checkingIn || !permitted()) return
+    if (!checkIns || !deviceFacts || checkingIn || !permitted()) return
     let due: ReturnType<typeof dueCheckIn>
     try { due = dueCheckIn(view.localStorage, clock()) } catch { return }
     if (!due) return
@@ -117,8 +117,8 @@ export function createAnalyticsClient({ view, config, native, enabled, send, now
     void deviceFacts().then(facts => {
       if (!permitted()) return
       pending.commit()
-      track('app_active', { first_this_month: pending.first_this_month, ...facts })
-    }).catch(() => { /* Older native builds lack device info; skip the check-in. */ })
+      track('app_active', { first_this_month: pending.first_this_month, first_this_week: pending.first_this_week, returning: pending.returning, ...facts })
+    }).catch(() => { /* Device lookup failed; the next foreground retries. */ })
       .finally(() => { checkingIn = false })
   }
   const visible = () => {

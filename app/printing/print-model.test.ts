@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { canonicalLineWords } from '../reader/canonical-line-words.ts'
 import { loadScrollPageLines } from '../view-model/scroll-view-model.ts'
-import { loadPrintPassage, passageTitle, validateRanges, type PassageRange } from './print-model.ts'
+import { loadPrintPassage, passageRangesLabel, passageTitle, validateRanges, type PassageRange } from './print-model.ts'
 import textFilter from '../text-filter.ts'
 import { tokenizeReaderWords } from '../reader/word-tokenization.ts'
 
@@ -73,4 +73,15 @@ test('Torah form preserves the same passage when maqaf groups expand into separa
   const expected = tokenizeReaderWords(textFilter({ text: passage.words.map(word => word.annotatedText).join(' '), annotated: false })).map(word => word.text)
   expect(actual).toEqual(expected)
   expect(actual.length).toBeGreaterThan(passage.words.length)
+})
+
+test('the masthead names a book once for consecutive ranges in it', () => {
+  const several = [range(6, 9, 8, 14), range(9, 8, 9, 17)]
+  expect(passageRangesLabel(several, 'en')).toBe('Beresheet 6:9–8:14, 9:8–17')
+  expect(passageRangesLabel(several)).toBe('בראשית ו:ט–ח:יד, ט:ח–יז')
+  const twoBooks: PassageRange[] = [range(50, 1, 50, 3), { start: { scroll: 'torah', b: 2, c: 1, v: 1 }, end: { scroll: 'torah', b: 2, c: 1, v: 5 } }]
+  expect(passageRangesLabel(twoBooks, 'en')).toBe('Beresheet 50:1–3, Shemot 1:1–5')
+  const crossing: PassageRange[] = [{ start: { scroll: 'torah', b: 1, c: 50, v: 26 }, end: { scroll: 'torah', b: 2, c: 1, v: 1 } }]
+  expect(passageRangesLabel(crossing, 'en')).toBe('Beresheet 50:26–Shemot 1:1')
+  expect(passageTitle(several, 'en')).toBe('Beresheet 6:9–8:14 · Beresheet 9:8–17')
 })

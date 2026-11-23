@@ -31,7 +31,7 @@ afterEach(() => {
   if (originalGpc) Object.defineProperty(navigator, 'globalPrivacyControl', originalGpc)
   else Reflect.deleteProperty(navigator, 'globalPrivacyControl')
 })
-function fixture(options: { native?: boolean; enabled?: boolean; host?: string; appSurface?: boolean; date?: Date; deviceFacts?: () => Promise<DeviceFacts> } = {}) {
+function fixture(options: { native?: boolean; enabled?: boolean; host?: string; checkIns?: boolean; date?: Date; deviceFacts?: () => Promise<DeviceFacts> } = {}) {
   const sent: AnalyticsPayload[] = []
   let clock = 0
   let date = options.date ?? new Date(2026, 9, 29, 16, 5)
@@ -44,7 +44,7 @@ function fixture(options: { native?: boolean; enabled?: boolean; host?: string; 
   client = createAnalyticsClient({ view, native: options.native ?? false, enabled: options.enabled ?? true,
     config: { webKey: 'website', appKey: 'native', siteOrigin: options.host ?? location.origin, appOrigin: 'https://app.tikkunreader.com', appCollector: 'https://adamn.cc/api/echo' },
     send: async payload => { sent.push(payload) }, now: () => clock,
-    clock: () => date, appSurface: options.appSurface ?? false,
+    clock: () => date, checkIns: options.checkIns ?? false,
     deviceFacts: options.deviceFacts ?? (async () => ({ device: 'ipad', os: 26, app_version: '1.2' })),
   })
   return { sent, client, advance: (ms: number) => { clock += ms }, setDate: (value: Date) => { date = value },
@@ -91,16 +91,16 @@ test('unreadable preferences fail closed; an unsavable opt-out still applies to 
   f.client.track('download_start'); await f.settle()
   expect(f.sent).toEqual([])
 })
-test('websites and opted-out devices never check in; a failed device lookup retries later', async () => {
+test('check-ins stay off when disabled or opted out; a failed device lookup retries later', async () => {
   const site = fixture(); await site.settle()
   expect(site.sent.some(p => p.e === 'app_active')).toBe(false)
   client?.destroy()
   setAnalyticsAllowed(window, false)
-  const optedOut = fixture({ appSurface: true }); setAnalyticsAllowed(window, false); await optedOut.settle()
+  const optedOut = fixture({ checkIns: true }); setAnalyticsAllowed(window, false); await optedOut.settle()
   expect(optedOut.sent).toEqual([])
   expect(localStorage.getItem(LAST_ACTIVE_DAY_KEY)).toBeNull()
   client?.destroy()
-  const failing = fixture({ appSurface: true, deviceFacts: () => Promise.reject(new Error('old build')) }); await failing.settle()
+  const failing = fixture({ checkIns: true, deviceFacts: () => Promise.reject(new Error('old build')) }); await failing.settle()
   expect(failing.sent.some(p => p.e === 'app_active')).toBe(false)
   expect(localStorage.getItem(LAST_ACTIVE_DAY_KEY)).toBeNull()
 })

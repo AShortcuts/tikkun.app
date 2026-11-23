@@ -234,7 +234,8 @@ export function createPlaybackTimeline(
           )}`,
           'partial-start': 'Starts at first available cue',
           'overlap-only': 'Partial: shared opening only',
-          passage: session.passage?.cueComplete ? '' : 'Audio available; word highlighting incomplete',
+          passage: session.passage?.cueComplete ? '' : session.passage?.wholeRecording
+            ? 'Full recording; no word highlighting' : 'Audio available; word highlighting incomplete',
           'partial-passage': `Available portion: ${session.passage ? passageRangeLabel(session.passage.range) : ''}${session.passage?.cueComplete ? '' : ' · Word highlighting incomplete'}`,
         }[session.status]
     const readingLabel = session.readingLabel ?? session.recording.reading.name

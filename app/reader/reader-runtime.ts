@@ -198,6 +198,7 @@ import {
   createLastReadingPrompt,
   type LastReadingPrompt,
 } from '../reader/last-reading-prompt.ts'
+import { READER_BANNER_AUTO_DISMISS_MS } from '../reader/banner-timing.ts'
 import {
   createOfflineRecordingPrompt,
   type OfflineRecordingPrompt,
@@ -685,7 +686,7 @@ export function startReaderRuntime({
       toast.setAttribute('role', 'status')
       toast.setAttribute('aria-live', 'polite')
       readerNoticeTimer = null
-    }, 6_000)
+    }, READER_BANNER_AUTO_DISMISS_MS)
   }
 
   const showPersistenceNotice = (message: string) => showReaderNotice(message)

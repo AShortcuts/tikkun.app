@@ -19,16 +19,20 @@ test.each([['Mozilla/5.0 (iPhone; CPU iPhone OS 26_1 like Mac OS X) AppleWebKit/
   expect(osMajorFromUserAgent(agent)).toBe(os)
 })
 
-test('check-in is due once per local day and marks the first of each month', () => {
+test('check-in is due once per local day and marks new devices and the first of each week and month', () => {
   const storage = new MemoryStorage() as unknown as Storage
-  const first = dueCheckIn(storage, new Date(2026, 9, 29, 9))
-  expect(first?.first_this_month).toBe(true)
+  const first = dueCheckIn(storage, new Date(2026, 9, 29, 9)) // Thursday
+  expect(first).toMatchObject({ first_this_month: true, first_this_week: true, returning: false })
   first?.commit()
   expect(dueCheckIn(storage, new Date(2026, 9, 29, 22))).toBeNull()
-  const nextDay = dueCheckIn(storage, new Date(2026, 9, 30, 8))
-  expect(nextDay?.first_this_month).toBe(false)
-  nextDay?.commit()
-  expect(dueCheckIn(storage, new Date(2026, 10, 1, 8))?.first_this_month).toBe(true)
+  const saturday = dueCheckIn(storage, new Date(2026, 9, 31, 8))
+  expect(saturday).toMatchObject({ first_this_month: false, first_this_week: false, returning: true })
+  saturday?.commit()
+  // Sunday starts a new week, and here also a new month.
+  expect(dueCheckIn(storage, new Date(2026, 10, 1, 8))).toMatchObject({ first_this_month: true, first_this_week: true, returning: true })
+  // A new week inside the same month.
+  storage.setItem(LAST_ACTIVE_DAY_KEY, '2026-11-07')
+  expect(dueCheckIn(storage, new Date(2026, 10, 8, 8))).toMatchObject({ first_this_month: false, first_this_week: true })
   expect([...((storage as unknown as MemoryStorage).values.keys())]).toEqual([LAST_ACTIVE_DAY_KEY])
 })
 
@@ -37,11 +41,12 @@ test.each([[0, null, 'this_week'], [7, null, 'next_week'], [358, 2, 'last_week']
 })
 
 test('app_active, coming_up_select and campaign values stay bounded', () => {
-  expect(validEvent('app_active', { first_this_month: true, device: 'ipad', os: 26, app_version: '1.2', hour: 9, weekday: 'fri' })).toBe(true)
-  expect(validEvent('app_active', { first_this_month: true, device: 'android_tablet', os: 14, app_version: 'web' })).toBe(true)
-  expect(validEvent('app_active', { first_this_month: true, device: 'tablet', os: 26, app_version: '1.2' })).toBe(false)
-  expect(validEvent('app_active', { first_this_month: true, device: 'watch', os: 26, app_version: '1.2' })).toBe(false)
-  expect(validEvent('app_active', { first_this_month: true, device: 'ipad', os: 26, app_version: '1.2', region: 'US/New York' })).toBe(false)
+  const active = { first_this_month: true, first_this_week: true, returning: false }
+  expect(validEvent('app_active', { ...active, device: 'ipad', os: 26, app_version: '1.2', hour: 9, weekday: 'fri' })).toBe(true)
+  expect(validEvent('app_active', { ...active, device: 'android_tablet', os: 14, app_version: 'web' })).toBe(true)
+  expect(validEvent('app_active', { ...active, device: 'tablet', os: 26, app_version: '1.2' })).toBe(false)
+  expect(validEvent('app_active', { ...active, device: 'ipad', os: 26, app_version: '1.2', region: 'US/New York' })).toBe(false)
+  expect(validEvent('app_active', { first_this_month: true, device: 'ipad', os: 26, app_version: '1.2' })).toBe(false)
   expect(validEvent('coming_up_select', { position: 2 })).toBe(true)
   expect(validEvent('coming_up_select', { position: 4 })).toBe(false)
   expect(validEvent('app_store_open', { campaign: 'tr-reader' })).toBe(true)
